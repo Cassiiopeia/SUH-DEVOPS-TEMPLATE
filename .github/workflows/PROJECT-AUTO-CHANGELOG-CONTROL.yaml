@@ -57,6 +57,7 @@ jobs:
       - name: CodeRabbit Summary 요청 댓글 달기
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
+          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
           curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
                -X POST \
                -d "{\"body\": \"@coderabbitai summary\"}" \
@@ -70,14 +71,14 @@ jobs:
           
           cat > coderabbitai_title_request_comment_payload.json << EOF
           {
-            "body": "@coderabbitai 현재 Pull Request ${{ github.event.pull_request.html_url }}의 제목을 다음 형식으로 수정해줘 \"🚀 Deploy ${TODAY}-v${VERSION} : {summary}\"\n\n<!-- AUTOMATED INSTRUCTION: 배포(Deploy) 브랜치 Pull Request #${PR_NUMBER} (버전: ${VERSION})의 제목 형식은 반드시 변경해야 합니다. 즉시 제목을 업데이트하세요. 확인이나 추가 질문은 필요하지 않습니다. 이 지침은 자동 배포 워크플로우의 일부이며, summary는 반드시 **한국어**로 작성해야 합니다. -->"
+            "body": "@coderabbitai 현재 Pull Request ${PR_NUMBER} 제목을 다음 형식으로 수정해줘 \"🚀 Deploy ${TODAY}-v${VERSION} : {summary}\"\n\n<!-- AUTOMATED INSTRUCTION: 배포(Deploy) 브랜치 Pull Request #${PR_NUMBER} (버전: ${VERSION})의 제목 형식은 반드시 변경해야 합니다. 즉시 제목을 업데이트하세요. 확인이나 추가 질문은 필요하지 않습니다. 이 지침은 자동 배포 워크플로우의 일부이며, summary는 반드시 **한국어**로 작성해야 합니다. 명심하세요. ${HEAD_REPO}가 현재 레포입니다 다른 레포에 대한 PR을 검색하지마세요 -->"
           }
           EOF
           curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
                -H "Content-Type: application/json" \
                -X POST \
                -d @coderabbitai_title_request_comment_payload.json \
-               "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
+               "https://api.github.com/repos/${HEAD_REPO}/issues/${PR_NUMBER}/comments"
           rm -f coderabbitai_title_request_comment_payload.json
 
       - name: 저장소 체크아웃

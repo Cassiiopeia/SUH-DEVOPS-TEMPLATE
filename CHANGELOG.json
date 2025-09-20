@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T19:34:15Z",
-    "currentVersion": "1.1.1",
+    "lastUpdated": "2025-09-20T19:59:25Z",
+    "currentVersion": "1.1.2",
     "projectType": "basic",
-    "totalReleases": 15
+    "totalReleases": 16
   },
   "releases": [
+    {
+      "version": "1.1.2",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 47,
+      "raw_summary": "Summary by CodeRabbit\n\n\n신기능\n\n\n버그 수정\n\n\n문서\n\nREADME의 최신 버전 표기를 v1.1.1에서 v1.1.2로 업데이트.\n\n\n\n작업(Chores)\n\n자동화 워크플로에서 PR 번호 대신 PR URL을 사용하도록 제목 변경 요청 로직 개선.\n버전을 1.1.2로 상향하고 관련 메타데이터를 갱신.",
+      "parsed_changes": {
+        "신기능": {
+          "title": "신기능",
+          "items": []
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": []
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "README의 최신 버전 표기를 v1.1.1에서 v1.1.2로 업데이트."
+          ]
+        },
+        "작업_chores": {
+          "title": "작업(Chores)",
+          "items": [
+            "자동화 워크플로에서 PR 번호 대신 PR URL을 사용하도록 제목 변경 요청 로직 개선.",
+            "버전을 1.1.2로 상향하고 관련 메타데이터를 갱신."
+          ]
+        }
+      }
+    },
     {
       "version": "1.1.1",
       "project_type": "basic",

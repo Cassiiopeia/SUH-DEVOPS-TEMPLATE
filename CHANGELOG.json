@@ -1,11 +1,32 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T19:59:25Z",
-    "currentVersion": "1.1.2",
+    "lastUpdated": "2025-09-20T20:26:18Z",
+    "currentVersion": "1.1.5",
     "projectType": "basic",
-    "totalReleases": 16
+    "totalReleases": 17
   },
   "releases": [
+    {
+      "version": "1.1.5",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 51,
+      "raw_summary": "Summary by CodeRabbit\n\n문서\n\nREADME의 프로젝트 명칭을 “GitHub 프로젝트 운영 자동화 템플릿”으로 업데이트했습니다. 문서 말미의 줄바꿈 및 경미한 형식을 정리하여 가독성을 개선했습니다.\n\n\nChores\n\n중앙 버전을 1.1.5로 상향하고 예제의 버전 표기를 일치시켰습니다. 마지막 업데이트 시각을 갱신했으며, 사용 예제 주석의 서식을 소폭 다듬어 일관성을 높였습니다.",
+      "parsed_changes": {
+        "문서": {
+          "title": "문서",
+          "items": [
+            "README의 프로젝트 명칭을 “GitHub 프로젝트 운영 자동화 템플릿”으로 업데이트했습니다. 문서 말미의 줄바꿈 및 경미한 형식을 정리하여 가독성을 개선했습니다."
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "중앙 버전을 1.1.5로 상향하고 예제의 버전 표기를 일치시켰습니다. 마지막 업데이트 시각을 갱신했으며, 사용 예제 주석의 서식을 소폭 다듬어 일관성을 높였습니다."
+          ]
+        }
+      }
+    },
     {
       "version": "1.1.2",
       "project_type": "basic",

@@ -1,11 +1,26 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T19:00:38Z",
-    "currentVersion": "1.0.13",
+    "lastUpdated": "2025-09-20T19:26:42Z",
+    "currentVersion": "1.0.16",
     "projectType": "basic",
-    "totalReleases": 13
+    "totalReleases": 14
   },
   "releases": [
+    {
+      "version": "1.0.16",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 45,
+      "raw_summary": "Summary by CodeRabbit\n\n문서화\n\nREADME의 \"최신 버전\" 표기를 v1.0.15에서 v1.0.16으로 업데이트했습니다(날짜 2025-09-20 유지). 설치 방법, 사용 예시, 구성 옵션 등의 문서 내용은 동일하며 기능적 변경은 없습니다. 이번 변경은 표시 정정에 한정되며, 기존 배포물과의 호환성이나 동작에는 영향이 없습니다. 코드, 테스트, 빌드 설정의 수정은 포함되지 않습니다.",
+      "parsed_changes": {
+        "문서화": {
+          "title": "문서화",
+          "items": [
+            "README의 \"최신 버전\" 표기를 v1.0.15에서 v1.0.16으로 업데이트했습니다(날짜 2025-09-20 유지). 설치 방법, 사용 예시, 구성 옵션 등의 문서 내용은 동일하며 기능적 변경은 없습니다. 이번 변경은 표시 정정에 한정되며, 기존 배포물과의 호환성이나 동작에는 영향이 없습니다. 코드, 테스트, 빌드 설정의 수정은 포함되지 않습니다."
+          ]
+        }
+      }
+    },
     {
       "version": "1.0.13",
       "project_type": "basic",

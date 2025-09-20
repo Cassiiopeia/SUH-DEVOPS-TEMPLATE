@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T20:46:31Z",
-    "currentVersion": "1.1.8",
+    "lastUpdated": "2025-09-20T20:56:06Z",
+    "currentVersion": "1.1.9",
     "projectType": "basic",
-    "totalReleases": 19
+    "totalReleases": 20
   },
   "releases": [
+    {
+      "version": "1.1.9",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 56,
+      "raw_summary": "Summary by CodeRabbit\n\n문서화\n\nREADME의 최신 버전 표기를 최신 상태로 업데이트.\n\n\n잡무(Chores)\n\n애플리케이션 버전을 1.1.9로 갱신하고 메타데이터를 업데이트.\n\n\n기타/CI\n\nPR 제목 자동 업데이트 로직 강화 및 예비 경로 추가.\n인증 토큰 처리와 권한 설정을 명시해 워크플로 실행 안정성 향상.\n로깅을 확장해 변경 사항을 명확히 기록.\n폴링 윈도우를 단축해 처리 속도 개선.",
+      "parsed_changes": {
+        "문서화": {
+          "title": "문서화",
+          "items": [
+            "README의 최신 버전 표기를 최신 상태로 업데이트."
+          ]
+        },
+        "잡무_chores": {
+          "title": "잡무(Chores)",
+          "items": [
+            "애플리케이션 버전을 1.1.9로 갱신하고 메타데이터를 업데이트."
+          ]
+        },
+        "기타_ci": {
+          "title": "기타/CI",
+          "items": [
+            "PR 제목 자동 업데이트 로직 강화 및 예비 경로 추가.",
+            "인증 토큰 처리와 권한 설정을 명시해 워크플로 실행 안정성 향상.",
+            "로깅을 확장해 변경 사항을 명확히 기록.",
+            "폴링 윈도우를 단축해 처리 속도 개선."
+          ]
+        }
+      }
+    },
     {
       "version": "1.1.8",
       "project_type": "basic",

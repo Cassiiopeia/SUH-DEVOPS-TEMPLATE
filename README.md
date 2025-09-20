@@ -6,6 +6,7 @@
 
 [전체 버전 기록 보기](CHANGELOG.md)
 <br>
+<br>
 _참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마세요. 변경 소스는 `CHANGELOG.json`입니다._
 
 [프로젝트 자동화 설정 적용 가이드](SETUP-GUIDE.md)

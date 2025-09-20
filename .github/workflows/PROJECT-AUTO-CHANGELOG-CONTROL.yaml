@@ -70,15 +70,6 @@ jobs:
             echo "⚠️ .github/scripts/version_manager.sh 파일을 찾을 수 없습니다."
           fi
 
-      - name: CodeRabbit Summary 요청 댓글 달기
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
-          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
-               -X POST \
-               -d "{\"body\": \"@coderabbitai summary\"}" \
-               "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
-
       - name: CodeRabbit 제목 변경 요청
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
@@ -116,6 +107,75 @@ jobs:
                -d @coderabbitai_title_request_comment_payload.json \
                "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
           rm -f coderabbitai_title_request_comment_payload.json
+
+      - name: PR 제목 변경 확인 (폴링)
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          MAX_ATTEMPTS=24  # 2분 = 24 * 5초
+          ATTEMPT=0
+          TODAY=$(date '+%Y%m%d')
+
+          echo "🔍 PR #$PR_NUMBER 제목에 🚀 이모지 확인 시작..."
+          echo "⏰ 최대 대기 시간: 2분 (5초마다 체크)"
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] PR 제목 확인 중... ($(date '+%H:%M:%S'))"
+
+            # GitHub API로 PR 정보 가져오기
+            PR_TITLE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                           "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                           jq -r '.title')
+
+            echo "현재 PR 제목: $PR_TITLE"
+
+            # 🚀 이모지가 있는지 확인
+            if echo "$PR_TITLE" | grep -q "🚀"; then
+              echo "✅ PR 제목에 🚀 이모지 발견! CodeRabbit이 제목을 업데이트했습니다"
+              break
+            else
+              echo "⏳ 아직 🚀 이모지가 없습니다. CodeRabbit 제목 변경 대기 중..."
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              sleep 5
+            fi
+          done
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "⚠️ 2분 대기 후에도 PR 제목에 🚀 이모지를 찾을 수 없습니다"
+            echo "🔧 자동으로 PR 제목을 변경합니다..."
+            
+            # 버전 정보 가져오기 (fallback)
+            if [ -f ".github/scripts/version_manager.sh" ]; then
+              VERSION=$(./.github/scripts/version_manager.sh get 2>/dev/null | tail -n 1)
+            elif [ -f "version.yml" ]; then
+              VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
+            else
+              VERSION="1.0.0"
+            fi
+            
+            # 직접 PR 제목 변경
+            NEW_TITLE="🚀 Deploy ${TODAY}-v${VERSION}"
+            echo "새로운 제목: $NEW_TITLE"
+            
+            curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+                 -H "Content-Type: application/json" \
+                 -X PATCH \
+                 -d "{\"title\": \"${NEW_TITLE}\"}" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+            
+            echo "✅ PR 제목이 자동으로 변경되었습니다: $NEW_TITLE"
+          fi
+
+      - name: CodeRabbit Summary 요청 댓글 달기
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -X POST \
+               -d "{\"body\": \"@coderabbitai summary\"}" \
+               "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
 
       - name: Git 설정 및 최신 상태 동기화
         run: |
@@ -317,94 +377,11 @@ jobs:
         run: |
           rm -f summary_section.html
 
-  # Job 3: PR 제목 변경 확인 (Job 2 완료 후 실행)
-  check-title-update:
-    name: PR 제목 변경 확인
-    runs-on: ubuntu-latest
-    needs: [detect-and-parse, update-changelog]
-    if: needs.detect-and-parse.outputs.summary_found == 'true'
-    outputs:
-      title_updated: ${{ steps.check_title.outputs.title_updated }}
-    steps:
-      - name: 저장소 체크아웃 (fallback용)
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets._GITHUB_PAT_TOKEN }}
-          fetch-depth: 0
-          ref: main
-
-      - name: 버전 관리 스크립트 권한 설정
-        run: |
-          if [ -f ".github/scripts/version_manager.sh" ]; then
-            chmod +x .github/scripts/version_manager.sh
-          fi
-
-      - name: PR 제목 변경 확인 (스마트 폴링)
-        id: check_title
-        env:
-          GH_TOKEN: ${{ secrets._GITHUB_PAT_TOKEN }}
-        run: |
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          MAX_ATTEMPTS=12  # 1분 = 12 * 5초
-          ATTEMPT=0
-          VERSION="${{ needs.detect-and-parse.outputs.version }}"
-          TODAY=$(date '+%Y%m%d')
-
-          echo "🔍 PR #$PR_NUMBER 제목에 🚀 이모지 확인 시작..."
-          echo "⏰ 최대 대기 시간: 1분 (5초마다 체크)"
-
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "[$ATTEMPT/$MAX_ATTEMPTS] PR 제목 확인 중... ($(date '+%H:%M:%S'))"
-
-            # GitHub API로 PR 정보 가져오기
-            PR_TITLE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                           "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
-                           jq -r '.title')
-
-            echo "현재 PR 제목: $PR_TITLE"
-
-            # 🚀 이모지가 있는지 확인
-            if echo "$PR_TITLE" | grep -q "🚀"; then
-              echo "✅ PR 제목에 🚀 이모지 발견! CodeRabbit이 제목을 업데이트했습니다"
-              echo "title_updated=true" >> $GITHUB_OUTPUT
-              break
-            else
-              echo "⏳ 아직 🚀 이모지가 없습니다. CodeRabbit 제목 변경 대기 중..."
-            fi
-
-            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-              sleep 5
-            fi
-          done
-
-          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-            echo "⚠️ 5분 대기 후에도 PR 제목에 🚀 이모지를 찾을 수 없습니다"
-            echo "🔧 자동으로 PR 제목을 변경합니다..."
-            
-            # 직접 PR 제목 변경
-            NEW_TITLE="🚀 Deploy ${TODAY}-v${VERSION}"
-            echo "새로운 제목: $NEW_TITLE"
-            
-            # gh CLI를 사용하여 PR 제목 변경
-            gh pr edit ${PR_NUMBER} --title "${NEW_TITLE}" || {
-              echo "❌ gh CLI로 제목 변경 실패, GitHub API 사용"
-              curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
-                   -H "Content-Type: application/json" \
-                   -X PATCH \
-                   -d "{\"title\": \"${NEW_TITLE}\"}" \
-                   "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
-            }
-            
-            echo "✅ PR 제목이 자동으로 변경되었습니다: $NEW_TITLE"
-            echo "title_updated=true" >> $GITHUB_OUTPUT
-          fi
-
-  # Job 4: PR 머지 및 배포 트리거 (Job 3 완료 후 실행)
+  # Job 3: PR 머지 및 배포 트리거 (Job 2 완료 후 실행)
   merge-and-deploy:
     name: PR 머지 및 배포 트리거
     runs-on: ubuntu-latest
-    needs: [detect-and-parse, update-changelog, check-title-update]
+    needs: [detect-and-parse, update-changelog]
     if: needs.detect-and-parse.outputs.summary_found == 'true'
     steps:
       - name: 저장소 체크아웃

@@ -1,11 +1,19 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T20:26:18Z",
-    "currentVersion": "1.1.5",
+    "lastUpdated": "2025-09-20T20:40:01Z",
+    "currentVersion": "1.1.6",
     "projectType": "basic",
-    "totalReleases": 17
+    "totalReleases": 18
   },
   "releases": [
+    {
+      "version": "1.1.6",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 53,
+      "raw_summary": "Summary by CodeRabbit",
+      "parsed_changes": {}
+    },
     {
       "version": "1.1.5",
       "project_type": "basic",

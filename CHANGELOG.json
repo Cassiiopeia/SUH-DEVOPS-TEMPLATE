@@ -1,11 +1,36 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T20:56:20Z",
-    "currentVersion": "1.1.9",
+    "lastUpdated": "2025-09-20T22:03:41Z",
+    "currentVersion": "1.1.10",
     "projectType": "basic",
-    "totalReleases": 21
+    "totalReleases": 22
   },
   "releases": [
+    {
+      "version": "1.1.10",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 58,
+      "raw_summary": "Summary by CodeRabbit\n\n\nChores\n\n버전 확인 후 자동 요약 댓글 중간 단계 제거.\nPR 제목에 🚀 이모지를 2분간 폴링해 감지, 미감지 시 표준 형식으로 자동 갱신하는 단계 추가.\n폴링 이후 요약 요청 댓글 단계 복원.\n병합·배포 작업 의존성 정비 및 불필요한 스마트 폴링 경로/작업 제거.\nPATCH 기반 제목 업데이트와 상태 로그 개선.\n\n\n\nChores (Version)\n\n버전 1.1.9 → 1.1.10 업데이트 및 메타데이터 갱신.",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 확인 후 자동 요약 댓글 중간 단계 제거.",
+            "PR 제목에 🚀 이모지를 2분간 폴링해 감지, 미감지 시 표준 형식으로 자동 갱신하는 단계 추가.",
+            "폴링 이후 요약 요청 댓글 단계 복원.",
+            "병합·배포 작업 의존성 정비 및 불필요한 스마트 폴링 경로/작업 제거.",
+            "PATCH 기반 제목 업데이트와 상태 로그 개선."
+          ]
+        },
+        "chores__version": {
+          "title": "Chores (Version)",
+          "items": [
+            "버전 1.1.9 → 1.1.10 업데이트 및 메타데이터 갱신."
+          ]
+        }
+      }
+    },
     {
       "version": "1.1.9",
       "project_type": "basic",

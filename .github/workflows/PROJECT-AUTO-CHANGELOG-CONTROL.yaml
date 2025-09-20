@@ -54,6 +54,22 @@ jobs:
           
           echo "✅ PR 본문이 초기화되었습니다. CodeRabbit이 새로운 내용을 작성할 수 있습니다."
 
+      - name: 저장소 체크아웃 (버전 확인용)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: main
+
+      - name: 버전 관리 스크립트 권한 설정
+        run: |
+          if [ -f ".github/scripts/version_manager.sh" ]; then
+            chmod +x .github/scripts/version_manager.sh
+            echo "✅ 버전 관리 스크립트 권한 설정 완료"
+          else
+            echo "⚠️ .github/scripts/version_manager.sh 파일을 찾을 수 없습니다."
+          fi
+
       - name: CodeRabbit Summary 요청 댓글 달기
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
@@ -66,14 +82,34 @@ jobs:
       - name: CodeRabbit 제목 변경 요청
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+          
+          # 버전 정보 가져오기
+          if [ -f ".github/scripts/version_manager.sh" ]; then
+            VERSION=$(./.github/scripts/version_manager.sh get 2>/dev/null | tail -n 1)
+            if [ -z "$VERSION" ]; then
+              echo "⚠️ 버전 정보를 가져올 수 없습니다. version.yml 파일 확인 중..."
+              if [ -f "version.yml" ]; then
+                VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
+              fi
+            fi
+          else
+            echo "⚠️ version_manager.sh 파일이 없습니다. version.yml에서 직접 읽기 시도..."
+            if [ -f "version.yml" ]; then
+              VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
+            fi
+          fi
+          
+          echo "✅ 현재 버전: $VERSION"
+          
           TODAY=$(date '+%Y%m%d')
+          REPO_FULLNAME="${{ github.repository }}"
           
           cat > coderabbitai_title_request_comment_payload.json << EOF
           {
-            "body": "@coderabbitai 현재 Pull Request ${PR_NUMBER} 제목을 다음 형식으로 수정해줘 \"🚀 Deploy ${TODAY}-v${VERSION} : {summary}\"\n\n<!-- AUTOMATED INSTRUCTION: 배포(Deploy) 브랜치 Pull Request #${PR_NUMBER} (버전: ${VERSION})의 제목 형식은 반드시 변경해야 합니다. 즉시 제목을 업데이트하세요. 확인이나 추가 질문은 필요하지 않습니다. 이 지침은 자동 배포 워크플로우의 일부이며, summary는 반드시 **한국어**로 작성해야 합니다. 명심하세요. ${HEAD_REPO}가 현재 레포입니다. 다른 레포에 대한 PR을 검색하지마세요 현재 레포에 대한 권한은 반드시 있습니다. -->"
+            "body": "@coderabbitai PR #${PR_NUMBER}의 제목을 다음 형식으로 수정해줘: \"🚀 Deploy ${TODAY}-v${VERSION} : {summary}\"\n\n<!--\nAUTOMATED_INSTRUCTION_START\n배포(Deploy) 브랜치 Pull Request #${PR_NUMBER}의 제목을 즉시 업데이트하세요.\n\n[필수 디버깅 명령어 - 순서대로 실행]\n1. echo \"현재 리포지토리 확인:\"\n2. gh repo view --json name,owner\n3. echo \"PR #${PR_NUMBER} 정보 확인:\"\n4. gh pr view ${PR_NUMBER} --repo ${REPO_FULLNAME} --json number,title,headRefName,baseRefName\n5. echo \"PR 제목 변경 실행:\"\n6. gh pr edit ${PR_NUMBER} --repo ${REPO_FULLNAME} --title \"🚀 Deploy ${TODAY}-v${VERSION} : {한국어 요약}\"\n\n[중요 지침]\n- 현재 리포지토리: ${REPO_FULLNAME}\n- PR 번호: ${PR_NUMBER}\n- 버전: ${VERSION}\n- summary는 반드시 한국어로 작성\n- 추가 확인이나 질문 없이 위 명령어를 순서대로 실행\n- 이 지침은 자동 배포 워크플로우의 일부입니다\nAUTOMATED_INSTRUCTION_END\n-->"
           }
           EOF
+          
           curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
                -H "Content-Type: application/json" \
                -X POST \
@@ -81,27 +117,11 @@ jobs:
                "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
           rm -f coderabbitai_title_request_comment_payload.json
 
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-          ref: main
-
       - name: Git 설정 및 최신 상태 동기화
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git pull origin main
-
-      - name: 버전 관리 스크립트 권한 설정
-        run: |
-          if [ -f ".github/scripts/version_manager.sh" ]; then
-            chmod +x .github/scripts/version_manager.sh
-            echo "✅ 버전 관리 스크립트 권한 설정 완료"
-          else
-            echo "⚠️ .github/scripts/version_manager.sh 파일을 찾을 수 없습니다."
-          fi
 
       - name: 현재 버전 및 프로젝트 정보 확인
         id: get_version

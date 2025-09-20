@@ -1,11 +1,32 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T19:26:42Z",
-    "currentVersion": "1.0.16",
+    "lastUpdated": "2025-09-20T19:34:15Z",
+    "currentVersion": "1.1.1",
     "projectType": "basic",
-    "totalReleases": 14
+    "totalReleases": 15
   },
   "releases": [
+    {
+      "version": "1.1.1",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 46,
+      "raw_summary": "Summary by CodeRabbit\n\n문서화\n\nREADME에서 가이드라인 파일연결을 추가했습니다\n\n\n설정\n\n버전 1.1.1 업데이트",
+      "parsed_changes": {
+        "문서화": {
+          "title": "문서화",
+          "items": [
+            "README에서 가이드라인 파일연결을 추가했습니다"
+          ]
+        },
+        "설정": {
+          "title": "설정",
+          "items": [
+            "버전 1.1.1 업데이트"
+          ]
+        }
+      }
+    },
     {
       "version": "1.0.16",
       "project_type": "basic",

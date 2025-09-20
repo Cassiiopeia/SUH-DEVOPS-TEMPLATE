@@ -279,11 +279,61 @@ jobs:
         run: |
           rm -f summary_section.html
 
-  # Job 3: PR 머지 및 배포 트리거 (Job 2 완료 후 실행)
+  # Job 3: PR 제목 변경 확인 (Job 2 완료 후 실행)
+  check-title-update:
+    name: PR 제목 변경 확인
+    runs-on: ubuntu-latest
+    needs: [detect-and-parse, update-changelog]
+    if: needs.detect-and-parse.outputs.summary_found == 'true'
+    outputs:
+      title_updated: ${{ steps.check_title.outputs.title_updated }}
+    steps:
+      - name: PR 제목 변경 확인 (스마트 폴링)
+        id: check_title
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          MAX_ATTEMPTS=60  # 5분 = 60 * 5초
+          ATTEMPT=0
+
+          echo "🔍 PR #$PR_NUMBER 제목에 🚀 이모지 확인 시작..."
+          echo "⏰ 최대 대기 시간: 5분 (5초마다 체크)"
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] PR 제목 확인 중... ($(date '+%H:%M:%S'))"
+
+            # GitHub API로 PR 정보 가져오기
+            PR_TITLE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                           "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                           jq -r '.title')
+
+            echo "현재 PR 제목: $PR_TITLE"
+
+            # 🚀 이모지가 있는지 확인
+            if echo "$PR_TITLE" | grep -q "🚀"; then
+              echo "✅ PR 제목에 🚀 이모지 발견! CodeRabbit이 제목을 업데이트했습니다"
+              echo "title_updated=true" >> $GITHUB_OUTPUT
+              break
+            else
+              echo "⏳ 아직 🚀 이모지가 없습니다. CodeRabbit 제목 변경 대기 중..."
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              sleep 5
+            fi
+          done
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "⚠️ 5분 대기 후에도 PR 제목에 🚀 이모지를 찾을 수 없습니다"
+            echo "현재 제목으로 진행합니다: $PR_TITLE"
+            echo "title_updated=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Job 4: PR 머지 및 배포 트리거 (Job 3 완료 후 실행)
   merge-and-deploy:
     name: PR 머지 및 배포 트리거
     runs-on: ubuntu-latest
-    needs: [detect-and-parse, update-changelog]
+    needs: [detect-and-parse, update-changelog, check-title-update]
     if: needs.detect-and-parse.outputs.summary_found == 'true'
     steps:
       - name: 저장소 체크아웃

@@ -40,6 +40,20 @@ jobs:
       version: ${{ steps.get_version.outputs.version }}
       project_type: ${{ steps.get_version.outputs.project_type }}
     steps:
+      - name: PR 본문 초기화 (기존 내용 삭제)
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "🗑️ PR #$PR_NUMBER 본문 초기화 중..."
+          
+          # PR 본문을 빈 문자열로 업데이트
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               -X PATCH \
+               -d '{"body": ""}' \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+          
+          echo "✅ PR 본문이 초기화되었습니다. CodeRabbit이 새로운 내용을 작성할 수 있습니다."
+
       - name: CodeRabbit Summary 요청 댓글 달기
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}

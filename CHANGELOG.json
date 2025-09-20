@@ -1,11 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T17:45:10Z",
-    "currentVersion": "1.0.10",
+    "lastUpdated": "2025-09-20T18:52:01Z",
+    "currentVersion": "1.0.12",
     "projectType": "basic",
-    "totalReleases": 10
+    "totalReleases": 11
   },
   "releases": [
+    {
+      "version": "1.0.12",
+      "project_type": "basic",
+      "date": "2025-09-20",
+      "pr_number": 40,
+      "raw_summary": "Summary by CodeRabbit\n\n문서화\n\n프로젝트 브랜딩을 “SUH-DEVOPS-TEMPLATE”로 변경하고 배지 버전을 v1.0.10으로 갱신.\nREADME 전면 개편: 핵심 특징, AI 기반 자동화 섹션, 모듈형 설정 흐름, 고급 디버깅/온보딩, 트러블슈팅 강화.\n신규 SETUP-GUIDE.md 추가: 빠른 시작 체크리스트, 필수 파일 복사 가이드, 토큰/브랜치 보호 설정, 프레임워크별 버전 동기화, 검증 시나리오 및 문제 해결.\n\n\n작업\n\n버전 상승: 1.0.10 → 1.0.12 및 메타데이터 업데이트.",
+      "parsed_changes": {
+        "문서화": {
+          "title": "문서화",
+          "items": [
+            "프로젝트 브랜딩을 “SUH-DEVOPS-TEMPLATE”로 변경하고 배지 버전을 v1.0.10으로 갱신.",
+            "README 전면 개편: 핵심 특징, AI 기반 자동화 섹션, 모듈형 설정 흐름, 고급 디버깅/온보딩, 트러블슈팅 강화.",
+            "신규 SETUP-GUIDE.md 추가: 빠른 시작 체크리스트, 필수 파일 복사 가이드, 토큰/브랜치 보호 설정, 프레임워크별 버전 동기화, 검증 시나리오 및 문제 해결."
+          ]
+        },
+        "작업": {
+          "title": "작업",
+          "items": [
+            "버전 상승: 1.0.10 → 1.0.12 및 메타데이터 업데이트."
+          ]
+        }
+      }
+    },
     {
       "version": "1.0.10",
       "project_type": "basic",

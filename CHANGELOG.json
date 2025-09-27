@@ -1,11 +1,46 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-20T22:12:42Z",
-    "currentVersion": "1.1.10",
+    "lastUpdated": "2025-09-27T15:44:22Z",
+    "currentVersion": "1.1.13",
     "projectType": "basic",
-    "totalReleases": 23
+    "totalReleases": 24
   },
   "releases": [
+    {
+      "version": "1.1.13",
+      "project_type": "basic",
+      "date": "2025-09-27",
+      "pr_number": 64,
+      "raw_summary": "Summary by CodeRabbit\n\n신규 기능\n\nSpring Boot용 CI/CD 워크플로우 추가: main/test 브랜치 자동 빌드·배포, Docker 이미지 태깅·캐시로 배포 안정성 향상.\n\n\n버그 수정\n\n버전 관리 파이프라인에서 오류 메시지 가려짐 해소로 실패 원인 파악 용이.\n\n\n문서\n\n버전 관리 오류 분석·해결 가이드 추가(변경 사항, 사용법, 트러블슈팅 포함).\n\n\n작업(Chores)\n\n버전 업데이트: 1.1.13.\n병렬 실행 제어로 중복 버전 증가 방지.\n로컬 설정 파일(.claude/settings.local.json) Git 추적 제외.",
+      "parsed_changes": {
+        "신규_기능": {
+          "title": "신규 기능",
+          "items": [
+            "Spring Boot용 CI/CD 워크플로우 추가: main/test 브랜치 자동 빌드·배포, Docker 이미지 태깅·캐시로 배포 안정성 향상."
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "버전 관리 파이프라인에서 오류 메시지 가려짐 해소로 실패 원인 파악 용이."
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "버전 관리 오류 분석·해결 가이드 추가(변경 사항, 사용법, 트러블슈팅 포함)."
+          ]
+        },
+        "작업_chores": {
+          "title": "작업(Chores)",
+          "items": [
+            "버전 업데이트: 1.1.13.",
+            "병렬 실행 제어로 중복 버전 증가 방지.",
+            "로컬 설정 파일(.claude/settings.local.json) Git 추적 제외."
+          ]
+        }
+      }
+    },
     {
       "version": "1.1.10",
       "project_type": "basic",

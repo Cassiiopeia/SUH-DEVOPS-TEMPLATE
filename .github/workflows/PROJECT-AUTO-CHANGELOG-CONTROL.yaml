@@ -76,7 +76,7 @@ jobs:
           
           # 버전 정보 가져오기
           if [ -f ".github/scripts/version_manager.sh" ]; then
-            VERSION=$(./.github/scripts/version_manager.sh get 2>/dev/null | tail -n 1)
+            VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
             if [ -z "$VERSION" ]; then
               echo "⚠️ 버전 정보를 가져올 수 없습니다. version.yml 파일 확인 중..."
               if [ -f "version.yml" ]; then
@@ -148,7 +148,7 @@ jobs:
             
             # 버전 정보 가져오기 (fallback)
             if [ -f ".github/scripts/version_manager.sh" ]; then
-              VERSION=$(./.github/scripts/version_manager.sh get 2>/dev/null | tail -n 1)
+              VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
             elif [ -f "version.yml" ]; then
               VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
             else

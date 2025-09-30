@@ -95,8 +95,10 @@ EOF
 
 log_success "version.yml 파일이 초기화되었습니다."
 
-# 2. CHANGELOG 파일들 삭제
-log_info "기존 CHANGELOG 파일들 삭제 중..."
+# 2. 템플릿 관련 파일들 삭제
+log_info "템플릿 관련 파일들 삭제 중..."
+
+# CHANGELOG 파일들 삭제
 if [ -f "CHANGELOG.md" ]; then
     rm -f CHANGELOG.md
     log_success "CHANGELOG.md 파일이 삭제되었습니다."
@@ -105,6 +107,29 @@ fi
 if [ -f "CHANGELOG.json" ]; then
     rm -f CHANGELOG.json
     log_success "CHANGELOG.json 파일이 삭제되었습니다."
+fi
+
+# LICENSE 파일 삭제
+if [ -f "LICENSE" ]; then
+    rm -f LICENSE
+    log_success "LICENSE 파일이 삭제되었습니다."
+fi
+
+# CONTRIBUTING.md 파일 삭제
+if [ -f "CONTRIBUTING.md" ]; then
+    rm -f CONTRIBUTING.md
+    log_success "CONTRIBUTING.md 파일이 삭제되었습니다."
+fi
+
+# 테스트 폴더들 삭제
+if [ -d ".github/scripts/test" ]; then
+    rm -rf .github/scripts/test
+    log_success ".github/scripts/test 폴더가 삭제되었습니다."
+fi
+
+if [ -d ".github/workflows/test" ]; then
+    rm -rf .github/workflows/test
+    log_success ".github/workflows/test 폴더가 삭제되었습니다."
 fi
 
 # 3. README.md 초기화
@@ -155,6 +180,8 @@ echo ""
 log_info "초기화된 항목:"
 echo "  ✅ version.yml → 0.0.0, basic 타입으로 초기화"
 echo "  ✅ CHANGELOG.md, CHANGELOG.json → 삭제됨"
+echo "  ✅ LICENSE, CONTRIBUTING.md → 삭제됨"
+echo "  ✅ 테스트 폴더들 (.github/scripts/test, .github/workflows/test) → 삭제됨"
 echo "  ✅ README.md → 기본 템플릿으로 초기화"
 echo "  ✅ 이슈 템플릿 assignee → $REPO_OWNER로 변경"
 echo "  ✅ 초기화 완료 기록 추가"

@@ -111,12 +111,11 @@ fi
 log_info "README.md 파일 초기화 중..."
 cat > README.md << EOF
 # $PROJECT_NAME
-<br>
+
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
 ## 최신 버전 : v0.0.0
-<br>
 [전체 버전 기록 보기](CHANGELOG.md)
-<br>
+</br>
 EOF
 
 log_success "README.md 파일이 초기화되었습니다."
@@ -145,7 +144,7 @@ fi
 # 5. 초기화 완료 기록 (README.md에 주석으로 추가)
 log_info "초기화 완료 기록 추가 중..."
 echo "" >> README.md
-echo "<!-- 템플릿 초기화 완료: $(date -u +"%Y-%m-%d %H:%M:%S UTC") -->" >> README.md
+echo "<!-- 템플릿 초기화 완료: $(TZ=Asia/Seoul date +"%Y-%m-%d %H:%M:%S KST") -->" >> README.md
 
 log_success "초기화 완료 기록이 README.md에 추가되었습니다."
 

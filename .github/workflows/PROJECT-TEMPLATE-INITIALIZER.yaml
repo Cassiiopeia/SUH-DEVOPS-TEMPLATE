@@ -1,0 +1,207 @@
+# ===================================================================
+# GitHub 템플릿 자동 초기화 워크플로우 v2.0.0
+# ===================================================================
+#
+# 이 워크플로우는 GitHub 템플릿을 통해 새 프로젝트가 생성될 때
+# 자동으로 실행되어 프로젝트를 초기 상태로 설정합니다.
+#
+# 🔥 안전장치:
+# 1. 이슈 개수 확인 (0개 = 새 저장소)
+# 2. 저장소 생성일 확인 (최근 1시간 이내)
+#
+# 자동화 작업:
+# 1. version.yml을 0.0.0, basic 타입으로 초기화
+# 2. CHANGELOG.md, CHANGELOG.json 파일 삭제
+# 3. README.md를 기본 템플릿으로 초기화
+# 4. 이슈 템플릿의 assignee를 현재 저장소 소유자로 변경
+# 5. 초기화 완료 후 이 워크플로우 파일 자체를 삭제 (일회성)
+#
+# 🛡️ 안전장치:
+# - 다중 조건 검증으로 중복 실행 완전 차단
+# - 템플릿이 아닌 기존 프로젝트에서 실행 방지
+# - 초기화 완료 후 워크플로우 자체 삭제로 재실행 불가
+#
+# ===================================================================
+
+name: PROJECT-TEMPLATE-INITIALIZER
+
+on:
+  workflow_dispatch:  # 수동 실행
+  push:
+    paths:
+      - '.github/scripts/template_initializer.sh'
+
+# 동시 실행 방지
+concurrency:
+  group: template-initializer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  check-initialization-needed:
+    name: 초기화 필요성 확인
+    runs-on: ubuntu-latest
+    outputs:
+      needs_init: ${{ steps.check.outputs.needs_init }}
+      project_name: ${{ steps.check.outputs.project_name }}
+      current_version: ${{ steps.check.outputs.current_version }}
+    
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: 초기화 필요성 확인 (이슈 개수 + 저장소 생성일)
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            console.log("=== 🔍 템플릿 초기화 필요성 확인 ===");
+            
+            let needsInit = true;
+            let failureReasons = [];
+            
+            // 1. 이슈 개수 확인 (0개 = 새 저장소)
+            console.log("1️⃣ 이슈 개수 확인 중...");
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 1
+            });
+            
+            if (issues.length > 0) {
+              console.log(`❌ 이슈가 ${issues.length}개 존재합니다. (새 저장소가 아님)`);
+              failureReasons.push(`이슈 ${issues.length}개 존재`);
+              needsInit = false;
+            } else {
+              console.log("✅ 이슈가 0개입니다. (새 저장소 확인)");
+            }
+            
+            // 2. 저장소 생성일 확인 (최근 1시간 이내)
+            console.log("2️⃣ 저장소 생성일 확인 중...");
+            const { data: repo } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            const createdAt = new Date(repo.created_at);
+            const now = new Date();
+            const ageHours = (now - createdAt) / (1000 * 60 * 60);
+            
+            console.log(`저장소 생성: ${createdAt.toISOString()}`);
+            console.log(`현재 시간: ${now.toISOString()}`);
+            console.log(`저장소 나이: ${ageHours.toFixed(1)}시간`);
+            
+            if (ageHours > 1) { // 1시간 이상
+              console.log("❌ 저장소가 1시간 이상 오래되었습니다.");
+              failureReasons.push(`저장소 나이 ${ageHours.toFixed(1)}시간`);
+              needsInit = false;
+            } else {
+              console.log("✅ 최근 1시간 이내에 생성된 저장소입니다.");
+            }
+            
+            // 결과 설정
+            const projectName = context.repo.repo;
+            const currentVersion = "템플릿";
+            
+            core.setOutput('needs_init', needsInit.toString());
+            core.setOutput('project_name', projectName);
+            core.setOutput('current_version', currentVersion);
+            
+            console.log("\n=== 🎯 최종 판정 ===");
+            if (needsInit) {
+              console.log("✅ 템플릿 초기화가 필요합니다!");
+              console.log(`프로젝트명: ${projectName}`);
+              console.log(`저장소 나이: ${ageHours.toFixed(1)}시간`);
+            } else {
+              console.log("❌ 템플릿 초기화가 필요하지 않습니다.");
+              console.log("실패 이유:", failureReasons.join(', '));
+            }
+
+  initialize-template:
+    name: 템플릿 초기화 실행
+    runs-on: ubuntu-latest
+    needs: check-initialization-needed
+    if: needs.check-initialization-needed.outputs.needs_init == 'true'
+    
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Git 사용자 설정
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: 초기화 스크립트 권한 설정
+        run: |
+          chmod +x .github/scripts/template_initializer.sh
+
+      - name: 템플릿 초기화 실행
+        run: |
+          echo "=== 템플릿 초기화 시작 ==="
+          
+          # 스크립트 실행
+          ./.github/scripts/template_initializer.sh \
+            "${{ needs.check-initialization-needed.outputs.project_name }}" \
+            "${{ github.repository_owner }}"
+          
+          echo "=== 초기화 완료 ==="
+
+      - name: 워크플로우 파일 삭제 (일회성 실행)
+        run: |
+          echo "=== 워크플로우 파일 삭제 중 ==="
+          
+          # 이 워크플로우 파일 자체를 삭제
+          if [ -f ".github/workflows/PROJECT-TEMPLATE-INITIALIZER.yaml" ]; then
+            rm -f .github/workflows/PROJECT-TEMPLATE-INITIALIZER.yaml
+            echo "✅ 템플릿 초기화 워크플로우 파일이 삭제되었습니다."
+          fi
+
+      - name: 변경사항 커밋 및 푸시
+        run: |
+          echo "=== 변경사항 커밋 준비 ==="
+          
+          # 변경된 파일들 확인
+          git status --porcelain
+          
+          # 모든 변경사항 스테이징
+          git add .
+          
+          # 변경사항이 있는지 확인
+          if git diff --staged --quiet; then
+            echo "❌ 커밋할 변경사항이 없습니다."
+            exit 1
+          fi
+          
+          # 커밋 메시지 생성
+          commit_message="SUH-DEVOPS-TEMPLATE : init : ${{ needs.check-initialization-needed.outputs.project_name }} 기본 Template 초기화 완료
+
+          자동으로 수행된 초기화 작업:
+          - version.yml → 0.0.0, basic 타입으로 초기화
+          - CHANGELOG.md, CHANGELOG.json → 삭제
+          - README.md → 기본 템플릿으로 초기화  
+          - 이슈 템플릿 assignee → ${{ github.repository_owner }}로 변경
+          - 템플릿 초기화 워크플로우 삭제 (일회성 실행 완료)
+          
+          프로젝트: ${{ needs.check-initialization-needed.outputs.project_name }}
+          초기화 시간: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          
+          # 커밋 실행
+          git commit -m "$commit_message"
+          
+          # 푸시 실행
+          git push origin main
+          
+          echo "✅ 초기화 완료 및 변경사항 푸시 완료"

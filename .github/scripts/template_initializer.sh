@@ -117,42 +117,6 @@ cat > README.md << EOF
 <br>
 [전체 버전 기록 보기](CHANGELOG.md)
 <br>
-
-## 📋 프로젝트 소개
-
-이 프로젝트에 대한 설명을 작성해주세요.
-
-## 🚀 시작하기
-
-### 필수 조건
-
-- 필요한 소프트웨어나 도구들을 나열해주세요
-
-### 설치
-
-\`\`\`bash
-# 설치 명령어를 작성해주세요
-\`\`\`
-
-### 사용법
-
-\`\`\`bash
-# 사용 예시를 작성해주세요
-\`\`\`
-
-## 🤝 기여하기
-
-기여 방법에 대한 설명을 작성해주세요.
-
-## 📄 라이선스
-
-이 프로젝트의 라이선스 정보를 작성해주세요.
-
-## 📞 연락처
-
-- 작성자: $GITHUB_USER
-- 이메일: your.email@example.com
-- 프로젝트 링크: [https://github.com/$REPO_OWNER/$PROJECT_NAME](https://github.com/$REPO_OWNER/$PROJECT_NAME)
 EOF
 
 log_success "README.md 파일이 초기화되었습니다."

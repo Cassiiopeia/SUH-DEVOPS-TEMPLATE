@@ -54,14 +54,14 @@ jobs:
       - name: 저장소 체크아웃
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 1
 
       - name: 초기화 필요성 확인 (이슈 개수 + 저장소 생성일)
         id: check
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             console.log("=== 🔍 템플릿 초기화 필요성 확인 ===");
             
@@ -136,7 +136,7 @@ jobs:
       - name: 저장소 체크아웃
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Git 사용자 설정
@@ -159,19 +159,15 @@ jobs:
           
           echo "=== 초기화 완료 ==="
 
-      - name: 워크플로우 파일 삭제 (일회성 실행)
+      - name: 변경사항 커밋 및 푸시
         run: |
-          echo "=== 워크플로우 파일 삭제 중 ==="
+          echo "=== 변경사항 커밋 준비 ==="
           
-          # 이 워크플로우 파일 자체를 삭제
+          # 워크플로우 파일 삭제 (일회성 실행)
           if [ -f ".github/workflows/PROJECT-TEMPLATE-INITIALIZER.yaml" ]; then
             rm -f .github/workflows/PROJECT-TEMPLATE-INITIALIZER.yaml
             echo "✅ 템플릿 초기화 워크플로우 파일이 삭제되었습니다."
           fi
-
-      - name: 변경사항 커밋 및 푸시
-        run: |
-          echo "=== 변경사항 커밋 준비 ==="
           
           # 변경된 파일들 확인
           git status --porcelain
@@ -201,7 +197,13 @@ jobs:
           # 커밋 실행
           git commit -m "$commit_message"
           
-          # 푸시 실행
-          git push origin main
+          # 원격 저장소 최신 상태 확인 후 푸시
+          git fetch origin main
+          
+          # 충돌이 있으면 강제 푸시 (템플릿 초기화는 한 번만 실행되므로 안전)
+          if ! git push origin main; then
+            echo "⚠️ 푸시 충돌 발생, 강제 푸시 실행..."
+            git push --force-with-lease origin main
+          fi
           
           echo "✅ 초기화 완료 및 변경사항 푸시 완료"

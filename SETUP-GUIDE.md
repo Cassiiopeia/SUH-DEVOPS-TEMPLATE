@@ -194,6 +194,16 @@ cat android/app/build.gradle | grep versionName
 # 모든 파일의 버전을 동일하게 설정
 ```
 
+#### Python 프로젝트
+```bash
+# pyproject.toml 확인
+cat pyproject.toml | grep version
+
+# version.yml과 동일한 버전으로 설정
+# pyproject.toml:
+version = "1.0.0"
+```
+
 ### 4단계: README 버전 표시 설정
 
 README.md 파일 상단에 다음 형식을 **정확히** 추가:

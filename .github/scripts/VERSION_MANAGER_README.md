@@ -33,6 +33,11 @@ GitHub Actions와 연동되어 자동으로 버전을 관리하고 동기화합�
 - **버전 형식**: `"expo": { "version": "x.y.z" }`
 - **설명**: Expo 관리형 프로젝트의 버전 파일
 
+### Python (`python`)
+- **동기화 파일**: `pyproject.toml`
+- **버전 형식**: `version = "x.y.z"`
+- **설명**: Python 프로젝트의 표준 버전 파일 (FastAPI, Django 등)
+
 ### Basic/기타 (`basic` 또는 기타)
 - **동기화 파일**: `version.yml`만 사용
 - **버전 형식**: `version: "x.y.z"`

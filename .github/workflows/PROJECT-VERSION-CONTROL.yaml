@@ -17,6 +17,7 @@
 # - react/node: package.json
 # - react-native: Info.plist + build.gradle
 # - react-native-expo: app.json
+# - python: pyproject.toml
 # - basic: version.yml만 관리
 #
 # ===================================================================

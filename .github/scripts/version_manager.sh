@@ -84,6 +84,9 @@ read_version_config() {
         "react-native-expo")
             VERSION_FILE="app.json"
             ;;
+        "python")
+            VERSION_FILE="pyproject.toml"
+            ;;
         "basic"|*)
             VERSION_FILE="version.yml"
             ;;
@@ -213,6 +216,9 @@ get_project_file_version() {
                 project_version=$(awk '/\"expo\":/,/^[[:space:]]*}/ { if ($0 ~ /\"version\":/) { gsub(/.*"version":[[:space:]]*"/, ""); gsub(/".*/, ""); print; exit } }' "$VERSION_FILE")
             fi
             ;;
+        "python")
+            project_version=$(grep "^version = " "$VERSION_FILE" | sed 's/version = *"\([^"]*\)".*/\1/' | head -1)
+            ;;
         *)
             project_version="$CURRENT_VERSION"
             ;;
@@ -327,6 +333,11 @@ update_project_file_version() {
                     { print }
                 ' "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
             fi
+            ;;
+        "python")
+            sed -i.bak "s/^version = \"[^\"]*\"/version = \"$new_version\"/" "$VERSION_FILE"
+            rm -f "${VERSION_FILE}.bak"
+            log_success "업데이트: $VERSION_FILE"
             ;;
     esac
     

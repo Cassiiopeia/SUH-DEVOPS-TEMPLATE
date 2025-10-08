@@ -58,12 +58,13 @@ name: PROJECT-SPRING-CICD
 #
 # 🌿 브랜치별 배포 전략:
 # - deploy 브랜치: 배포 환경 (PROJECT_DEPLOY_PORT 사용, 기본: 8080)
+# - main 브랜치: 배포 환경 (수동 실행시, PROJECT_DEPLOY_PORT 사용, 기본: 8080)
 # - test 브랜치: 테스트 환경 (PROJECT_TEST_PORT 사용, 기본: 8081)
 #
 # 📝 사용 방법:
 # 1. 위의 GitHub Secrets 설정
 # 2. 아래 PROJECT_NAME을 실제 프로젝트명으로 변경
-# 3. deploy와 test 브랜치에 push하면 자동으로 CI/CD 실행
+# 3. deploy와 test 브랜치에 push하면 자동으로 CI/CD 실행 (main 브랜치는 수동 실행만 가능)
 # 4. GitHub Secrets에서 포트 설정 (기본값: deploy=8080, test=8081)
 #
 # ===================================================================
@@ -72,6 +73,7 @@ name: PROJECT-SPRING-CICD
 # 트리거 설정
 # ===================================================================
 # deploy와 test 브랜치에 push할 때 자동으로 CI/CD가 실행됩니다.
+# main 브랜치는 workflow_dispatch로 수동 실행만 가능합니다.
 on:
   push:
     branches:
@@ -219,13 +221,13 @@ jobs:
             CONTAINER_NAME="${PROJECT_NAME}-back"
 
             # 브랜치에 따른 환경별 설정
-            if [ "$BRANCH" == "deploy" ]; then
-              # 🚀 배포 환경 (deploy 브랜치)
+            if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
+              # 🚀 배포 환경 (deploy 브랜치 또는 main 브랜치)
               # GitHub Secrets의 PROJECT_DEPLOY_PORT 환경변수 사용
               # 설정되어 있지 않으면 기본값 8080 사용
               PORT=${{ secrets.PROJECT_DEPLOY_PORT || '8080' }}
               CONTAINER_NAME="${PROJECT_NAME}-back-deploy"
-              echo "🚀 배포 환경으로 배포합니다"
+              echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"
 
             elif [ "$BRANCH" == "test" ]; then
               # 🧪 테스트 환경 (test 브랜치)
@@ -309,9 +311,11 @@ jobs:
 # ===================================================================
 #
 # 현재 설정: deploy와 test 브랜치에 push할 때 자동 배포
+# main 브랜치는 수동 실행(workflow_dispatch)만 가능
 #
 # 브랜치별 포트:
 # - deploy: 8080 (PROJECT_DEPLOY_PORT secret으로 변경 가능)
+# - main: 8080 (수동 실행시, PROJECT_DEPLOY_PORT secret으로 변경 가능)
 # - test: 8081 (PROJECT_TEST_PORT secret으로 변경 가능)
 #
 # 필요한 Secrets:

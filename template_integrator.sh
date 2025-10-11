@@ -101,7 +101,6 @@ NC=''
 # 템플릿 저장소 URL
 TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
 TEMP_DIR=".template_download_temp"
-BACKUP_DIR=".template_integration"
 
 # 출력 함수 (/dev/tty 우선, 없으면 stderr로 폴백하여 명령어 치환 시 데이터 오염 방지)
 print_header() {
@@ -274,7 +273,6 @@ EOF
 MODE="interactive"
 VERSION=""
 PROJECT_TYPE=""
-CREATE_BACKUP=true
 FORCE_MODE=false
 
 # 지원하는 프로젝트 타입
@@ -294,10 +292,6 @@ while [[ $# -gt 0 ]]; do
         -t|--type)
             PROJECT_TYPE="$2"
             shift 2
-            ;;
-        --no-backup)
-            CREATE_BACKUP=false
-            shift
             ;;
         --force)
             FORCE_MODE=true
@@ -500,79 +494,6 @@ download_template() {
     print_success "템플릿 다운로드 완료"
 }
 
-# 백업 생성
-create_backup() {
-    if [ "$CREATE_BACKUP" = false ]; then
-        print_info "백업 생성 건너뛰기 (--no-backup)"
-        return
-    fi
-    
-    print_step "백업 생성 중..."
-    
-    mkdir -p "$BACKUP_DIR/backup"
-    
-    # 백업할 파일 목록
-    local files_to_backup=(
-        "README.md"
-        "version.yml"
-        ".github/workflows"
-        ".github/scripts"
-    )
-    
-    local backed_up=0
-    for file in "${files_to_backup[@]}"; do
-        if [ -e "$file" ]; then
-            cp -r "$file" "$BACKUP_DIR/backup/" 2>/dev/null && backed_up=$((backed_up + 1))
-        fi
-    done
-    
-    if [ $backed_up -gt 0 ]; then
-        print_success "백업 완료: $backed_up 개 파일/디렉토리"
-    else
-        print_info "백업할 기존 파일이 없습니다"
-    fi
-    
-    # 롤백 스크립트 생성
-    create_rollback_script
-}
-
-# 롤백 스크립트 생성
-create_rollback_script() {
-    cat > "$BACKUP_DIR/rollback.sh" << 'EOF'
-#!/bin/bash
-# 템플릿 통합 롤백 스크립트
-
-set -e
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${YELLOW}⚠️  템플릿 통합을 롤백합니다...${NC}"
-echo ""
-
-if [ ! -d "backup" ]; then
-    echo -e "${RED}✗ 백업 파일을 찾을 수 없습니다${NC}"
-    exit 1
-fi
-
-# 백업에서 복원
-cp -r backup/* ../ 2>/dev/null || true
-
-# 추가된 파일 삭제
-[ -f "../version.yml" ] && rm -f "../version.yml"
-
-echo ""
-echo -e "${GREEN}✓ 롤백 완료${NC}"
-echo ""
-echo -e "${YELLOW}다음 파일들을 수동으로 확인하세요:${NC}"
-echo "  • .github/workflows/ (추가된 워크플로우)"
-echo "  • .github/scripts/ (추가된 스크립트)"
-EOF
-    
-    chmod +x "$BACKUP_DIR/rollback.sh"
-}
 
 # README.md 버전 섹션 추가
 add_version_section_to_readme() {
@@ -779,41 +700,86 @@ copy_issue_templates() {
     fi
 }
 
-# 통합 로그 생성
-create_integration_log() {
-    local log_file="$BACKUP_DIR/integration.log"
+# .cursor 폴더 복사
+copy_cursor_folder() {
+    print_step ".cursor 폴더 복사 여부 확인 중..."
     
-    cat > "$log_file" << EOF
-===============================================
-템플릿 통합 로그
-===============================================
-통합 날짜: $(date "+%Y-%m-%d %H:%M:%S")
-통합 모드: $MODE
-프로젝트 타입: $PROJECT_TYPE
-초기 버전: $VERSION
-템플릿 소스: $TEMPLATE_REPO
-
-추가된 파일:
-- version.yml
-- .github/workflows/*.yaml
-- .github/scripts/*.sh, *.py
-- README.md (버전 섹션 추가)
-
-롤백 방법:
-  ./.template_integration/rollback.sh
-
-다음 단계:
-1. git add .
-2. git commit -m "chore: SUH-DEVOPS-TEMPLATE 통합"
-3. git push origin $(detect_default_branch)
-
-문서:
-- https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
-===============================================
-EOF
+    if [ ! -d "$TEMP_DIR/.cursor" ]; then
+        print_info ".cursor 폴더가 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
     
-    print_success "통합 로그 생성: $log_file"
+    # 사용자 동의 확인
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        local reply
+        local valid_input=false
+        
+        print_question ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)"
+        
+        while [ "$valid_input" = false ]; do
+            if safe_read "복사하시겠습니까? (y/N): " reply "-n 1"; then
+                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                
+                if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
+                    valid_input=true
+                    print_info ".cursor 폴더 복사 건너뜁니다"
+                    return
+                elif [[ "$reply" =~ ^[Yy]$ ]]; then
+                    valid_input=true
+                else
+                    print_error "잘못된 입력입니다. y 또는 N을 입력해주세요. (Enter는 N)"
+                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                fi
+            fi
+        done
+    fi
+    
+    # 복사 실행
+    mkdir -p .cursor
+    cp -r "$TEMP_DIR/.cursor/"* .cursor/ 2>/dev/null || true
+    print_success ".cursor 폴더 복사 완료"
 }
+
+# agent-prompts 폴더 복사
+copy_agent_prompts() {
+    print_step "agent-prompts 폴더 복사 여부 확인 중..."
+    
+    if [ ! -d "$TEMP_DIR/agent-prompts" ]; then
+        print_info "agent-prompts 폴더가 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
+    
+    # 사용자 동의 확인
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        local reply
+        local valid_input=false
+        
+        print_question "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)"
+        
+        while [ "$valid_input" = false ]; do
+            if safe_read "복사하시겠습니까? (y/N): " reply "-n 1"; then
+                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                
+                if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
+                    valid_input=true
+                    print_info "agent-prompts 폴더 복사 건너뜁니다"
+                    return
+                elif [[ "$reply" =~ ^[Yy]$ ]]; then
+                    valid_input=true
+                else
+                    print_error "잘못된 입력입니다. y 또는 N을 입력해주세요. (Enter는 N)"
+                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                fi
+            fi
+        done
+    fi
+    
+    # 복사 실행
+    mkdir -p agent-prompts
+    cp -r "$TEMP_DIR/agent-prompts/"* agent-prompts/ 2>/dev/null || true
+    print_success "agent-prompts 폴더 복사 완료"
+}
+
 
 # 대화형 모드
 interactive_mode() {
@@ -961,10 +927,7 @@ execute_integration() {
     # 1. 템플릿 다운로드
     download_template
     
-    # 2. 백업 생성
-    create_backup
-    
-    # 3. 모드별 통합
+    # 2. 모드별 통합
     case $MODE in
         full)
             create_version_yml "$VERSION" "$PROJECT_TYPE" "$DETECTED_BRANCH"
@@ -972,6 +935,8 @@ execute_integration() {
             copy_workflows
             copy_scripts
             copy_issue_templates
+            copy_cursor_folder
+            copy_agent_prompts
             ;;
         version)
             create_version_yml "$VERSION" "$PROJECT_TYPE" "$DETECTED_BRANCH"
@@ -987,10 +952,7 @@ execute_integration() {
             ;;
     esac
     
-    # 4. 통합 로그 생성
-    create_integration_log
-    
-    # 5. 임시 파일 정리
+    # 3. 임시 파일 정리
     rm -rf "$TEMP_DIR"
     
     # 완료 메시지

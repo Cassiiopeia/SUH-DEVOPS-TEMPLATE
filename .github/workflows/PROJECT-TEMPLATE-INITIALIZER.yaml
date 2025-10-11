@@ -29,7 +29,7 @@ on:
   workflow_dispatch:  # 수동 실행
   push:
     paths:
-      - '.github/scripts/template_initializer.sh'
+      - 'template_initializer.sh'
 
 # 동시 실행 방지
 concurrency:
@@ -146,16 +146,16 @@ jobs:
 
       - name: 초기화 스크립트 권한 설정
         run: |
-          chmod +x .github/scripts/template_initializer.sh
+          chmod +x template_initializer.sh
 
       - name: 템플릿 초기화 실행
         run: |
           echo "=== 템플릿 초기화 시작 ==="
           
-          # 스크립트 실행
-          ./.github/scripts/template_initializer.sh \
-            "${{ needs.check-initialization-needed.outputs.project_name }}" \
-            "${{ github.repository_owner }}"
+          # 스크립트 실행 (옵션 플래그 방식)
+          ./template_initializer.sh \
+            --version 0.0.0 \
+            --type basic
           
           echo "=== 초기화 완료 ==="
 

@@ -21,17 +21,16 @@ name: PROJECT-SPRING-CICD
 # │ SERVER_HOST                 │ 배포 대상 서버 IP/도메인           │
 # │ SERVER_USER                 │ 서버 SSH 접속 사용자명             │
 # │ SERVER_PASSWORD             │ 서버 SSH 접속 비밀번호             │
-# │ PROJECT_MAIN_PORT           │ main 브랜치 배포 포트 (기본: 8085) │
 # └─────────────────────────────┴────────────────────────────────────┘
 #
-# 🧪 선택적 Secrets (test 브랜치 사용시에만):
+# 🧪 선택적 Secrets (포트 커스터마이징시):
 # ┌─────────────────────────────┬────────────────────────────────────┐
-# │ PROJECT_TEST_PORT           │ test 브랜치 배포 포트 (기본: 8086) │
+# │ PROJECT_DEPLOY_PORT         │ deploy 브랜치 배포 포트 (기본: 8081) │
 # └─────────────────────────────┴────────────────────────────────────┘
 #
 # 💡 포트 설정 예시:
-# - PROJECT_MAIN_PORT: 8090    (프로덕션 서비스 포트)
-# - PROJECT_TEST_PORT: 8091    (테스트 서비스 포트)
+# - PROJECT_DEPLOY_PORT: 8080  (배포 서비스 포트)
+# - PROJECT_TEST_PORT: 8081    (테스트 서비스 포트)
 #
 # ⚠️ 주의사항:
 # 1. 포트는 서버에서 사용하지 않는 포트를 선택하세요
@@ -58,26 +57,28 @@ name: PROJECT-SPRING-CICD
 # - 포트 충돌 방지를 위한 환경변수 기반 포트 설정
 #
 # 🌿 브랜치별 배포 전략:
-# - main 브랜치: 프로덕션 환경 (PROJECT_MAIN_PORT 사용)
-# - test 브랜치: 테스트 환경 (PROJECT_TEST_PORT 사용) - 선택사항
+# - deploy 브랜치: 배포 환경 (PROJECT_DEPLOY_PORT 사용, 기본: 8080)
+# - main 브랜치: 배포 환경 (수동 실행시, PROJECT_DEPLOY_PORT 사용, 기본: 8080)
+# - test 브랜치: 테스트 환경 (PROJECT_TEST_PORT 사용, 기본: 8081)
 #
 # 📝 사용 방법:
 # 1. 위의 GitHub Secrets 설정
 # 2. 아래 PROJECT_NAME을 실제 프로젝트명으로 변경
-# 3. 워크플로우 활성화: 'on' 섹션의 주석 해제
-# 4. (선택) test 브랜치 사용시에만 test 브랜치 트리거 추가
+# 3. deploy와 test 브랜치에 push하면 자동으로 CI/CD 실행 (main 브랜치는 수동 실행만 가능)
+# 4. GitHub Secrets에서 포트 설정 (기본값: deploy=8080, test=8081)
 #
 # ===================================================================
 
 # ===================================================================
 # 트리거 설정
 # ===================================================================
-# 기본적으로 비활성화 상태입니다. 사용하려면 아래 주석을 해제하세요.
+# deploy와 test 브랜치에 push할 때 자동으로 CI/CD가 실행됩니다.
+# main 브랜치는 workflow_dispatch로 수동 실행만 가능합니다.
 on:
-  # push:
-  #   branches:
-  #     - main    # 프로덕션 배포 (필수)
-  #     - test    # 테스트 환경 배포 (선택사항 - 작은 프로젝트는 생략 가능)
+  push:
+    branches:
+      - deploy  # 배포 환경 (8080 포트)
+      - test    # 테스트 환경 (8081 포트)
   workflow_dispatch:  # 수동 실행 허용
 
 # ===================================================================
@@ -220,27 +221,27 @@ jobs:
             CONTAINER_NAME="${PROJECT_NAME}-back"
 
             # 브랜치에 따른 환경별 설정
-            if [ "$BRANCH" == "main" ]; then
-              # 🏭 프로덕션 환경 (main 브랜치)
-              # GitHub Secrets의 PROJECT_MAIN_PORT 환경변수 사용
-              # 설정되어 있지 않으면 기본값 8085 사용
-              PORT=${{ secrets.PROJECT_MAIN_PORT || '8085' }}
-              CONTAINER_NAME="${PROJECT_NAME}-back"
-              echo "🏭 프로덕션 환경으로 배포합니다"
+            if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
+              # 🚀 배포 환경 (deploy 브랜치 또는 main 브랜치)
+              # GitHub Secrets의 PROJECT_DEPLOY_PORT 환경변수 사용
+              # 설정되어 있지 않으면 기본값 8080 사용
+              PORT=${{ secrets.PROJECT_DEPLOY_PORT || '8080' }}
+              CONTAINER_NAME="${PROJECT_NAME}-back-deploy"
+              echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"
 
             elif [ "$BRANCH" == "test" ]; then
               # 🧪 테스트 환경 (test 브랜치)
               # GitHub Secrets의 PROJECT_TEST_PORT 환경변수 사용
-              # 설정되어 있지 않으면 기본값 8086 사용
-              PORT=${{ secrets.PROJECT_TEST_PORT || '8086' }}
+              # 설정되어 있지 않으면 기본값 8081 사용
+              PORT=${{ secrets.PROJECT_TEST_PORT || '8081' }}
               CONTAINER_NAME="${PROJECT_NAME}-back-test"
               echo "🧪 테스트 환경으로 배포합니다"
 
             else
               # ⚠️ 기타 브랜치 (예상치 못한 브랜치)
               echo "⚠️ 지원하지 않는 브랜치입니다: $BRANCH"
-              echo "이 워크플로우는 main 브랜치 (필수)와 test 브랜치 (선택)만 지원합니다."
-              echo "main 브랜치만 사용하는 경우, on.push.branches에서 test 브랜치를 제거하세요."
+              echo "이 워크플로우는 deploy 브랜치와 test 브랜치만 지원합니다."
+              echo "on.push.branches에서 지원할 브랜치를 설정하세요."
               exit 1
             fi
 
@@ -303,20 +304,23 @@ jobs:
             echo "  🌐 포트: $PORT"
             echo "  ⏰ 배포 시간: $(date '+%Y-%m-%d %H:%M:%S')"
             echo ""
-            echo "🔗 접속 URL: http://your-server:${PORT}"
+            echo "🔗 접속 URL: http://${{ secrets.SERVER_HOST }}:${PORT}"
 
 # ===================================================================
-# 사용 예시 - 작은 프로젝트 (main 브랜치만)
+# 사용 예시 - deploy와 test 브랜치 사용
 # ===================================================================
 #
-# 작은 프로젝트에서 main 브랜치만 사용하는 경우:
+# 현재 설정: deploy와 test 브랜치에 push할 때 자동 배포
+# main 브랜치는 수동 실행(workflow_dispatch)만 가능
 #
-# on:
-#   push:
-#     branches:
-#       - main    # test 브랜치 제거
-#   workflow_dispatch:
+# 브랜치별 포트:
+# - deploy: 8080 (PROJECT_DEPLOY_PORT secret으로 변경 가능)
+# - main: 8080 (수동 실행시, PROJECT_DEPLOY_PORT secret으로 변경 가능)
+# - test: 8081 (PROJECT_TEST_PORT secret으로 변경 가능)
 #
-# 필요한 Secrets: APPLICATION_PROD_YML, DOCKERHUB_*, SERVER_*, PROJECT_MAIN_PORT
+# 필요한 Secrets:
+# - APPLICATION_PROD_YML, DOCKERHUB_*, SERVER_* (필수)
+# - PROJECT_DEPLOY_PORT (선택, 기본값: 8080)
+# - PROJECT_TEST_PORT (선택, 기본값: 8081)
 #
 # ===================================================================

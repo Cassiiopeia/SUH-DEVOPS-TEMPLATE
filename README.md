@@ -2,7 +2,7 @@
 - GitHub 프로젝트 운영 자동화 템플릿
 
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v1.1.10 (2025-09-20)
+## 최신 버전 : v1.1.13 (2025-09-27)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 <br>
@@ -13,7 +13,7 @@ _참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마
 
 ---
 
-## 🌟 핵심 특징
+## 🌟 핵심 특징 
 
 **개발자를 위한 완전 자동화된 DevOps 솔루션**
 
@@ -59,7 +59,7 @@ _참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마
 - ios/Runner.xcodeproj/project.pbxproj (React Native iOS)
 - android/app/build.gradle (React Native Android)
 - app.json (Expo)
-- pyproject.toml, setup.py (Python)
+- pyproject.toml (Python/FastAPI/Django)
 ```
 
 ### 2. 🤖 AI 기반 문서화 자동화
@@ -139,7 +139,7 @@ project_type: "spring"        # 🎯 프로젝트 타입 (아래 지원 타입 �
 ### 백엔드 프레임워크
 - **`spring`**: Spring Boot / Java / Gradle
 - **`node`**: Node.js / Express / Fastify
-- **`python`**: FastAPI / Django / Flask
+- **`python`**: Python / FastAPI / Django / Flask
 
 ### 프론트엔드 프레임워크  
 - **`react`**: React.js / Next.js 웹 프로젝트

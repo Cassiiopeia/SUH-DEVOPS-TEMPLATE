@@ -59,7 +59,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          ref: main
+          ref: ${{ github.event.repository.default_branch || 'main' }}
 
       - name: 버전 관리 스크립트 권한 설정
         run: |
@@ -179,9 +179,10 @@ jobs:
 
       - name: Git 설정 및 최신 상태 동기화
         run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git pull origin main
+          git pull origin $DEFAULT_BRANCH
 
       - name: 현재 버전 및 프로젝트 정보 확인
         id: get_version
@@ -211,6 +212,9 @@ jobs:
             elif [ -f "package.json" ]; then
               CURRENT_VERSION=$(grep '"version":' package.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
               echo "project_type=node" >> $GITHUB_OUTPUT
+            elif [ -f "pyproject.toml" ]; then
+              CURRENT_VERSION=$(grep "^version = " pyproject.toml | sed 's/version = *"\([^"]*\)".*/\1/')
+              echo "project_type=python" >> $GITHUB_OUTPUT
             else
               CURRENT_VERSION="1.0.0"
               echo "project_type=unknown" >> $GITHUB_OUTPUT
@@ -284,13 +288,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          ref: main
+          ref: ${{ github.event.repository.default_branch || 'main' }}
 
       - name: Git 설정
         run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git pull origin main
+          git pull origin $DEFAULT_BRANCH
 
       - name: Summary 파일 다운로드
         uses: actions/download-artifact@v4
@@ -359,6 +364,7 @@ jobs:
 
       - name: 변경사항 커밋 및 푸시
         run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
           git add CHANGELOG.json CHANGELOG.md
 
           if git diff --staged --quiet; then
@@ -369,7 +375,7 @@ jobs:
             VERSION="${{ needs.detect-and-parse.outputs.version }}"
 
             git commit -m "$REPO_NAME 버전 관리 : docs : v$VERSION 릴리즈 문서 업데이트 (PR #${{ github.event.pull_request.number }})"
-            git push origin HEAD:main
+            git push origin HEAD:$DEFAULT_BRANCH
             echo "✅ 변경사항이 성공적으로 커밋되었습니다"
           fi
 

@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://lab.suhsaechan.me/api/issue-helper/create/commit-branch/github-workflow'
+          URL='https://lab.suhsaechan.kr/api/issue-helper/create/commit-branch/github-workflow'
           RESPONSE=$(curl -sS -X POST \
             -H 'Accept: application/json' \
             -F "issueUrl=${ISSUE_URL}" \

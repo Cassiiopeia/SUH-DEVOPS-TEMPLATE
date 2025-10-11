@@ -119,6 +119,30 @@ print_header() {
     fi
 }
 
+# 멋진 배너 출력 (템플릿 버전 표시)
+print_banner() {
+    local version=$1
+    local mode=$2
+    
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "" >/dev/tty
+        echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}" >/dev/tty
+        echo -e "${CYAN}║${NC} ${MAGENTA}🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦${NC}              ${CYAN}║${NC}" >/dev/tty
+        echo -e "${CYAN}║${NC}      ${BLUE}Version${NC} : ${GREEN}v${version}${NC}                                          ${CYAN}║${NC}" >/dev/tty
+        echo -e "${CYAN}║${NC}      ${BLUE}Mode${NC}    : ${YELLOW}${mode}${NC}                     ${CYAN}║${NC}" >/dev/tty
+        echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}" >/dev/tty
+        echo "" >/dev/tty
+    else
+        echo "" >&2
+        echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}" >&2
+        echo -e "${CYAN}║${NC} ${MAGENTA}🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦${NC}              ${CYAN}║${NC}" >&2
+        echo -e "${CYAN}║${NC}      ${BLUE}Version${NC} : ${GREEN}v${version}${NC}                                          ${CYAN}║${NC}" >&2
+        echo -e "${CYAN}║${NC}      ${BLUE}Mode${NC}    : ${YELLOW}${mode}${NC}                     ${CYAN}║${NC}" >&2
+        echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}" >&2
+        echo "" >&2
+    fi
+}
+
 print_step() {
     if [ -w /dev/tty ] 2>/dev/null; then
         echo -e "${CYAN}▶${NC} $1" >/dev/tty
@@ -783,7 +807,13 @@ copy_agent_prompts() {
 
 # 대화형 모드
 interactive_mode() {
-    print_header "           🎯 템플릿 통합 - 대화형 모드                    "
+    # 템플릿 버전 가져오기 (로컬 version.yml에서)
+    local template_version="1.3.7"
+    if [ -f "version.yml" ]; then
+        template_version=$(grep "^version:" version.yml | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
+    fi
+    
+    print_banner "$template_version" "Interactive (대화형 모드)"
     
     # stdin 모드 정보 표시
     if [ "$STDIN_MODE" = true ] && [ "$TTY_AVAILABLE" = true ]; then
@@ -867,8 +897,6 @@ interactive_mode() {
 
 # 통합 실행
 execute_integration() {
-    print_header "           🚀 템플릿 통합 시작                            "
-    
     # 자동 감지
     if [ -z "$PROJECT_TYPE" ]; then
         PROJECT_TYPE=$(detect_project_type)
@@ -927,6 +955,31 @@ execute_integration() {
     # 1. 템플릿 다운로드
     download_template
     
+    # 템플릿 버전 가져오기 및 배너 표시
+    local template_version="1.3.7"
+    if [ -f "$TEMP_DIR/version.yml" ]; then
+        template_version=$(grep "^version:" "$TEMP_DIR/version.yml" | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
+    fi
+    
+    # 모드에 따른 배너 표시
+    case $MODE in
+        full)
+            print_banner "$template_version" "Full Integration (전체 통합)"
+            ;;
+        version)
+            print_banner "$template_version" "Version Management (버전 관리)"
+            ;;
+        workflows)
+            print_banner "$template_version" "Workflows Only (워크플로우만)"
+            ;;
+        issues)
+            print_banner "$template_version" "Issue Templates (이슈 템플릿)"
+            ;;
+        *)
+            print_banner "$template_version" "Integration (통합)"
+            ;;
+    esac
+    
     # 2. 모드별 통합
     case $MODE in
         full)
@@ -962,9 +1015,9 @@ execute_integration() {
 # 완료 요약
 print_summary() {
     echo "" >&2
-    echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}" >&2
-    echo -e "${GREEN}║                🎉 템플릿 통합 완료! 🎉                       ║${NC}" >&2
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}" >&2
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}" >&2
+    echo -e "${GREEN}║${NC}                    ${MAGENTA}✨ 통합 완료! ✨${NC}                        ${GREEN}║${NC}" >&2
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}" >&2
     echo "" >&2
     echo -e "${CYAN}통합된 기능:${NC}" >&2
     

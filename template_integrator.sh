@@ -989,26 +989,23 @@ print_summary() {
     
     echo "" >&2
     echo -e "${CYAN}추가된 파일:${NC}" >&2
-    echo "  📄 version.yml - 버전 관리 설정" >&2
-    echo "  📝 README.md - 버전 섹션 추가 (하단)" >&2
-    echo "  ⚙️  .github/workflows/ - 자동화 워크플로우" >&2
-    echo "  🔧 .github/scripts/ - 버전 관리 스크립트" >&2
+    echo "  📄 version.yml" >&2
+    echo "  📝 README.md (버전 섹션 추가)" >&2
     echo "" >&2
-    echo -e "${YELLOW}다음 단계:${NC}" >&2
-    echo "  1. 변경사항 확인:" >&2
-    echo "     ${GREEN}git status${NC}" >&2
+    echo -e "${CYAN}추가된 디렉토리:${NC}" >&2
+    echo "  ⚙️  .github/workflows/" >&2
+    echo "     ├─ PROJECT-VERSION-CONTROL.yaml" >&2
+    echo "     ├─ PROJECT-AUTO-CHANGELOG-CONTROL.yaml" >&2
+    echo "     ├─ PROJECT-README-VERSION-UPDATE.yaml" >&2
+    echo "     ├─ PROJECT-ISSUE-COMMENT.yaml" >&2
+    echo "     └─ PROJECT-SYNC-ISSUE-LABELS.yaml" >&2
     echo "" >&2
-    echo "  2. 커밋 및 푸시:" >&2
-    echo "     ${GREEN}git add .${NC}" >&2
-    echo "     ${GREEN}git commit -m \"chore: SUH-DEVOPS-TEMPLATE 통합 v$VERSION\"${NC}" >&2
-    echo "     ${GREEN}git push origin $DETECTED_BRANCH${NC}" >&2
-    echo "" >&2
-    echo "  3. GitHub에서 Actions 탭 확인" >&2
+    echo "  🔧 .github/scripts/" >&2
+    echo "     ├─ version_manager.sh" >&2
+    echo "     └─ changelog_manager.py" >&2
     echo "" >&2
     echo -e "${CYAN}유용한 정보:${NC}" >&2
     echo "  📖 템플릿 문서: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-    echo "  📜 통합 로그: .template_integration/integration.log" >&2
-    echo "  ↩️  롤백: ./.template_integration/rollback.sh" >&2
     echo "" >&2
 }
 

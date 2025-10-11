@@ -124,20 +124,35 @@ print_banner() {
     local version=$1
     local mode=$2
     
+    # 박스 너비 (안쪽 컨텐츠 영역)
+    local box_width=66
+    
+    # 타이틀 라인 (이모지 포함)
+    local title="🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦"
+    
+    # Version 라인
+    local version_label="Version"
+    local version_value="v${version}"
+    local version_line="     ${version_label} : ${version_value}"
+    
+    # Mode 라인
+    local mode_label="Mode"
+    local mode_line="     ${mode_label}    : ${mode}"
+    
     if [ -w /dev/tty ] 2>/dev/null; then
         echo "" >/dev/tty
         echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}" >/dev/tty
-        echo -e "${CYAN}║${NC} ${MAGENTA}🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦${NC}              ${CYAN}║${NC}" >/dev/tty
-        echo -e "${CYAN}║${NC}      ${BLUE}Version${NC} : ${GREEN}v${version}${NC}                                          ${CYAN}║${NC}" >/dev/tty
-        echo -e "${CYAN}║${NC}      ${BLUE}Mode${NC}    : ${YELLOW}${mode}${NC}                     ${CYAN}║${NC}" >/dev/tty
+        printf "${CYAN}║${NC} ${MAGENTA}%-66s${NC}${CYAN}║${NC}\n" "$title" >/dev/tty
+        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${GREEN}%-48s${NC}${CYAN}║${NC}\n" "$version_label" "$version_value" >/dev/tty
+        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${YELLOW}%-48s${NC}${CYAN}║${NC}\n" "$mode_label" "$mode" >/dev/tty
         echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}" >/dev/tty
         echo "" >/dev/tty
     else
         echo "" >&2
         echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}" >&2
-        echo -e "${CYAN}║${NC} ${MAGENTA}🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦${NC}              ${CYAN}║${NC}" >&2
-        echo -e "${CYAN}║${NC}      ${BLUE}Version${NC} : ${GREEN}v${version}${NC}                                          ${CYAN}║${NC}" >&2
-        echo -e "${CYAN}║${NC}      ${BLUE}Mode${NC}    : ${YELLOW}${mode}${NC}                     ${CYAN}║${NC}" >&2
+        printf "${CYAN}║${NC} ${MAGENTA}%-66s${NC}${CYAN}║${NC}\n" "$title" >&2
+        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${GREEN}%-48s${NC}${CYAN}║${NC}\n" "$version_label" "$version_value" >&2
+        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${YELLOW}%-48s${NC}${CYAN}║${NC}\n" "$mode_label" "$mode" >&2
         echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}" >&2
         echo "" >&2
     fi

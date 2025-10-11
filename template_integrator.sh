@@ -103,37 +103,69 @@ TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
 TEMP_DIR=".template_download_temp"
 BACKUP_DIR=".template_integration"
 
-# 출력 함수 (모두 stderr로 리다이렉션하여 명령어 치환 시 데이터 오염 방지)
+# 출력 함수 (/dev/tty 우선, 없으면 stderr로 폴백하여 명령어 치환 시 데이터 오염 방지)
 print_header() {
-    echo "" >&2
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}" >&2
-    echo -e "${CYAN}║$1${NC}" >&2
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}" >&2
-    echo "" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "" >/dev/tty
+        echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}" >/dev/tty
+        echo -e "${CYAN}║$1${NC}" >/dev/tty
+        echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}" >/dev/tty
+        echo "" >/dev/tty
+    else
+        echo "" >&2
+        echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}" >&2
+        echo -e "${CYAN}║$1${NC}" >&2
+        echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}" >&2
+        echo "" >&2
+    fi
 }
 
 print_step() {
-    echo -e "${CYAN}▶${NC} $1" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "${CYAN}▶${NC} $1" >/dev/tty
+    else
+        echo -e "${CYAN}▶${NC} $1" >&2
+    fi
 }
 
 print_info() {
-    echo -e "  ${BLUE}→${NC} $1" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "  ${BLUE}→${NC} $1" >/dev/tty
+    else
+        echo -e "  ${BLUE}→${NC} $1" >&2
+    fi
 }
 
 print_success() {
-    echo -e "${GREEN}✓${NC} $1" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} $1" >/dev/tty
+    else
+        echo -e "${GREEN}✓${NC} $1" >&2
+    fi
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠${NC} $1" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "${YELLOW}⚠${NC} $1" >/dev/tty
+    else
+        echo -e "${YELLOW}⚠${NC} $1" >&2
+    fi
 }
 
 print_error() {
-    echo -e "${RED}✗${NC} $1" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "${RED}✗${NC} $1" >/dev/tty
+    else
+        echo -e "${RED}✗${NC} $1" >&2
+    fi
 }
 
 print_question() {
-    echo -e "${MAGENTA}?${NC} $1" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "${MAGENTA}?${NC} $1" >/dev/tty
+    else
+        echo -e "${MAGENTA}?${NC} $1" >&2
+    fi
 }
 
 # 안전한 read 함수 (stdin 모드에서도 /dev/tty 사용)
@@ -790,29 +822,48 @@ interactive_mode() {
     # stdin 모드 정보 표시
     if [ "$STDIN_MODE" = true ] && [ "$TTY_AVAILABLE" = true ]; then
         print_info "원격 실행 모드 감지: /dev/tty를 통해 대화형 입력 사용"
-        echo "" >&2
+        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
     fi
     
     # 터미널 상태 확인
     if [ "$TTY_AVAILABLE" = false ]; then
         print_error "대화형 입력이 불가능한 환경입니다 (CI/CD, non-interactive shell)"
         print_error "다음 중 하나를 사용하세요:"
-        echo "" >&2
-        echo "  ${GREEN}bash <(curl -fsSL URL) --mode full --force${NC}" >&2
-        echo "  ${GREEN}bash <(curl -fsSL URL) --mode version${NC}" >&2
-        echo "  ${GREEN}curl -fsSL URL | bash -s -- --mode version --force${NC}" >&2
-        echo "" >&2
+        if [ -w /dev/tty ] 2>/dev/null; then
+            echo "" >/dev/tty
+            echo "  ${GREEN}bash <(curl -fsSL URL) --mode full --force${NC}" >/dev/tty
+            echo "  ${GREEN}bash <(curl -fsSL URL) --mode version${NC}" >/dev/tty
+            echo "  ${GREEN}curl -fsSL URL | bash -s -- --mode version --force${NC}" >/dev/tty
+            echo "" >/dev/tty
+        else
+            echo "" >&2
+            echo "  ${GREEN}bash <(curl -fsSL URL) --mode full --force${NC}" >&2
+            echo "  ${GREEN}bash <(curl -fsSL URL) --mode version${NC}" >&2
+            echo "  ${GREEN}curl -fsSL URL | bash -s -- --mode version --force${NC}" >&2
+            echo "" >&2
+        fi
         exit 1
     fi
     
-    echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}" >&2
-    echo "" >&2
-    echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >&2
-    echo "  ${GREEN}2${NC}) 버전 관리 시스템만" >&2
-    echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만" >&2
-    echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만" >&2
-    echo "  ${GREEN}5${NC}) 취소" >&2
-    echo "" >&2
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}" >/dev/tty
+        echo "" >/dev/tty
+        echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >/dev/tty
+        echo "  ${GREEN}2${NC}) 버전 관리 시스템만" >/dev/tty
+        echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만" >/dev/tty
+        echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만" >/dev/tty
+        echo "  ${GREEN}5${NC}) 취소" >/dev/tty
+        echo "" >/dev/tty
+    else
+        echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}" >&2
+        echo "" >&2
+        echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >&2
+        echo "  ${GREEN}2${NC}) 버전 관리 시스템만" >&2
+        echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만" >&2
+        echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만" >&2
+        echo "  ${GREEN}5${NC}) 취소" >&2
+        echo "" >&2
+    fi
     
     local choice
     local valid_input=false
@@ -820,7 +871,7 @@ interactive_mode() {
     # 입력 검증 루프 - 올바른 값(1-5)이 입력될 때까지 반복
     while [ "$valid_input" = false ]; do
         if safe_read "선택 (1-5): " choice "-n 1"; then
-            echo "" >&2
+            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
             
             # 입력값 검증: 1-5 숫자만 허용
             if [[ "$choice" =~ ^[1-5]$ ]]; then
@@ -838,7 +889,7 @@ interactive_mode() {
             else
                 # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
                 print_error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
-                echo "" >&2
+                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
             fi
         else
             # safe_read 실패 (이론상 여기 도달 안 함)

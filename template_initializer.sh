@@ -266,47 +266,67 @@ EOF
 }
 
 # 워크플로우 트리거 브랜치 변경
+# 
+# 동작 방식:
+# - Default branch가 "main"인 경우: 모든 워크플로우가 기본적으로 main을 사용하므로 변경 불필요
+# - Default branch가 "main"이 아닌 경우: main 브랜치를 트리거로 사용하는 워크플로우만 변경
+#
+# 화이트리스트 방식:
+# - main 브랜치를 트리거로 사용하는 워크플로우를 명시적으로 지정
+# - deploy 브랜치 전용 워크플로우는 변경하지 않음
+# - 새로운 main 트리거 워크플로우 추가 시 MAIN_BRANCH_WORKFLOWS 배열에 추가 필요
+#
+# 참고: 
+# - 이 함수는 템플릿 초기화 시에만 실행됩니다.
+# - 임시 파일 방식으로 macOS (BSD sed) / Linux (GNU sed) 모두 호환됩니다.
 update_workflow_triggers() {
     local branch=$1
     
-    # main 브랜치면 변경 불필요
+    # main 브랜치면 변경 불필요 (워크플로우 기본값이 main이므로)
     if [ "$branch" = "main" ]; then
         print_info "브랜치가 main이므로 워크플로우 변경 불필요"
+        print_info "모든 워크플로우는 기본적으로 main 브랜치를 트리거로 사용합니다"
         return
     fi
     
     print_step "워크플로우 트리거 브랜치 변경 중: main → $branch"
     
-    local count=0
+    # main 브랜치를 트리거로 사용하는 워크플로우만 명시적으로 지정
+    # (deploy 브랜치 전용 워크플로우는 포함하지 않음)
+    local MAIN_BRANCH_WORKFLOWS=(
+        "PROJECT-VERSION-CONTROL.yaml"
+    )
     
-    # .github/workflows 디렉토리의 모든 YAML 파일 (초기화 워크플로우 제외)
-    find .github/workflows -type f \( -name "*.yml" -o -name "*.yaml" \) ! -name "PROJECT-TEMPLATE-INITIALIZER.yaml" 2>/dev/null | while read -r file; do
-        local changed=false
+    local updated=0
+    
+    for workflow in "${MAIN_BRANCH_WORKFLOWS[@]}"; do
+        local file=".github/workflows/$workflow"
         
-        # 패턴 1: branches: ["main"]
-        if grep -q 'branches: \["main"\]' "$file"; then
-            sed -i "s/branches: \[\"main\"\]/branches: [\"$branch\"]/" "$file"
-            changed=true
-        fi
-        
-        # 패턴 2: branches: ['main']
-        if grep -q "branches: \['main'\]" "$file"; then
-            sed -i "s/branches: \['main'\]/branches: ['$branch']/" "$file"
-            changed=true
-        fi
-        
-        # 패턴 3: - main (리스트 항목)
-        if grep -q '^[[:space:]]*-[[:space:]]*main[[:space:]]*$' "$file"; then
-            sed -i "s/^\\([[:space:]]*-[[:space:]]*\\)main[[:space:]]*$/\\1$branch/" "$file"
-            changed=true
-        fi
-        
-        if [ "$changed" = true ]; then
-            echo "  ✓ $(basename "$file")"
+        if [ -f "$file" ]; then
+            # main 브랜치 트리거를 감지된 브랜치로 변경 (임시 파일 사용, macOS/Linux 호환)
+            if grep -q 'branches: \["main"\]' "$file"; then
+                sed "s/branches: \\[\"main\"\\]/branches: [\"$branch\"]/" "$file" > "$file.tmp"
+                mv "$file.tmp" "$file"
+                echo "  ✓ $workflow"
+                updated=$((updated + 1))
+            elif grep -q "branches: \\['main'\\]" "$file"; then
+                sed "s/branches: \\['main'\\]/branches: ['$branch']/" "$file" > "$file.tmp"
+                mv "$file.tmp" "$file"
+                echo "  ✓ $workflow"
+                updated=$((updated + 1))
+            else
+                print_warning "$workflow 파일에서 main 브랜치 트리거를 찾을 수 없습니다"
+            fi
+        else
+            print_warning "$workflow 파일이 존재하지 않습니다"
         fi
     done
     
-    print_success "워크플로우 트리거 브랜치 변경 완료"
+    if [ $updated -gt 0 ]; then
+        print_success "$updated 개 워크플로우 파일 업데이트 완료"
+    else
+        print_warning "업데이트할 워크플로우 파일이 없습니다"
+    fi
 }
 
 # 템플릿 관련 파일 삭제
@@ -381,21 +401,28 @@ update_issue_templates() {
     
     # bug_report.md 업데이트
     if [ -f ".github/ISSUE_TEMPLATE/bug_report.md" ]; then
-        sed -i "s/assignees: \[Cassiiopeia\]/assignees: [$REPO_OWNER]/" .github/ISSUE_TEMPLATE/bug_report.md
+        # 임시 파일 사용 (macOS/Linux 호환)
+        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+            .github/ISSUE_TEMPLATE/bug_report.md > .github/ISSUE_TEMPLATE/bug_report.md.tmp
+        mv .github/ISSUE_TEMPLATE/bug_report.md.tmp .github/ISSUE_TEMPLATE/bug_report.md
         echo "  ✓ bug_report.md"
         updated=$((updated + 1))
     fi
     
     # design_request.md 업데이트
     if [ -f ".github/ISSUE_TEMPLATE/design_request.md" ]; then
-        sed -i "s/assignees: \[Cassiiopeia\]/assignees: [$REPO_OWNER]/" .github/ISSUE_TEMPLATE/design_request.md
+        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+            .github/ISSUE_TEMPLATE/design_request.md > .github/ISSUE_TEMPLATE/design_request.md.tmp
+        mv .github/ISSUE_TEMPLATE/design_request.md.tmp .github/ISSUE_TEMPLATE/design_request.md
         echo "  ✓ design_request.md"
         updated=$((updated + 1))
     fi
     
     # feature_request.md 업데이트
     if [ -f ".github/ISSUE_TEMPLATE/feature_request.md" ]; then
-        sed -i "s/assignees: \[Cassiiopeia\]/assignees: [$REPO_OWNER]/" .github/ISSUE_TEMPLATE/feature_request.md
+        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+            .github/ISSUE_TEMPLATE/feature_request.md > .github/ISSUE_TEMPLATE/feature_request.md.tmp
+        mv .github/ISSUE_TEMPLATE/feature_request.md.tmp .github/ISSUE_TEMPLATE/feature_request.md
         echo "  ✓ feature_request.md"
         updated=$((updated + 1))
     fi

@@ -651,8 +651,10 @@ show_project_type_menu() {
                 print_to_user ""
             fi
         else
-            print_error "입력을 읽을 수 없습니다"
-            exit 1
+            # TTY를 읽을 수 없는 환경 - 기존 값 유지
+            print_error "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+            echo "$PROJECT_TYPE"
+            return 1
         fi
     done
 }
@@ -754,6 +756,9 @@ handle_project_edit_menu() {
                                 print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
                             fi
                             print_to_user ""
+                        else
+                            print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                            print_to_user ""
                         fi
                         ;;
                     3)
@@ -771,6 +776,9 @@ handle_project_edit_menu() {
                                 print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
                             fi
                             print_to_user ""
+                        else
+                            print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                            print_to_user ""
                         fi
                         ;;
                     4)
@@ -786,8 +794,11 @@ handle_project_edit_menu() {
                 print_to_user ""
             fi
         else
-            print_error "입력을 읽을 수 없습니다"
-            exit 1
+            # TTY를 읽을 수 없는 환경 - 대화형 편집 불가
+            print_error "대화형 입력이 불가능한 환경입니다."
+            print_warning "자동화 환경에서는 --type, --version 옵션을 직접 지정해주세요."
+            print_to_user ""
+            return 1
         fi
     done
 }

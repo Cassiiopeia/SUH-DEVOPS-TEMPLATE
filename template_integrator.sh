@@ -103,37 +103,37 @@ TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
 TEMP_DIR=".template_download_temp"
 BACKUP_DIR=".template_integration"
 
-# 출력 함수
+# 출력 함수 (모두 stderr로 리다이렉션하여 명령어 치환 시 데이터 오염 방지)
 print_header() {
-    echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║$1${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
+    echo "" >&2
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}" >&2
+    echo -e "${CYAN}║$1${NC}" >&2
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}" >&2
+    echo "" >&2
 }
 
 print_step() {
-    echo -e "${CYAN}▶${NC} $1"
+    echo -e "${CYAN}▶${NC} $1" >&2
 }
 
 print_info() {
-    echo -e "  ${BLUE}→${NC} $1"
+    echo -e "  ${BLUE}→${NC} $1" >&2
 }
 
 print_success() {
-    echo -e "${GREEN}✓${NC} $1"
+    echo -e "${GREEN}✓${NC} $1" >&2
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠${NC} $1"
+    echo -e "${YELLOW}⚠${NC} $1" >&2
 }
 
 print_error() {
-    echo -e "${RED}✗${NC} $1"
+    echo -e "${RED}✗${NC} $1" >&2
 }
 
 print_question() {
-    echo -e "${MAGENTA}?${NC} $1"
+    echo -e "${MAGENTA}?${NC} $1" >&2
 }
 
 # 안전한 read 함수 (stdin 모드에서도 /dev/tty 사용)
@@ -294,53 +294,53 @@ detect_project_type() {
         if grep -q "@react-native" package.json || grep -q "react-native" package.json; then
             # Expo 체크
             if grep -q "expo" package.json; then
-                echo "react-native-expo"
                 print_info "감지됨: React Native (Expo)"
+                echo "react-native-expo"
                 return
             else
-                echo "react-native"
                 print_info "감지됨: React Native"
+                echo "react-native"
                 return
             fi
         fi
         
         # React 체크
         if grep -q "\"react\"" package.json; then
-            echo "react"
             print_info "감지됨: React"
+            echo "react"
             return
         fi
         
         # 기본 Node.js
-        echo "node"
         print_info "감지됨: Node.js"
+        echo "node"
         return
     fi
     
     # Spring Boot
     if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] || [ -f "pom.xml" ]; then
-        echo "spring"
         print_info "감지됨: Spring Boot"
+        echo "spring"
         return
     fi
     
     # Flutter
     if [ -f "pubspec.yaml" ]; then
-        echo "flutter"
         print_info "감지됨: Flutter"
+        echo "flutter"
         return
     fi
     
     # Python
     if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
-        echo "python"
         print_info "감지됨: Python"
+        echo "python"
         return
     fi
     
     # 감지 실패
-    echo "basic"
     print_warning "프로젝트 타입을 감지하지 못했습니다. 기본(basic) 타입으로 설정합니다."
+    echo "basic"
 }
 
 # 버전 자동 감지
@@ -353,8 +353,8 @@ detect_version() {
     if [ -f "package.json" ] && command -v jq >/dev/null 2>&1; then
         detected_version=$(jq -r '.version // empty' package.json 2>/dev/null)
         if [ -n "$detected_version" ]; then
-            echo "$detected_version"
             print_info "package.json에서 발견: v$detected_version"
+            echo "$detected_version"
             return
         fi
     fi
@@ -363,8 +363,8 @@ detect_version() {
     if [ -f "build.gradle" ]; then
         detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" build.gradle | head -1)
         if [ -n "$detected_version" ]; then
-            echo "$detected_version"
             print_info "build.gradle에서 발견: v$detected_version"
+            echo "$detected_version"
             return
         fi
     fi
@@ -373,8 +373,8 @@ detect_version() {
     if [ -f "pubspec.yaml" ]; then
         detected_version=$(grep -oP "version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" pubspec.yaml | head -1)
         if [ -n "$detected_version" ]; then
-            echo "$detected_version"
             print_info "pubspec.yaml에서 발견: v$detected_version"
+            echo "$detected_version"
             return
         fi
     fi
@@ -383,8 +383,8 @@ detect_version() {
     if [ -f "pyproject.toml" ]; then
         detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" pyproject.toml | head -1)
         if [ -n "$detected_version" ]; then
-            echo "$detected_version"
             print_info "pyproject.toml에서 발견: v$detected_version"
+            echo "$detected_version"
             return
         fi
     fi
@@ -393,15 +393,15 @@ detect_version() {
     if git rev-parse --git-dir > /dev/null 2>&1; then
         detected_version=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
         if [ -n "$detected_version" ]; then
-            echo "$detected_version"
             print_info "Git 태그에서 발견: v$detected_version"
+            echo "$detected_version"
             return
         fi
     fi
     
     # 기본값
-    echo "0.1.0"
     print_warning "버전을 감지하지 못했습니다. 기본값 0.1.0으로 설정합니다."
+    echo "0.1.0"
 }
 
 # Default branch 감지
@@ -587,13 +587,30 @@ create_version_yml() {
     
     if [ -f "version.yml" ]; then
         print_warning "version.yml이 이미 존재합니다"
-        if [ "$FORCE_MODE" = false ]; then
-            read -p "덮어쓰시겠습니까? (y/N): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                print_info "version.yml 생성 건너뜁니다"
-                return
-            fi
+        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+            local reply
+            local valid_input=false
+            
+            # 입력 검증 루프 - Y/y/N/n/Enter만 허용
+            while [ "$valid_input" = false ]; do
+                if safe_read "덮어쓰시겠습니까? (y/N): " reply "-n 1"; then
+                    echo "" >&2
+                    
+                    # 빈 입력(Enter) 또는 N/n은 건너뛰기, Y/y는 덮어쓰기
+                    if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
+                        valid_input=true
+                        print_info "version.yml 생성 건너뜁니다"
+                        return
+                    elif [[ "$reply" =~ ^[Yy]$ ]]; then
+                        valid_input=true
+                        # 덮어쓰기 진행
+                    else
+                        # 잘못된 입력
+                        print_error "잘못된 입력입니다. y 또는 N을 입력해주세요. (Enter는 N)"
+                        echo "" >&2
+                    fi
+                fi
+            done
         fi
     fi
     
@@ -601,17 +618,42 @@ create_version_yml() {
 # ===================================================================
 # 프로젝트 버전 관리 파일
 # ===================================================================
-# 이 파일은 GitHub Actions 워크플로우가 자동으로 관리합니다
-# 
+#
+# 이 파일은 다양한 프로젝트 타입에서 버전 정보를 중앙 관리하기 위한 파일입니다.
+# GitHub Actions 워크플로우가 이 파일을 읽어 자동으로 버전을 관리합니다.
+#
+# 사용법:
+# 1. version: "1.0.0" - 사용자에게 표시되는 버전
+# 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
+# 3. project_type: 프로젝트 타입 지정
+#
+# 자동 버전 업데이트:
+# - patch: 자동으로 세 번째 자리 증가 (x.x.x -> x.x.x+1)
+# - version_code: 매 빌드마다 자동으로 1씩 증가
+# - minor/major: 수동으로 직접 수정 필요
+#
+# 프로젝트 타입별 동기화 파일:
+# - spring: build.gradle (version = "x.y.z")
+# - flutter: pubspec.yaml (version: x.y.z+i, buildNumber 포함)
+# - react/node: package.json ("version": "x.y.z")
+# - react-native: iOS Info.plist 또는 Android build.gradle
+# - react-native-expo: app.json (expo.version)
+# - python: pyproject.toml (version = "x.y.z")
+# - basic/기타: version.yml 파일만 사용
+#
 # 연관된 워크플로우:
 # - .github/workflows/PROJECT-VERSION-CONTROL.yaml
 # - .github/workflows/PROJECT-README-VERSION-UPDATE.yaml
 # - .github/workflows/PROJECT-AUTO-CHANGELOG-CONTROL.yaml
+#
+# 주의사항:
+# - project_type은 최초 설정 후 변경하지 마세요
+# - 버전은 항상 높은 버전으로 자동 동기화됩니다
 # ===================================================================
 
 version: "$version"
-version_code: 1
-project_type: "$type"
+version_code: 1  # app build number
+project_type: "$type"  # spring, flutter, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "template_integrator"
@@ -748,52 +790,62 @@ interactive_mode() {
     # stdin 모드 정보 표시
     if [ "$STDIN_MODE" = true ] && [ "$TTY_AVAILABLE" = true ]; then
         print_info "원격 실행 모드 감지: /dev/tty를 통해 대화형 입력 사용"
-        echo ""
+        echo "" >&2
     fi
     
     # 터미널 상태 확인
     if [ "$TTY_AVAILABLE" = false ]; then
         print_error "대화형 입력이 불가능한 환경입니다 (CI/CD, non-interactive shell)"
         print_error "다음 중 하나를 사용하세요:"
-        echo ""
-        echo "  ${GREEN}bash <(curl -fsSL URL) --mode full --force${NC}"
-        echo "  ${GREEN}bash <(curl -fsSL URL) --mode version${NC}"
-        echo "  ${GREEN}curl -fsSL URL | bash -s -- --mode version --force${NC}"
-        echo ""
+        echo "" >&2
+        echo "  ${GREEN}bash <(curl -fsSL URL) --mode full --force${NC}" >&2
+        echo "  ${GREEN}bash <(curl -fsSL URL) --mode version${NC}" >&2
+        echo "  ${GREEN}curl -fsSL URL | bash -s -- --mode version --force${NC}" >&2
+        echo "" >&2
         exit 1
     fi
     
-    echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}"
-    echo ""
-    echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
-    echo "  ${GREEN}2${NC}) 버전 관리 시스템만"
-    echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만"
-    echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만"
-    echo "  ${GREEN}5${NC}) 취소"
-    echo ""
+    echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}" >&2
+    echo "" >&2
+    echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >&2
+    echo "  ${GREEN}2${NC}) 버전 관리 시스템만" >&2
+    echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만" >&2
+    echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만" >&2
+    echo "  ${GREEN}5${NC}) 취소" >&2
+    echo "" >&2
     
     local choice
-    if safe_read "선택 (1-5): " choice "-n 1"; then
-        echo ""
-        case $choice in
-            1) MODE="full" ;;
-            2) MODE="version" ;;
-            3) MODE="workflows" ;;
-            4) MODE="issues" ;;
-            5) 
-                print_info "취소되었습니다"
-                exit 0
-                ;;
-            *)
-                print_error "잘못된 선택입니다"
-                exit 1
-                ;;
-        esac
-    else
-        # safe_read 실패 (이론상 여기 도달 안 함)
-        print_error "입력을 읽을 수 없습니다"
-        exit 1
-    fi
+    local valid_input=false
+    
+    # 입력 검증 루프 - 올바른 값(1-5)이 입력될 때까지 반복
+    while [ "$valid_input" = false ]; do
+        if safe_read "선택 (1-5): " choice "-n 1"; then
+            echo "" >&2
+            
+            # 입력값 검증: 1-5 숫자만 허용
+            if [[ "$choice" =~ ^[1-5]$ ]]; then
+                valid_input=true
+                case $choice in
+                    1) MODE="full" ;;
+                    2) MODE="version" ;;
+                    3) MODE="workflows" ;;
+                    4) MODE="issues" ;;
+                    5) 
+                        print_info "취소되었습니다"
+                        exit 0
+                        ;;
+                esac
+            else
+                # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
+                print_error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
+                echo "" >&2
+            fi
+        else
+            # safe_read 실패 (이론상 여기 도달 안 함)
+            print_error "입력을 읽을 수 없습니다"
+            exit 1
+        fi
+    done
 }
 
 # 통합 실행
@@ -811,34 +863,49 @@ execute_integration() {
     
     DETECTED_BRANCH=$(detect_default_branch)
     
-    echo -e "${BLUE}통합 정보:${NC}"
-    echo -e "  프로젝트 타입: ${GREEN}$PROJECT_TYPE${NC}"
-    echo -e "  초기 버전: ${GREEN}v$VERSION${NC}"
-    echo -e "  Default 브랜치: ${GREEN}$DETECTED_BRANCH${NC}"
-    echo -e "  통합 모드: ${GREEN}$MODE${NC}"
-    echo ""
+    echo -e "${BLUE}통합 정보:${NC}" >&2
+    echo -e "  프로젝트 타입: ${GREEN}$PROJECT_TYPE${NC}" >&2
+    echo -e "  초기 버전: ${GREEN}v$VERSION${NC}" >&2
+    echo -e "  Default 브랜치: ${GREEN}$DETECTED_BRANCH${NC}" >&2
+    echo -e "  통합 모드: ${GREEN}$MODE${NC}" >&2
+    echo "" >&2
     
     if [ "$FORCE_MODE" = false ]; then
         if [ "$TTY_AVAILABLE" = true ]; then
             local reply
-            if safe_read "계속하시겠습니까? (Y/n): " reply "-n 1"; then
-                echo ""
-                if [[ $reply =~ ^[Nn]$ ]]; then
-                    print_info "취소되었습니다"
-                    exit 0
+            local valid_input=false
+            
+            # 입력 검증 루프 - Y/y/N/n/Enter만 허용
+            while [ "$valid_input" = false ]; do
+                if safe_read "계속하시겠습니까? (Y/n): " reply "-n 1"; then
+                    echo "" >&2
+                    
+                    # 빈 입력(Enter) 또는 Y/y는 계속, N/n은 취소
+                    if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
+                        valid_input=true
+                        # 계속 진행
+                    elif [[ "$reply" =~ ^[Nn]$ ]]; then
+                        valid_input=true
+                        print_info "취소되었습니다"
+                        exit 0
+                    else
+                        # 잘못된 입력
+                        print_error "잘못된 입력입니다. Y 또는 n을 입력해주세요. (Enter는 Y)"
+                        echo "" >&2
+                    fi
                 fi
-            fi
+            done
         else
             # TTY 없음 - --force 필수
             print_error "--force 옵션이 필요합니다 (non-interactive 환경)"
-            echo ""
-            echo "  ${GREEN}bash <(curl -fsSL URL) --mode $MODE --force${NC}"
-            echo ""
+            echo "" >&2
+            echo "  ${GREEN}bash <(curl -fsSL URL) --mode $MODE --force${NC}" >&2
+            echo "" >&2
             exit 1
         fi
     fi
     
-    echo ""
+    echo "" >&2
     
     # 1. 템플릿 다운로드
     download_template
@@ -881,55 +948,55 @@ execute_integration() {
 
 # 완료 요약
 print_summary() {
-    echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                🎉 템플릿 통합 완료! 🎉                       ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${CYAN}통합된 기능:${NC}"
+    echo "" >&2
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}" >&2
+    echo -e "${GREEN}║                🎉 템플릿 통합 완료! 🎉                       ║${NC}" >&2
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}" >&2
+    echo "" >&2
+    echo -e "${CYAN}통합된 기능:${NC}" >&2
     
     case $MODE in
         full)
-            echo "  ✅ 버전 관리 시스템 (version.yml)"
-            echo "  ✅ README.md 자동 버전 업데이트"
-            echo "  ✅ GitHub Actions 워크플로우"
-            echo "  ✅ 이슈/PR 템플릿"
+            echo "  ✅ 버전 관리 시스템 (version.yml)" >&2
+            echo "  ✅ README.md 자동 버전 업데이트" >&2
+            echo "  ✅ GitHub Actions 워크플로우" >&2
+            echo "  ✅ 이슈/PR 템플릿" >&2
             ;;
         version)
-            echo "  ✅ 버전 관리 시스템 (version.yml)"
-            echo "  ✅ README.md 자동 버전 업데이트"
+            echo "  ✅ 버전 관리 시스템 (version.yml)" >&2
+            echo "  ✅ README.md 자동 버전 업데이트" >&2
             ;;
         workflows)
-            echo "  ✅ GitHub Actions 워크플로우"
+            echo "  ✅ GitHub Actions 워크플로우" >&2
             ;;
         issues)
-            echo "  ✅ 이슈/PR 템플릿"
+            echo "  ✅ 이슈/PR 템플릿" >&2
             ;;
     esac
     
-    echo ""
-    echo -e "${CYAN}추가된 파일:${NC}"
-    echo "  📄 version.yml - 버전 관리 설정"
-    echo "  📝 README.md - 버전 섹션 추가 (하단)"
-    echo "  ⚙️  .github/workflows/ - 자동화 워크플로우"
-    echo "  🔧 .github/scripts/ - 버전 관리 스크립트"
-    echo ""
-    echo -e "${YELLOW}다음 단계:${NC}"
-    echo "  1. 변경사항 확인:"
-    echo "     ${GREEN}git status${NC}"
-    echo ""
-    echo "  2. 커밋 및 푸시:"
-    echo "     ${GREEN}git add .${NC}"
-    echo "     ${GREEN}git commit -m \"chore: SUH-DEVOPS-TEMPLATE 통합 v$VERSION\"${NC}"
-    echo "     ${GREEN}git push origin $DETECTED_BRANCH${NC}"
-    echo ""
-    echo "  3. GitHub에서 Actions 탭 확인"
-    echo ""
-    echo -e "${CYAN}유용한 정보:${NC}"
-    echo "  📖 템플릿 문서: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-    echo "  📜 통합 로그: .template_integration/integration.log"
-    echo "  ↩️  롤백: ./.template_integration/rollback.sh"
-    echo ""
+    echo "" >&2
+    echo -e "${CYAN}추가된 파일:${NC}" >&2
+    echo "  📄 version.yml - 버전 관리 설정" >&2
+    echo "  📝 README.md - 버전 섹션 추가 (하단)" >&2
+    echo "  ⚙️  .github/workflows/ - 자동화 워크플로우" >&2
+    echo "  🔧 .github/scripts/ - 버전 관리 스크립트" >&2
+    echo "" >&2
+    echo -e "${YELLOW}다음 단계:${NC}" >&2
+    echo "  1. 변경사항 확인:" >&2
+    echo "     ${GREEN}git status${NC}" >&2
+    echo "" >&2
+    echo "  2. 커밋 및 푸시:" >&2
+    echo "     ${GREEN}git add .${NC}" >&2
+    echo "     ${GREEN}git commit -m \"chore: SUH-DEVOPS-TEMPLATE 통합 v$VERSION\"${NC}" >&2
+    echo "     ${GREEN}git push origin $DETECTED_BRANCH${NC}" >&2
+    echo "" >&2
+    echo "  3. GitHub에서 Actions 탭 확인" >&2
+    echo "" >&2
+    echo -e "${CYAN}유용한 정보:${NC}" >&2
+    echo "  📖 템플릿 문서: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+    echo "  📜 통합 로그: .template_integration/integration.log" >&2
+    echo "  ↩️  롤백: ./.template_integration/rollback.sh" >&2
+    echo "" >&2
 }
 
 # 메인 실행
@@ -944,13 +1011,13 @@ main() {
         else
             print_info "실행 모드: 원격 (stdin), TTY 불가 (자동화 환경)"
         fi
-        echo ""
+        echo "" >&2
     fi
     
     # Git 저장소 확인 (경고만 표시)
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         print_warning "Git 저장소가 아닙니다. 일부 기능이 제한될 수 있습니다."
-        echo ""
+        echo "" >&2
     fi
     
     # 대화형 모드

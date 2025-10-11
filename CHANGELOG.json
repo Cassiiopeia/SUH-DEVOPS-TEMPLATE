@@ -1,11 +1,44 @@
 {
   "metadata": {
-    "lastUpdated": "2025-09-27T15:44:22Z",
-    "currentVersion": "1.1.13",
+    "lastUpdated": "2025-10-11T14:56:56Z",
+    "currentVersion": "1.3.1",
     "projectType": "basic",
-    "totalReleases": 24
+    "totalReleases": 25
   },
   "releases": [
+    {
+      "version": "1.3.1",
+      "project_type": "basic",
+      "date": "2025-10-11",
+      "pr_number": 73,
+      "raw_summary": "Summary by CodeRabbit\n\n\nNew Features\n\n동적 기본 브랜치 감지·적용으로 워크플로 자동화 개선\n버전 코드 관리(get/increment) 추가 및 Flutter 빌드번호 동기화\n템플릿 초기화 워크플로/스크립트 도입(1회 자동 초기 설정)\n\n\n\nChores\n\n배포 플로우 개편: deploy/main 통합, 포트 기본값 정리, 로그/메시지 개선\n기본 브랜치 참조를 동적으로 변경, 푸시/체크아웃 일관화\n일부 테스트/보조 워크플로 제거 및 유지보수\n외부 API 도메인 업데이트\n버전 업데이트(1.3.1) 및 메타데이터 확장(Python 지원, 문서 보강)\n\n\n\nDocumentation\n\nAnalyze/Build/Design/Document/Figma/Implement/Refactor/Review/Test/Troubleshoot 가이드 추가 및 설정/버전 문서 보강",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "동적 기본 브랜치 감지·적용으로 워크플로 자동화 개선",
+            "버전 코드 관리(get/increment) 추가 및 Flutter 빌드번호 동기화",
+            "템플릿 초기화 워크플로/스크립트 도입(1회 자동 초기 설정)"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "배포 플로우 개편: deploy/main 통합, 포트 기본값 정리, 로그/메시지 개선",
+            "기본 브랜치 참조를 동적으로 변경, 푸시/체크아웃 일관화",
+            "일부 테스트/보조 워크플로 제거 및 유지보수",
+            "외부 API 도메인 업데이트",
+            "버전 업데이트(1.3.1) 및 메타데이터 확장(Python 지원, 문서 보강)"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "Analyze/Build/Design/Document/Figma/Implement/Refactor/Review/Test/Troubleshoot 가이드 추가 및 설정/버전 문서 보강"
+          ]
+        }
+      }
+    },
     {
       "version": "1.1.13",
       "project_type": "basic",

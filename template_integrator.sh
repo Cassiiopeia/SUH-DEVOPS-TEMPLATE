@@ -215,6 +215,71 @@ safe_read() {
     fi
 }
 
+# 안전한 출력 함수 (TTY 우선, stderr 폴백)
+print_to_user() {
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "$@" >/dev/tty
+    else
+        echo "$@" >&2
+    fi
+}
+
+# Y/N 질문 함수 (기본값 지원)
+# 반환: 0 (Yes), 1 (No)
+ask_yes_no() {
+    local prompt="$1"
+    local default="${2:-N}"  # 기본값 N
+    local reply
+    
+    while true; do
+        if safe_read "$prompt" reply "-n 1"; then
+            print_to_user ""
+            
+            # Enter 키 처리
+            if [[ -z "$reply" ]]; then
+                reply="$default"
+            fi
+            
+            if [[ "$reply" =~ ^[Yy]$ ]]; then
+                return 0
+            elif [[ "$reply" =~ ^[Nn]$ ]]; then
+                return 1
+            else
+                print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 $default)"
+                print_to_user ""
+            fi
+        else
+            return 1
+        fi
+    done
+}
+
+# Y/N/E 질문 함수 (예/아니오/편집)
+# 반환: 0 (Yes), 1 (No), 2 (Edit)
+ask_yes_no_edit() {
+    local reply
+    
+    while true; do
+        if safe_read "선택: " reply "-n 1"; then
+            print_to_user ""
+            
+            if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
+                return 0
+            elif [[ "$reply" =~ ^[Nn]$ ]]; then
+                return 1
+            elif [[ "$reply" =~ ^[Ee]$ ]]; then
+                return 2
+            else
+                print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
+                print_to_user ""
+            fi
+        else
+            print_error "입력을 읽을 수 없습니다"
+            exit 1
+        fi
+    done
+}
+
 # 도움말 표시
 show_help() {
     cat << EOF
@@ -541,40 +606,25 @@ print_question_header() {
 
 # 프로젝트 타입 선택 메뉴
 show_project_type_menu() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "" >/dev/tty
-        echo "프로젝트 타입을 선택하세요:" >/dev/tty
-        echo "" >/dev/tty
-        echo "  1) spring            - Spring Boot 백엔드" >/dev/tty
-        echo "  2) flutter           - Flutter 모바일 앱" >/dev/tty
-        echo "  3) react             - React 웹 앱" >/dev/tty
-        echo "  4) react-native      - React Native 모바일 앱" >/dev/tty
-        echo "  5) react-native-expo - React Native Expo 앱" >/dev/tty
-        echo "  6) node              - Node.js 프로젝트" >/dev/tty
-        echo "  7) python            - Python 프로젝트" >/dev/tty
-        echo "  8) basic             - 기타 프로젝트" >/dev/tty
-        echo "" >/dev/tty
-    else
-        echo "" >&2
-        echo "프로젝트 타입을 선택하세요:" >&2
-        echo "" >&2
-        echo "  1) spring            - Spring Boot 백엔드" >&2
-        echo "  2) flutter           - Flutter 모바일 앱" >&2
-        echo "  3) react             - React 웹 앱" >&2
-        echo "  4) react-native      - React Native 모바일 앱" >&2
-        echo "  5) react-native-expo - React Native Expo 앱" >&2
-        echo "  6) node              - Node.js 프로젝트" >&2
-        echo "  7) python            - Python 프로젝트" >&2
-        echo "  8) basic             - 기타 프로젝트" >&2
-        echo "" >&2
-    fi
+    print_to_user ""
+    print_to_user "프로젝트 타입을 선택하세요:"
+    print_to_user ""
+    print_to_user "  1) spring            - Spring Boot 백엔드"
+    print_to_user "  2) flutter           - Flutter 모바일 앱"
+    print_to_user "  3) react             - React 웹 앱"
+    print_to_user "  4) react-native      - React Native 모바일 앱"
+    print_to_user "  5) react-native-expo - React Native Expo 앱"
+    print_to_user "  6) node              - Node.js 프로젝트"
+    print_to_user "  7) python            - Python 프로젝트"
+    print_to_user "  8) basic             - 기타 프로젝트"
+    print_to_user ""
     
     local choice
     local valid_input=false
     
     while [ "$valid_input" = false ]; do
         if safe_read "선택 (1-8): " choice "-n 1"; then
-            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            print_to_user ""
             
             if [[ "$choice" =~ ^[1-8]$ ]]; then
                 valid_input=true
@@ -590,7 +640,7 @@ show_project_type_menu() {
                 esac
             else
                 print_error "잘못된 입력입니다. 1-8 사이의 숫자를 입력해주세요."
-                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                print_to_user ""
             fi
         else
             print_error "입력을 읽을 수 없습니다"
@@ -614,159 +664,109 @@ detect_and_confirm_project() {
     DETECTED_BRANCH="$detected_branch"
     
     # 감지 결과 표시
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "" >/dev/tty
-        echo "       📂 Project Type  : $PROJECT_TYPE" >/dev/tty
-        echo "       🌙 Version       : $VERSION" >/dev/tty
-        echo "       🌿 Branch        : $DETECTED_BRANCH" >/dev/tty
-        echo "" >/dev/tty
-    else
-        echo "" >&2
-        echo "       📂 Project Type  : $PROJECT_TYPE" >&2
-        echo "       🌙 Version       : $VERSION" >&2
-        echo "       🌿 Branch        : $DETECTED_BRANCH" >&2
-        echo "" >&2
-    fi
+    print_to_user ""
+    print_to_user "       📂 Project Type  : $PROJECT_TYPE"
+    print_to_user "       🌙 Version       : $VERSION"
+    print_to_user "       🌿 Branch        : $DETECTED_BRANCH"
+    print_to_user ""
     
     # 사용자 확인
-    local reply
-    local valid_input=false
+    print_to_user "이 정보가 맞습니까?"
+    print_to_user "  Y/y - 예, 계속 진행"
+    print_to_user "  E/e - 수정하기"
+    print_to_user "  N/n - 아니오, 취소"
+    print_to_user ""
     
-    # 가이드 표시
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "이 정보가 맞습니까?" >/dev/tty
-        echo "  Y/y - 예, 계속 진행" >/dev/tty
-        echo "  E/e - 수정하기" >/dev/tty
-        echo "  N/n - 아니오, 취소" >/dev/tty
-        echo "" >/dev/tty
-    else
-        echo "이 정보가 맞습니까?" >&2
-        echo "  Y/y - 예, 계속 진행" >&2
-        echo "  E/e - 수정하기" >&2
-        echo "  N/n - 아니오, 취소" >&2
-        echo "" >&2
-    fi
+    # Y/N/E 입력 받기
+    ask_yes_no_edit
+    local user_choice=$?
     
-    while [ "$valid_input" = false ]; do
-        if safe_read "선택: " reply "-n 1"; then
-            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+    case $user_choice in
+        0)  # Yes - 계속 진행
+            print_success "프로젝트 정보 확인 완료"
+            print_to_user ""
+            ;;
+        1)  # No - 취소
+            print_info "취소되었습니다"
+            exit 0
+            ;;
+        2)  # Edit - 수정하기
+            print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
             
-            if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
-                # 예, 계속 진행
-                valid_input=true
-                print_success "프로젝트 정보 확인 완료"
-                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            print_to_user "  1) Project Type"
+            print_to_user "  2) Version"
+            print_to_user "  3) Branch"
+            print_to_user "  4) 모두 맞음, 계속"
+            print_to_user ""
                 
-            elif [[ "$reply" =~ ^[Nn]$ ]]; then
-                # 아니오, 취소
-                valid_input=true
-                print_info "취소되었습니다"
-                exit 0
-                
-            elif [[ "$reply" =~ ^[Ee]$ ]]; then
-                # 수정하기
-                valid_input=true
-                
-                print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
-                
-                if [ -w /dev/tty ] 2>/dev/null; then
-                    echo "  1) Project Type" >/dev/tty
-                    echo "  2) Version" >/dev/tty
-                    echo "  3) Branch" >/dev/tty
-                    echo "  4) 모두 맞음, 계속" >/dev/tty
-                    echo "" >/dev/tty
-                else
-                    echo "  1) Project Type" >&2
-                    echo "  2) Version" >&2
-                    echo "  3) Branch" >&2
-                    echo "  4) 모두 맞음, 계속" >&2
-                    echo "" >&2
-                fi
-                
-                local edit_choice
-                local edit_valid=false
-                
-                while [ "$edit_valid" = false ]; do
-                    if safe_read "선택 (1-4): " edit_choice "-n 1"; then
-                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            local edit_choice
+            local edit_valid=false
+            
+            while [ "$edit_valid" = false ]; do
+                if safe_read "선택 (1-4): " edit_choice "-n 1"; then
+                    print_to_user ""
+                    
+                    if [[ "$edit_choice" =~ ^[1-4]$ ]]; then
+                        edit_valid=true
                         
-                        if [[ "$edit_choice" =~ ^[1-4]$ ]]; then
-                            edit_valid=true
-                            
-                            case $edit_choice in
-                                1)
-                                    # Project Type 수정
-                                    PROJECT_TYPE=$(show_project_type_menu)
-                                    print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
-                                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                                    ;;
-                                2)
-                                    # Version 수정
-                                    local new_version
-                                    if [ -w /dev/tty ] 2>/dev/null; then
-                                        echo "" >/dev/tty
-                                    else
-                                        echo "" >&2
-                                    fi
+                        case $edit_choice in
+                            1)
+                                # Project Type 수정
+                                PROJECT_TYPE=$(show_project_type_menu)
+                                print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                                print_to_user ""
+                                ;;
+                            2)
+                                # Version 수정
+                                local new_version
+                                print_to_user ""
+                                
+                                if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
+                                    print_to_user ""
                                     
-                                    if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
-                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                                        
-                                        if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                            VERSION="$new_version"
-                                            print_success "Version이 '$VERSION'(으)로 변경되었습니다"
-                                        else
-                                            print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-                                        fi
-                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                                    fi
-                                    ;;
-                                3)
-                                    # Branch 수정
-                                    local new_branch
-                                    if [ -w /dev/tty ] 2>/dev/null; then
-                                        echo "" >/dev/tty
+                                    if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                        VERSION="$new_version"
+                                        print_success "Version이 '$VERSION'(으)로 변경되었습니다"
                                     else
-                                        echo "" >&2
+                                        print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
                                     fi
+                                    print_to_user ""
+                                fi
+                                ;;
+                            3)
+                                # Branch 수정
+                                local new_branch
+                                print_to_user ""
+                                
+                                if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
+                                    print_to_user ""
                                     
-                                    if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
-                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                                        
-                                        if [ -n "$new_branch" ]; then
-                                            DETECTED_BRANCH="$new_branch"
-                                            print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
-                                        else
-                                            print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-                                        fi
-                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                    if [ -n "$new_branch" ]; then
+                                        DETECTED_BRANCH="$new_branch"
+                                        print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                                    else
+                                        print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
                                     fi
-                                    ;;
-                                4)
-                                    # 모두 맞음, 계속
-                                    print_success "프로젝트 정보 확인 완료"
-                                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                                    ;;
-                            esac
-                        else
-                            print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
-                            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                        fi
+                                    print_to_user ""
+                                fi
+                                ;;
+                            4)
+                                # 모두 맞음, 계속
+                                print_success "프로젝트 정보 확인 완료"
+                                print_to_user ""
+                                ;;
+                        esac
                     else
-                        print_error "입력을 읽을 수 없습니다"
-                        exit 1
+                        print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+                        print_to_user ""
                     fi
-                done
-            else
-                # 잘못된 입력
-                print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
-                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-            fi
-        else
-            print_error "입력을 읽을 수 없습니다"
-            exit 1
-        fi
-    done
+                else
+                    print_error "입력을 읽을 수 없습니다"
+                    exit 1
+                fi
+            done
+            ;;
+    esac
 }
 
 # 템플릿 다운로드
@@ -849,45 +849,17 @@ create_version_yml() {
     if [ -f "version.yml" ]; then
         print_warning "version.yml이 이미 존재합니다"
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            local reply
-            local valid_input=false
-            
-            # 구분선과 가이드 표시
             print_separator_line
-            if [ -w /dev/tty ] 2>/dev/null; then
-                echo "" >/dev/tty
-                echo "version.yml을 덮어쓰시겠습니까?" >/dev/tty
-                echo "  Y/y - 예, 덮어쓰기" >/dev/tty
-                echo "  N/n - 아니오, 건너뛰기 (기본)" >/dev/tty
-                echo "" >/dev/tty
-            else
-                echo "" >&2
-                echo "version.yml을 덮어쓰시겠습니까?" >&2
-                echo "  Y/y - 예, 덮어쓰기" >&2
-                echo "  N/n - 아니오, 건너뛰기 (기본)" >&2
-                echo "" >&2
-            fi
+            print_to_user ""
+            print_to_user "version.yml을 덮어쓰시겠습니까?"
+            print_to_user "  Y/y - 예, 덮어쓰기"
+            print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+            print_to_user ""
             
-            # 입력 검증 루프 - Y/y/N/n/Enter만 허용
-            while [ "$valid_input" = false ]; do
-                if safe_read "선택: " reply "-n 1"; then
-                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                    
-                    # 빈 입력(Enter) 또는 N/n은 건너뛰기, Y/y는 덮어쓰기
-                    if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
-                        valid_input=true
-                        print_info "version.yml 생성 건너뜁니다"
-                        return
-                    elif [[ "$reply" =~ ^[Yy]$ ]]; then
-                        valid_input=true
-                        # 덮어쓰기 진행
-                    else
-                        # 잘못된 입력
-                        print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 N)"
-                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                    fi
-                fi
-            done
+            if ! ask_yes_no "선택: " "N"; then
+                print_info "version.yml 생성 건너뜁니다"
+                return
+            fi
         fi
     fi
     
@@ -1035,41 +1007,17 @@ copy_cursor_folder() {
     
     # 사용자 동의 확인
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        local reply
-        local valid_input=false
-        
-        # 구분선과 가이드 표시
         print_separator_line
-        if [ -w /dev/tty ] 2>/dev/null; then
-            echo "" >/dev/tty
-            echo ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)" >/dev/tty
-            echo "  Y/y - 예, 복사하기" >/dev/tty
-            echo "  N/n - 아니오, 건너뛰기 (기본)" >/dev/tty
-            echo "" >/dev/tty
-        else
-            echo "" >&2
-            echo ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)" >&2
-            echo "  Y/y - 예, 복사하기" >&2
-            echo "  N/n - 아니오, 건너뛰기 (기본)" >&2
-            echo "" >&2
-        fi
+        print_to_user ""
+        print_to_user ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)"
+        print_to_user "  Y/y - 예, 복사하기"
+        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+        print_to_user ""
         
-        while [ "$valid_input" = false ]; do
-            if safe_read "선택: " reply "-n 1"; then
-                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                
-                if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
-                    valid_input=true
-                    print_info ".cursor 폴더 복사 건너뜁니다"
-                    return
-                elif [[ "$reply" =~ ^[Yy]$ ]]; then
-                    valid_input=true
-                else
-                    print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 N)"
-                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                fi
-            fi
-        done
+        if ! ask_yes_no "선택: " "N"; then
+            print_info ".cursor 폴더 복사 건너뜁니다"
+            return
+        fi
     fi
     
     # 복사 실행
@@ -1089,41 +1037,17 @@ copy_agent_prompts() {
     
     # 사용자 동의 확인
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        local reply
-        local valid_input=false
-        
-        # 구분선과 가이드 표시
         print_separator_line
-        if [ -w /dev/tty ] 2>/dev/null; then
-            echo "" >/dev/tty
-            echo "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)" >/dev/tty
-            echo "  Y/y - 예, 복사하기" >/dev/tty
-            echo "  N/n - 아니오, 건너뛰기 (기본)" >/dev/tty
-            echo "" >/dev/tty
-        else
-            echo "" >&2
-            echo "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)" >&2
-            echo "  Y/y - 예, 복사하기" >&2
-            echo "  N/n - 아니오, 건너뛰기 (기본)" >&2
-            echo "" >&2
-        fi
+        print_to_user ""
+        print_to_user "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)"
+        print_to_user "  Y/y - 예, 복사하기"
+        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+        print_to_user ""
         
-        while [ "$valid_input" = false ]; do
-            if safe_read "선택: " reply "-n 1"; then
-                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                
-                if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
-                    valid_input=true
-                    print_info "agent-prompts 폴더 복사 건너뜁니다"
-                    return
-                elif [[ "$reply" =~ ^[Yy]$ ]]; then
-                    valid_input=true
-                else
-                    print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 N)"
-                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                fi
-            fi
-        done
+        if ! ask_yes_no "선택: " "N"; then
+            print_info "agent-prompts 폴더 복사 건너뜁니다"
+            return
+        fi
     fi
     
     # 복사 실행
@@ -1177,21 +1101,12 @@ interactive_mode() {
     
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
     
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >/dev/tty
-        echo "  2) 버전 관리 시스템만" >/dev/tty
-        echo "  3) GitHub Actions 워크플로우만" >/dev/tty
-        echo "  4) 이슈/PR 템플릿만" >/dev/tty
-        echo "  5) 취소" >/dev/tty
-        echo "" >/dev/tty
-    else
-        echo "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >&2
-        echo "  2) 버전 관리 시스템만" >&2
-        echo "  3) GitHub Actions 워크플로우만" >&2
-        echo "  4) 이슈/PR 템플릿만" >&2
-        echo "  5) 취소" >&2
-        echo "" >&2
-    fi
+    print_to_user "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
+    print_to_user "  2) 버전 관리 시스템만"
+    print_to_user "  3) GitHub Actions 워크플로우만"
+    print_to_user "  4) 이슈/PR 템플릿만"
+    print_to_user "  5) 취소"
+    print_to_user ""
     
     local choice
     local valid_input=false
@@ -1199,7 +1114,7 @@ interactive_mode() {
     # 입력 검증 루프 - 올바른 값(1-5)이 입력될 때까지 반복
     while [ "$valid_input" = false ]; do
         if safe_read "선택 (1-5): " choice "-n 1"; then
-            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            print_to_user ""
             
             # 입력값 검증: 1-5 숫자만 허용
             if [[ "$choice" =~ ^[1-5]$ ]]; then
@@ -1217,7 +1132,7 @@ interactive_mode() {
             else
                 # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
                 print_error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
-                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                print_to_user ""
             fi
         else
             # safe_read 실패 (이론상 여기 도달 안 함)
@@ -1246,61 +1161,25 @@ execute_integration() {
         # CLI 모드에서만 통합 정보 표시
         print_question_header "🪐" "통합 정보"
         
-        if [ -w /dev/tty ] 2>/dev/null; then
-            echo "🔭 프로젝트 타입  : $PROJECT_TYPE" >/dev/tty
-            echo "🌙 초기 버전     : v$VERSION" >/dev/tty
-            echo "🌿 Default 브랜치 : $DETECTED_BRANCH" >/dev/tty
-            echo "💫 통합 모드     : $MODE" >/dev/tty
-            print_separator_line
-            echo "" >/dev/tty
-        else
-            echo "🔭 프로젝트 타입  : $PROJECT_TYPE" >&2
-            echo "🌙 초기 버전     : v$VERSION" >&2
-            echo "🌿 Default 브랜치 : $DETECTED_BRANCH" >&2
-            echo "💫 통합 모드     : $MODE" >&2
-            print_separator_line
-            echo "" >&2
-        fi
+        print_to_user "🔭 프로젝트 타입  : $PROJECT_TYPE"
+        print_to_user "🌙 초기 버전     : v$VERSION"
+        print_to_user "🌿 Default 브랜치 : $DETECTED_BRANCH"
+        print_to_user "💫 통합 모드     : $MODE"
+        print_separator_line
+        print_to_user ""
         
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         if [ "$FORCE_MODE" = false ]; then
             if [ "$TTY_AVAILABLE" = true ]; then
-                local reply
-                local valid_input=false
+                print_to_user "이 정보로 통합을 진행하시겠습니까?"
+                print_to_user "  Y/y - 예, 계속 진행"
+                print_to_user "  N/n - 아니오, 취소"
+                print_to_user ""
                 
-                # 가이드 표시
-                if [ -w /dev/tty ] 2>/dev/null; then
-                    echo "이 정보로 통합을 진행하시겠습니까?" >/dev/tty
-                    echo "  Y/y - 예, 계속 진행" >/dev/tty
-                    echo "  N/n - 아니오, 취소" >/dev/tty
-                    echo "" >/dev/tty
-                else
-                    echo "이 정보로 통합을 진행하시겠습니까?" >&2
-                    echo "  Y/y - 예, 계속 진행" >&2
-                    echo "  N/n - 아니오, 취소" >&2
-                    echo "" >&2
+                if ! ask_yes_no "선택: " "Y"; then
+                    print_info "취소되었습니다"
+                    exit 0
                 fi
-                
-                # 입력 검증 루프 - Y/y/N/n/Enter만 허용
-                while [ "$valid_input" = false ]; do
-                    if safe_read "선택: " reply "-n 1"; then
-                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                        
-                        # 빈 입력(Enter) 또는 Y/y는 계속, N/n은 취소
-                        if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
-                            valid_input=true
-                            # 계속 진행
-                        elif [[ "$reply" =~ ^[Nn]$ ]]; then
-                            valid_input=true
-                            print_info "취소되었습니다"
-                            exit 0
-                        else
-                            # 잘못된 입력
-                            print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 Y)"
-                            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
-                        fi
-                    fi
-                done
             else
                 # TTY 없음 - --force 필수
                 print_error "--force 옵션이 필요합니다 (non-interactive 환경)"

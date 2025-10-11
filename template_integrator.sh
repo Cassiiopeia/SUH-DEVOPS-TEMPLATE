@@ -204,7 +204,7 @@ safe_read() {
     if [ "$TTY_AVAILABLE" = true ]; then
         # /dev/tty에서 읽기
         if [ -n "$options" ]; then
-            read $options -r -p "$prompt" "$varname" < /dev/tty
+            eval "read $options -r -p \"\$prompt\" \"\$varname\" < /dev/tty"
         else
             read -r -p "$prompt" "$varname" < /dev/tty
         fi
@@ -263,16 +263,24 @@ ask_yes_no_edit() {
         if safe_read "선택: " reply "-n 1"; then
             print_to_user ""
             
-            if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
-                return 0
-            elif [[ "$reply" =~ ^[Nn]$ ]]; then
-                return 1
-            elif [[ "$reply" =~ ^[Ee]$ ]]; then
-                return 2
-            else
-                print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
-                print_to_user ""
-            fi
+            # 입력값 정규화 (공백 제거, 소문자 변환)
+            reply=$(echo "$reply" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+            
+            case "$reply" in
+                ""|"y")
+                    return 0
+                    ;;
+                "n")
+                    return 1
+                    ;;
+                "e")
+                    return 2
+                    ;;
+                *)
+                    print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
+                    print_to_user ""
+                    ;;
+            esac
         else
             print_error "입력을 읽을 수 없습니다"
             exit 1
@@ -651,122 +659,137 @@ show_project_type_menu() {
 
 # 프로젝트 감지 및 확인
 detect_and_confirm_project() {
-    print_section_header "🛰️" "프로젝트 분석 결과"
+    # 자동 감지 (최초 1회만)
+    if [ -z "$PROJECT_TYPE" ]; then
+        PROJECT_TYPE=$(detect_project_type)
+    fi
+    if [ -z "$VERSION" ]; then
+        VERSION=$(detect_version)
+    fi
+    if [ -z "$DETECTED_BRANCH" ]; then
+        DETECTED_BRANCH=$(detect_default_branch)
+    fi
     
-    # 자동 감지
-    local detected_type=$(detect_project_type)
-    local detected_version=$(detect_version)
-    local detected_branch=$(detect_default_branch)
+    local confirmed=false
     
-    # 전역 변수 설정
-    PROJECT_TYPE="$detected_type"
-    VERSION="$detected_version"
-    DETECTED_BRANCH="$detected_branch"
+    # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
+    while [ "$confirmed" = false ]; do
+        print_section_header "🛰️" "프로젝트 분석 결과"
+        
+        # 감지 결과 표시
+        print_to_user ""
+        print_to_user "       📂 Project Type  : $PROJECT_TYPE"
+        print_to_user "       🌙 Version       : $VERSION"
+        print_to_user "       🌿 Branch        : $DETECTED_BRANCH"
+        print_to_user ""
+        
+        # 사용자 확인
+        print_to_user "이 정보가 맞습니까?"
+        print_to_user "  Y/y - 예, 계속 진행"
+        print_to_user "  E/e - 수정하기"
+        print_to_user "  N/n - 아니오, 취소"
+        print_to_user ""
+        
+        # Y/N/E 입력 받기
+        ask_yes_no_edit
+        local user_choice=$?
+        
+        case $user_choice in
+            0)  # Yes - 계속 진행
+                confirmed=true
+                print_success "프로젝트 정보 확인 완료"
+                print_to_user ""
+                ;;
+            1)  # No - 취소
+                print_info "취소되었습니다"
+                exit 0
+                ;;
+            2)  # Edit - 수정하기
+                handle_project_edit_menu
+                # 루프 계속 - 다시 확인 질문으로
+                ;;
+        esac
+    done
+}
+
+# 프로젝트 정보 수정 메뉴
+handle_project_edit_menu() {
+    print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
     
-    # 감지 결과 표시
+    print_to_user "  1) Project Type"
+    print_to_user "  2) Version"
+    print_to_user "  3) Branch"
+    print_to_user "  4) 모두 맞음, 계속"
     print_to_user ""
-    print_to_user "       📂 Project Type  : $PROJECT_TYPE"
-    print_to_user "       🌙 Version       : $VERSION"
-    print_to_user "       🌿 Branch        : $DETECTED_BRANCH"
-    print_to_user ""
+        
+    local edit_choice
+    local edit_valid=false
     
-    # 사용자 확인
-    print_to_user "이 정보가 맞습니까?"
-    print_to_user "  Y/y - 예, 계속 진행"
-    print_to_user "  E/e - 수정하기"
-    print_to_user "  N/n - 아니오, 취소"
-    print_to_user ""
-    
-    # Y/N/E 입력 받기
-    ask_yes_no_edit
-    local user_choice=$?
-    
-    case $user_choice in
-        0)  # Yes - 계속 진행
-            print_success "프로젝트 정보 확인 완료"
+    while [ "$edit_valid" = false ]; do
+        if safe_read "선택 (1-4): " edit_choice "-n 1"; then
             print_to_user ""
-            ;;
-        1)  # No - 취소
-            print_info "취소되었습니다"
-            exit 0
-            ;;
-        2)  # Edit - 수정하기
-            print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
             
-            print_to_user "  1) Project Type"
-            print_to_user "  2) Version"
-            print_to_user "  3) Branch"
-            print_to_user "  4) 모두 맞음, 계속"
-            print_to_user ""
+            if [[ "$edit_choice" =~ ^[1-4]$ ]]; then
+                edit_valid=true
                 
-            local edit_choice
-            local edit_valid=false
-            
-            while [ "$edit_valid" = false ]; do
-                if safe_read "선택 (1-4): " edit_choice "-n 1"; then
-                    print_to_user ""
-                    
-                    if [[ "$edit_choice" =~ ^[1-4]$ ]]; then
-                        edit_valid=true
-                        
-                        case $edit_choice in
-                            1)
-                                # Project Type 수정
-                                PROJECT_TYPE=$(show_project_type_menu)
-                                print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
-                                print_to_user ""
-                                ;;
-                            2)
-                                # Version 수정
-                                local new_version
-                                print_to_user ""
-                                
-                                if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
-                                    print_to_user ""
-                                    
-                                    if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                        VERSION="$new_version"
-                                        print_success "Version이 '$VERSION'(으)로 변경되었습니다"
-                                    else
-                                        print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-                                    fi
-                                    print_to_user ""
-                                fi
-                                ;;
-                            3)
-                                # Branch 수정
-                                local new_branch
-                                print_to_user ""
-                                
-                                if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
-                                    print_to_user ""
-                                    
-                                    if [ -n "$new_branch" ]; then
-                                        DETECTED_BRANCH="$new_branch"
-                                        print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
-                                    else
-                                        print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-                                    fi
-                                    print_to_user ""
-                                fi
-                                ;;
-                            4)
-                                # 모두 맞음, 계속
-                                print_success "프로젝트 정보 확인 완료"
-                                print_to_user ""
-                                ;;
-                        esac
-                    else
-                        print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+                case $edit_choice in
+                    1)
+                        # Project Type 수정
+                        PROJECT_TYPE=$(show_project_type_menu)
+                        print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
                         print_to_user ""
-                    fi
-                else
-                    print_error "입력을 읽을 수 없습니다"
-                    exit 1
-                fi
-            done
-            ;;
-    esac
+                        ;;
+                    2)
+                        # Version 수정
+                        local new_version
+                        print_to_user ""
+                        
+                        if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
+                            print_to_user ""
+                            
+                            if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                VERSION="$new_version"
+                                print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                            else
+                                print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                            fi
+                            print_to_user ""
+                        fi
+                        ;;
+                    3)
+                        # Branch 수정
+                        local new_branch
+                        print_to_user ""
+                        
+                        if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
+                            print_to_user ""
+                            
+                            if [ -n "$new_branch" ]; then
+                                DETECTED_BRANCH="$new_branch"
+                                print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                            else
+                                print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+                            fi
+                            print_to_user ""
+                        fi
+                        ;;
+                    4)
+                        # 모두 맞음, 계속
+                        print_success "프로젝트 정보 확인 완료"
+                        print_to_user ""
+                        # 메인 루프로 돌아가지 않고 바로 종료
+                        return 0
+                        ;;
+                esac
+            else
+                print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+                print_to_user ""
+            fi
+        else
+            print_error "입력을 읽을 수 없습니다"
+            exit 1
+        fi
+    done
 }
 
 # 템플릿 다운로드
@@ -1062,23 +1085,16 @@ interactive_mode() {
     # Interactive 모드 플래그 설정
     IS_INTERACTIVE_MODE=true
     
-    # 템플릿 버전 가져오기 (우선순위: version.yml → Git 태그 → 기본값)
+    # 템플릿 버전 가져오기 (원격 version.yml)
     local template_version=""
     
-    # 1순위: version.yml (로컬 실행 시)
-    if [ -f "version.yml" ]; then
-        template_version=$(grep "^version:" version.yml | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
+    # GitHub 원격 저장소의 version.yml에서 버전 가져오기
+    if command -v curl >/dev/null 2>&1; then
+        template_version=$(curl -fsSL --max-time 3 \
+            "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/version.yml" \
+            2>/dev/null | grep "^version:" | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
     fi
     
-    # 2순위: Git 태그 (원격 실행 시)
-    if [ -z "$template_version" ] && git rev-parse --git-dir > /dev/null 2>&1; then
-        template_version=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
-    fi
-    
-    # 3순위: 기본값
-    if [ -z "$template_version" ]; then
-        template_version="1.0.0"
-    fi
     
     print_banner "$template_version" "Interactive (대화형 모드)"
     

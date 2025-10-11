@@ -339,7 +339,14 @@ update_project_file_version() {
             done
             ;;
         "flutter")
-            sed -i.bak "s/^version:.*/version: $new_version/" "$VERSION_FILE"
+            # Flutter는 version: x.y.z+buildNumber 형식 사용
+            # version.yml의 version + version_code를 조합하여 pubspec.yaml에 저장
+            local code=$(get_version_code)
+            local full_version="$new_version+$code"
+            
+            log_debug "Flutter 버전 저장: $new_version (version) + $code (code) = $full_version"
+            
+            sed -i.bak "s/^version:.*/version: $full_version/" "$VERSION_FILE"
             rm -f "${VERSION_FILE}.bak"
             ;;
         "react"|"node")

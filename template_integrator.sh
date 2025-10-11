@@ -195,22 +195,24 @@ print_question() {
     fi
 }
 
-# 안전한 read 함수 (stdin 모드에서도 /dev/tty 사용)
+# 안전한 read 함수 (/dev/tty 사용)
 safe_read() {
     local prompt="$1"
     local varname="$2"
-    local options="$3"  # 예: "-n 1"
+    local options="$3"
     
     if [ "$TTY_AVAILABLE" = true ]; then
-        # /dev/tty에서 읽기
-        if [ -n "$options" ]; then
-            eval "read $options -r -p \"\$prompt\" \"\$varname\" < /dev/tty"
+        printf "%s" "$prompt" > /dev/tty
+        
+        if [ "$options" = "-n 1" ]; then
+            IFS= read -r -n 1 "$varname" < /dev/tty
+        elif [ -n "$options" ]; then
+            IFS= read -r $options "$varname" < /dev/tty
         else
-            read -r -p "$prompt" "$varname" < /dev/tty
+            IFS= read -r "$varname" < /dev/tty
         fi
         return 0
     else
-        # TTY 없음 - 대화형 불가
         return 1
     fi
 }
@@ -255,26 +257,30 @@ ask_yes_no() {
 }
 
 # Y/N/E 질문 함수 (예/아니오/편집)
-# 반환: 0 (Yes), 1 (No), 2 (Edit)
+# 출력: "yes", "no", "edit" (set -e 모드 호환)
 ask_yes_no_edit() {
     local reply
+    local reply_normalized
     
     while true; do
         if safe_read "선택: " reply "-n 1"; then
             print_to_user ""
             
             # 입력값 정규화 (공백 제거, 소문자 변환)
-            reply=$(echo "$reply" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+            reply_normalized=$(printf '%s' "$reply" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
             
-            case "$reply" in
+            case "$reply_normalized" in
                 ""|"y")
+                    echo "yes"
                     return 0
                     ;;
                 "n")
-                    return 1
+                    echo "no"
+                    return 0
                     ;;
                 "e")
-                    return 2
+                    echo "edit"
+                    return 0
                     ;;
                 *)
                     print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
@@ -680,9 +686,9 @@ detect_and_confirm_project() {
         
         # 감지 결과 표시
         print_to_user ""
-        print_to_user "       📂 Project Type  : $PROJECT_TYPE"
-        print_to_user "       🌙 Version       : $VERSION"
-        print_to_user "       🌿 Branch        : $DETECTED_BRANCH"
+        print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+        print_to_user "       🌙 Version          : $VERSION"
+        print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
         print_to_user ""
         
         # 사용자 확인
@@ -693,22 +699,26 @@ detect_and_confirm_project() {
         print_to_user ""
         
         # Y/N/E 입력 받기
-        ask_yes_no_edit
-        local user_choice=$?
+        local user_choice
+        user_choice=$(ask_yes_no_edit)
         
-        case $user_choice in
-            0)  # Yes - 계속 진행
+        case "$user_choice" in
+            "yes")
                 confirmed=true
                 print_success "프로젝트 정보 확인 완료"
                 print_to_user ""
                 ;;
-            1)  # No - 취소
+            "no")
                 print_info "취소되었습니다"
                 exit 0
                 ;;
-            2)  # Edit - 수정하기
+            "edit")
                 handle_project_edit_menu
                 # 루프 계속 - 다시 확인 질문으로
+                ;;
+            *)
+                print_error "예상치 못한 오류가 발생했습니다"
+                exit 1
                 ;;
         esac
     done
@@ -720,7 +730,7 @@ handle_project_edit_menu() {
     
     print_to_user "  1) Project Type"
     print_to_user "  2) Version"
-    print_to_user "  3) Branch"
+    print_to_user "  3) Default Branch (기본 브랜치)"
     print_to_user "  4) 모두 맞음, 계속"
     print_to_user ""
         
@@ -762,16 +772,18 @@ handle_project_edit_menu() {
                         fi
                         ;;
                     3)
-                        # Branch 수정
+                        # Default Branch 수정
                         local new_branch
                         print_to_user ""
+                        print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+                        print_to_user ""
                         
-                        if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
+                        if safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""; then
                             print_to_user ""
                             
                             if [ -n "$new_branch" ]; then
                                 DETECTED_BRANCH="$new_branch"
-                                print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                                print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
                             else
                                 print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
                             fi

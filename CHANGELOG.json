@@ -1,11 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2025-10-11T14:56:56Z",
-    "currentVersion": "1.3.1",
+    "lastUpdated": "2025-10-11T19:00:05Z",
+    "currentVersion": "1.3.17",
     "projectType": "basic",
-    "totalReleases": 25
+    "totalReleases": 26
   },
   "releases": [
+    {
+      "version": "1.3.17",
+      "project_type": "basic",
+      "date": "2025-10-11",
+      "pr_number": 75,
+      "raw_summary": "Summary by CodeRabbit\n\nNew Features\n\n기존 프로젝트에 템플릿을 손쉽게 적용하는 인터랙티브 통합 스크립트를 추가했습니다. 여러 통합 모드, 프로젝트 타입 자동 감지, 비대화식 환경 지원, 백업 및 안내 메시지를 제공합니다.\n\n\nDocumentation\n\n아키텍처 가이드 신설. 기여 가이드, README, 설정 가이드를 전면 개편하여 빠른 시작, 지원 타입, 워크플로우, 문제 해결, 릴리스 지침을 강화했습니다.\n\n\nChores\n\n워크플로우가 스크립트의 새 위치를 참조하도록 정비했습니다.\n초기화 스크립트의 표시문구에서 하드코딩된 버전 표기를 제거했습니다.\n버전 및 메타데이터를 최신 상태로 갱신했습니다.",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "기존 프로젝트에 템플릿을 손쉽게 적용하는 인터랙티브 통합 스크립트를 추가했습니다. 여러 통합 모드, 프로젝트 타입 자동 감지, 비대화식 환경 지원, 백업 및 안내 메시지를 제공합니다."
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "아키텍처 가이드 신설. 기여 가이드, README, 설정 가이드를 전면 개편하여 빠른 시작, 지원 타입, 워크플로우, 문제 해결, 릴리스 지침을 강화했습니다."
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "워크플로우가 스크립트의 새 위치를 참조하도록 정비했습니다.",
+            "초기화 스크립트의 표시문구에서 하드코딩된 버전 표기를 제거했습니다.",
+            "버전 및 메타데이터를 최신 상태로 갱신했습니다."
+          ]
+        }
+      }
+    },
     {
       "version": "1.3.1",
       "project_type": "basic",

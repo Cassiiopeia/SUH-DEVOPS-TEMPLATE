@@ -89,14 +89,14 @@ detect_terminal() {
     fi
 }
 
-# 색상 정의
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
+# 색상 정의 (비활성화 - 안정성 향상)
+RED=''
+GREEN=''
+YELLOW=''
+BLUE=''
+CYAN=''
+MAGENTA=''
+NC=''
 
 # 템플릿 저장소 URL
 TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
@@ -124,36 +124,25 @@ print_banner() {
     local version=$1
     local mode=$2
     
-    # 박스 너비 (안쪽 컨텐츠 영역)
-    local box_width=66
-    
-    # 타이틀 라인 (이모지 포함)
-    local title="🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦"
-    
-    # Version 라인
-    local version_label="Version"
-    local version_value="v${version}"
-    local version_line="     ${version_label} : ${version_value}"
-    
-    # Mode 라인
-    local mode_label="Mode"
-    local mode_line="     ${mode_label}    : ${mode}"
+    # 박스 전체 너비: 68자 (║ 포함)
+    # 안쪽 컨텐츠: 66자
+    # 이모지 🔮는 표시 너비 2칸을 차지하므로, 그만큼 공백 줄여야 함
     
     if [ -w /dev/tty ] 2>/dev/null; then
         echo "" >/dev/tty
-        echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}" >/dev/tty
-        printf "${CYAN}║${NC} ${MAGENTA}%-66s${NC}${CYAN}║${NC}\n" "$title" >/dev/tty
-        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${GREEN}%-48s${NC}${CYAN}║${NC}\n" "$version_label" "$version_value" >/dev/tty
-        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${YELLOW}%-48s${NC}${CYAN}║${NC}\n" "$mode_label" "$mode" >/dev/tty
-        echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}" >/dev/tty
+        echo "╔══════════════════════════════════════════════════════════════════╗" >/dev/tty
+        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦               ║" >/dev/tty
+        printf "║      Version : %-50s║\n" "v${version}" >/dev/tty
+        printf "║      Mode    : %-50s║\n" "${mode}" >/dev/tty
+        echo "╚══════════════════════════════════════════════════════════════════╝" >/dev/tty
         echo "" >/dev/tty
     else
         echo "" >&2
-        echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}" >&2
-        printf "${CYAN}║${NC} ${MAGENTA}%-66s${NC}${CYAN}║${NC}\n" "$title" >&2
-        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${GREEN}%-48s${NC}${CYAN}║${NC}\n" "$version_label" "$version_value" >&2
-        printf "${CYAN}║${NC}      ${BLUE}%-7s${NC} : ${YELLOW}%-48s${NC}${CYAN}║${NC}\n" "$mode_label" "$mode" >&2
-        echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}" >&2
+        echo "╔══════════════════════════════════════════════════════════════════╗" >&2
+        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦               ║" >&2
+        printf "║      Version : %-50s║\n" "v${version}" >&2
+        printf "║      Mode    : %-50s║\n" "${mode}" >&2
+        echo "╚══════════════════════════════════════════════════════════════════╝" >&2
         echo "" >&2
     fi
 }

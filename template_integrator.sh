@@ -1095,6 +1095,10 @@ interactive_mode() {
             2>/dev/null | grep "^version:" | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
     fi
     
+    # 폴백: 버전을 가져오지 못한 경우 기본값 사용
+    if [ -z "$template_version" ]; then
+        template_version="1.3.14"
+    fi
     
     print_banner "$template_version" "Interactive (대화형 모드)"
     

@@ -200,12 +200,13 @@ jobs:
           git commit -m "$commit_message"
           
           # 원격 저장소 최신 상태 확인 후 푸시
-          git fetch origin main
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          git fetch origin $DEFAULT_BRANCH
           
           # 충돌이 있으면 강제 푸시 (템플릿 초기화는 한 번만 실행되므로 안전)
-          if ! git push origin main; then
+          if ! git push origin $DEFAULT_BRANCH; then
             echo "⚠️ 푸시 충돌 발생, 강제 푸시 실행..."
-            git push --force-with-lease origin main
+            git push --force-with-lease origin $DEFAULT_BRANCH
           fi
           
           echo "✅ 초기화 완료 및 변경사항 푸시 완료"

@@ -52,6 +52,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch || 'main' }}
 
       - name: 버전 관리 스크립트 권한 설정
         run: |

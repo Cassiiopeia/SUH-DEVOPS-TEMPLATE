@@ -10,10 +10,11 @@
 - [ ] GitHub Personal Access Token (Classic) 생성
 - [ ] `_GITHUB_PAT_TOKEN` Secret 등록
 - [ ] `deploy` 브랜치 생성
-- [ ] 필수 3개 파일 복사 완료
+- [ ] **template_initializer.sh 실행**
 
 ### ✅ 설정 완료 확인
-- [ ] `version.yml` 프로젝트 타입 설정
+- [ ] `version.yml` 생성 및 프로젝트 타입 설정
+- [ ] **동적 브랜치 감지 완료** 
 - [ ] README 버전 표시 영역 추가
 - [ ] 첫 번째 테스트 커밋 성공
 - [ ] 자동화 워크플로우 실행 확인
@@ -52,21 +53,40 @@ chmod +x .github/scripts/version_manager.sh
 chmod +x .github/scripts/changelog_manager.py
 ```
 
-#### `version.yml` (프로젝트 루트)
-```yaml
-# 프로젝트 버전 설정
-version: "1.0.0"              # 🎯 시작 버전 (프로젝트에 맞게 수정)
-project_type: "spring"        # 🎯 프로젝트 타입 (아래 타입 중 선택)
+#### `template_initializer.sh`
 
-# 지원하는 project_type:
-# - spring          : Spring Boot / Java / Gradle
-# - flutter         : Flutter / Dart
-# - react           : React.js / Next.js
-# - react-native    : React Native (iOS + Android)
-# - react-native-expo : Expo 기반 React Native
-# - node            : Node.js / Express
-# - python          : Python / FastAPI / Django
-# - basic           : 기본 타입 (version.yml만 사용)
+**자동 초기화 스크립트로 version.yml 생성 권장!**
+
+```bash
+# GitHub 템플릿으로 새 리포지토리 생성 후
+chmod +x .github/scripts/template_initializer.sh
+
+# 초기화 실행 (version.yml 자동 생성)
+./.github/scripts/template_initializer.sh --version 1.0.0 --type spring
+
+# 또는 짧은 형식
+./.github/scripts/template_initializer.sh -v 1.0.0 -t spring
+```
+
+**지원하는 project_type**:
+- `spring` - Spring Boot / Java / Gradle
+- `flutter` - Flutter / Dart
+- `react` - React.js / Next.js
+- `react-native` - React Native (iOS + Android)
+- `react-native-expo` - Expo 기반 React Native
+- `node` - Node.js / Express
+- `python` - Python / FastAPI / Django
+- `basic` - 기본 타입 (version.yml만 사용)
+
+**생성되는 version.yml 예시**:
+```yaml
+version: "1.0.0"
+version_code: 1
+project_type: "spring"
+metadata:
+  last_updated: "2025-10-11 09:12:11"
+  last_updated_by: "your-username"
+  default_branch: "main"  # 🆕 자동 감지됨!
 ```
 
 #### `.coderabbit.yaml` (프로젝트 루트, 선택사항)
@@ -418,5 +438,16 @@ CodeRabbit summary not found
 ---
 
 **🎉 축하합니다! 이제 완전 자동화된 DevOps 환경이 구축되었습니다.**
+
+---
+
+## 📚 추가 문서
+
+- [SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md) - 스크립트 상세 사용법
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 시스템 아키텍처
+- [CONTRIBUTING.md](CONTRIBUTING.md) - 기여 가이드
+- [README.md](README.md) - 프로젝트 개요
+
+---
 
 추가 질문이나 문제가 있다면 [이슈](https://github.com/Cassiiopeia/suh-github-template/issues/new/choose)를 생성해 주세요.

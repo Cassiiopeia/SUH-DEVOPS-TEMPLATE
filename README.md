@@ -2,14 +2,23 @@
 - GitHub 프로젝트 운영 자동화 템플릿
 
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v1.1.13 (2025-09-27)
+## 최신 버전 : v1.3.1 (2025-10-11)
 
 [전체 버전 기록 보기](CHANGELOG.md)
-<br>
-<br>
-_참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마세요. 변경 소스는 `CHANGELOG.json`입니다._
 
-[프로젝트 자동화 설정 적용 가이드](SETUP-GUIDE.md)
+---
+
+## 📚 문서 가이드
+
+| 문서 | 설명 |
+|------|------|
+| [SETUP-GUIDE.md](SETUP-GUIDE.md) | 🚀 **빠른 시작**: 프로젝트 초기 설정 가이드 |
+| [SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md) | 📜 **스크립트 사용법**: version_manager, template_initializer, changelog_manager 상세 가이드 |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 🏗️ **시스템 구조**: 아키텍처, 데이터 흐름, 설계 결정 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 🤝 **기여 가이드**: 개발 환경 설정, 코드 스타일, PR 프로세스 |
+| [CHANGELOG.md](CHANGELOG.md) | 📝 **변경 이력**: 버전별 변경사항 (자동 생성) |
+
+_참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마세요. 변경 소스는 `CHANGELOG.json`입니다._
 
 ---
 
@@ -26,8 +35,8 @@ _참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마
 - 프로젝트 타입 자동 감지 및 맞춤형 빌드
 
 ### ⚡ 제로 설정 워크플로우
-- **3개 파일만 복사**하면 완전한 DevOps 환경 구축
-- 복잡한 설정 없이 즉시 사용 가능
+- **한 번의 스크립트 실행**으로 완전한 DevOps 환경 구축
+- **동적 브랜치 감지**: main, master, develop 등 자동 지원
 - 다양한 프로젝트 타입 자동 지원 (Spring, Flutter, React, Node.js 등)
 - 기존 프로젝트에 **무중단 통합** 가능
 
@@ -105,30 +114,51 @@ _참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마
 
 ### 🎯 30초 설정
 
-**단 3개 파일 복사로 완전한 DevOps 환경 구축**
+**template_initializer.sh 스크립트 한 번 실행으로 모든 설정 완료**
 
-#### 1단계: 필수 파일 복사
-```
-📁 프로젝트 루트/
-├── 📁 .github/           # 🔥 이 폴더 전체 복사
-│   ├── 📁 workflows/     # 모든 자동화 워크플로우
-│   └── 📁 scripts/       # 자동화 스크립트들
-├── 📄 version.yml        # 🔥 이 파일 복사
-└── 📄 .coderabbit.yaml   # 🔥 이 파일 복사 (선택사항)
+#### 1단계: 템플릿으로 새 리포지토리 생성
+GitHub에서 "Use this template" 버튼 클릭
+
+#### 2단계: 리포지토리 클론 및 초기화
+```bash
+# 클론
+git clone https://github.com/your-username/your-project.git
+cd your-project
+
+# 초기화 스크립트 실행 (🆕 한 번에 모든 설정!)
+chmod +x .github/scripts/template_initializer.sh
+./.github/scripts/template_initializer.sh --version 1.0.0 --type spring
+
+# 또는 짧은 형식
+./.github/scripts/template_initializer.sh -v 1.0.0 -t spring
 ```
 
-#### 2단계: 프로젝트 설정
-```yaml
-# version.yml 파일 편집
-version: "1.0.0"              # 🎯 시작 버전
-project_type: "spring"        # 🎯 프로젝트 타입 (아래 지원 타입 참조)
-```
+**자동으로 처리되는 작업**:
+- ✅ version.yml 생성 (버전, 타입, 메타데이터)
+- ✅ 기본 브랜치 자동 감지 (main, master, develop 등)
+- ✅ 워크플로우 트리거 자동 설정
+- ✅ README 초기화
+- ✅ 이슈 템플릿 assignee 변경
 
 #### 3단계: GitHub 토큰 설정
 1. GitHub → Settings → Developer settings → Personal access tokens (Classic)
 2. 토큰 이름: `_GITHUB_PAT_TOKEN`
 3. 권한: `repo`, `workflow`
 4. Repository Settings → Secrets → New repository secret에 등록
+
+#### 4단계: deploy 브랜치 생성
+```bash
+git checkout -b deploy
+git push -u origin deploy
+git checkout main
+```
+
+#### 5단계: 첫 커밋 푸시
+```bash
+git add .
+git commit -m "chore: 템플릿 초기화 완료 v1.0.0"
+git push origin main
+```
 
 **🎉 완료! 이제 코드를 푸시하면 모든 자동화가 시작됩니다.**
 

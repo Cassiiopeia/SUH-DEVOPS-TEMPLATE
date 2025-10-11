@@ -1062,10 +1062,22 @@ interactive_mode() {
     # Interactive 모드 플래그 설정
     IS_INTERACTIVE_MODE=true
     
-    # 템플릿 버전 가져오기 (로컬 version.yml에서)
-    local template_version="1.3.7"
+    # 템플릿 버전 가져오기 (우선순위: version.yml → Git 태그 → 기본값)
+    local template_version=""
+    
+    # 1순위: version.yml (로컬 실행 시)
     if [ -f "version.yml" ]; then
         template_version=$(grep "^version:" version.yml | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
+    fi
+    
+    # 2순위: Git 태그 (원격 실행 시)
+    if [ -z "$template_version" ] && git rev-parse --git-dir > /dev/null 2>&1; then
+        template_version=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+    fi
+    
+    # 3순위: 기본값
+    if [ -z "$template_version" ]; then
+        template_version="1.0.0"
     fi
     
     print_banner "$template_version" "Interactive (대화형 모드)"

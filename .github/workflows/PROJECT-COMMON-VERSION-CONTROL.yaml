@@ -1,0 +1,165 @@
+# ===================================================================
+# 범용 프로젝트 버전 자동 관리 워크플로우 v2.0
+# ===================================================================
+#
+# 이 워크플로우는 다양한 프로젝트 타입에서 main 브랜치에 푸시될 때마다 
+# patch 버전을 자동으로 증가시키고 모든 관련 파일을 동기화합니다.
+#
+# 주요 개선사항:
+# - 버전 동기화 자동화 (version.yml ↔ 프로젝트 파일)
+# - 에러 처리 강화
+# - 로깅 개선
+# - 스크립트 안정성 향상
+#
+# 지원 프로젝트 타입:
+# - spring: build.gradle
+# - flutter: pubspec.yaml  
+# - react/node: package.json
+# - react-native: Info.plist + build.gradle
+# - react-native-expo: app.json
+# - python: pyproject.toml
+# - basic: version.yml만 관리
+#
+# ===================================================================
+
+name: PROJECT-VERSION-CONTROL
+
+# 동시 실행 방지 (https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/63)
+concurrency:
+  group: version-increment
+  cancel-in-progress: false
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'CHANGELOG.json'
+      - 'version.yml'  # 무한 루프 방지
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  version-bump:
+    name: 버전 자동 증가
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+
+      - name: 버전 관리 스크립트 권한 설정
+        run: |
+          chmod +x .github/scripts/version_manager.sh
+          echo "버전 관리 스크립트 권한 설정 완료"
+
+      - name: 현재 버전 확인 및 동기화
+        id: current_version
+        run: |
+          echo "🔍 현재 버전 확인 및 동기화 중..."
+          CURRENT_VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "❌ 버전 확인 실패"
+            exit 1
+          fi
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ 현재 버전: $CURRENT_VERSION"
+
+      - name: 새 버전 계산 및 업데이트
+        id: version
+        run: |
+          echo "⬆️ 패치 버전 증가 중..."
+          NEW_VERSION=$(./.github/scripts/version_manager.sh increment | tail -n 1)
+          if [ -z "$NEW_VERSION" ]; then
+            echo "❌ 버전 업데이트 실패"
+            exit 1
+          fi
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ 새 버전: $NEW_VERSION"
+
+      - name: 프로젝트 타입 확인
+        id: project_info
+        run: |
+          if [ -f "version.yml" ]; then
+            PROJECT_TYPE=$(grep "^project_type:" version.yml | sed 's/project_type: *"\([^"]*\)".*/\1/')
+            echo "project_type=$PROJECT_TYPE" >> $GITHUB_OUTPUT
+            echo "프로젝트 타입: $PROJECT_TYPE"
+          else
+            echo "project_type=unknown" >> $GITHUB_OUTPUT
+            echo "⚠️ version.yml 파일을 찾을 수 없습니다."
+          fi
+
+      - name: 변경사항 확인 및 커밋
+        run: |
+          echo "📝 Git 설정 및 변경사항 확인 중..."
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # 모든 변경사항 스테이징
+          git add -A
+          
+          # 변경사항이 있는지 확인
+          if git diff --staged --quiet; then
+            echo "ℹ️ 변경사항이 없습니다. (이미 동기화됨)"
+          else
+            echo "📤 변경사항 커밋 중..."
+            REPO_NAME=$(basename "${{ github.repository }}")
+            COMMIT_MSG="$REPO_NAME 버전 정보 관리: chore: 버전 ${{ steps.version.outputs.new_version }} [skip ci]"
+          
+            if git commit -m "$COMMIT_MSG"; then
+              git push
+              echo "✅ 버전 업데이트 커밋 완료"
+            else
+              echo "❌ 커밋 실패"
+              exit 1
+            fi
+          fi
+
+      - name: Git 태그 생성
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          TAG_NAME="v$NEW_VERSION"
+          
+          echo "🏷️ Git 태그 생성 중: $TAG_NAME"
+          
+          # 기존 태그 확인
+          if git tag -l | grep -q "^$TAG_NAME$"; then
+            echo "⚠️ 태그 $TAG_NAME이 이미 존재합니다. 건너뛰기."
+          else
+            if git tag "$TAG_NAME" && git push origin "$TAG_NAME"; then
+              echo "✅ Git 태그 생성 완료: $TAG_NAME"
+            else
+              echo "❌ 태그 생성 실패: $TAG_NAME"
+              exit 1
+            fi
+          fi
+
+      - name: 버전 업데이트 완료 요약
+        if: always()
+        run: |
+          echo ""
+          echo "🎉 버전 업데이트 워크플로우 완료!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 업데이트 요약:"
+          echo "  📦 프로젝트 타입: ${{ steps.project_info.outputs.project_type }}"
+          echo "  📌 이전 버전: ${{ steps.current_version.outputs.current_version }}"
+          echo "  🆙 새 버전: ${{ steps.version.outputs.new_version }}"
+          echo "  🔖 Git 태그: v${{ steps.version.outputs.new_version }}"
+          echo "  📝 커밋: ${{ github.sha }}"
+          echo "  🌿 브랜치: ${{ github.ref_name }}"
+          echo "  🕐 시간: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          
+          # 실패한 경우에만 에러 표시
+          if [ "${{ job.status }}" != "success" ]; then
+            echo "❌ 일부 단계에서 오류가 발생했습니다. 로그를 확인해주세요."
+          else
+            echo "✅ 모든 단계가 성공적으로 완료되었습니다."
+          fi

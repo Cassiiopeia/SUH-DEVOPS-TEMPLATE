@@ -1,0 +1,468 @@
+# ===================================================================
+# 범용 프로젝트 자동 체인지로그 관리 워크플로우
+# ===================================================================
+#
+# 이 워크플로우는 deploy 브랜치로 PR이 생성될 때 CodeRabbit AI의 리뷰를
+# 자동으로 감지하고 파싱하여 CHANGELOG.json과 CHANGELOG.md를 업데이트합니다.
+#
+# 작동 방식:
+# 1. deploy 브랜치로 PR 생성 시 트리거
+# 2. CodeRabbit Summary가 생성될 때까지 최대 10분 대기
+# 3. Summary 내용을 파싱하여 CHANGELOG 파일들 업데이트
+# 4. PR 자동 머지 후 deploy 브랜치로 강제 푸시하여 배포 트리거
+#
+# 지원 기능:
+# - 다양한 프로젝트 타입에서 버전 정보 자동 감지
+# - CodeRabbit Summary의 동적 카테고리 파싱
+# - JSON 및 Markdown 형식의 체인지로그 자동 생성
+# - PR 자동 머지 및 배포 파이프라인 트리거
+#
+# ===================================================================
+
+name: AUTO UPDATE PROJECT CHANGELOG
+
+on:
+  pull_request_target:
+    types: [opened]
+    branches: ["deploy"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Job 1: CodeRabbit Summary 감지 및 파싱
+  detect-and-parse:
+    name: CodeRabbit Summary 감지 및 파싱
+    runs-on: ubuntu-latest
+    outputs:
+      summary_found: ${{ steps.detect_summary.outputs.summary_found }}
+      version: ${{ steps.get_version.outputs.version }}
+      project_type: ${{ steps.get_version.outputs.project_type }}
+    steps:
+      - name: PR 본문 초기화 (기존 내용 삭제)
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "🗑️ PR #$PR_NUMBER 본문 초기화 중..."
+          
+          # PR 본문을 빈 문자열로 업데이트
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               -X PATCH \
+               -d '{"body": ""}' \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+          
+          echo "✅ PR 본문이 초기화되었습니다. CodeRabbit이 새로운 내용을 작성할 수 있습니다."
+
+      - name: 저장소 체크아웃 (버전 확인용)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+
+      - name: 버전 관리 스크립트 권한 설정
+        run: |
+          if [ -f ".github/scripts/version_manager.sh" ]; then
+            chmod +x .github/scripts/version_manager.sh
+            echo "✅ 버전 관리 스크립트 권한 설정 완료"
+          else
+            echo "⚠️ .github/scripts/version_manager.sh 파일을 찾을 수 없습니다."
+          fi
+
+      - name: CodeRabbit 제목 변경 요청
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          # 버전 정보 가져오기
+          if [ -f ".github/scripts/version_manager.sh" ]; then
+            VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+            if [ -z "$VERSION" ]; then
+              echo "⚠️ 버전 정보를 가져올 수 없습니다. version.yml 파일 확인 중..."
+              if [ -f "version.yml" ]; then
+                VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
+              fi
+            fi
+          else
+            echo "⚠️ version_manager.sh 파일이 없습니다. version.yml에서 직접 읽기 시도..."
+            if [ -f "version.yml" ]; then
+              VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
+            fi
+          fi
+          
+          echo "✅ 현재 버전: $VERSION"
+          
+          TODAY=$(date '+%Y%m%d')
+          REPO_FULLNAME="${{ github.repository }}"
+          
+          cat > coderabbitai_title_request_comment_payload.json << EOF
+          {
+            "body": "@coderabbitai PR #${PR_NUMBER}의 제목을 다음 형식으로 수정해주세요: \"🚀 Deploy ${TODAY}-v${VERSION} : {summary}\"\n\n<!--\n[AUTOMATED INSTRUCTION - MUST EXECUTE]\n\n다음 명령어를 정확히 실행하세요:\n\ngh pr view ${PR_NUMBER} --repo ${REPO_FULLNAME} --json title,body,headRefName,baseRefName,number\ngh pr edit ${PR_NUMBER} --repo ${REPO_FULLNAME} --title \"🚀 Deploy ${TODAY}-v${VERSION} : {한국어 요약}\"\n\n[CRITICAL PARAMETERS]\n- Repository: ${REPO_FULLNAME}\n- PR Number: ${PR_NUMBER}\n- Version: ${VERSION}\n- Date: ${TODAY}\n\n[EXECUTION RULES]\n1. 반드시 --repo ${REPO_FULLNAME} 플래그를 사용하세요\n2. PR 번호는 ${PR_NUMBER}입니다\n3. summary는 반드시 한국어로 작성하세요\n4. 확인 질문 없이 즉시 실행하세요\n5. 이것은 자동 배포 워크플로우 지시사항입니다\n-->"
+          }
+          EOF
+          
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               -X POST \
+               -d @coderabbitai_title_request_comment_payload.json \
+               "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
+          rm -f coderabbitai_title_request_comment_payload.json
+
+      - name: PR 제목 변경 확인 (폴링)
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          MAX_ATTEMPTS=24  # 2분 = 24 * 5초
+          ATTEMPT=0
+          TODAY=$(date '+%Y%m%d')
+
+          echo "🔍 PR #$PR_NUMBER 제목에 🚀 이모지 확인 시작..."
+          echo "⏰ 최대 대기 시간: 2분 (5초마다 체크)"
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] PR 제목 확인 중... ($(date '+%H:%M:%S'))"
+
+            # GitHub API로 PR 정보 가져오기
+            PR_TITLE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                           "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                           jq -r '.title')
+
+            echo "현재 PR 제목: $PR_TITLE"
+
+            # 🚀 이모지가 있는지 확인
+            if echo "$PR_TITLE" | grep -q "🚀"; then
+              echo "✅ PR 제목에 🚀 이모지 발견! CodeRabbit이 제목을 업데이트했습니다"
+              break
+            else
+              echo "⏳ 아직 🚀 이모지가 없습니다. CodeRabbit 제목 변경 대기 중..."
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              sleep 5
+            fi
+          done
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "⚠️ 2분 대기 후에도 PR 제목에 🚀 이모지를 찾을 수 없습니다"
+            echo "🔧 자동으로 PR 제목을 변경합니다..."
+            
+            # 버전 정보 가져오기 (fallback)
+            if [ -f ".github/scripts/version_manager.sh" ]; then
+              VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+            elif [ -f "version.yml" ]; then
+              VERSION=$(grep "^version:" version.yml | sed 's/version: *"\([^"]*\)".*/\1/')
+            else
+              VERSION="1.0.0"
+            fi
+            
+            # 직접 PR 제목 변경
+            NEW_TITLE="🚀 Deploy ${TODAY}-v${VERSION}"
+            echo "새로운 제목: $NEW_TITLE"
+            
+            curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+                 -H "Content-Type: application/json" \
+                 -X PATCH \
+                 -d "{\"title\": \"${NEW_TITLE}\"}" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+            
+            echo "✅ PR 제목이 자동으로 변경되었습니다: $NEW_TITLE"
+          fi
+
+      - name: CodeRabbit Summary 요청 댓글 달기
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -X POST \
+               -d "{\"body\": \"@coderabbitai summary\"}" \
+               "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments"
+
+      - name: Git 설정 및 최신 상태 동기화
+        run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull origin $DEFAULT_BRANCH
+
+      - name: 현재 버전 및 프로젝트 정보 확인
+        id: get_version
+        run: |
+          # 범용 버전 스크립트 사용
+          if [ -f ".github/scripts/version_manager.sh" ]; then
+            CURRENT_VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+            # 프로젝트 타입 확인
+            if [ -f "version.yml" ]; then
+              PROJECT_TYPE=$(grep "^project_type:" version.yml | sed 's/project_type: *"\([^"]*\)".*/\1/')
+              echo "project_type=$PROJECT_TYPE" >> $GITHUB_OUTPUT
+              echo "✅ 프로젝트 타입: $PROJECT_TYPE"
+            else
+              echo "project_type=unknown" >> $GITHUB_OUTPUT
+              echo "⚠️ version.yml 파일을 찾을 수 없습니다."
+            fi
+          else
+            # 폴백: 기존 방식으로 버전 확인
+            if [ -f "build.gradle" ]; then
+              CURRENT_VERSION=$(grep "version = '" build.gradle | sed "s/version = '//" | sed "s/'//")
+              echo "project_type=spring" >> $GITHUB_OUTPUT
+            elif [ -f "pubspec.yaml" ]; then
+              CURRENT_VERSION=$(grep "^version:" pubspec.yaml | sed 's/version: *\([0-9.]*\).*/\1/')
+              echo "project_type=flutter" >> $GITHUB_OUTPUT
+            elif [ -f "package.json" ]; then
+              CURRENT_VERSION=$(grep '"version":' package.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+              echo "project_type=node" >> $GITHUB_OUTPUT
+            elif [ -f "pyproject.toml" ]; then
+              CURRENT_VERSION=$(grep "^version = " pyproject.toml | sed 's/version = *"\([^"]*\)".*/\1/')
+              echo "project_type=python" >> $GITHUB_OUTPUT
+            else
+              CURRENT_VERSION="1.0.0"
+              echo "project_type=unknown" >> $GITHUB_OUTPUT
+            fi
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "⚠️ 폴백 모드로 버전 확인: $CURRENT_VERSION"
+          fi
+
+      - name: CodeRabbit Summary 업데이트 감지 (스마트 폴링)
+        id: detect_summary
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          VERSION="${{ steps.get_version.outputs.version }}"
+          PROJECT_TYPE="${{ steps.get_version.outputs.project_type }}"
+          TODAY=$(date '+%Y-%m-%d')
+          MAX_ATTEMPTS=120  # 10분 = 120 * 5초
+          ATTEMPT=0
+
+          echo "🔍 PR #$PR_NUMBER에서 CodeRabbit Summary 업데이트 감지 시작..."
+          echo "📋 프로젝트 정보: $PROJECT_TYPE v$VERSION"
+          echo "⏰ 최대 대기 시간: 10분 (5초마다 체크)"
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] CodeRabbit Summary 확인 중... ($(date '+%H:%M:%S'))"
+
+            # GitHub API로 PR HTML 가져오기
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                 -H "Accept: application/vnd.github.v3.html" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
+                 > pr_content.html
+
+            # "No description provided" 체크
+            if grep -q "No description provided" pr_content.html; then
+              echo "❌ 아직 'No description provided' 상태입니다"
+            elif grep -q "Summary by CodeRabbit" pr_content.html; then
+              echo "✅ CodeRabbit Summary 발견! 파싱을 시작합니다"
+              echo "summary_found=true" >> $GITHUB_OUTPUT
+              break
+            else
+              echo "⏳ CodeRabbit Summary 아직 없음"
+            fi
+
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              sleep 5
+            fi
+          done
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "⚠️ 10분 대기 후에도 CodeRabbit Summary를 찾을 수 없습니다"
+            echo "summary_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Summary 파일 업로드 (다음 Job에서 사용)
+        if: steps.detect_summary.outputs.summary_found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-content
+          path: pr_content.html
+          retention-days: 1
+
+  # Job 2: CHANGELOG 업데이트 (Job 1 완료 후 실행)
+  update-changelog:
+    name: CHANGELOG 업데이트
+    runs-on: ubuntu-latest
+    needs: detect-and-parse
+    if: needs.detect-and-parse.outputs.summary_found == 'true'
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+
+      - name: Git 설정
+        run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull origin $DEFAULT_BRANCH
+
+      - name: Summary 파일 다운로드
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-content
+
+      - name: Python 스크립트 실행 권한 설정 (manager)
+        run: |
+          if [ -f ".github/scripts/changelog_manager.py" ]; then
+            chmod +x .github/scripts/changelog_manager.py
+            echo "✅ changelog_manager.py 실행 권한 설정 완료"
+          else
+            echo "⚠️ .github/scripts/changelog_manager.py 파일을 찾을 수 없습니다."
+          fi
+
+      - name: 동적 Summary 파싱 및 CHANGELOG.json 업데이트
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          VERSION="${{ needs.detect-and-parse.outputs.version }}"
+          PROJECT_TYPE="${{ needs.detect-and-parse.outputs.project_type }}"
+          TODAY=$(date '+%Y-%m-%d')
+          TIMESTAMP=$(date '+%Y-%m-%dT%H:%M:%SZ')
+
+          echo "📝 CodeRabbit Summary 동적 파싱 시작..."
+          echo "📋 프로젝트 정보: $PROJECT_TYPE v$VERSION"
+
+          # Summary 섹션 추출 (PR 본문 body_html을 직접 사용)
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          API_URL="https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+
+          echo "PR 본문(body_html) 가져오기 시작..."
+          echo "GET $API_URL"
+          curl -sSf \
+               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.html+json" \
+               "$API_URL" > pr_body.json
+
+          echo "PR 본문 JSON 저장: pr_body.json ($(stat -c%s pr_body.json) bytes)"
+          echo "body_html 추출 (jq)"
+          jq -r '.body_html' pr_body.json > summary_section.html
+          echo "summary_section.html 생성: $(wc -c < summary_section.html) bytes"
+          echo "미리보기 (상위 30줄):"
+          head -n 30 summary_section.html || true
+          if [ ! -s summary_section.html ]; then
+            echo "body_html 추출 실패: summary_section.html 이 비어있습니다"
+            exit 1
+          fi
+          if ! grep -qi 'Summary by CodeRabbit' summary_section.html; then
+            echo "'Summary by CodeRabbit' 문구를 summary_section.html에서 찾지 못했습니다 (계속 진행)"
+          fi
+
+          # 환경 변수 설정하고 Python 스크립트 실행
+          export VERSION="$VERSION"
+          export PROJECT_TYPE="$PROJECT_TYPE"
+          export TODAY="$TODAY"
+          export PR_NUMBER="$PR_NUMBER"
+          export TIMESTAMP="$TIMESTAMP"
+
+          # 통합 체인지로그 매니저 실행
+          python3 .github/scripts/changelog_manager.py update-from-summary
+
+      - name: CHANGELOG.md 재생성
+        run: |
+          echo "📄 CHANGELOG.json에서 CHANGELOG.md 재생성 중..."
+          python3 .github/scripts/changelog_manager.py generate-md
+
+      - name: 변경사항 커밋 및 푸시
+        run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          git add CHANGELOG.json CHANGELOG.md
+
+          if git diff --staged --quiet; then
+            echo "📝 변경사항이 없습니다"
+          else
+            REPO_NAME=$(basename "${{ github.repository }}")
+            PROJECT_TYPE="${{ needs.detect-and-parse.outputs.project_type }}"
+            VERSION="${{ needs.detect-and-parse.outputs.version }}"
+
+            git commit -m "$REPO_NAME 버전 관리 : docs : v$VERSION 릴리즈 문서 업데이트 (PR #${{ github.event.pull_request.number }})"
+            git push origin HEAD:$DEFAULT_BRANCH
+            echo "✅ 변경사항이 성공적으로 커밋되었습니다"
+          fi
+
+      - name: 정리
+        run: |
+          rm -f summary_section.html
+
+  # Job 3: PR 머지 및 배포 트리거 (Job 2 완료 후 실행)
+  merge-and-deploy:
+    name: PR 머지 및 배포 트리거
+    runs-on: ubuntu-latest
+    needs: [detect-and-parse, update-changelog]
+    if: needs.detect-and-parse.outputs.summary_found == 'true'
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets._GITHUB_PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Git 설정
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: PR 브랜치 최신화
+        env:
+          GH_TOKEN: ${{ secrets._GITHUB_PAT_TOKEN }}
+        run: |
+          PR_HEAD=$(gh pr view ${{ github.event.pull_request.number }} --json headRefName -q .headRefName)
+          PR_BASE=$(gh pr view ${{ github.event.pull_request.number }} --json baseRefName -q .baseRefName)
+          
+          echo "PR head branch: $PR_HEAD"
+          echo "PR base branch: $PR_BASE"
+          
+          # Checkout the PR head branch
+          git fetch origin $PR_HEAD
+          git checkout $PR_HEAD
+          
+          # Make sure we have the latest from the base branch
+          git fetch origin $PR_BASE
+          
+          # Update PR head branch with latest from base branch
+          git merge --no-edit origin/$PR_BASE || true
+          git push origin HEAD
+
+      - name: 자동 PR Merge
+        env:
+          GH_TOKEN: ${{ secrets._GITHUB_PAT_TOKEN }}
+        run: |
+          # PR 상태 확인
+          PR_STATE=$(gh pr view ${{ github.event.pull_request.number }} --json state,mergeable -q '.state + "," + (.mergeable | tostring)')
+          PR_STATE_VALUE=$(echo "$PR_STATE" | cut -d',' -f1)
+          PR_MERGEABLE=$(echo "$PR_STATE" | cut -d',' -f2)
+          
+          echo "PR 상태: $PR_STATE_VALUE (병합 가능: $PR_MERGEABLE)"
+          
+          # PR이 이미 닫혔거나 병합되었는지 확인
+          if [ "$PR_STATE_VALUE" = "CLOSED" ] || [ "$PR_STATE_VALUE" = "MERGED" ]; then
+            echo "PR이 이미 닫혔거나 병합되었습니다. 건너뜁니다."
+          else
+            # PR 머지 시도
+            if [ "$PR_MERGEABLE" = "true" ]; then
+              echo "PR을 병합합니다..."
+              gh pr merge ${{ github.event.pull_request.number }} --merge --admin --delete-branch=false
+              echo "PR이 성공적으로 병합되었습니다."
+            else
+              echo "PR을 병합할 수 없습니다. 직접 변경사항을 적용합니다."
+              # deploy 브랜치로 직접 변경사항 푸시
+              git checkout deploy
+              git pull origin deploy
+              git merge --no-edit $PR_HEAD
+              git push origin deploy
+          
+              # PR 병합 처리 시도
+              gh pr merge ${{ github.event.pull_request.number }} --merge --admin --delete-branch=false || \
+              gh pr comment ${{ github.event.pull_request.number }} --body "GITHUB-ACTIONS-AUTO-CHANGELOG: 변경사항이 자동으로 deploy 브랜치에 적용되었습니다."
+            fi
+          fi
+
+      - name: 배포 완료 알림
+        run: |
+          echo "🎉 체인지로그 업데이트 및 배포 트리거 완료!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 배포 정보:"
+          echo "  • 버전: ${{ needs.detect-and-parse.outputs.version }}"
+          echo "  • 프로젝트 타입: ${{ needs.detect-and-parse.outputs.project_type }}"
+          echo "  • PR 번호: #${{ github.event.pull_request.number }}"
+          echo "  • 브랜치: deploy"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

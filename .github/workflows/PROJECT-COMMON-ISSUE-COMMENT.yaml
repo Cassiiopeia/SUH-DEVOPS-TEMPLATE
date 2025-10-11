@@ -1,0 +1,87 @@
+name: 이슈 브랜치/커밋 가이드 자동 댓글
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  add-comment:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get Issue information
+        id: issue-info
+        run: |
+          echo "ISSUE_URL=${{ github.event.issue.html_url }}" >> $GITHUB_ENV
+
+      - name: Call Suh Project Utility API (multipart)
+        id: api-call
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://lab.suhsaechan.kr/api/issue-helper/create/commit-branch/github-workflow'
+          RESPONSE=$(curl -sS -X POST \
+            -H 'Accept: application/json' \
+            -F "issueUrl=${ISSUE_URL}" \
+            "${URL}" -w '\n%{http_code}')
+          STATUS=$(echo "${RESPONSE}" | tail -n1)
+          BODY=$(echo "${RESPONSE}" | sed '$d')
+          DELIM="GHOUT_$(date +%s%N)"
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<${DELIM}"
+            echo "${BODY}"
+            echo "${DELIM}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Debug API Response (safe)
+        env:
+          API_STATUS: ${{ steps.api-call.outputs.status }}
+          API_BODY: ${{ steps.api-call.outputs.body }}
+        run: |
+          printf 'API Status: %s\n' "$API_STATUS"
+          printf 'API Response Body (raw):\n%s\n' "$API_BODY"
+
+      - name: Check API response (use server-provided markdown only)
+        id: check-response
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS='${{ steps.api-call.outputs.status }}'
+          BODY='${{ steps.api-call.outputs.body }}'
+          if [[ "${STATUS}" =~ ^2[0-9][0-9]$ ]]; then
+            echo "API call successful (status: ${STATUS})"
+            MARKDOWN=$(printf '%s' "${BODY}" | jq -e -r '.commentMarkdown')
+            DELIM="GHENV_$(date +%s%N)"
+            {
+              echo "COMMENT_BODY<<${DELIM}"
+              printf "%s\n" "${MARKDOWN}"
+              echo "${DELIM}"
+            } >> "$GITHUB_ENV"
+          else
+            echo "API call failed with status ${STATUS}"
+          echo "COMMENT_BODY=API 호출에 실패했습니다. 레포지토리가 허용 목록에 있는지 확인하세요. 해당 레포는 반드시 lab.suhsaechan.me 사이트 내부 모듈에서 기능을 한 번이라도 이용한 적이 있어야 합니다." >> "$GITHUB_ENV"
+          fi
+
+      - name: Add comment to Issue
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentBody = process.env.COMMENT_BODY;
+            if (!commentBody) {
+              core.setFailed('댓글 내용이 없습니다.');
+              return;
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });

@@ -41,25 +41,25 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# 로깅 함수
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# 출력 함수 (stderr로 출력하여 변수 캡처와 분리)
+print_step() {
+    echo -e "${CYAN}▶${NC} $1" >&2
 }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+print_info() {
+    echo -e "  ${BLUE}→${NC} $1" >&2
 }
 
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+print_success() {
+    echo -e "${GREEN}✓${NC} $1" >&2
 }
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1" >&2
 }
 
-log_step() {
-    echo -e "${CYAN}[STEP]${NC} $1"
+print_error() {
+    echo -e "${RED}✗${NC} $1" >&2
 }
 
 # 도움말 표시
@@ -135,7 +135,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            log_error "알 수 없는 옵션: $1"
+            print_error "알 수 없는 옵션: $1"
             echo ""
             show_help
             exit 1
@@ -146,8 +146,8 @@ done
 # 버전 형식 검증
 validate_version() {
     if [[ ! $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        log_error "잘못된 버전 형식: $1"
-        log_error "올바른 형식: x.y.z (예: 1.0.0, 2.1.3)"
+        print_error "잘못된 버전 형식: $1"
+        print_error "올바른 형식: x.y.z (예: 1.0.0, 2.1.3)"
         exit 1
     fi
 }
@@ -165,8 +165,8 @@ validate_project_type() {
     done
     
     if [ "$valid" = false ]; then
-        log_error "지원하지 않는 프로젝트 타입: $type"
-        log_error "지원 타입: ${VALID_TYPES[*]}"
+        print_error "지원하지 않는 프로젝트 타입: $type"
+        print_error "지원 타입: ${VALID_TYPES[*]}"
         exit 1
     fi
 }
@@ -175,13 +175,13 @@ validate_project_type() {
 detect_default_branch() {
     local detected=""
     
-    log_step "Default branch 자동 감지 중..."
+    print_step "Default branch 자동 감지 중..."
     
     # 방법 1: GitHub CLI
     if command -v gh >/dev/null 2>&1; then
         detected=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || echo "")
         if [ -n "$detected" ]; then
-            log_info "gh CLI로 감지: $detected"
+            print_info "gh CLI로 감지: $detected"
             echo "$detected"
             return
         fi
@@ -190,7 +190,7 @@ detect_default_branch() {
     # 방법 2: git symbolic-ref
     detected=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "")
     if [ -n "$detected" ]; then
-        log_info "git symbolic-ref로 감지: $detected"
+        print_info "git symbolic-ref로 감지: $detected"
         echo "$detected"
         return
     fi
@@ -198,13 +198,13 @@ detect_default_branch() {
     # 방법 3: git remote show
     detected=$(git remote show origin 2>/dev/null | grep 'HEAD branch' | sed 's/.*: //' || echo "")
     if [ -n "$detected" ]; then
-        log_info "git remote show로 감지: $detected"
+        print_info "git remote show로 감지: $detected"
         echo "$detected"
         return
     fi
     
     # 최종 폴백
-    log_warning "자동 감지 실패, 기본값 사용: main"
+    print_warning "자동 감지 실패, 기본값 사용: main"
     echo "main"
 }
 
@@ -215,11 +215,11 @@ create_version_yml() {
     local branch=$3
     local user=$4
     
-    log_step "version.yml 파일 생성 중..."
-    log_info "  버전: $version"
-    log_info "  타입: $type"
-    log_info "  브랜치: $branch"
-    log_info "  사용자: $user"
+    print_step "version.yml 파일 생성 중..."
+    print_info "버전: $version"
+    print_info "타입: $type"
+    print_info "브랜치: $branch"
+    print_info "사용자: $user"
     
     cat > version.yml << EOF
 # ===================================================================
@@ -241,7 +241,7 @@ create_version_yml() {
 #
 # 프로젝트 타입별 동기화 파일:
 # - spring: build.gradle (version = "x.y.z")
-# - flutter: pubspec.yaml (version: 1.0.0+1, buildNumber 포함)
+# - flutter: pubspec.yaml (version: x.y.z+i, buildNumber 포함)
 # - react/node: package.json ("version": "x.y.z")
 # - react-native: iOS Info.plist 또는 Android build.gradle
 # - react-native-expo: app.json (expo.version)
@@ -262,92 +262,112 @@ metadata:
   default_branch: "$branch"
 EOF
     
-    log_success "version.yml 파일이 생성되었습니다."
+    print_success "version.yml 파일이 생성되었습니다."
 }
 
 # 워크플로우 트리거 브랜치 변경
+# 
+# 동작 방식:
+# - Default branch가 "main"인 경우: 모든 워크플로우가 기본적으로 main을 사용하므로 변경 불필요
+# - Default branch가 "main"이 아닌 경우: main 브랜치를 트리거로 사용하는 워크플로우만 변경
+#
+# 화이트리스트 방식:
+# - main 브랜치를 트리거로 사용하는 워크플로우를 명시적으로 지정
+# - deploy 브랜치 전용 워크플로우는 변경하지 않음
+# - 새로운 main 트리거 워크플로우 추가 시 MAIN_BRANCH_WORKFLOWS 배열에 추가 필요
+#
+# 참고: 
+# - 이 함수는 템플릿 초기화 시에만 실행됩니다.
+# - 임시 파일 방식으로 macOS (BSD sed) / Linux (GNU sed) 모두 호환됩니다.
 update_workflow_triggers() {
     local branch=$1
     
-    # main 브랜치면 변경 불필요
+    # main 브랜치면 변경 불필요 (워크플로우 기본값이 main이므로)
     if [ "$branch" = "main" ]; then
-        log_info "브랜치가 main이므로 워크플로우 변경 불필요"
+        print_info "브랜치가 main이므로 워크플로우 변경 불필요"
+        print_info "모든 워크플로우는 기본적으로 main 브랜치를 트리거로 사용합니다"
         return
     fi
     
-    log_step "워크플로우 트리거 브랜치 변경 중: main → $branch"
+    print_step "워크플로우 트리거 브랜치 변경 중: main → $branch"
     
-    local count=0
+    # main 브랜치를 트리거로 사용하는 워크플로우만 명시적으로 지정
+    # (deploy 브랜치 전용 워크플로우는 포함하지 않음)
+    local MAIN_BRANCH_WORKFLOWS=(
+        "PROJECT-VERSION-CONTROL.yaml"
+    )
     
-    # .github/workflows 디렉토리의 모든 YAML 파일 (초기화 워크플로우 제외)
-    find .github/workflows -type f \( -name "*.yml" -o -name "*.yaml" \) ! -name "PROJECT-TEMPLATE-INITIALIZER.yaml" 2>/dev/null | while read -r file; do
-        local changed=false
+    local updated=0
+    
+    for workflow in "${MAIN_BRANCH_WORKFLOWS[@]}"; do
+        local file=".github/workflows/$workflow"
         
-        # 패턴 1: branches: ["main"]
-        if grep -q 'branches: \["main"\]' "$file"; then
-            sed -i "s/branches: \[\"main\"\]/branches: [\"$branch\"]/" "$file"
-            changed=true
-        fi
-        
-        # 패턴 2: branches: ['main']
-        if grep -q "branches: \['main'\]" "$file"; then
-            sed -i "s/branches: \['main'\]/branches: ['$branch']/" "$file"
-            changed=true
-        fi
-        
-        # 패턴 3: - main (리스트 항목)
-        if grep -q '^[[:space:]]*-[[:space:]]*main[[:space:]]*$' "$file"; then
-            sed -i "s/^\\([[:space:]]*-[[:space:]]*\\)main[[:space:]]*$/\\1$branch/" "$file"
-            changed=true
-        fi
-        
-        if [ "$changed" = true ]; then
-            echo "  ✓ $(basename "$file")"
+        if [ -f "$file" ]; then
+            # main 브랜치 트리거를 감지된 브랜치로 변경 (임시 파일 사용, macOS/Linux 호환)
+            if grep -q 'branches: \["main"\]' "$file"; then
+                sed "s/branches: \\[\"main\"\\]/branches: [\"$branch\"]/" "$file" > "$file.tmp"
+                mv "$file.tmp" "$file"
+                echo "  ✓ $workflow"
+                updated=$((updated + 1))
+            elif grep -q "branches: \\['main'\\]" "$file"; then
+                sed "s/branches: \\['main'\\]/branches: ['$branch']/" "$file" > "$file.tmp"
+                mv "$file.tmp" "$file"
+                echo "  ✓ $workflow"
+                updated=$((updated + 1))
+            else
+                print_warning "$workflow 파일에서 main 브랜치 트리거를 찾을 수 없습니다"
+            fi
+        else
+            print_warning "$workflow 파일이 존재하지 않습니다"
         fi
     done
     
-    log_success "워크플로우 트리거 브랜치 변경 완료"
+    if [ $updated -gt 0 ]; then
+        print_success "$updated 개 워크플로우 파일 업데이트 완료"
+    else
+        print_warning "업데이트할 워크플로우 파일이 없습니다"
+    fi
 }
 
 # 템플릿 관련 파일 삭제
 cleanup_template_files() {
-    log_step "템플릿 관련 파일 삭제 중..."
+    print_step "템플릿 관련 파일 삭제 중..."
     
     # CHANGELOG 파일들 삭제
     if [ -f "CHANGELOG.md" ]; then
         rm -f CHANGELOG.md
-        log_info "  ✓ CHANGELOG.md 삭제"
+        echo "  ✓ CHANGELOG.md 삭제"
     fi
     
     if [ -f "CHANGELOG.json" ]; then
         rm -f CHANGELOG.json
-        log_info "  ✓ CHANGELOG.json 삭제"
+        echo "  ✓ CHANGELOG.json 삭제"
     fi
     
     # LICENSE 파일 삭제
     if [ -f "LICENSE" ]; then
         rm -f LICENSE
-        log_info "  ✓ LICENSE 삭제"
+        echo "  ✓ LICENSE 삭제"
     fi
     
     # CONTRIBUTING.md 파일 삭제
     if [ -f "CONTRIBUTING.md" ]; then
         rm -f CONTRIBUTING.md
-        log_info "  ✓ CONTRIBUTING.md 삭제"
+        echo "  ✓ CONTRIBUTING.md 삭제"
     fi
     
     # 테스트 폴더들 삭제
     if [ -d ".github/scripts/test" ]; then
         rm -rf .github/scripts/test
-        log_info "  ✓ .github/scripts/test 폴더 삭제"
+        echo "  ✓ .github/scripts/test 폴더 삭제"
     fi
     
     if [ -d ".github/workflows/test" ]; then
         rm -rf .github/workflows/test
-        log_info "  ✓ .github/workflows/test 폴더 삭제"
+        echo "  ✓ .github/workflows/test 폴더 삭제"
     fi
     
-    log_success "템플릿 관련 파일 삭제 완료"
+    print_success "템플릿 관련 파일 삭제 완료"
 }
 
 # README.md 초기화
@@ -355,7 +375,7 @@ initialize_readme() {
     local project_name=$1
     local version=$2
     
-    log_step "README.md 파일 초기화 중..."
+    print_step "README.md 파일 초기화 중..."
     
     cat > README.md << EOF
 # $project_name
@@ -370,37 +390,44 @@ initialize_readme() {
 <!-- 템플릿 초기화 완료: $(TZ=Asia/Seoul date +"%Y-%m-%d %H:%M:%S KST") -->
 EOF
     
-    log_success "README.md 파일이 초기화되었습니다."
+    print_success "README.md 파일이 초기화되었습니다."
 }
 
 # 이슈 템플릿 assignee 업데이트
 update_issue_templates() {
-    log_step "이슈 템플릿 assignee 업데이트 중..."
+    print_step "이슈 템플릿 assignee 업데이트 중..."
     
     local updated=0
     
     # bug_report.md 업데이트
     if [ -f ".github/ISSUE_TEMPLATE/bug_report.md" ]; then
-        sed -i "s/assignees: \[Cassiiopeia\]/assignees: [$REPO_OWNER]/" .github/ISSUE_TEMPLATE/bug_report.md
-        log_info "  ✓ bug_report.md"
+        # 임시 파일 사용 (macOS/Linux 호환)
+        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+            .github/ISSUE_TEMPLATE/bug_report.md > .github/ISSUE_TEMPLATE/bug_report.md.tmp
+        mv .github/ISSUE_TEMPLATE/bug_report.md.tmp .github/ISSUE_TEMPLATE/bug_report.md
+        echo "  ✓ bug_report.md"
         updated=$((updated + 1))
     fi
     
     # design_request.md 업데이트
     if [ -f ".github/ISSUE_TEMPLATE/design_request.md" ]; then
-        sed -i "s/assignees: \[Cassiiopeia\]/assignees: [$REPO_OWNER]/" .github/ISSUE_TEMPLATE/design_request.md
-        log_info "  ✓ design_request.md"
+        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+            .github/ISSUE_TEMPLATE/design_request.md > .github/ISSUE_TEMPLATE/design_request.md.tmp
+        mv .github/ISSUE_TEMPLATE/design_request.md.tmp .github/ISSUE_TEMPLATE/design_request.md
+        echo "  ✓ design_request.md"
         updated=$((updated + 1))
     fi
     
     # feature_request.md 업데이트
     if [ -f ".github/ISSUE_TEMPLATE/feature_request.md" ]; then
-        sed -i "s/assignees: \[Cassiiopeia\]/assignees: [$REPO_OWNER]/" .github/ISSUE_TEMPLATE/feature_request.md
-        log_info "  ✓ feature_request.md"
+        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+            .github/ISSUE_TEMPLATE/feature_request.md > .github/ISSUE_TEMPLATE/feature_request.md.tmp
+        mv .github/ISSUE_TEMPLATE/feature_request.md.tmp .github/ISSUE_TEMPLATE/feature_request.md
+        echo "  ✓ feature_request.md"
         updated=$((updated + 1))
     fi
     
-    log_success "이슈 템플릿 $updated 개 업데이트 완료"
+    print_success "이슈 템플릿 $updated 개 업데이트 완료"
 }
 
 # 초기화 완료 요약 출력
@@ -459,9 +486,9 @@ main() {
         PROJECT_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
     fi
     
-    log_info "프로젝트명: $PROJECT_NAME"
-    log_info "설정된 버전: $VERSION"
-    log_info "설정된 타입: $PROJECT_TYPE"
+    echo -e "${BLUE}프로젝트명:${NC} $PROJECT_NAME"
+    echo -e "${BLUE}설정된 버전:${NC} $VERSION"
+    echo -e "${BLUE}설정된 타입:${NC} $PROJECT_TYPE"
     echo ""
     
     # Default branch 감지
@@ -494,3 +521,4 @@ main() {
 
 # 스크립트 실행
 main "$@"
+

@@ -149,49 +149,49 @@ print_banner() {
 
 print_step() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${CYAN}▶${NC} $1" >/dev/tty
+        echo -e "${CYAN}🔅${NC} $1" >/dev/tty
     else
-        echo -e "${CYAN}▶${NC} $1" >&2
+        echo -e "${CYAN}🔅${NC} $1" >&2
     fi
 }
 
 print_info() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "  ${BLUE}→${NC} $1" >/dev/tty
+        echo -e "  ${BLUE}🔸${NC} $1" >/dev/tty
     else
-        echo -e "  ${BLUE}→${NC} $1" >&2
+        echo -e "  ${BLUE}🔸${NC} $1" >&2
     fi
 }
 
 print_success() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${GREEN}✓${NC} $1" >/dev/tty
+        echo -e "${GREEN}✨${NC} $1" >/dev/tty
     else
-        echo -e "${GREEN}✓${NC} $1" >&2
+        echo -e "${GREEN}✨${NC} $1" >&2
     fi
 }
 
 print_warning() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${YELLOW}⚠${NC} $1" >/dev/tty
+        echo -e "${YELLOW}⚠️${NC} $1" >/dev/tty
     else
-        echo -e "${YELLOW}⚠${NC} $1" >&2
+        echo -e "${YELLOW}⚠️${NC} $1" >&2
     fi
 }
 
 print_error() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${RED}✗${NC} $1" >/dev/tty
+        echo -e "${RED}💥${NC} $1" >/dev/tty
     else
-        echo -e "${RED}✗${NC} $1" >&2
+        echo -e "${RED}💥${NC} $1" >&2
     fi
 }
 
 print_question() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${MAGENTA}?${NC} $1" >/dev/tty
+        echo -e "${MAGENTA}💫${NC} $1" >/dev/tty
     else
-        echo -e "${MAGENTA}?${NC} $1" >&2
+        echo -e "${MAGENTA}💫${NC} $1" >&2
     fi
 }
 
@@ -302,6 +302,7 @@ MODE="interactive"
 VERSION=""
 PROJECT_TYPE=""
 FORCE_MODE=false
+IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
 
 # 지원하는 프로젝트 타입
 VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
@@ -489,6 +490,285 @@ detect_default_branch() {
     echo "main"
 }
 
+# 구분선 출력 (40자)
+print_separator_line() {
+    local line="────────────────────────────────────────"
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "$line" >/dev/tty
+    else
+        echo "$line" >&2
+    fi
+}
+
+# 섹션 헤더 출력 (80자 구분선)
+print_section_header() {
+    local emoji="$1"
+    local title="$2"
+    local line="────────────────────────────────────────────────────────────────────────────────"
+    
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "" >/dev/tty
+        echo "$line" >/dev/tty
+        echo "$emoji $title" >/dev/tty
+        echo "$line" >/dev/tty
+    else
+        echo "" >&2
+        echo "$line" >&2
+        echo "$emoji $title" >&2
+        echo "$line" >&2
+    fi
+}
+
+# 질문 헤더 출력 (40자 구분선)
+print_question_header() {
+    local emoji="$1"
+    local question="$2"
+    
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "" >/dev/tty
+        print_separator_line
+        echo "$emoji $question" >/dev/tty
+        print_separator_line
+        echo "" >/dev/tty
+    else
+        echo "" >&2
+        print_separator_line
+        echo "$emoji $question" >&2
+        print_separator_line
+        echo "" >&2
+    fi
+}
+
+# 프로젝트 타입 선택 메뉴
+show_project_type_menu() {
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "" >/dev/tty
+        echo "프로젝트 타입을 선택하세요:" >/dev/tty
+        echo "" >/dev/tty
+        echo "  1) spring            - Spring Boot 백엔드" >/dev/tty
+        echo "  2) flutter           - Flutter 모바일 앱" >/dev/tty
+        echo "  3) react             - React 웹 앱" >/dev/tty
+        echo "  4) react-native      - React Native 모바일 앱" >/dev/tty
+        echo "  5) react-native-expo - React Native Expo 앱" >/dev/tty
+        echo "  6) node              - Node.js 프로젝트" >/dev/tty
+        echo "  7) python            - Python 프로젝트" >/dev/tty
+        echo "  8) basic             - 기타 프로젝트" >/dev/tty
+        echo "" >/dev/tty
+    else
+        echo "" >&2
+        echo "프로젝트 타입을 선택하세요:" >&2
+        echo "" >&2
+        echo "  1) spring            - Spring Boot 백엔드" >&2
+        echo "  2) flutter           - Flutter 모바일 앱" >&2
+        echo "  3) react             - React 웹 앱" >&2
+        echo "  4) react-native      - React Native 모바일 앱" >&2
+        echo "  5) react-native-expo - React Native Expo 앱" >&2
+        echo "  6) node              - Node.js 프로젝트" >&2
+        echo "  7) python            - Python 프로젝트" >&2
+        echo "  8) basic             - 기타 프로젝트" >&2
+        echo "" >&2
+    fi
+    
+    local choice
+    local valid_input=false
+    
+    while [ "$valid_input" = false ]; do
+        if safe_read "선택 (1-8): " choice "-n 1"; then
+            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            
+            if [[ "$choice" =~ ^[1-8]$ ]]; then
+                valid_input=true
+                case $choice in
+                    1) echo "spring" ;;
+                    2) echo "flutter" ;;
+                    3) echo "react" ;;
+                    4) echo "react-native" ;;
+                    5) echo "react-native-expo" ;;
+                    6) echo "node" ;;
+                    7) echo "python" ;;
+                    8) echo "basic" ;;
+                esac
+            else
+                print_error "잘못된 입력입니다. 1-8 사이의 숫자를 입력해주세요."
+                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            fi
+        else
+            print_error "입력을 읽을 수 없습니다"
+            exit 1
+        fi
+    done
+}
+
+# 프로젝트 감지 및 확인
+detect_and_confirm_project() {
+    print_section_header "🛰️" "프로젝트 분석 결과"
+    
+    # 자동 감지
+    local detected_type=$(detect_project_type)
+    local detected_version=$(detect_version)
+    local detected_branch=$(detect_default_branch)
+    
+    # 전역 변수 설정
+    PROJECT_TYPE="$detected_type"
+    VERSION="$detected_version"
+    DETECTED_BRANCH="$detected_branch"
+    
+    # 감지 결과 표시
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "" >/dev/tty
+        echo "       📂 Project Type  : $PROJECT_TYPE" >/dev/tty
+        echo "       🌙 Version       : $VERSION" >/dev/tty
+        echo "       🌿 Branch        : $DETECTED_BRANCH" >/dev/tty
+        echo "" >/dev/tty
+    else
+        echo "" >&2
+        echo "       📂 Project Type  : $PROJECT_TYPE" >&2
+        echo "       🌙 Version       : $VERSION" >&2
+        echo "       🌿 Branch        : $DETECTED_BRANCH" >&2
+        echo "" >&2
+    fi
+    
+    # 사용자 확인
+    local reply
+    local valid_input=false
+    
+    # 가이드 표시
+    if [ -w /dev/tty ] 2>/dev/null; then
+        echo "이 정보가 맞습니까?" >/dev/tty
+        echo "  Y/y - 예, 계속 진행" >/dev/tty
+        echo "  E/e - 수정하기" >/dev/tty
+        echo "  N/n - 아니오, 취소" >/dev/tty
+        echo "" >/dev/tty
+    else
+        echo "이 정보가 맞습니까?" >&2
+        echo "  Y/y - 예, 계속 진행" >&2
+        echo "  E/e - 수정하기" >&2
+        echo "  N/n - 아니오, 취소" >&2
+        echo "" >&2
+    fi
+    
+    while [ "$valid_input" = false ]; do
+        if safe_read "선택: " reply "-n 1"; then
+            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            
+            if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
+                # 예, 계속 진행
+                valid_input=true
+                print_success "프로젝트 정보 확인 완료"
+                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                
+            elif [[ "$reply" =~ ^[Nn]$ ]]; then
+                # 아니오, 취소
+                valid_input=true
+                print_info "취소되었습니다"
+                exit 0
+                
+            elif [[ "$reply" =~ ^[Ee]$ ]]; then
+                # 수정하기
+                valid_input=true
+                
+                print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
+                
+                if [ -w /dev/tty ] 2>/dev/null; then
+                    echo "  1) Project Type" >/dev/tty
+                    echo "  2) Version" >/dev/tty
+                    echo "  3) Branch" >/dev/tty
+                    echo "  4) 모두 맞음, 계속" >/dev/tty
+                    echo "" >/dev/tty
+                else
+                    echo "  1) Project Type" >&2
+                    echo "  2) Version" >&2
+                    echo "  3) Branch" >&2
+                    echo "  4) 모두 맞음, 계속" >&2
+                    echo "" >&2
+                fi
+                
+                local edit_choice
+                local edit_valid=false
+                
+                while [ "$edit_valid" = false ]; do
+                    if safe_read "선택 (1-4): " edit_choice "-n 1"; then
+                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                        
+                        if [[ "$edit_choice" =~ ^[1-4]$ ]]; then
+                            edit_valid=true
+                            
+                            case $edit_choice in
+                                1)
+                                    # Project Type 수정
+                                    PROJECT_TYPE=$(show_project_type_menu)
+                                    print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                    ;;
+                                2)
+                                    # Version 수정
+                                    local new_version
+                                    if [ -w /dev/tty ] 2>/dev/null; then
+                                        echo "" >/dev/tty
+                                    else
+                                        echo "" >&2
+                                    fi
+                                    
+                                    if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
+                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                        
+                                        if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                            VERSION="$new_version"
+                                            print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                                        else
+                                            print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                                        fi
+                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                    fi
+                                    ;;
+                                3)
+                                    # Branch 수정
+                                    local new_branch
+                                    if [ -w /dev/tty ] 2>/dev/null; then
+                                        echo "" >/dev/tty
+                                    else
+                                        echo "" >&2
+                                    fi
+                                    
+                                    if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
+                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                        
+                                        if [ -n "$new_branch" ]; then
+                                            DETECTED_BRANCH="$new_branch"
+                                            print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                                        else
+                                            print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+                                        fi
+                                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                    fi
+                                    ;;
+                                4)
+                                    # 모두 맞음, 계속
+                                    print_success "프로젝트 정보 확인 완료"
+                                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                                    ;;
+                            esac
+                        else
+                            print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+                            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                        fi
+                    else
+                        print_error "입력을 읽을 수 없습니다"
+                        exit 1
+                    fi
+                done
+            else
+                # 잘못된 입력
+                print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
+                if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+            fi
+        else
+            print_error "입력을 읽을 수 없습니다"
+            exit 1
+        fi
+    done
+}
+
 # 템플릿 다운로드
 download_template() {
     print_step "템플릿 다운로드 중..."
@@ -572,10 +852,26 @@ create_version_yml() {
             local reply
             local valid_input=false
             
+            # 구분선과 가이드 표시
+            print_separator_line
+            if [ -w /dev/tty ] 2>/dev/null; then
+                echo "" >/dev/tty
+                echo "version.yml을 덮어쓰시겠습니까?" >/dev/tty
+                echo "  Y/y - 예, 덮어쓰기" >/dev/tty
+                echo "  N/n - 아니오, 건너뛰기 (기본)" >/dev/tty
+                echo "" >/dev/tty
+            else
+                echo "" >&2
+                echo "version.yml을 덮어쓰시겠습니까?" >&2
+                echo "  Y/y - 예, 덮어쓰기" >&2
+                echo "  N/n - 아니오, 건너뛰기 (기본)" >&2
+                echo "" >&2
+            fi
+            
             # 입력 검증 루프 - Y/y/N/n/Enter만 허용
             while [ "$valid_input" = false ]; do
-                if safe_read "덮어쓰시겠습니까? (y/N): " reply "-n 1"; then
-                    echo "" >&2
+                if safe_read "선택: " reply "-n 1"; then
+                    if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
                     
                     # 빈 입력(Enter) 또는 N/n은 건너뛰기, Y/y는 덮어쓰기
                     if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
@@ -587,8 +883,8 @@ create_version_yml() {
                         # 덮어쓰기 진행
                     else
                         # 잘못된 입력
-                        print_error "잘못된 입력입니다. y 또는 N을 입력해주세요. (Enter는 N)"
-                        echo "" >&2
+                        print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 N)"
+                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
                     fi
                 fi
             done
@@ -742,10 +1038,24 @@ copy_cursor_folder() {
         local reply
         local valid_input=false
         
-        print_question ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)"
+        # 구분선과 가이드 표시
+        print_separator_line
+        if [ -w /dev/tty ] 2>/dev/null; then
+            echo "" >/dev/tty
+            echo ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)" >/dev/tty
+            echo "  Y/y - 예, 복사하기" >/dev/tty
+            echo "  N/n - 아니오, 건너뛰기 (기본)" >/dev/tty
+            echo "" >/dev/tty
+        else
+            echo "" >&2
+            echo ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)" >&2
+            echo "  Y/y - 예, 복사하기" >&2
+            echo "  N/n - 아니오, 건너뛰기 (기본)" >&2
+            echo "" >&2
+        fi
         
         while [ "$valid_input" = false ]; do
-            if safe_read "복사하시겠습니까? (y/N): " reply "-n 1"; then
+            if safe_read "선택: " reply "-n 1"; then
                 if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
                 
                 if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
@@ -755,7 +1065,7 @@ copy_cursor_folder() {
                 elif [[ "$reply" =~ ^[Yy]$ ]]; then
                     valid_input=true
                 else
-                    print_error "잘못된 입력입니다. y 또는 N을 입력해주세요. (Enter는 N)"
+                    print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 N)"
                     if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
                 fi
             fi
@@ -782,10 +1092,24 @@ copy_agent_prompts() {
         local reply
         local valid_input=false
         
-        print_question "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)"
+        # 구분선과 가이드 표시
+        print_separator_line
+        if [ -w /dev/tty ] 2>/dev/null; then
+            echo "" >/dev/tty
+            echo "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)" >/dev/tty
+            echo "  Y/y - 예, 복사하기" >/dev/tty
+            echo "  N/n - 아니오, 건너뛰기 (기본)" >/dev/tty
+            echo "" >/dev/tty
+        else
+            echo "" >&2
+            echo "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)" >&2
+            echo "  Y/y - 예, 복사하기" >&2
+            echo "  N/n - 아니오, 건너뛰기 (기본)" >&2
+            echo "" >&2
+        fi
         
         while [ "$valid_input" = false ]; do
-            if safe_read "복사하시겠습니까? (y/N): " reply "-n 1"; then
+            if safe_read "선택: " reply "-n 1"; then
                 if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
                 
                 if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Nn]$ ]]; then
@@ -795,7 +1119,7 @@ copy_agent_prompts() {
                 elif [[ "$reply" =~ ^[Yy]$ ]]; then
                     valid_input=true
                 else
-                    print_error "잘못된 입력입니다. y 또는 N을 입력해주세요. (Enter는 N)"
+                    print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 N)"
                     if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
                 fi
             fi
@@ -811,6 +1135,9 @@ copy_agent_prompts() {
 
 # 대화형 모드
 interactive_mode() {
+    # Interactive 모드 플래그 설정
+    IS_INTERACTIVE_MODE=true
+    
     # 템플릿 버전 가져오기 (로컬 version.yml에서)
     local template_version="1.3.7"
     if [ -f "version.yml" ]; then
@@ -845,23 +1172,24 @@ interactive_mode() {
         exit 1
     fi
     
+    # 프로젝트 감지 및 확인
+    detect_and_confirm_project
+    
+    print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
+    
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}" >/dev/tty
-        echo "" >/dev/tty
-        echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >/dev/tty
-        echo "  ${GREEN}2${NC}) 버전 관리 시스템만" >/dev/tty
-        echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만" >/dev/tty
-        echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만" >/dev/tty
-        echo "  ${GREEN}5${NC}) 취소" >/dev/tty
+        echo "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >/dev/tty
+        echo "  2) 버전 관리 시스템만" >/dev/tty
+        echo "  3) GitHub Actions 워크플로우만" >/dev/tty
+        echo "  4) 이슈/PR 템플릿만" >/dev/tty
+        echo "  5) 취소" >/dev/tty
         echo "" >/dev/tty
     else
-        echo -e "${BLUE}어떤 기능을 통합하시겠습니까?${NC}" >&2
-        echo "" >&2
-        echo "  ${GREEN}1${NC}) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >&2
-        echo "  ${GREEN}2${NC}) 버전 관리 시스템만" >&2
-        echo "  ${GREEN}3${NC}) GitHub Actions 워크플로우만" >&2
-        echo "  ${GREEN}4${NC}) 이슈/PR 템플릿만" >&2
-        echo "  ${GREEN}5${NC}) 취소" >&2
+        echo "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" >&2
+        echo "  2) 버전 관리 시스템만" >&2
+        echo "  3) GitHub Actions 워크플로우만" >&2
+        echo "  4) 이슈/PR 템플릿만" >&2
+        echo "  5) 취소" >&2
         echo "" >&2
     fi
     
@@ -901,56 +1229,86 @@ interactive_mode() {
 
 # 통합 실행
 execute_integration() {
-    # 자동 감지
-    if [ -z "$PROJECT_TYPE" ]; then
-        PROJECT_TYPE=$(detect_project_type)
-    fi
-    
-    if [ -z "$VERSION" ]; then
-        VERSION=$(detect_version)
-    fi
-    
-    DETECTED_BRANCH=$(detect_default_branch)
-    
-    echo -e "${BLUE}통합 정보:${NC}" >&2
-    echo -e "  프로젝트 타입: ${GREEN}$PROJECT_TYPE${NC}" >&2
-    echo -e "  초기 버전: ${GREEN}v$VERSION${NC}" >&2
-    echo -e "  Default 브랜치: ${GREEN}$DETECTED_BRANCH${NC}" >&2
-    echo -e "  통합 모드: ${GREEN}$MODE${NC}" >&2
-    echo "" >&2
-    
-    if [ "$FORCE_MODE" = false ]; then
-        if [ "$TTY_AVAILABLE" = true ]; then
-            local reply
-            local valid_input=false
-            
-            # 입력 검증 루프 - Y/y/N/n/Enter만 허용
-            while [ "$valid_input" = false ]; do
-                if safe_read "계속하시겠습니까? (Y/n): " reply "-n 1"; then
-                    echo "" >&2
-                    
-                    # 빈 입력(Enter) 또는 Y/y는 계속, N/n은 취소
-                    if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
-                        valid_input=true
-                        # 계속 진행
-                    elif [[ "$reply" =~ ^[Nn]$ ]]; then
-                        valid_input=true
-                        print_info "취소되었습니다"
-                        exit 0
-                    else
-                        # 잘못된 입력
-                        print_error "잘못된 입력입니다. Y 또는 n을 입력해주세요. (Enter는 Y)"
-                        echo "" >&2
-                    fi
-                fi
-            done
+    # CLI 모드에서만 자동 감지 및 확인 (interactive 모드에서는 이미 감지 완료)
+    if [ "$IS_INTERACTIVE_MODE" = false ]; then
+        if [ -z "$PROJECT_TYPE" ]; then
+            PROJECT_TYPE=$(detect_project_type)
+        fi
+        
+        if [ -z "$VERSION" ]; then
+            VERSION=$(detect_version)
+        fi
+        
+        if [ -z "$DETECTED_BRANCH" ]; then
+            DETECTED_BRANCH=$(detect_default_branch)
+        fi
+        
+        # CLI 모드에서만 통합 정보 표시
+        print_question_header "🪐" "통합 정보"
+        
+        if [ -w /dev/tty ] 2>/dev/null; then
+            echo "🔭 프로젝트 타입  : $PROJECT_TYPE" >/dev/tty
+            echo "🌙 초기 버전     : v$VERSION" >/dev/tty
+            echo "🌿 Default 브랜치 : $DETECTED_BRANCH" >/dev/tty
+            echo "💫 통합 모드     : $MODE" >/dev/tty
+            print_separator_line
+            echo "" >/dev/tty
         else
-            # TTY 없음 - --force 필수
-            print_error "--force 옵션이 필요합니다 (non-interactive 환경)"
+            echo "🔭 프로젝트 타입  : $PROJECT_TYPE" >&2
+            echo "🌙 초기 버전     : v$VERSION" >&2
+            echo "🌿 Default 브랜치 : $DETECTED_BRANCH" >&2
+            echo "💫 통합 모드     : $MODE" >&2
+            print_separator_line
             echo "" >&2
-            echo "  ${GREEN}bash <(curl -fsSL URL) --mode $MODE --force${NC}" >&2
-            echo "" >&2
-            exit 1
+        fi
+        
+        # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
+        if [ "$FORCE_MODE" = false ]; then
+            if [ "$TTY_AVAILABLE" = true ]; then
+                local reply
+                local valid_input=false
+                
+                # 가이드 표시
+                if [ -w /dev/tty ] 2>/dev/null; then
+                    echo "이 정보로 통합을 진행하시겠습니까?" >/dev/tty
+                    echo "  Y/y - 예, 계속 진행" >/dev/tty
+                    echo "  N/n - 아니오, 취소" >/dev/tty
+                    echo "" >/dev/tty
+                else
+                    echo "이 정보로 통합을 진행하시겠습니까?" >&2
+                    echo "  Y/y - 예, 계속 진행" >&2
+                    echo "  N/n - 아니오, 취소" >&2
+                    echo "" >&2
+                fi
+                
+                # 입력 검증 루프 - Y/y/N/n/Enter만 허용
+                while [ "$valid_input" = false ]; do
+                    if safe_read "선택: " reply "-n 1"; then
+                        if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                        
+                        # 빈 입력(Enter) 또는 Y/y는 계속, N/n은 취소
+                        if [[ -z "$reply" ]] || [[ "$reply" =~ ^[Yy]$ ]]; then
+                            valid_input=true
+                            # 계속 진행
+                        elif [[ "$reply" =~ ^[Nn]$ ]]; then
+                            valid_input=true
+                            print_info "취소되었습니다"
+                            exit 0
+                        else
+                            # 잘못된 입력
+                            print_error "잘못된 입력입니다. Y/y 또는 N/n을 입력해주세요. (Enter는 Y)"
+                            if [ -w /dev/tty ] 2>/dev/null; then echo "" >/dev/tty; else echo "" >&2; fi
+                        fi
+                    fi
+                done
+            else
+                # TTY 없음 - --force 필수
+                print_error "--force 옵션이 필요합니다 (non-interactive 환경)"
+                echo "" >&2
+                echo "  bash <(curl -fsSL URL) --mode $MODE --force" >&2
+                echo "" >&2
+                exit 1
+            fi
         fi
     fi
     
@@ -958,31 +1316,6 @@ execute_integration() {
     
     # 1. 템플릿 다운로드
     download_template
-    
-    # 템플릿 버전 가져오기 및 배너 표시
-    local template_version="1.3.7"
-    if [ -f "$TEMP_DIR/version.yml" ]; then
-        template_version=$(grep "^version:" "$TEMP_DIR/version.yml" | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
-    fi
-    
-    # 모드에 따른 배너 표시
-    case $MODE in
-        full)
-            print_banner "$template_version" "Full Integration (전체 통합)"
-            ;;
-        version)
-            print_banner "$template_version" "Version Management (버전 관리)"
-            ;;
-        workflows)
-            print_banner "$template_version" "Workflows Only (워크플로우만)"
-            ;;
-        issues)
-            print_banner "$template_version" "Issue Templates (이슈 템플릿)"
-            ;;
-        *)
-            print_banner "$template_version" "Integration (통합)"
-            ;;
-    esac
     
     # 2. 모드별 통합
     case $MODE in
@@ -1019,11 +1352,13 @@ execute_integration() {
 # 완료 요약
 print_summary() {
     echo "" >&2
-    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}" >&2
-    echo -e "${GREEN}║${NC}                    ${MAGENTA}✨ 통합 완료! ✨${NC}                        ${GREEN}║${NC}" >&2
-    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}" >&2
+    print_separator_line
     echo "" >&2
-    echo -e "${CYAN}통합된 기능:${NC}" >&2
+    echo "✨ SUH-DEVOPS-TEMPLATE Setup Complete!" >&2
+    echo "" >&2
+    print_separator_line
+    echo "" >&2
+    echo "통합된 기능:" >&2
     
     case $MODE in
         full)
@@ -1045,11 +1380,11 @@ print_summary() {
     esac
     
     echo "" >&2
-    echo -e "${CYAN}추가된 파일:${NC}" >&2
+    echo "추가된 파일:" >&2
     echo "  📄 version.yml" >&2
     echo "  📝 README.md (버전 섹션 추가)" >&2
     echo "" >&2
-    echo -e "${CYAN}추가된 디렉토리:${NC}" >&2
+    echo "추가된 디렉토리:" >&2
     echo "  ⚙️  .github/workflows/" >&2
     echo "     ├─ PROJECT-VERSION-CONTROL.yaml" >&2
     echo "     ├─ PROJECT-AUTO-CHANGELOG-CONTROL.yaml" >&2
@@ -1061,8 +1396,7 @@ print_summary() {
     echo "     ├─ version_manager.sh" >&2
     echo "     └─ changelog_manager.py" >&2
     echo "" >&2
-    echo -e "${CYAN}유용한 정보:${NC}" >&2
-    echo "  📖 템플릿 문서: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+    echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
     echo "" >&2
 }
 

@@ -266,8 +266,15 @@ ask_yes_no_edit() {
         if safe_read "선택: " reply "-n 1"; then
             print_to_user ""
             
-            # 입력값 정규화 (공백 제거, 소문자 변환)
-            reply_normalized=$(printf '%s' "$reply" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+            # 입력값 정규화 (tr 에러 무시, 공백 제거, 소문자 변환)
+            reply_normalized=$(printf '%s' "$reply" | tr -d '[:space:]' 2>/dev/null | tr '[:upper:]' '[:lower:]' 2>/dev/null)
+            
+            # 정규화 실패 시 원본 사용 (한국어 등)
+            if [ -z "$reply_normalized" ] && [ -n "$reply" ]; then
+                print_error "영문자만 입력해주세요. (Y/y, E/e, N/n)"
+                print_to_user ""
+                continue
+            fi
             
             case "$reply_normalized" in
                 ""|"y")

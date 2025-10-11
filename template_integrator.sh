@@ -124,25 +124,25 @@ print_banner() {
     local version=$1
     local mode=$2
     
-    # 박스 전체 너비: 68자 (║ 포함)
-    # 안쪽 컨텐츠: 66자
-    # 이모지 🔮는 표시 너비 2칸을 차지하므로, 그만큼 공백 줄여야 함
-    
     if [ -w /dev/tty ] 2>/dev/null; then
         echo "" >/dev/tty
         echo "╔══════════════════════════════════════════════════════════════════╗" >/dev/tty
-        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦               ║" >/dev/tty
-        printf "║      Version : %-50s║\n" "v${version}" >/dev/tty
-        printf "║      Mode    : %-50s║\n" "${mode}" >/dev/tty
+        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦                    ║" >/dev/tty
         echo "╚══════════════════════════════════════════════════════════════════╝" >/dev/tty
+        echo "       🌙 Version : v${version}" >/dev/tty
+        echo "       🐵 Author  : Cassiiopeia" >/dev/tty
+        echo "       🪐 Mode    : ${mode}" >/dev/tty
+        echo "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >/dev/tty
         echo "" >/dev/tty
     else
         echo "" >&2
         echo "╔══════════════════════════════════════════════════════════════════╗" >&2
-        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦               ║" >&2
-        printf "║      Version : %-50s║\n" "v${version}" >&2
-        printf "║      Mode    : %-50s║\n" "${mode}" >&2
+        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦                    ║" >&2
         echo "╚══════════════════════════════════════════════════════════════════╝" >&2
+        echo "       🌙 Version : v${version}" >&2
+        echo "       🐵 Author  : Cassiiopeia" >&2
+        echo "       🪐 Mode    : ${mode}" >&2
+        echo "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
         echo "" >&2
     fi
 }

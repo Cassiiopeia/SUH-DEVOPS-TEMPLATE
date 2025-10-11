@@ -967,37 +967,79 @@ EOF
     print_success "version.yml 생성 완료"
 }
 
-# 워크플로우 복사
+# 워크플로우 복사 (폴더 기반, 단순화)
 copy_workflows() {
-    print_step "GitHub Actions 워크플로우 복사 중..."
+    print_step "프로젝트 타입별 워크플로우 복사 중..."
+    print_info "프로젝트 타입: $PROJECT_TYPE"
     
     mkdir -p .github/workflows
     
-    local workflows=(
-        "PROJECT-VERSION-CONTROL.yaml"
-        "PROJECT-README-VERSION-UPDATE.yaml"
-        "PROJECT-AUTO-CHANGELOG-CONTROL.yaml"
-        "PROJECT-ISSUE-COMMENT.yaml"
-        "PROJECT-SYNC-ISSUE-LABELS.yaml"
-    )
-    
     local copied=0
-    for workflow in "${workflows[@]}"; do
-        local src="$TEMP_DIR/.github/workflows/$workflow"
-        local dst=".github/workflows/$workflow"
-        
-        if [ -f "$src" ]; then
-            if [ -f "$dst" ]; then
-                print_warning "$workflow 이미 존재 → ${workflow}.bak으로 백업"
-                mv "$dst" "${dst}.bak"
-            fi
-            cp "$src" "$dst"
-            echo "  ✓ $workflow"
-            copied=$((copied + 1))
-        fi
-    done
+    local project_types_dir="$TEMP_DIR/.github/workflows/project-types"
     
-    print_success "$copied 개 워크플로우 복사 완료"
+    # project-types 폴더 존재 확인
+    if [ ! -d "$project_types_dir" ]; then
+        print_error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
+        print_error "project-types 폴더를 찾을 수 없습니다."
+        exit 1
+    fi
+    
+    # 1. Common 워크플로우 복사 (필수)
+    print_info "공통 워크플로우 복사 중..."
+    if [ -d "$project_types_dir/common" ]; then
+        for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            local filename=$(basename "$workflow")
+            
+            if [ -f ".github/workflows/$filename" ]; then
+                print_warning "$filename 이미 존재 → ${filename}.bak으로 백업"
+                mv ".github/workflows/$filename" ".github/workflows/${filename}.bak"
+            fi
+            
+            cp "$workflow" .github/workflows/
+            echo "  ✓ $filename"
+            copied=$((copied + 1))
+        done
+    else
+        print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
+    fi
+    
+    # 2. 타입별 워크플로우 복사 (optional 구분 없이 전체 복사)
+    local type_dir="$project_types_dir/$PROJECT_TYPE"
+    if [ -d "$type_dir" ]; then
+        print_info "$PROJECT_TYPE 전용 워크플로우 복사 중..."
+        
+        for workflow in "$type_dir"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            
+            local filename=$(basename "$workflow")
+            
+            if [ -f ".github/workflows/$filename" ]; then
+                print_warning "$filename 이미 존재 → ${filename}.bak으로 백업"
+                mv ".github/workflows/$filename" ".github/workflows/${filename}.bak"
+            fi
+            
+            cp "$workflow" .github/workflows/
+            echo "  ✓ $filename"
+            copied=$((copied + 1))
+        done
+    else
+        print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
+    fi
+    
+    print_success "$copied 개 워크플로우 복사 완료 (타입: $PROJECT_TYPE)"
+    
+    # CI/CD 워크플로우 안내
+    if [ "$PROJECT_TYPE" = "spring" ]; then
+        echo ""
+        print_info "🔐 Spring CI/CD 워크플로우 사용 시 GitHub Secrets 설정:"
+        echo "     Repository > Settings > Secrets and variables > Actions"
+        echo "     필수 Secrets:"
+        echo "       - APPLICATION_PROD_YML (Spring 운영 설정)"
+        echo "       - DOCKERHUB_USERNAME, DOCKERHUB_TOKEN"
+        echo "       - SERVER_HOST, SERVER_USER, SERVER_PASSWORD"
+        echo "       - GRADLE_PROPERTIES (Nexus 사용 시)"
+    fi
 }
 
 # 스크립트 복사
@@ -1322,22 +1364,44 @@ print_summary() {
     
     echo "" >&2
     echo "추가된 파일:" >&2
-    echo "  📄 version.yml" >&2
+    echo "  📄 version.yml (버전: $VERSION, 타입: $PROJECT_TYPE)" >&2
     echo "  📝 README.md (버전 섹션 추가)" >&2
     echo "" >&2
-    echo "추가된 디렉토리:" >&2
-    echo "  ⚙️  .github/workflows/" >&2
-    echo "     ├─ PROJECT-VERSION-CONTROL.yaml" >&2
-    echo "     ├─ PROJECT-AUTO-CHANGELOG-CONTROL.yaml" >&2
-    echo "     ├─ PROJECT-README-VERSION-UPDATE.yaml" >&2
-    echo "     ├─ PROJECT-ISSUE-COMMENT.yaml" >&2
-    echo "     └─ PROJECT-SYNC-ISSUE-LABELS.yaml" >&2
+    echo "추가된 워크플로우:" >&2
+    
+    # 실제 복사된 워크플로우 동적 표시
+    if [ -d ".github/workflows" ]; then
+        local wf_count=0
+        for wf in .github/workflows/PROJECT-*.{yaml,yml}; do
+            [ -e "$wf" ] || continue
+            local filename=$(basename "$wf")
+            if [[ "$filename" =~ ^PROJECT-COMMON- ]]; then
+                echo "     📌 $filename (공통)" >&2
+            else
+                echo "     🎯 $filename ($PROJECT_TYPE 전용)" >&2
+            fi
+            wf_count=$((wf_count + 1))
+        done
+        echo "     → 총 $wf_count 개 워크플로우 설치됨" >&2
+    fi
+    
     echo "" >&2
     echo "  🔧 .github/scripts/" >&2
     echo "     ├─ version_manager.sh" >&2
     echo "     └─ changelog_manager.py" >&2
     echo "" >&2
+    
+    # 프로젝트 타입별 안내
+    if [ "$PROJECT_TYPE" = "spring" ]; then
+        echo "  💡 Spring 프로젝트 추가 설정:" >&2
+        echo "     • build.gradle의 버전 정보가 자동 동기화됩니다" >&2
+        echo "     • CI/CD 워크플로우에서 GitHub Secrets 설정이 필요합니다" >&2
+        echo "     • 자세한 설정 방법: .github/workflows/project-types/spring/README.md" >&2
+        echo "" >&2
+    fi
+    
     echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+    echo "  📚 워크플로우 가이드: .github/workflows/project-types/README.md" >&2
     echo "" >&2
 }
 

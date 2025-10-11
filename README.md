@@ -461,3 +461,12 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 4. **피드백**: 개선사항이나 문제점 이슈로 공유
 
 **🎉 이제 개발에만 집중하세요! 나머지는 자동화가 처리합니다.**
+
+---
+
+<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
+<!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
+## 최신 버전 : v1.3.19
+
+[전체 버전 기록 보기](CHANGELOG.md)
+<!-- END-AUTO-VERSION-SECTION -->

@@ -59,13 +59,13 @@ chmod +x .github/scripts/changelog_manager.py
 
 ```bash
 # GitHub 템플릿으로 새 리포지토리 생성 후
-chmod +x template_initializer.sh
+chmod +x .github/scripts/template_initializer.sh
 
 # 초기화 실행 (version.yml 자동 생성)
-./template_initializer.sh --version 1.0.0 --type spring
+./.github/scripts/template_initializer.sh --version 1.0.0 --type spring
 
 # 또는 짧은 형식
-./template_initializer.sh -v 1.0.0 -t spring
+./.github/scripts/template_initializer.sh -v 1.0.0 -t spring
 ```
 
 **지원하는 project_type**:

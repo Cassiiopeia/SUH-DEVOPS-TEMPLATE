@@ -126,11 +126,11 @@ git clone https://github.com/your-username/your-project.git
 cd your-project
 
 # 초기화 스크립트 실행 (🆕 한 번에 모든 설정!)
-chmod +x template_initializer.sh
-./template_initializer.sh --version 1.0.0 --type spring
+chmod +x .github/scripts/template_initializer.sh
+./.github/scripts/template_initializer.sh --version 1.0.0 --type spring
 
 # 또는 짧은 형식
-./template_initializer.sh -v 1.0.0 -t spring
+./.github/scripts/template_initializer.sh -v 1.0.0 -t spring
 ```
 
 **자동으로 처리되는 작업**:

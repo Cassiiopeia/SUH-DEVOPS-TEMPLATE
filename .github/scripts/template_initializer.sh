@@ -428,6 +428,9 @@ cleanup_unused_workflows() {
 cleanup_template_files() {
     print_step "템플릿 관련 파일 삭제 중..."
     
+    # 주의: SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md는 삭제하지 않습니다
+    # (사용자가 템플릿 사용법을 참고할 수 있도록 보존)
+    
     # CHANGELOG 파일들 삭제
     if [ -f "CHANGELOG.md" ]; then
         rm -f CHANGELOG.md

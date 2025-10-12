@@ -811,13 +811,9 @@ download_template() {
     }
     
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
-    print_info "문서 파일 제외 중..."
+    print_info "템플릿 내부 문서 제외 중..."
     local docs_to_remove=(
         "ARCHITECTURE.md"
-        "SETUP-GUIDE.md"
-        "SCRIPTS_GUIDE.md"
-        "WORKFLOWS.md"
-        "TROUBLESHOOTING.md"
         "CONTRIBUTING.md"
     )
     
@@ -826,6 +822,12 @@ download_template() {
             rm -f "$TEMP_DIR/$doc"
         fi
     done
+    
+    # 사용자 적용 가이드 문서는 포함 (SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)
+    print_info "사용자 적용 가이드 문서 다운로드 중..."
+    if [ -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
+        print_info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+    fi
     
     print_success "템플릿 다운로드 완료"
 }

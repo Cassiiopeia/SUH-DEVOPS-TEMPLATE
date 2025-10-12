@@ -1055,20 +1055,155 @@ copy_issue_templates() {
     
     mkdir -p .github/ISSUE_TEMPLATE
     
-    # 기존 템플릿 백업
-    if [ -d ".github/ISSUE_TEMPLATE" ] && [ "$(ls -A .github/ISSUE_TEMPLATE)" ]; then
-        print_info "기존 이슈 템플릿 백업 중..."
-        cp -r .github/ISSUE_TEMPLATE "$BACKUP_DIR/backup/ISSUE_TEMPLATE_old" 2>/dev/null || true
+    # 기존 템플릿 백업 (백업 디렉토리 없어도 실패하지 않음)
+    if [ -d ".github/ISSUE_TEMPLATE" ] && [ "$(ls -A .github/ISSUE_TEMPLATE 2>/dev/null)" ]; then
+        print_info "기존 이슈 템플릿이 있습니다. 덮어씁니다."
     fi
     
     # 템플릿 복사
-    cp -r "$TEMP_DIR/.github/ISSUE_TEMPLATE/"* .github/ISSUE_TEMPLATE/ 2>/dev/null || true
+    if [ -d "$TEMP_DIR/.github/ISSUE_TEMPLATE" ]; then
+        cp -r "$TEMP_DIR/.github/ISSUE_TEMPLATE/"* .github/ISSUE_TEMPLATE/ 2>/dev/null || true
+    fi
     
     # PR 템플릿
     if [ -f "$TEMP_DIR/.github/PULL_REQUEST_TEMPLATE.md" ]; then
         cp "$TEMP_DIR/.github/PULL_REQUEST_TEMPLATE.md" .github/
         print_success "이슈/PR 템플릿 복사 완료"
     fi
+}
+
+# Discussion 템플릿 복사
+copy_discussion_templates() {
+    print_step "GitHub Discussions 템플릿 복사 중..."
+    
+    # 템플릿에 DISCUSSION_TEMPLATE이 없으면 건너뛰기
+    if [ ! -d "$TEMP_DIR/.github/DISCUSSION_TEMPLATE" ]; then
+        print_info "DISCUSSION_TEMPLATE이 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
+    
+    mkdir -p .github/DISCUSSION_TEMPLATE
+    
+    # 기존 템플릿이 있으면 알림
+    if [ -d ".github/DISCUSSION_TEMPLATE" ] && [ "$(ls -A .github/DISCUSSION_TEMPLATE 2>/dev/null)" ]; then
+        print_info "기존 Discussion 템플릿이 있습니다. 덮어씁니다."
+    fi
+    
+    # 템플릿 복사
+    cp -r "$TEMP_DIR/.github/DISCUSSION_TEMPLATE/"* .github/DISCUSSION_TEMPLATE/ 2>/dev/null || true
+    print_success "GitHub Discussions 템플릿 복사 완료"
+}
+
+# .coderabbit.yaml 복사
+copy_coderabbit_config() {
+    print_step "CodeRabbit 설정 파일 복사 여부 확인 중..."
+    
+    if [ ! -f "$TEMP_DIR/.coderabbit.yaml" ]; then
+        print_info ".coderabbit.yaml 파일이 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
+    
+    # 기존 파일이 있으면 사용자 확인
+    if [ -f ".coderabbit.yaml" ]; then
+        print_warning ".coderabbit.yaml이 이미 존재합니다"
+        
+        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+            print_separator_line
+            print_to_user ""
+            print_to_user ".coderabbit.yaml을 덮어쓰시겠습니까?"
+            print_to_user "  Y/y - 예, 덮어쓰기"
+            print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+            print_to_user ""
+            
+            if ! ask_yes_no "선택: " "N"; then
+                print_info ".coderabbit.yaml 복사 건너뜁니다"
+                return
+            fi
+            
+            # 백업
+            cp .coderabbit.yaml .coderabbit.yaml.bak
+            print_info "기존 파일을 .coderabbit.yaml.bak으로 백업했습니다"
+        elif [ "$FORCE_MODE" = true ]; then
+            # Force 모드에서는 백업하고 덮어쓰기
+            cp .coderabbit.yaml .coderabbit.yaml.bak 2>/dev/null || true
+            print_info "강제 모드: 기존 파일 덮어씁니다"
+        else
+            # TTY 없고 Force도 아니면 건너뛰기
+            print_info "대화형 모드가 아닙니다. 기존 파일을 유지합니다."
+            return
+        fi
+    fi
+    
+    # 복사 실행
+    cp "$TEMP_DIR/.coderabbit.yaml" .coderabbit.yaml
+    print_success ".coderabbit.yaml 복사 완료"
+    print_info "💡 CodeRabbit AI 리뷰가 활성화됩니다 (language: ko-KR)"
+}
+
+# .gitignore 생성 또는 업데이트
+ensure_gitignore() {
+    print_step ".gitignore 파일 확인 및 업데이트 중..."
+    
+    local required_entries=(
+        "/.idea"
+        "/.claude/settings.local.json"
+    )
+    
+    # .gitignore가 없으면 생성
+    if [ ! -f ".gitignore" ]; then
+        print_info ".gitignore 파일이 없습니다. 생성합니다."
+        
+        cat > .gitignore << 'EOF'
+# IDE Settings
+/.idea
+
+# Claude AI Settings
+/.claude/settings.local.json
+EOF
+        
+        print_success ".gitignore 파일 생성 완료"
+        return
+    fi
+    
+    # 기존 파일이 있으면 누락된 항목만 추가
+    print_info "기존 .gitignore 파일 발견. 필수 항목 확인 중..."
+    
+    local added=0
+    local entries_to_add=()
+    
+    for entry in "${required_entries[@]}"; do
+        # 정확한 매칭 확인 (주석 제외)
+        if ! grep -qxF "$entry" .gitignore 2>/dev/null; then
+            entries_to_add+=("$entry")
+            added=$((added + 1))
+        fi
+    done
+    
+    if [ $added -eq 0 ]; then
+        print_info "필수 항목이 이미 모두 존재합니다. 건너뜁니다."
+        return
+    fi
+    
+    # 항목 추가 (마지막에 섹션으로 추가)
+    print_info "$added 개 항목 추가 중..."
+    
+    # 파일 끝에 빈 줄이 없으면 추가
+    if [ -n "$(tail -c 1 .gitignore 2>/dev/null)" ]; then
+        echo "" >> .gitignore
+    fi
+    
+    # 섹션 헤더 추가
+    echo "" >> .gitignore
+    echo "# ====================================================================" >> .gitignore
+    echo "# SUH-DEVOPS-TEMPLATE: Auto-added entries" >> .gitignore
+    echo "# ====================================================================" >> .gitignore
+    
+    for entry in "${entries_to_add[@]}"; do
+        echo "$entry" >> .gitignore
+        print_info "  ✓ $entry"
+    done
+    
+    print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 
 # .cursor 폴더 복사
@@ -1288,6 +1423,9 @@ execute_integration() {
             copy_workflows
             copy_scripts
             copy_issue_templates
+            copy_discussion_templates
+            copy_coderabbit_config
+            ensure_gitignore
             copy_cursor_folder
             copy_agent_prompts
             ;;
@@ -1295,6 +1433,7 @@ execute_integration() {
             create_version_yml "$VERSION" "$PROJECT_TYPE" "$DETECTED_BRANCH"
             add_version_section_to_readme "$VERSION"
             copy_scripts
+            ensure_gitignore
             ;;
         workflows)
             copy_workflows
@@ -1302,6 +1441,7 @@ execute_integration() {
             ;;
         issues)
             copy_issue_templates
+            copy_discussion_templates
             ;;
     esac
     
@@ -1328,17 +1468,20 @@ print_summary() {
             echo "  ✅ 버전 관리 시스템 (version.yml)" >&2
             echo "  ✅ README.md 자동 버전 업데이트" >&2
             echo "  ✅ GitHub Actions 워크플로우" >&2
-            echo "  ✅ 이슈/PR 템플릿" >&2
+            echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
+            echo "  ✅ CodeRabbit AI 리뷰 설정" >&2
+            echo "  ✅ .gitignore 필수 항목" >&2
             ;;
         version)
             echo "  ✅ 버전 관리 시스템 (version.yml)" >&2
             echo "  ✅ README.md 자동 버전 업데이트" >&2
+            echo "  ✅ .gitignore 필수 항목" >&2
             ;;
         workflows)
             echo "  ✅ GitHub Actions 워크플로우" >&2
             ;;
         issues)
-            echo "  ✅ 이슈/PR 템플릿" >&2
+            echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
             ;;
     esac
     

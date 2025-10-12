@@ -1,11 +1,42 @@
 {
   "metadata": {
-    "lastUpdated": "2025-10-12T15:42:54Z",
-    "currentVersion": "2.0.0",
+    "lastUpdated": "2025-10-12T15:56:36Z",
+    "currentVersion": "2.0.1",
     "projectType": "basic",
-    "totalReleases": 27
+    "totalReleases": 28
   },
   "releases": [
+    {
+      "version": "2.0.1",
+      "project_type": "basic",
+      "date": "2025-10-12",
+      "pr_number": 79,
+      "raw_summary": "Summary by CodeRabbit\n\n\n신기능\n\nGitHub Discussions 템플릿 통합 지원 추가\nAI 코드 리뷰 설정 파일 선택적 복사 지원\n.gitignore 자동 생성/갱신으로 기본 예외 규칙 유지\n실행 요약·상태 메시지에 신규 항목 반영\n\n\n\n문서\n\nREADME의 최신 버전 표기를 자동 동기화 방식으로 전환\n\n\n\n잡무\n\n버전 정보를 2.0.1로 업데이트하고 빌드 번호를 증가\n버전 타임스탬프 최신화",
+      "parsed_changes": {
+        "신기능": {
+          "title": "신기능",
+          "items": [
+            "GitHub Discussions 템플릿 통합 지원 추가",
+            "AI 코드 리뷰 설정 파일 선택적 복사 지원",
+            ".gitignore 자동 생성/갱신으로 기본 예외 규칙 유지",
+            "실행 요약·상태 메시지에 신규 항목 반영"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "README의 최신 버전 표기를 자동 동기화 방식으로 전환"
+          ]
+        },
+        "잡무": {
+          "title": "잡무",
+          "items": [
+            "버전 정보를 2.0.1로 업데이트하고 빌드 번호를 증가",
+            "버전 타임스탬프 최신화"
+          ]
+        }
+      }
+    },
     {
       "version": "2.0.0",
       "project_type": "basic",

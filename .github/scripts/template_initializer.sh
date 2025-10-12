@@ -442,6 +442,12 @@ cleanup_template_files() {
         echo "  ✓ CHANGELOG.json 삭제"
     fi
     
+    # template_integrator.sh 삭제 (원격 실행 전용 스크립트)
+    if [ -f "template_integrator.sh" ]; then
+        rm -f template_integrator.sh
+        echo "  ✓ template_integrator.sh 삭제 (원격 실행 전용)"
+    fi
+    
     # LICENSE 파일 삭제
     if [ -f "LICENSE" ]; then
         rm -f LICENSE

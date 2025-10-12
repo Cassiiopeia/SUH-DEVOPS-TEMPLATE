@@ -3,10 +3,12 @@
 
 > **개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 우리가 자동으로 처리합니다.**
 
-<!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v1.3.17 (2025-10-11)
+<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
+<!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
+## 최신 버전 : v1.3.19
 
 [전체 버전 기록 보기](CHANGELOG.md)
+<!-- END-AUTO-VERSION-SECTION -->
 
 ---
 
@@ -25,7 +27,7 @@
 
 ## 🚀 2가지 사용 방법
 
-### 방법 1: 🆕 새 프로젝트 시작 (GitHub 템플릿 사용)
+### 방법 1: 새 프로젝트 시작 (GitHub 템플릿 사용)
 
 **가장 쉬운 방법! GitHub에서 템플릿으로 프로젝트 생성**
 
@@ -59,8 +61,9 @@ cd your-project
 
 **다른 프로젝트 타입으로 변경하려면?**
 ```bash
-# Spring Boot 프로젝트로 변경
-./template_integrator.sh --mode workflows --type spring
+# Spring Boot 프로젝트로 변경 (원격 실행)
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+  --mode workflows --type spring
 
 # 또는 수동으로 복사
 cp .github/workflows/project-types/spring/*.yaml .github/workflows/
@@ -498,7 +501,11 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 
 ### 방법 1 사용자 (GitHub 템플릿)
 1. ✅ "Use this template"으로 프로젝트 생성 완료
-2. 📝 프로젝트 타입 변경이 필요하면: `./template_integrator.sh --mode workflows --type spring`
+2. 📝 프로젝트 타입 변경이 필요하면 원격 스크립트 실행:
+   ```bash
+   bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+     --mode workflows --type spring
+   ```
 3. 🎉 코드 푸시하면 자동화 시작!
 
 ### 방법 2 사용자 (기존 프로젝트 통합)
@@ -513,12 +520,3 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 - ⭐ 도움이 되었다면 Star 부탁드립니다!
 
 **🎉 이제 개발에만 집중하세요! 나머지는 자동화가 처리합니다.**
-
----
-
-<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-<!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
-## 최신 버전 : v1.3.19
-
-[전체 버전 기록 보기](CHANGELOG.md)
-<!-- END-AUTO-VERSION-SECTION -->

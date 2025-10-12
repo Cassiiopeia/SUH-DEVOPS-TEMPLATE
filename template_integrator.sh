@@ -535,8 +535,8 @@ detect_version() {
     fi
     
     # 기본값
-    print_warning "버전을 감지하지 못했습니다. 기본값 0.1.0으로 설정합니다."
-    echo "0.1.0"
+    print_warning "버전을 감지하지 못했습니다. 기본값 0.0.1로 설정합니다."
+    echo "0.0.1"
 }
 
 # Default branch 감지
@@ -944,9 +944,9 @@ EOF
     print_success "version.yml 생성 완료"
 }
 
-# 워크플로우 복사 (폴더 기반, 단순화)
+# 워크플로우 다운로드 (폴더 기반, 단순화)
 copy_workflows() {
-    print_step "프로젝트 타입별 워크플로우 복사 중..."
+    print_step "프로젝트 타입별 워크플로우 다운로드 중..."
     print_info "프로젝트 타입: $PROJECT_TYPE"
     
     mkdir -p "$WORKFLOWS_DIR"
@@ -961,8 +961,8 @@ copy_workflows() {
         exit 1
     fi
     
-    # 1. Common 워크플로우 복사 (필수)
-    print_info "공통 워크플로우 복사 중..."
+    # 1. Common 워크플로우 다운로드 (필수)
+    print_info "공통 워크플로우 다운로드 중..."
     if [ -d "$project_types_dir/common" ]; then
         for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
@@ -981,10 +981,10 @@ copy_workflows() {
         print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
     fi
     
-    # 2. 타입별 워크플로우 복사 (optional 구분 없이 전체 복사)
+    # 2. 타입별 워크플로우 다운로드 (optional 구분 없이 전체 다운로드)
     local type_dir="$project_types_dir/$PROJECT_TYPE"
     if [ -d "$type_dir" ]; then
-        print_info "$PROJECT_TYPE 전용 워크플로우 복사 중..."
+        print_info "$PROJECT_TYPE 전용 워크플로우 다운로드 중..."
         
         for workflow in "$type_dir"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
@@ -1004,7 +1004,7 @@ copy_workflows() {
         print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     fi
     
-    print_success "$copied 개 워크플로우 복사 완료 (타입: $PROJECT_TYPE)"
+    print_success "$copied 개 워크플로우 다운로드 완료 (타입: $PROJECT_TYPE)"
     
     # 복사된 워크플로우 수를 전역 변수로 저장 (최종 요약에서 사용)
     WORKFLOWS_COPIED=$copied
@@ -1022,9 +1022,9 @@ copy_workflows() {
     fi
 }
 
-# 스크립트 복사
+# 스크립트 다운로드
 copy_scripts() {
-    print_step "버전 관리 스크립트 복사 중..."
+    print_step "버전 관리 스크립트 다운로드 중..."
     
     mkdir -p "$SCRIPTS_DIR"
     
@@ -1046,12 +1046,12 @@ copy_scripts() {
         fi
     done
     
-    print_success "$copied 개 스크립트 복사 완료"
+    print_success "$copied 개 스크립트 다운로드 완료"
 }
 
-# 이슈 템플릿 복사
+# 이슈 템플릿 다운로드
 copy_issue_templates() {
-    print_step "이슈/PR 템플릿 복사 중..."
+    print_step "이슈/PR 템플릿 다운로드 중..."
     
     mkdir -p .github/ISSUE_TEMPLATE
     
@@ -1060,7 +1060,7 @@ copy_issue_templates() {
         print_info "기존 이슈 템플릿이 있습니다. 덮어씁니다."
     fi
     
-    # 템플릿 복사
+    # 템플릿 다운로드
     if [ -d "$TEMP_DIR/.github/ISSUE_TEMPLATE" ]; then
         cp -r "$TEMP_DIR/.github/ISSUE_TEMPLATE/"* .github/ISSUE_TEMPLATE/ 2>/dev/null || true
     fi
@@ -1068,13 +1068,13 @@ copy_issue_templates() {
     # PR 템플릿
     if [ -f "$TEMP_DIR/.github/PULL_REQUEST_TEMPLATE.md" ]; then
         cp "$TEMP_DIR/.github/PULL_REQUEST_TEMPLATE.md" .github/
-        print_success "이슈/PR 템플릿 복사 완료"
+        print_success "이슈/PR 템플릿 다운로드 완료"
     fi
 }
 
-# Discussion 템플릿 복사
+# Discussion 템플릿 다운로드
 copy_discussion_templates() {
-    print_step "GitHub Discussions 템플릿 복사 중..."
+    print_step "GitHub Discussions 템플릿 다운로드 중..."
     
     # 템플릿에 DISCUSSION_TEMPLATE이 없으면 건너뛰기
     if [ ! -d "$TEMP_DIR/.github/DISCUSSION_TEMPLATE" ]; then
@@ -1089,14 +1089,14 @@ copy_discussion_templates() {
         print_info "기존 Discussion 템플릿이 있습니다. 덮어씁니다."
     fi
     
-    # 템플릿 복사
+    # 템플릿 다운로드
     cp -r "$TEMP_DIR/.github/DISCUSSION_TEMPLATE/"* .github/DISCUSSION_TEMPLATE/ 2>/dev/null || true
-    print_success "GitHub Discussions 템플릿 복사 완료"
+    print_success "GitHub Discussions 템플릿 다운로드 완료"
 }
 
-# .coderabbit.yaml 복사
+# .coderabbit.yaml 다운로드
 copy_coderabbit_config() {
-    print_step "CodeRabbit 설정 파일 복사 여부 확인 중..."
+    print_step "CodeRabbit 설정 파일 다운로드 여부 확인 중..."
     
     if [ ! -f "$TEMP_DIR/.coderabbit.yaml" ]; then
         print_info ".coderabbit.yaml 파일이 템플릿에 없습니다. 건너뜁니다."
@@ -1116,7 +1116,7 @@ copy_coderabbit_config() {
             print_to_user ""
             
             if ! ask_yes_no "선택: " "N"; then
-                print_info ".coderabbit.yaml 복사 건너뜁니다"
+                print_info ".coderabbit.yaml 다운로드 건너뜁니다"
                 return
             fi
             
@@ -1134,9 +1134,9 @@ copy_coderabbit_config() {
         fi
     fi
     
-    # 복사 실행
+    # 다운로드 실행
     cp "$TEMP_DIR/.coderabbit.yaml" .coderabbit.yaml
-    print_success ".coderabbit.yaml 복사 완료"
+    print_success ".coderabbit.yaml 다운로드 완료"
     print_info "💡 CodeRabbit AI 리뷰가 활성화됩니다 (language: ko-KR)"
 }
 
@@ -1206,9 +1206,9 @@ EOF
     print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 
-# .cursor 폴더 복사
+# .cursor 폴더 다운로드
 copy_cursor_folder() {
-    print_step ".cursor 폴더 복사 여부 확인 중..."
+    print_step ".cursor 폴더 다운로드 여부 확인 중..."
     
     if [ ! -d "$TEMP_DIR/.cursor" ]; then
         print_info ".cursor 폴더가 템플릿에 없습니다. 건너뜁니다."
@@ -1219,26 +1219,26 @@ copy_cursor_folder() {
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
         print_separator_line
         print_to_user ""
-        print_to_user ".cursor 폴더를 복사하시겠습니까? (Cursor IDE 설정)"
-        print_to_user "  Y/y - 예, 복사하기"
+        print_to_user ".cursor 폴더를 다운로드하시겠습니까? (Cursor IDE 설정)"
+        print_to_user "  Y/y - 예, 다운로드하기"
         print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
         print_to_user ""
         
         if ! ask_yes_no "선택: " "N"; then
-            print_info ".cursor 폴더 복사 건너뜁니다"
+            print_info ".cursor 폴더 다운로드 건너뜁니다"
             return
         fi
     fi
     
-    # 복사 실행
+    # 다운로드 실행
     mkdir -p .cursor
     cp -r "$TEMP_DIR/.cursor/"* .cursor/ 2>/dev/null || true
-    print_success ".cursor 폴더 복사 완료"
+    print_success ".cursor 폴더 다운로드 완료"
 }
 
-# agent-prompts 폴더 복사
+# agent-prompts 폴더 다운로드
 copy_agent_prompts() {
-    print_step "agent-prompts 폴더 복사 여부 확인 중..."
+    print_step "agent-prompts 폴더 다운로드 여부 확인 중..."
     
     if [ ! -d "$TEMP_DIR/agent-prompts" ]; then
         print_info "agent-prompts 폴더가 템플릿에 없습니다. 건너뜁니다."
@@ -1249,21 +1249,21 @@ copy_agent_prompts() {
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
         print_separator_line
         print_to_user ""
-        print_to_user "agent-prompts 폴더를 복사하시겠습니까? (AI 개발 가이드라인)"
-        print_to_user "  Y/y - 예, 복사하기"
+        print_to_user "agent-prompts 폴더를 다운로드하시겠습니까? (AI 개발 가이드라인)"
+        print_to_user "  Y/y - 예, 다운로드하기"
         print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
         print_to_user ""
         
         if ! ask_yes_no "선택: " "N"; then
-            print_info "agent-prompts 폴더 복사 건너뜁니다"
+            print_info "agent-prompts 폴더 다운로드 건너뜁니다"
             return
         fi
     fi
     
-    # 복사 실행
+    # 다운로드 실행
     mkdir -p agent-prompts
     cp -r "$TEMP_DIR/agent-prompts/"* agent-prompts/ 2>/dev/null || true
-    print_success "agent-prompts 폴더 복사 완료"
+    print_success "agent-prompts 폴더 다운로드 완료"
 }
 
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드

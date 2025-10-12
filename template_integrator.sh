@@ -1266,6 +1266,21 @@ copy_agent_prompts() {
     print_success "agent-prompts 폴더 복사 완료"
 }
 
+# SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
+copy_setup_guide() {
+    print_step "템플릿 설정 가이드 다운로드 중..."
+    
+    if [ ! -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
+        print_info "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 파일이 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
+    
+    # 항상 최신 버전으로 다운로드 (기존 파일 덮어쓰기)
+    cp "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" .
+    print_success "템플릿 설정 가이드 다운로드 완료 (최신 버전)"
+    print_info "📖 템플릿 사용법을 SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md에서 확인하세요"
+}
+
 
 # 대화형 모드
 interactive_mode() {
@@ -1428,16 +1443,19 @@ execute_integration() {
             ensure_gitignore
             copy_cursor_folder
             copy_agent_prompts
+            copy_setup_guide
             ;;
         version)
             create_version_yml "$VERSION" "$PROJECT_TYPE" "$DETECTED_BRANCH"
             add_version_section_to_readme "$VERSION"
             copy_scripts
             ensure_gitignore
+            copy_setup_guide
             ;;
         workflows)
             copy_workflows
             copy_scripts
+            copy_setup_guide
             ;;
         issues)
             copy_issue_templates
@@ -1471,14 +1489,17 @@ print_summary() {
             echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
             echo "  ✅ CodeRabbit AI 리뷰 설정" >&2
             echo "  ✅ .gitignore 필수 항목" >&2
+            echo "  ✅ 템플릿 설정 가이드 (SETUP-GUIDE.md)" >&2
             ;;
         version)
             echo "  ✅ 버전 관리 시스템 (version.yml)" >&2
             echo "  ✅ README.md 자동 버전 업데이트" >&2
             echo "  ✅ .gitignore 필수 항목" >&2
+            echo "  ✅ 템플릿 설정 가이드 (SETUP-GUIDE.md)" >&2
             ;;
         workflows)
             echo "  ✅ GitHub Actions 워크플로우" >&2
+            echo "  ✅ 템플릿 설정 가이드 (SETUP-GUIDE.md)" >&2
             ;;
         issues)
             echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
@@ -1555,6 +1576,28 @@ print_summary() {
     
     echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
     echo "  📚 워크플로우 가이드: .github/workflows/project-types/README.md" >&2
+    echo "" >&2
+    
+    # 필수 3가지 작업 안내
+    print_separator_line
+    echo "" >&2
+    echo -e "${YELLOW}⚠️  다음 3가지 작업을 완료해주세요:${NC}" >&2
+    echo "" >&2
+    echo "  1️⃣  GitHub Personal Access Token 설정" >&2
+    echo "     → Repository Settings > Secrets > Actions" >&2
+    echo "     → Secret Name: _GITHUB_PAT_TOKEN" >&2
+    echo "     → Scopes: repo, workflow" >&2
+    echo "" >&2
+    echo "  2️⃣  deploy 브랜치 생성" >&2
+    echo "     → git checkout -b deploy && git push -u origin deploy" >&2
+    echo "" >&2
+    echo "  3️⃣  CodeRabbit 활성화" >&2
+    echo "     → https://coderabbit.ai 방문하여 저장소 활성화" >&2
+    echo "" >&2
+    print_separator_line
+    echo "" >&2
+    echo -e "${CYAN}📖 자세한 설정 방법은 다음 파일을 참고하세요:${NC}" >&2
+    echo "   → SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" >&2
     echo "" >&2
 }
 

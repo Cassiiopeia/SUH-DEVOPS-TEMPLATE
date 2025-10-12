@@ -1,5 +1,7 @@
 # 🚀 SUH-DEVOPS-TEMPLATE
-- GitHub 프로젝트 운영 자동화 템플릿
+**완전 자동화된 GitHub 프로젝트 관리 템플릿**
+
+> **개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 우리가 자동으로 처리합니다.**
 
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
 ## 최신 버전 : v1.3.17 (2025-10-11)
@@ -8,17 +10,121 @@
 
 ---
 
+## 🎯 이 템플릿이 필요한 이유
+
+매번 새 프로젝트를 시작할 때마다 반복하는 지루한 작업들:
+- ❌ 버전 관리 시스템 구축
+- ❌ CI/CD 파이프라인 설정
+- ❌ 체인지로그 수동 작성
+- ❌ GitHub Actions 워크플로우 작성
+- ❌ 이슈/PR 템플릿 설정
+
+**이 모든 것을 5분 안에 자동으로!** ✨
+
+---
+
+## 🚀 2가지 사용 방법
+
+### 방법 1: 🆕 새 프로젝트 시작 (GitHub 템플릿 사용)
+
+**가장 쉬운 방법! GitHub에서 템플릿으로 프로젝트 생성**
+
+```bash
+# 1️⃣ GitHub에서 "Use this template" 버튼 클릭
+#    → 새 저장소 생성됨
+
+# 2️⃣ 자동 초기화 완료!
+#    ✅ basic 타입으로 자동 설정
+#    ✅ 공통 워크플로우 5개 자동 설치:
+#       - 버전 자동 관리
+#       - README 버전 자동 업데이트  
+#       - 체인지로그 자동 생성
+#       - 이슈 자동 댓글
+#       - 라벨 자동 동기화
+#    ✅ version.yml 자동 생성
+#    ✅ README 초기화 완료
+
+# 3️⃣ 클론하고 바로 개발 시작!
+git clone https://github.com/your-username/your-project.git
+cd your-project
+
+# 🎉 완료! 코드 푸시하면 모든 자동화 작동
+```
+
+**자동 초기화 과정**:
+- 🤖 PROJECT-TEMPLATE-INITIALIZER 워크플로우가 자동 실행
+- ⚡ 1분 이내 완료 (이슈 0개 + 저장소 생성 1시간 이내 조건)
+- ✅ basic 타입, v0.0.0으로 시작
+- 🗑️ 템플릿 전용 파일 자동 삭제
+
+**다른 프로젝트 타입으로 변경하려면?**
+```bash
+# Spring Boot 프로젝트로 변경
+./template_integrator.sh --mode workflows --type spring
+
+# 또는 수동으로 복사
+cp .github/workflows/project-types/spring/*.yaml .github/workflows/
+
+# version.yml 수정
+vi version.yml  # project_type: "spring"
+```
+
+---
+
+### 방법 2: 📦 기존 프로젝트에 통합 (원격 스크립트 실행)
+
+**이미 진행 중인 프로젝트에 템플릿 기능 추가**
+
+```bash
+# 한 줄 명령어로 즉시 설치!
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+```
+
+**대화형 모드로 쉽게 설정**:
+```bash
+1️⃣ 프로젝트 타입 자동 감지
+   → Spring Boot 감지됨! (build.gradle 발견)
+
+2️⃣ 버전 정보 자동 감지
+   → 현재 버전: 1.2.3 (build.gradle에서 읽음)
+
+3️⃣ 설치할 기능 선택
+   [ ] 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)
+   [ ] 버전 관리 시스템만
+   [ ] GitHub Actions 워크플로우만
+   [ ] 이슈/PR 템플릿만
+
+4️⃣ 자동 설치 완료!
+   ✅ Spring Boot 전용 워크플로우 8개 설치
+   ✅ 공통 워크플로우 5개 설치
+   ✅ version.yml 생성
+   ✅ README에 버전 섹션 추가
+```
+
+**CLI 모드 (자동화/스크립트용)**:
+```bash
+# Spring Boot 프로젝트에 전체 통합
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+  --mode full --type spring --version 1.0.0 --force
+
+# 워크플로우만 추가 (React 프로젝트)
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+  --mode workflows --type react --force
+
+# 버전 관리 시스템만 추가 (Node.js 프로젝트)
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+  --mode version --type node --force
+```
+
+---
+
 ## 📚 문서 가이드
 
 | 문서 | 설명 |
 |------|------|
-| [SETUP-GUIDE.md](SETUP-GUIDE.md) | 🚀 **빠른 시작**: 프로젝트 초기 설정 가이드 |
-| [SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md) | 📜 **스크립트 사용법**: version_manager, template_initializer, changelog_manager 상세 가이드 |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 🏗️ **시스템 구조**: 아키텍처, 데이터 흐름, 설계 결정 |
+| [SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md](SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md) | 🚀 **빠른 시작**: 프로젝트 초기 설정 가이드 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 🤝 **기여 가이드**: 개발 환경 설정, 코드 스타일, PR 프로세스 |
 | [CHANGELOG.md](CHANGELOG.md) | 📝 **변경 이력**: 버전별 변경사항 (자동 생성) |
-
-_참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마세요. 변경 소스는 `CHANGELOG.json`입니다._
 
 ---
 
@@ -110,110 +216,45 @@ _참고: `CHANGELOG.md`는 자동 생성됩니다. 수동으로 수정하지 마
 
 ---
 
-## ⚡ 빠른 시작 가이드
+## ⚡ 설치 후 추가 설정 (선택사항)
 
-### 🎯 30초 설정
+### 🔐 GitHub Token 설정 (고급 기능 사용 시)
 
-**template_initializer.sh 스크립트 한 번 실행으로 모든 설정 완료**
+**자동 체인지로그, PR 자동 머지 등을 사용하려면 토큰 필요**
 
-#### 1단계: 템플릿으로 새 리포지토리 생성
-GitHub에서 "Use this template" 버튼 클릭
-
-#### 2단계: 리포지토리 클론 및 초기화
 ```bash
-# 클론
-git clone https://github.com/your-username/your-project.git
-cd your-project
+1. GitHub → Settings → Developer settings 
+   → Personal access tokens (Classic)
 
-# 초기화 스크립트 실행 (🆕 한 번에 모든 설정!)
-chmod +x .github/scripts/template_initializer.sh
-./.github/scripts/template_initializer.sh --version 1.0.0 --type spring
+2. 토큰 생성
+   - Name: _GITHUB_PAT_TOKEN
+   - Scopes: ✅ repo, ✅ workflow
 
-# 또는 짧은 형식
-./.github/scripts/template_initializer.sh -v 1.0.0 -t spring
+3. Repository Settings → Secrets and variables → Actions
+   → New repository secret
+   - Name: _GITHUB_PAT_TOKEN
+   - Value: [생성한 토큰 붙여넣기]
 ```
-
-**자동으로 처리되는 작업**:
-- ✅ version.yml 생성 (버전, 타입, 메타데이터)
-- ✅ 기본 브랜치 자동 감지 (main, master, develop 등)
-- ✅ 워크플로우 트리거 자동 설정
-- ✅ README 초기화
-- ✅ 이슈 템플릿 assignee 변경
-
-#### 3단계: GitHub 토큰 설정
-1. GitHub → Settings → Developer settings → Personal access tokens (Classic)
-2. 토큰 이름: `_GITHUB_PAT_TOKEN`
-3. 권한: `repo`, `workflow`
-4. Repository Settings → Secrets → New repository secret에 등록
-
-#### 4단계: deploy 브랜치 생성
-```bash
-git checkout -b deploy
-git push -u origin deploy
-git checkout main
-```
-
-#### 5단계: 첫 커밋 푸시
-```bash
-git add .
-git commit -m "chore: 템플릿 초기화 완료 v1.0.0"
-git push origin main
-```
-
-**🎉 완료! 이제 코드를 푸시하면 모든 자동화가 시작됩니다.**
 
 ---
 
 ## 🎮 지원하는 프로젝트 타입
 
-### 백엔드 프레임워크
-- **`spring`**: Spring Boot / Java / Gradle
+### 백엔드
+- **`spring`**: Spring Boot (Gradle/Maven) + Nexus CI/CD
 - **`node`**: Node.js / Express / Fastify
-- **`python`**: Python / FastAPI / Django / Flask
+- **`python`**: FastAPI / Django / Flask
 
-### 프론트엔드 프레임워크  
-- **`react`**: React.js / Next.js 웹 프로젝트
-- **`flutter`**: Flutter / Dart 멀티 플랫폼
-- **`react-native`**: React Native 네이티브 앱
-- **`react-native-expo`**: Expo 기반 React Native
+### 프론트엔드  
+- **`react`**: React.js / Next.js 웹
+- **`react-native`**: React Native CLI
+- **`react-native-expo`**: Expo 기반 RN
 
-### 범용 타입
-- **`basic`**: 기본 타입 (version.yml만 사용)
+### 모바일/기타
+- **`flutter`**: Flutter 멀티 플랫폼
+- **`basic`**: 범용 타입 (버전 관리만)
 
-각 타입별로 **자동으로 적절한 버전 파일을 감지**하고 업데이트합니다.
-
----
-
-## 🏗️ 기존 프로젝트 통합 가이드
-
-### 1단계: 브랜치 구조 설정
-```bash
-# 현재 브랜치 확인
-git branch -a
-
-# deploy 브랜치 생성 (없는 경우)
-git checkout -b deploy
-git push origin deploy
-
-# main 브랜치로 돌아가기
-git checkout main
-```
-
-### 2단계: 버전 동기화
-- `version.yml`의 버전과 프로젝트 실제 버전 파일을 **동일하게** 설정
-- 예: Spring의 `build.gradle`, Flutter의 `pubspec.yaml` 버전 통일
-- ⚠️ **주의**: 버전이 다르면 자동으로 높은 버전으로 동기화됩니다
-
-### 3단계: README 버전 표시 추가 (예시)
-```markdown
-<!-- README.md 상단에 추가 -->
-<!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v1.0.0 (2025-09-20)
-```
-
-### 4단계: 브랜치 보호 설정 (권장)
-- GitHub Repository → Settings → Branches
-- `main`과 `deploy` 브랜치 모두 보호 규칙 설정
+**각 타입마다 전용 CI/CD 워크플로우 제공!**
 
 ---
 
@@ -455,10 +496,21 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 
 ## 🚀 다음 단계
 
-1. **템플릿 적용**: 위의 가이드에 따라 프로젝트에 적용
-2. **자동화 확인**: 첫 번째 커밋으로 모든 기능 테스트
-3. **팀 공유**: 팀원들과 새로운 워크플로우 공유
-4. **피드백**: 개선사항이나 문제점 이슈로 공유
+### 방법 1 사용자 (GitHub 템플릿)
+1. ✅ "Use this template"으로 프로젝트 생성 완료
+2. 📝 프로젝트 타입 변경이 필요하면: `./template_integrator.sh --mode workflows --type spring`
+3. 🎉 코드 푸시하면 자동화 시작!
+
+### 방법 2 사용자 (기존 프로젝트 통합)
+1. ✅ 원격 스크립트로 설치 완료
+2. 🔐 GitHub Token 설정 (고급 기능 사용 시)
+3. 📊 첫 커밋 푸시로 자동화 테스트
+4. 🎉 개발에만 집중!
+
+### 모든 사용자 공통
+- 📢 팀원들과 워크플로우 공유
+- 💡 개선사항/문제점 이슈로 제보
+- ⭐ 도움이 되었다면 Star 부탁드립니다!
 
 **🎉 이제 개발에만 집중하세요! 나머지는 자동화가 처리합니다.**
 

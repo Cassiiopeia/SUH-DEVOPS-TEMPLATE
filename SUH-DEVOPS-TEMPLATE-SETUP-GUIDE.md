@@ -443,9 +443,8 @@ CodeRabbit summary not found
 
 ## 📚 추가 문서
 
-- [SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md) - 스크립트 상세 사용법
-- [ARCHITECTURE.md](ARCHITECTURE.md) - 시스템 아키텍처
 - [CONTRIBUTING.md](CONTRIBUTING.md) - 기여 가이드
+- [CHANGELOG.md](CHANGELOG.md) - 변경 이력
 - [README.md](README.md) - 프로젝트 개요
 
 ---

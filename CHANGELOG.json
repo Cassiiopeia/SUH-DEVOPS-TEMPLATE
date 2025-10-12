@@ -1,11 +1,49 @@
 {
   "metadata": {
-    "lastUpdated": "2025-10-11T19:00:05Z",
-    "currentVersion": "1.3.17",
+    "lastUpdated": "2025-10-12T15:42:54Z",
+    "currentVersion": "2.0.0",
     "projectType": "basic",
-    "totalReleases": 26
+    "totalReleases": 27
   },
   "releases": [
+    {
+      "version": "2.0.0",
+      "project_type": "basic",
+      "date": "2025-10-12",
+      "pr_number": 77,
+      "raw_summary": "Summary by CodeRabbit\n\nNew Features\n\nPR 요약 감지·자동 변경로그 생성·자동 병합/배포 파이프라인 추가\n이슈 생성 시 커밋/브랜치 가이드 자동 댓글\n배포 브랜치 푸시 시 README 버전 자동 갱신\n레이블 구성 동기화 및 자동 버전 관리\n\n\nRefactor\n\n초기화/통합 절차 안정화(안전한 입출력, 비대화형 대응) 및 워크플로 복사/정리 개선\n\n\nChores\n\n샘플 CI/CD 제거 및 프로젝트 타입별 불필요 워크플로 자동 정리\n버전 2.0.0 릴리스\n\n\nDocumentation\n\nREADME 전면 개편, 신규 설정 가이드 추가, 기여 가이드 링크 업데이트\n불필요 문서 정리(아키텍처/설치 가이드)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "PR 요약 감지·자동 변경로그 생성·자동 병합/배포 파이프라인 추가",
+            "이슈 생성 시 커밋/브랜치 가이드 자동 댓글",
+            "배포 브랜치 푸시 시 README 버전 자동 갱신",
+            "레이블 구성 동기화 및 자동 버전 관리"
+          ]
+        },
+        "refactor": {
+          "title": "Refactor",
+          "items": [
+            "초기화/통합 절차 안정화(안전한 입출력, 비대화형 대응) 및 워크플로 복사/정리 개선"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "샘플 CI/CD 제거 및 프로젝트 타입별 불필요 워크플로 자동 정리",
+            "버전 2.0.0 릴리스"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "README 전면 개편, 신규 설정 가이드 추가, 기여 가이드 링크 업데이트",
+            "불필요 문서 정리(아키텍처/설치 가이드)"
+          ]
+        }
+      }
+    },
     {
       "version": "1.3.17",
       "project_type": "basic",

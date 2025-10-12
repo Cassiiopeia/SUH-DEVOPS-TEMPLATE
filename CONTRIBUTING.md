@@ -876,7 +876,7 @@ assignees: ''
 
 1. **코드 주석**: 모든 공개 함수/변수
 2. **README.md**: 프로젝트 개요 및 빠른 시작
-3. **가이드 문서**: 상세 사용법 (SETUP-GUIDE.md, SCRIPTS_GUIDE.md 등)
+3. **가이드 문서**: 상세 사용법 (SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 등)
 4. **아키텍처 문서**: 시스템 구조 설명
 
 ### 마크다운 스타일

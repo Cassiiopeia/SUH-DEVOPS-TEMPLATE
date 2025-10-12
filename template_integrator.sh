@@ -102,21 +102,55 @@ NC=''
 TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
 TEMP_DIR=".template_download_temp"
 
+# 상수 정의
+readonly TEMPLATE_RAW_URL="https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main"
+readonly VERSION_FILE="version.yml"
+readonly WORKFLOWS_DIR=".github/workflows"
+readonly SCRIPTS_DIR=".github/scripts"
+readonly PROJECT_TYPES_DIR="project-types"
+readonly DEFAULT_VERSION="1.3.14"
+
+# 워크플로우 파일명 패턴
+readonly WORKFLOW_PREFIX="PROJECT"
+readonly WORKFLOW_COMMON_PREFIX="PROJECT-COMMON"
+readonly WORKFLOW_TEMPLATE_INIT="PROJECT-TEMPLATE-INITIALIZER.yaml"
+
 # 출력 함수 (/dev/tty 우선, 없으면 stderr로 폴백하여 명령어 치환 시 데이터 오염 방지)
-print_header() {
+
+# 출력 대상 선택 헬퍼 (중복 제거)
+get_output_target() {
     if [ -w /dev/tty ] 2>/dev/null; then
-        echo "" >/dev/tty
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}" >/dev/tty
-        echo -e "${CYAN}║$1${NC}" >/dev/tty
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}" >/dev/tty
-        echo "" >/dev/tty
+        echo "/dev/tty"
     else
-        echo "" >&2
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}" >&2
-        echo -e "${CYAN}║$1${NC}" >&2
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}" >&2
-        echo "" >&2
+        echo "/dev/stderr"
     fi
+}
+
+# 안전한 출력 헬퍼
+safe_echo() {
+    local target=$(get_output_target)
+    if [ "$target" = "/dev/tty" ]; then
+        echo "$@" >/dev/tty
+    else
+        echo "$@" >&2
+    fi
+}
+
+safe_echo_e() {
+    local target=$(get_output_target)
+    if [ "$target" = "/dev/tty" ]; then
+        echo -e "$@" >/dev/tty
+    else
+        echo -e "$@" >&2
+    fi
+}
+
+print_header() {
+    safe_echo ""
+    safe_echo_e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
+    safe_echo_e "${CYAN}║$1${NC}"
+    safe_echo_e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
+    safe_echo ""
 }
 
 # 멋진 배너 출력 (템플릿 버전 표시)
@@ -124,104 +158,66 @@ print_banner() {
     local version=$1
     local mode=$2
     
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "" >/dev/tty
-        echo "╔══════════════════════════════════════════════════════════════════╗" >/dev/tty
-        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦                    ║" >/dev/tty
-        echo "╚══════════════════════════════════════════════════════════════════╝" >/dev/tty
-        echo "       🌙 Version : v${version}" >/dev/tty
-        echo "       🐵 Author  : Cassiiopeia" >/dev/tty
-        echo "       🪐 Mode    : ${mode}" >/dev/tty
-        echo "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >/dev/tty
-        echo "" >/dev/tty
-    else
-        echo "" >&2
-        echo "╔══════════════════════════════════════════════════════════════════╗" >&2
-        echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦                    ║" >&2
-        echo "╚══════════════════════════════════════════════════════════════════╝" >&2
-        echo "       🌙 Version : v${version}" >&2
-        echo "       🐵 Author  : Cassiiopeia" >&2
-        echo "       🪐 Mode    : ${mode}" >&2
-        echo "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-        echo "" >&2
-    fi
+    safe_echo ""
+    safe_echo "╔══════════════════════════════════════════════════════════════════╗"
+    safe_echo "║ 🔮  ✦ S U H · D E V O P S · T E M P L A T E ✦                    ║"
+    safe_echo "╚══════════════════════════════════════════════════════════════════╝"
+    safe_echo "       🌙 Version : v${version}"
+    safe_echo "       🐵 Author  : Cassiiopeia"
+    safe_echo "       🪐 Mode    : ${mode}"
+    safe_echo "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    safe_echo ""
 }
 
 print_step() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${CYAN}🔅${NC} $1" >/dev/tty
-    else
-        echo -e "${CYAN}🔅${NC} $1" >&2
-    fi
+    safe_echo_e "${CYAN}🔅${NC} $1"
 }
 
 print_info() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "  ${BLUE}🔸${NC} $1" >/dev/tty
-    else
-        echo -e "  ${BLUE}🔸${NC} $1" >&2
-    fi
+    safe_echo_e "  ${BLUE}🔸${NC} $1"
 }
 
 print_success() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${GREEN}✨${NC} $1" >/dev/tty
-    else
-        echo -e "${GREEN}✨${NC} $1" >&2
-    fi
+    safe_echo_e "${GREEN}✨${NC} $1"
 }
 
 print_warning() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${YELLOW}⚠️${NC} $1" >/dev/tty
-    else
-        echo -e "${YELLOW}⚠️${NC} $1" >&2
-    fi
+    safe_echo_e "${YELLOW}⚠️${NC} $1"
 }
 
 print_error() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${RED}💥${NC} $1" >/dev/tty
-    else
-        echo -e "${RED}💥${NC} $1" >&2
-    fi
+    safe_echo_e "${RED}💥${NC} $1"
 }
 
 print_question() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo -e "${MAGENTA}💫${NC} $1" >/dev/tty
-    else
-        echo -e "${MAGENTA}💫${NC} $1" >&2
-    fi
+    safe_echo_e "${MAGENTA}💫${NC} $1"
 }
 
-# 안전한 read 함수 (stdin 모드에서도 /dev/tty 사용)
+# 안전한 read 함수 (/dev/tty 사용)
 safe_read() {
     local prompt="$1"
     local varname="$2"
-    local options="$3"  # 예: "-n 1"
+    local options="$3"
     
     if [ "$TTY_AVAILABLE" = true ]; then
-        # /dev/tty에서 읽기
-        if [ -n "$options" ]; then
-            eval "read $options -r -p \"\$prompt\" \"\$varname\" < /dev/tty"
+        printf "%s" "$prompt" > /dev/tty
+        
+        if [ "$options" = "-n 1" ]; then
+            IFS= read -r -n 1 "$varname" < /dev/tty
+        elif [ -n "$options" ]; then
+            IFS= read -r $options "$varname" < /dev/tty
         else
-            read -r -p "$prompt" "$varname" < /dev/tty
+            IFS= read -r "$varname" < /dev/tty
         fi
         return 0
     else
-        # TTY 없음 - 대화형 불가
         return 1
     fi
 }
 
 # 안전한 출력 함수 (TTY 우선, stderr 폴백)
 print_to_user() {
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "$@" >/dev/tty
-    else
-        echo "$@" >&2
-    fi
+    safe_echo "$@"
 }
 
 # Y/N 질문 함수 (기본값 지원)
@@ -255,26 +251,37 @@ ask_yes_no() {
 }
 
 # Y/N/E 질문 함수 (예/아니오/편집)
-# 반환: 0 (Yes), 1 (No), 2 (Edit)
+# 출력: "yes", "no", "edit" (set -e 모드 호환)
 ask_yes_no_edit() {
     local reply
+    local reply_normalized
     
     while true; do
         if safe_read "선택: " reply "-n 1"; then
             print_to_user ""
             
-            # 입력값 정규화 (공백 제거, 소문자 변환)
-            reply=$(echo "$reply" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+            # 입력값 정규화 (tr 에러 무시, 공백 제거, 소문자 변환)
+            reply_normalized=$(printf '%s' "$reply" | tr -d '[:space:]' 2>/dev/null | tr '[:upper:]' '[:lower:]' 2>/dev/null)
             
-            case "$reply" in
+            # 정규화 실패 시 원본 사용 (한국어 등)
+            if [ -z "$reply_normalized" ] && [ -n "$reply" ]; then
+                print_error "영문자만 입력해주세요. (Y/y, E/e, N/n)"
+                print_to_user ""
+                continue
+            fi
+            
+            case "$reply_normalized" in
                 ""|"y")
+                    echo "yes"
                     return 0
                     ;;
                 "n")
-                    return 1
+                    echo "no"
+                    return 0
                     ;;
                 "e")
-                    return 2
+                    echo "edit"
+                    return 0
                     ;;
                 *)
                     print_error "잘못된 입력입니다. Y/y, E/e, 또는 N/n을 입력해주세요."
@@ -566,11 +573,7 @@ detect_default_branch() {
 # 구분선 출력 (40자)
 print_separator_line() {
     local line="────────────────────────────────────────"
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "$line" >/dev/tty
-    else
-        echo "$line" >&2
-    fi
+    safe_echo "$line"
 }
 
 # 섹션 헤더 출력 (80자 구분선)
@@ -579,17 +582,10 @@ print_section_header() {
     local title="$2"
     local line="────────────────────────────────────────────────────────────────────────────────"
     
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "" >/dev/tty
-        echo "$line" >/dev/tty
-        echo "$emoji $title" >/dev/tty
-        echo "$line" >/dev/tty
-    else
-        echo "" >&2
-        echo "$line" >&2
-        echo "$emoji $title" >&2
-        echo "$line" >&2
-    fi
+    safe_echo ""
+    safe_echo "$line"
+    safe_echo "$emoji $title"
+    safe_echo "$line"
 }
 
 # 질문 헤더 출력 (40자 구분선)
@@ -597,19 +593,11 @@ print_question_header() {
     local emoji="$1"
     local question="$2"
     
-    if [ -w /dev/tty ] 2>/dev/null; then
-        echo "" >/dev/tty
-        print_separator_line
-        echo "$emoji $question" >/dev/tty
-        print_separator_line
-        echo "" >/dev/tty
-    else
-        echo "" >&2
-        print_separator_line
-        echo "$emoji $question" >&2
-        print_separator_line
-        echo "" >&2
-    fi
+    safe_echo ""
+    print_separator_line
+    safe_echo "$emoji $question"
+    print_separator_line
+    safe_echo ""
 }
 
 # 프로젝트 타입 선택 메뉴
@@ -651,8 +639,10 @@ show_project_type_menu() {
                 print_to_user ""
             fi
         else
-            print_error "입력을 읽을 수 없습니다"
-            exit 1
+            # TTY를 읽을 수 없는 환경 - 기존 값 유지
+            print_error "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+            echo "$PROJECT_TYPE"
+            return 1
         fi
     done
 }
@@ -678,9 +668,9 @@ detect_and_confirm_project() {
         
         # 감지 결과 표시
         print_to_user ""
-        print_to_user "       📂 Project Type  : $PROJECT_TYPE"
-        print_to_user "       🌙 Version       : $VERSION"
-        print_to_user "       🌿 Branch        : $DETECTED_BRANCH"
+        print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+        print_to_user "       🌙 Version          : $VERSION"
+        print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
         print_to_user ""
         
         # 사용자 확인
@@ -691,22 +681,26 @@ detect_and_confirm_project() {
         print_to_user ""
         
         # Y/N/E 입력 받기
-        ask_yes_no_edit
-        local user_choice=$?
+        local user_choice
+        user_choice=$(ask_yes_no_edit)
         
-        case $user_choice in
-            0)  # Yes - 계속 진행
+        case "$user_choice" in
+            "yes")
                 confirmed=true
                 print_success "프로젝트 정보 확인 완료"
                 print_to_user ""
                 ;;
-            1)  # No - 취소
+            "no")
                 print_info "취소되었습니다"
                 exit 0
                 ;;
-            2)  # Edit - 수정하기
+            "edit")
                 handle_project_edit_menu
                 # 루프 계속 - 다시 확인 질문으로
+                ;;
+            *)
+                print_error "예상치 못한 오류가 발생했습니다"
+                exit 1
                 ;;
         esac
     done
@@ -718,7 +712,7 @@ handle_project_edit_menu() {
     
     print_to_user "  1) Project Type"
     print_to_user "  2) Version"
-    print_to_user "  3) Branch"
+    print_to_user "  3) Default Branch (기본 브랜치)"
     print_to_user "  4) 모두 맞음, 계속"
     print_to_user ""
         
@@ -754,22 +748,30 @@ handle_project_edit_menu() {
                                 print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
                             fi
                             print_to_user ""
+                        else
+                            print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                            print_to_user ""
                         fi
                         ;;
                     3)
-                        # Branch 수정
+                        # Default Branch 수정
                         local new_branch
                         print_to_user ""
+                        print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+                        print_to_user ""
                         
-                        if safe_read "새 브랜치 이름을 입력하세요 (예: main): " new_branch ""; then
+                        if safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""; then
                             print_to_user ""
                             
                             if [ -n "$new_branch" ]; then
                                 DETECTED_BRANCH="$new_branch"
-                                print_success "Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                                print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
                             else
                                 print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
                             fi
+                            print_to_user ""
+                        else
+                            print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
                             print_to_user ""
                         fi
                         ;;
@@ -786,8 +788,11 @@ handle_project_edit_menu() {
                 print_to_user ""
             fi
         else
-            print_error "입력을 읽을 수 없습니다"
-            exit 1
+            # TTY를 읽을 수 없는 환경 - 대화형 편집 불가
+            print_error "대화형 입력이 불가능한 환경입니다."
+            print_warning "자동화 환경에서는 --type, --version 옵션을 직접 지정해주세요."
+            print_to_user ""
+            return 1
         fi
     done
 }
@@ -806,13 +811,9 @@ download_template() {
     }
     
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
-    print_info "문서 파일 제외 중..."
+    print_info "템플릿 내부 문서 제외 중..."
     local docs_to_remove=(
         "ARCHITECTURE.md"
-        "SETUP-GUIDE.md"
-        "SCRIPTS_GUIDE.md"
-        "WORKFLOWS.md"
-        "TROUBLESHOOTING.md"
         "CONTRIBUTING.md"
     )
     
@@ -821,6 +822,12 @@ download_template() {
             rm -f "$TEMP_DIR/$doc"
         fi
     done
+    
+    # 사용자 적용 가이드 문서는 포함 (SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)
+    print_info "사용자 적용 가이드 문서 다운로드 중..."
+    if [ -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
+        print_info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+    fi
     
     print_success "템플릿 다운로드 완료"
 }
@@ -937,44 +944,89 @@ EOF
     print_success "version.yml 생성 완료"
 }
 
-# 워크플로우 복사
+# 워크플로우 복사 (폴더 기반, 단순화)
 copy_workflows() {
-    print_step "GitHub Actions 워크플로우 복사 중..."
+    print_step "프로젝트 타입별 워크플로우 복사 중..."
+    print_info "프로젝트 타입: $PROJECT_TYPE"
     
-    mkdir -p .github/workflows
-    
-    local workflows=(
-        "PROJECT-VERSION-CONTROL.yaml"
-        "PROJECT-README-VERSION-UPDATE.yaml"
-        "PROJECT-AUTO-CHANGELOG-CONTROL.yaml"
-        "PROJECT-ISSUE-COMMENT.yaml"
-        "PROJECT-SYNC-ISSUE-LABELS.yaml"
-    )
+    mkdir -p "$WORKFLOWS_DIR"
     
     local copied=0
-    for workflow in "${workflows[@]}"; do
-        local src="$TEMP_DIR/.github/workflows/$workflow"
-        local dst=".github/workflows/$workflow"
-        
-        if [ -f "$src" ]; then
-            if [ -f "$dst" ]; then
-                print_warning "$workflow 이미 존재 → ${workflow}.bak으로 백업"
-                mv "$dst" "${dst}.bak"
-            fi
-            cp "$src" "$dst"
-            echo "  ✓ $workflow"
-            copied=$((copied + 1))
-        fi
-    done
+    local project_types_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"
     
-    print_success "$copied 개 워크플로우 복사 완료"
+    # project-types 폴더 존재 확인
+    if [ ! -d "$project_types_dir" ]; then
+        print_error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
+        print_error "project-types 폴더를 찾을 수 없습니다."
+        exit 1
+    fi
+    
+    # 1. Common 워크플로우 복사 (필수)
+    print_info "공통 워크플로우 복사 중..."
+    if [ -d "$project_types_dir/common" ]; then
+        for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            local filename=$(basename "$workflow")
+            
+            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                print_warning "$filename 이미 존재 → ${filename}.bak으로 백업"
+                mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+            fi
+            
+            cp "$workflow" "$WORKFLOWS_DIR/"
+            echo "  ✓ $filename"
+            copied=$((copied + 1))
+        done
+    else
+        print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
+    fi
+    
+    # 2. 타입별 워크플로우 복사 (optional 구분 없이 전체 복사)
+    local type_dir="$project_types_dir/$PROJECT_TYPE"
+    if [ -d "$type_dir" ]; then
+        print_info "$PROJECT_TYPE 전용 워크플로우 복사 중..."
+        
+        for workflow in "$type_dir"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            
+            local filename=$(basename "$workflow")
+            
+            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                print_warning "$filename 이미 존재 → ${filename}.bak으로 백업"
+                mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+            fi
+            
+            cp "$workflow" "$WORKFLOWS_DIR/"
+            echo "  ✓ $filename"
+            copied=$((copied + 1))
+        done
+    else
+        print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
+    fi
+    
+    print_success "$copied 개 워크플로우 복사 완료 (타입: $PROJECT_TYPE)"
+    
+    # 복사된 워크플로우 수를 전역 변수로 저장 (최종 요약에서 사용)
+    WORKFLOWS_COPIED=$copied
+    
+    # CI/CD 워크플로우 안내
+    if [ "$PROJECT_TYPE" = "spring" ]; then
+        echo ""
+        print_info "🔐 Spring CI/CD 워크플로우 사용 시 GitHub Secrets 설정:"
+        echo "     Repository > Settings > Secrets and variables > Actions"
+        echo "     필수 Secrets:"
+        echo "       - APPLICATION_PROD_YML (Spring 운영 설정)"
+        echo "       - DOCKERHUB_USERNAME, DOCKERHUB_TOKEN"
+        echo "       - SERVER_HOST, SERVER_USER, SERVER_PASSWORD"
+        echo "       - GRADLE_PROPERTIES (Nexus 사용 시)"
+    fi
 }
 
 # 스크립트 복사
 copy_scripts() {
     print_step "버전 관리 스크립트 복사 중..."
     
-    mkdir -p .github/scripts
+    mkdir -p "$SCRIPTS_DIR"
     
     local scripts=(
         "version_manager.sh"
@@ -983,8 +1035,8 @@ copy_scripts() {
     
     local copied=0
     for script in "${scripts[@]}"; do
-        local src="$TEMP_DIR/.github/scripts/$script"
-        local dst=".github/scripts/$script"
+        local src="$TEMP_DIR/$SCRIPTS_DIR/$script"
+        local dst="$SCRIPTS_DIR/$script"
         
         if [ -f "$src" ]; then
             cp "$src" "$dst"
@@ -1091,13 +1143,13 @@ interactive_mode() {
     # GitHub 원격 저장소의 version.yml에서 버전 가져오기
     if command -v curl >/dev/null 2>&1; then
         template_version=$(curl -fsSL --max-time 3 \
-            "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/version.yml" \
+            "${TEMPLATE_RAW_URL}/${VERSION_FILE}" \
             2>/dev/null | grep "^version:" | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
     fi
     
     # 폴백: 버전을 가져오지 못한 경우 기본값 사용
     if [ -z "$template_version" ]; then
-        template_version="1.3.14"
+        template_version="$DEFAULT_VERSION"
     fi
     
     print_banner "$template_version" "Interactive (대화형 모드)"
@@ -1292,22 +1344,74 @@ print_summary() {
     
     echo "" >&2
     echo "추가된 파일:" >&2
-    echo "  📄 version.yml" >&2
+    echo "  📄 version.yml (버전: $VERSION, 타입: $PROJECT_TYPE)" >&2
     echo "  📝 README.md (버전 섹션 추가)" >&2
     echo "" >&2
-    echo "추가된 디렉토리:" >&2
-    echo "  ⚙️  .github/workflows/" >&2
-    echo "     ├─ PROJECT-VERSION-CONTROL.yaml" >&2
-    echo "     ├─ PROJECT-AUTO-CHANGELOG-CONTROL.yaml" >&2
-    echo "     ├─ PROJECT-README-VERSION-UPDATE.yaml" >&2
-    echo "     ├─ PROJECT-ISSUE-COMMENT.yaml" >&2
-    echo "     └─ PROJECT-SYNC-ISSUE-LABELS.yaml" >&2
+    echo "추가된 워크플로우:" >&2
+    
+    # 워크플로우 분류 저장용 배열
+    local common_workflows=()
+    local type_workflows=()
+    local existing_workflows=()
+    
+    # 실제 복사된 워크플로우와 기존 파일 구분
+    if [ -d "$WORKFLOWS_DIR" ]; then
+        for wf in "$WORKFLOWS_DIR/$WORKFLOW_PREFIX"-*.{yaml,yml}; do
+            [ -e "$wf" ] || continue
+            local filename=$(basename "$wf")
+            
+            # TEMPLATE-INITIALIZER는 기존 파일로 분류
+            if [[ "$filename" == "$WORKFLOW_TEMPLATE_INIT" ]]; then
+                existing_workflows+=("$filename")
+            elif [[ "$filename" =~ ^${WORKFLOW_COMMON_PREFIX}- ]]; then
+                common_workflows+=("$filename")
+            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-${PROJECT_TYPE^^}- ]]; then
+                type_workflows+=("$filename")
+            fi
+        done
+    fi
+    
+    # 새로 설치된 워크플로우 출력
+    if [ ${#common_workflows[@]} -gt 0 ] || [ ${#type_workflows[@]} -gt 0 ]; then
+        echo "  📦 새로 설치됨 (${WORKFLOWS_COPIED:-0}개):" >&2
+        
+        # 공통 워크플로우
+        for wf in "${common_workflows[@]}"; do
+            echo "     📌 $wf" >&2
+        done
+        
+        # 타입별 워크플로우
+        for wf in "${type_workflows[@]}"; do
+            echo "     🎯 $wf" >&2
+        done
+    fi
+    
+    # 기존 파일 유지됨 표시
+    if [ ${#existing_workflows[@]} -gt 0 ]; then
+        echo "" >&2
+        echo "  🔧 기존 파일 유지됨:" >&2
+        for wf in "${existing_workflows[@]}"; do
+            echo "     📌 $wf (템플릿 전용)" >&2
+        done
+    fi
+    
     echo "" >&2
     echo "  🔧 .github/scripts/" >&2
     echo "     ├─ version_manager.sh" >&2
     echo "     └─ changelog_manager.py" >&2
     echo "" >&2
+    
+    # 프로젝트 타입별 안내
+    if [ "$PROJECT_TYPE" = "spring" ]; then
+        echo "  💡 Spring 프로젝트 추가 설정:" >&2
+        echo "     • build.gradle의 버전 정보가 자동 동기화됩니다" >&2
+        echo "     • CI/CD 워크플로우에서 GitHub Secrets 설정이 필요합니다" >&2
+        echo "     • 자세한 설정 방법: .github/workflows/project-types/spring/README.md" >&2
+        echo "" >&2
+    fi
+    
     echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+    echo "  📚 워크플로우 가이드: .github/workflows/project-types/README.md" >&2
     echo "" >&2
 }
 

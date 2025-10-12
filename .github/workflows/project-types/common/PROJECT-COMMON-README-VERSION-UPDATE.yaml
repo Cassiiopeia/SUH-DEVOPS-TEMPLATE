@@ -1,0 +1,183 @@
+# ===================================================================
+# README 파일 버전 자동 업데이트 워크플로우
+# ===================================================================
+#
+# 이 워크플로우는 deploy 브랜치로 푸시가 발생할 때 README.md 파일의
+# 버전 정보를 version_manager.sh를 통해 가져와 자동으로 업데이트합니다.
+#
+# 작동 방식:
+# 1. deploy 브랜치 푸시 시 트리거
+# 2. version_manager.sh를 통해 최신 버전 정보 추출
+# 3. README.md 파일의 버전 정보 업데이트
+# 4. 변경사항 커밋 및 푸시
+#
+# ⚠️ README.md 파일 버전 표기 가이드라인:
+#
+# ✅ 지원되는 버전 표기 형식들:
+# - ## 최신 버전 : v1.0.0 (2025-08-15)
+# - ## 최신버전 : v1.0.0 (2025-08-15)
+# - ## Current Version : v1.0.0 (2025-08-15)
+# - ## Recent Version : v1.0.0 (2025-08-15)
+# - ## Version : v1.0.0 (2025-08-15)
+# - ## 버전 : v1.0.0 (2025-08-15)
+#
+# - 대소문자 구분 없음
+# - 콜론(:) 앞뒤 공백 자유롭게 허용
+# - "version", "버전", "최신", "current", "recent" 등의 키워드 포함 시 자동 인식
+# - 주석 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->는 자동으로 추가됩니다.
+#
+# 🔧 환경변수 설정:
+# - SHOW_DATE: 버전에 날짜 표시 여부 (true/false, 기본값: true)
+#   * true: v1.0.0 (2025-08-16) 형식
+#   * false: v1.0.0 형식
+#
+# ===================================================================
+
+name: README VERSION UPDATE
+
+# 환경변수 설정 - 사용자 맞춤 설정
+env:
+  # 버전에 날짜 표시 여부 (true/false)
+  SHOW_DATE: true  # 🔧 이 값을 false로 변경하면 날짜가 표시되지 않습니다
+
+on:
+  push:
+    branches: ["deploy"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-readme:
+    name: README 버전 정보 업데이트
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+
+      - name: Git 설정
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: version_manager.sh를 통해 최신 버전 정보 가져오기
+        id: version_info
+        run: |
+          # 버전 관리 스크립트에 실행 권한 부여
+          chmod +x .github/scripts/version_manager.sh
+          
+          # version_manager.sh를 통해 최신 버전 가져오기
+          LATEST_VERSION=$(.github/scripts/version_manager.sh get | tail -n 1)
+          
+          # 현재 날짜를 릴리즈 날짜로 사용
+          RELEASE_DATE=$(date '+%Y-%m-%d')
+          
+          # 버전 정보 저장
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+
+      - name: README.md 파일 버전 정보 업데이트
+        run: |
+          LATEST_VERSION="${{ steps.version_info.outputs.latest_version }}"
+          RELEASE_DATE="${{ steps.version_info.outputs.release_date }}"
+          SHOW_DATE="${{ env.SHOW_DATE }}"
+          
+          # 날짜 표시 여부에 따라 버전 형식 결정
+          if [ "$SHOW_DATE" = "true" ]; then
+            VERSION_TEXT="v${LATEST_VERSION} (${RELEASE_DATE})"
+            echo "🗓️ 날짜 포함 버전 형식: $VERSION_TEXT"
+          else
+            VERSION_TEXT="v${LATEST_VERSION}"
+            echo "📋 버전만 표시 형식: $VERSION_TEXT"
+          fi
+          
+          # 다양한 버전 표기 패턴을 찾기 위한 정규표현식
+          # 대소문자 무시, 공백 유연하게 처리
+          VERSION_PATTERNS=(
+            "^##[[:space:]]*최신[[:space:]]*버전[[:space:]]*:"
+            "^##[[:space:]]*최신버전[[:space:]]*:"
+            "^##[[:space:]]*[Cc]urrent[[:space:]]*[Vv]ersion[[:space:]]*:"
+            "^##[[:space:]]*[Rr]ecent[[:space:]]*[Vv]ersion[[:space:]]*:"
+            "^##[[:space:]]*[Vv]ersion[[:space:]]*:"
+            "^##[[:space:]]*버전[[:space:]]*:"
+            "^##[[:space:]]*[Ll]atest[[:space:]]*[Vv]ersion[[:space:]]*:"
+          )
+          
+          # 버전 라인 찾기
+          VERSION_LINE=""
+          PATTERN_FOUND=""
+          
+          for pattern in "${VERSION_PATTERNS[@]}"; do
+            if grep -qi "$pattern" README.md; then
+              VERSION_LINE=$(grep -i "$pattern" README.md | head -n 1)
+              PATTERN_FOUND="$pattern"
+              echo "✅ 버전 패턴 발견: $VERSION_LINE"
+              break
+            fi
+          done
+          
+          # 버전 라인이 없으면 기본 형식으로 추가
+          if [ -z "$VERSION_LINE" ]; then
+            echo "📝 버전 정보가 없어 새로 추가합니다"
+          
+            # 파일 맨 앞에 제목이 있는지 확인 후 그 다음에 추가
+            if grep -q "^# " README.md; then
+              # 첫 번째 제목 다음에 추가
+              sed -i '/^# /a\\n<!-- 수정하지마세요 자동으로 동기화 됩니다 -->\n## 최신 버전 : '"$VERSION_TEXT" README.md
+            else
+              # 파일 맨 앞에 추가
+              sed -i '1i\<!-- 수정하지마세요 자동으로 동기화 됩니다 -->\n## 최신 버전 : '"$VERSION_TEXT"'\n' README.md
+            fi
+            echo "✅ 기본 버전 정보 추가 완료: $VERSION_TEXT"
+          else
+            # 기존 버전 라인 업데이트
+          
+            # HTML 주석이 해당 라인 위에 있는지 확인
+            LINE_NUMBER=$(grep -n -i "$PATTERN_FOUND" README.md | head -n 1 | cut -d: -f1)
+            PREV_LINE_NUMBER=$((LINE_NUMBER - 1))
+          
+            if [ $PREV_LINE_NUMBER -gt 0 ]; then
+              PREV_LINE=$(sed -n "${PREV_LINE_NUMBER}p" README.md)
+              if [[ "$PREV_LINE" != *"수정하지마세요 자동으로 동기화 됩니다"* ]]; then
+                # 주석이 없으면 버전 라인 위에 추가
+                sed -i "${PREV_LINE_NUMBER}a\\<!-- 수정하지마세요 자동으로 동기화 됩니다 -->" README.md
+                echo "✅ 자동 업데이트 주석 추가 완료"
+              fi
+            else
+              # 첫 번째 라인이면 그 위에 추가
+              sed -i '1i\<!-- 수정하지마세요 자동으로 동기화 됩니다 -->' README.md
+              echo "✅ 자동 업데이트 주석 추가 완료"
+            fi
+          
+            # 원래 패턴의 형식을 유지하면서 버전 정보만 업데이트
+            # 기존 라인에서 헤더 부분(## ... :)을 추출하고 새 버전 정보로 교체
+            HEADER_PART=$(echo "$VERSION_LINE" | sed 's/v[0-9].*//' | sed 's/[0-9].*//')
+          
+            # 기존 라인을 새 버전 정보로 교체
+            sed -i "s|^${VERSION_LINE}.*|${HEADER_PART}${VERSION_TEXT}|" README.md
+            echo "✅ 버전 정보 업데이트 완료: $VERSION_TEXT"
+          fi
+
+      - name: 변경사항 커밋 및 푸시
+        run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          git add README.md
+          
+          if git diff --staged --quiet; then
+            echo "📝 README.md에 변경사항이 없습니다"
+          else
+            REPO_NAME=$(basename "${{ github.repository }}")
+            VERSION="${{ steps.version_info.outputs.latest_version }}"
+          
+            git commit -m "$REPO_NAME 버전 관리 : docs : v$VERSION README 버전 정보 업데이트 [skip ci]"
+          
+            # default 브랜치로 푸시
+            git push origin HEAD:$DEFAULT_BRANCH
+          
+            echo "✅ README.md 버전 정보 업데이트 완료"
+          fi

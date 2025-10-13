@@ -6,7 +6,7 @@
 # GitHub Actions 워크플로우가 이 파일을 읽어 자동으로 버전을 관리합니다.
 #
 # 사용법:
-# 1. version: "2.0.2" - 사용자에게 표시되는 버전
+# 1. version: "2.0.3" - 사용자에게 표시되는 버전
 # 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
 # 3. project_type: 프로젝트 타입 지정
 #
@@ -17,7 +17,7 @@
 #
 # 프로젝트 타입별 동기화 파일:
 # - spring: build.gradle (version = "x.y.z")
-# - flutter: pubspec.yaml (version: x.y.z+buildNumber)
+# - flutter: pubspec.yaml (version: "2.0.3"
 # - react/node: package.json ("version": "x.y.z")
 # - react-native: iOS Info.plist 또는 Android build.gradle
 # - react-native-expo: app.json (expo.version)
@@ -34,9 +34,9 @@
 # - 버전은 항상 높은 버전으로 자동 동기화됩니다
 # ===================================================================
 
-version: "2.0.2"
-version_code: 41  # app build number
+version: "2.0.3"
+version_code: 42  # app build number
 project_type: "basic" # spring, flutter, react, react-native, react-native-expo, node, basic
 metadata:
-  last_updated: "2025-10-12 16:11:13"
+  last_updated: "2025-10-12 16:18:20"
   last_updated_by: "Cassiiopeia"

@@ -1,0 +1,265 @@
+# ===================================================================
+# React/Next.js 전용 CI/CD 배포 워크플로우
+# ===================================================================
+
+name: PROJECT-REACT-CICD
+
+# ===================================================================
+# 📋 필수 GitHub Secrets 설정 가이드
+# ===================================================================
+#
+# 🔧 필수 Secrets:
+# ┌─────────────────────────────┬────────────────────────────────────┐
+# │ Secret 이름                 │ 설명                               │
+# ├─────────────────────────────┼────────────────────────────────────┤
+# │ ENV                         │ React/Next.js 환경변수 파일 내용  │
+# │ DOCKERHUB_USERNAME          │ DockerHub 사용자명                 │
+# │ DOCKERHUB_TOKEN             │ DockerHub 액세스 토큰              │
+# │ SERVER_HOST                 │ 배포 대상 서버 IP/도메인           │
+# │ SERVER_USER                 │ 서버 SSH 접속 사용자명             │
+# │ SERVER_PASSWORD             │ 서버 SSH 접속 비밀번호             │
+# └─────────────────────────────┴────────────────────────────────────┘
+#
+# 🧪 선택적 Secrets:
+# ┌─────────────────────────────┬────────────────────────────────────┐
+# │ PROJECT_DEPLOY_PORT         │ deploy 브랜치 배포 포트 (기본: 3000) │
+# └─────────────────────────────┴────────────────────────────────────┘
+#
+# ===================================================================
+
+on:
+  push:
+    branches:
+      - deploy
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: "project"
+  DOCKER_IMAGE_PREFIX: "front-container"
+  NODE_VERSION: "20.15.0"
+  ENV_FILE_NAME: ".env"
+
+jobs:
+  build:
+    name: React/Next.js 애플리케이션 빌드
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 소스코드 체크아웃
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # 2. Node.js 개발 환경 설정
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # 3. 환경변수 파일 생성
+      - name: 환경변수 파일 생성 (${{ env.ENV_FILE_NAME }})
+        run: |
+          cat << 'EOF' > ./${{ env.ENV_FILE_NAME }}
+          ${{ secrets.ENV }}
+          EOF
+          echo "✅ ${{ env.ENV_FILE_NAME }} 파일 생성 완료"
+
+      # 4. npm 의존성 캐싱
+      - name: npm 의존성 캐싱
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      # 5. node_modules 캐싱
+      - name: node_modules 캐싱
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      # 6. 의존성 설치
+      - name: 의존성 설치
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # 7. Next.js 빌드 캐싱
+      - name: Next.js 빌드 캐싱
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
+      # 8. 프로젝트 빌드
+      - name: Build with npm
+        run: npm run build
+
+      # 9. Docker 빌드 환경 설정
+      - name: Docker 빌드환경 설정
+        uses: docker/setup-buildx-action@v3
+
+      # 10. DockerHub 로그인
+      - name: DockerHub 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 11. Docker 레이어 캐싱
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile') }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      # 12. Docker 이미지 빌드 및 푸시
+      - name: Docker 이미지 빌드 및 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}-${{ env.DOCKER_IMAGE_PREFIX }}:${{ github.ref_name }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # 13. Docker 캐시 정리
+      - name: Move Docker cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  deploy:
+    name: 원격 서버 배포
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 2022
+          script: |
+            set -e
+
+            # ============================================================
+            # 배포 환경 변수 설정
+            # ============================================================
+            echo "🔧 환경변수 설정.."
+            export PATH=$PATH:/usr/local/bin
+            export PW=${{ secrets.SERVER_PASSWORD }}
+
+            # GitHub에서 전달받은 브랜치명
+            BRANCH=${{ github.ref_name }}
+
+            # 프로젝트 설정
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+
+            # ============================================================
+            # 브랜치별 포트 및 컨테이너명 설정
+            # ============================================================
+            # 기본값 설정
+            PORT=3000
+            CONTAINER_NAME="${PROJECT_NAME}-front"
+
+            # 브랜치에 따른 환경별 설정
+            if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
+              # 🚀 배포 환경 (deploy 브랜치 또는 main 브랜치)
+              # GitHub Secrets의 PROJECT_DEPLOY_PORT 환경변수 사용
+              # 설정되어 있지 않으면 기본값 3000 사용
+              PORT=${{ secrets.PROJECT_DEPLOY_PORT || '3000' }}
+              CONTAINER_NAME="${PROJECT_NAME}-front-deploy"
+              echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"
+
+            else
+              # ⚠️ 기타 브랜치 (예상치 못한 브랜치)
+              echo "⚠️ 지원하지 않는 브랜치입니다: $BRANCH"
+              echo "이 워크플로우는 deploy 브랜치만 지원합니다."
+              echo "on.push.branches에서 지원할 브랜치를 설정하세요."
+              exit 1
+            fi
+
+            # 설정 정보 출력
+            echo "📋 배포 설정 정보:"
+            echo "  - 브랜치: $BRANCH"
+            echo "  - 프로젝트: $PROJECT_NAME"
+            echo "  - 컨테이너 이름: $CONTAINER_NAME"
+            echo "  - 포트: $PORT"
+            echo "  - Docker 이미지: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}"
+
+            # ============================================================
+            # Docker 이미지 풀 (Pull)
+            # ============================================================
+            echo "⬇️ Docker 이미지 풀: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}"
+            echo $PW | sudo -S docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}
+
+            # ============================================================
+            # 기존 컨테이너 정리
+            # ============================================================
+            echo "🧹 컨테이너 $CONTAINER_NAME 존재 여부 확인 중..."
+
+            # 동일한 이름의 컨테이너가 존재하는지 확인
+            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+              echo "⚠️ 컨테이너 $CONTAINER_NAME 이(가) 존재합니다. 중지 및 삭제 중..."
+              echo $PW | sudo -S docker rm -f $CONTAINER_NAME
+              echo "✅ 컨테이너 $CONTAINER_NAME 이(가) 삭제되었습니다."
+            else
+              echo "ℹ️ 존재하는 컨테이너 $CONTAINER_NAME 이(가) 없습니다."
+            fi
+
+            # ============================================================
+            # 새 컨테이너 실행
+            # ============================================================
+            echo "🚀 새로운 컨테이너 $CONTAINER_NAME 실행 중..."
+
+            echo $PW | sudo -S docker run -d \
+              -p ${PORT}:3000 \
+              --name $CONTAINER_NAME \
+              -e TZ=Asia/Seoul \
+              -v /etc/localtime:/etc/localtime:ro \
+              ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}
+
+            # ============================================================
+            # 배포 완료 확인
+            # ============================================================
+            echo "✅ 배포가 성공적으로 완료되었습니다!"
+            echo ""
+            echo "📋 배포 결과 요약:"
+            echo "  🎯 프로젝트: $PROJECT_NAME"
+            echo "  🌿 브랜치: $BRANCH"
+            echo "  🐳 컨테이너: $CONTAINER_NAME"
+            echo "  🌐 포트: $PORT"
+            echo "  ⏰ 배포 시간: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo ""
+            echo "🔗 접속 URL: http://${{ secrets.SERVER_HOST }}:${PORT}"
+
+# ===================================================================
+# 사용 예시 - deploy 브랜치 사용
+# ===================================================================
+#
+# 현재 설정: deploy 브랜치에 push할 때 자동 배포
+# main 브랜치는 수동 실행(workflow_dispatch)만 가능
+#
+# 브랜치별 포트:
+# - deploy: 3000 (PROJECT_DEPLOY_PORT secret으로 변경 가능)
+# - main: 3000 (수동 실행시, PROJECT_DEPLOY_PORT secret으로 변경 가능)
+#
+# 필요한 Secrets:
+# - REACT_ENV_FILE, DOCKERHUB_*, SERVER_* (필수)
+# - PROJECT_DEPLOY_PORT (선택, 기본값: 3000)
+#
+# ===================================================================
+

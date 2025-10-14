@@ -1,12 +1,11 @@
-name: 🔧 CI Build Check
+name: PROJECT-SPRING-NEXUS-CI
 
 on:
-# 임시 주석 처리
-#  pull_request:
-#    branches: [ main ]
-#    types: [opened, synchronize, reopened]
-#  push:
-#    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:

@@ -506,32 +506,6 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 
 ---
 
-## 🚀 다음 단계
-
-### 방법 1 사용자 (GitHub 템플릿)
-1. ✅ "Use this template"으로 프로젝트 생성 완료
-2. 📝 프로젝트 타입 변경이 필요하면 대화형 모드로 재설정:
-   
-   🐧 **macOS / Linux**:
-   - 대화형 모드 - 자동 감지 및 선택
-   ```bash
-   bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
-   ```
-   
-   🪟 **Windows (PowerShell)**:
-   - 대화형 모드 - 자동 감지 및 선택
-   ```powershell
-   iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
-   ```
-
-3. 🎉 코드 푸시하면 자동화 시작!
-
-### 방법 2 사용자 (기존 프로젝트 통합)
-1. ✅ 원격 스크립트로 설치 완료
-2. 🔐 GitHub Token 설정 (고급 기능 사용 시)
-3. 📊 첫 커밋 푸시로 자동화 테스트
-4. 🎉 개발에만 집중!
-
 ### 모든 사용자 공통
 - 📢 팀원들과 워크플로우 공유
 - 💡 개선사항/문제점 이슈로 제보

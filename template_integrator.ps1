@@ -57,14 +57,12 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false)]
-    [ValidateSet("interactive", "full", "version", "workflows", "issues")]
     [string]$Mode = "interactive",
     
     [Parameter(Mandatory=$false)]
     [string]$Version = "",
     
     [Parameter(Mandatory=$false)]
-    [ValidateSet("spring", "flutter", "react", "react-native", "react-native-expo", "node", "python", "basic")]
     [string]$Type = "",
     
     [Parameter(Mandatory=$false)]
@@ -1470,6 +1468,24 @@ function Main {
     if ($Help) {
         Show-Help
         exit 0
+    }
+    
+    # 파라미터 검증
+    $validModes = @("interactive", "full", "version", "workflows", "issues")
+    if ($Mode -ne "" -and $Mode -notin $validModes) {
+        Print-Error "잘못된 모드: $Mode"
+        Write-Host "지원되는 모드: $($validModes -join ', ')"
+        Write-Host ""
+        Write-Host "도움말: .\template_integrator.ps1 -Help"
+        exit 1
+    }
+    
+    if ($Type -ne "" -and $Type -notin $script:ValidTypes) {
+        Print-Error "잘못된 프로젝트 타입: $Type"
+        Write-Host "지원되는 타입: $($script:ValidTypes -join ', ')"
+        Write-Host ""
+        Write-Host "도움말: .\template_integrator.ps1 -Help"
+        exit 1
     }
     
     # Git 저장소 확인 (경고만 표시)

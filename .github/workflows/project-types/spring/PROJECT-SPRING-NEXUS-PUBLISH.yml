@@ -1,10 +1,10 @@
-name: PUBLISH_NEXUS-REPOSITORY
+name: PROJECT-SPRING-NEXUS-PUBLISH
 
 on:
   push:
-#    branches: ["deploy"]  # 임시주석처리 deploy 브랜치 푸시 시 자동 배포
+    branches: ["deploy"]
     tags:
-      - 'v*.*.*'  # v Semantic Version Tag (ex: v1.0.0)
+      - 'v*.*.*'
 
 jobs:
   publish:

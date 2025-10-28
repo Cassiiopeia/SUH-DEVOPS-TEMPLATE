@@ -6,7 +6,7 @@
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
 <!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v2.0.1 (2025-10-12)
+## 최신 버전 : v2.0.3 (2025-10-12)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 <!-- END-AUTO-VERSION-SECTION -->
@@ -60,29 +60,28 @@ cd your-project
 - ✅ basic 타입, v0.0.0으로 시작
 - 🗑️ 템플릿 전용 파일 자동 삭제
 
-**다른 프로젝트 타입으로 변경하려면?**
-```bash
-# Spring Boot 프로젝트로 변경 (원격 실행)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
-  --mode workflows --type spring
-
-# 또는 수동으로 복사
-cp .github/workflows/project-types/spring/*.yaml .github/workflows/
-
-# version.yml 수정
-vi version.yml  # project_type: "spring"
-```
-
----
-
 ### 방법 2: 📦 기존 프로젝트에 통합 (원격 스크립트 실행)
 
 **이미 진행 중인 프로젝트에 템플릿 기능 추가**
 
+#### 🐧 macOS / Linux
+- 한 줄 명령어로 즉시 설치! (대화형 모드 - 자동 감지)
 ```bash
-# 한 줄 명령어로 즉시 설치!
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
 ```
+
+#### 🪟 Windows (PowerShell)
+- PowerShell에서 한 줄 명령어로 즉시 설치! (대화형 모드 - 자동 감지)
+```powershell
+iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
+```
+
+**또는** (실행 정책 우회):
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iex (iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content"
+```
+
+> 💡 **대화형 모드**: 프로젝트 타입과 버전을 자동으로 감지하고, 필요 시 수정할 수 있습니다!
 
 **대화형 모드로 쉽게 설정**:
 ```bash
@@ -105,20 +104,29 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
    ✅ README에 버전 섹션 추가
 ```
 
-**CLI 모드 (자동화/스크립트용)**:
+**CLI 모드 (자동화/CI-CD용 - 대화 없이 실행)**:
+
+🐧 **macOS / Linux**:
+- 전체 통합 (타입/버전 자동 감지 + 확인 없이 실행)
 ```bash
-# Spring Boot 프로젝트에 전체 통합
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --force
+```
+- 특정 타입 지정 (수동 설정)
+```bash
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
   --mode full --type spring --version 1.0.0 --force
-
-# 워크플로우만 추가 (React 프로젝트)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
-  --mode workflows --type react --force
-
-# 버전 관리 시스템만 추가 (Node.js 프로젝트)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
-  --mode version --type node --force
 ```
+
+🪟 **Windows (PowerShell)**:
+- 전체 통합 (타입/버전 자동 감지 + 확인 없이 실행)
+```powershell
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Force"
+- 특정 타입 지정 (수동 설정)
+```powershell
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Type spring -Version '1.0.0' -Force"
+```
+
+> ⚠️ **CLI 모드는 자동화 환경에서만 사용하세요!** 일반 사용자는 대화형 모드를 권장합니다.
 
 ---
 
@@ -497,23 +505,6 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 이 프로젝트는 MIT 라이선스 하에 제공됩니다. 자유롭게 사용, 수정, 배포하실 수 있습니다.
 
 ---
-
-## 🚀 다음 단계
-
-### 방법 1 사용자 (GitHub 템플릿)
-1. ✅ "Use this template"으로 프로젝트 생성 완료
-2. 📝 프로젝트 타입 변경이 필요하면 원격 스크립트 실행:
-   ```bash
-   bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
-     --mode workflows --type spring
-   ```
-3. 🎉 코드 푸시하면 자동화 시작!
-
-### 방법 2 사용자 (기존 프로젝트 통합)
-1. ✅ 원격 스크립트로 설치 완료
-2. 🔐 GitHub Token 설정 (고급 기능 사용 시)
-3. 📊 첫 커밋 푸시로 자동화 테스트
-4. 🎉 개발에만 집중!
 
 ### 모든 사용자 공통
 - 📢 팀원들과 워크플로우 공유

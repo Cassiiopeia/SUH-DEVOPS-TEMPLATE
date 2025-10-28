@@ -1,11 +1,43 @@
 {
   "metadata": {
-    "lastUpdated": "2025-10-12T16:21:03Z",
-    "currentVersion": "2.0.3",
+    "lastUpdated": "2025-10-28T08:12:07Z",
+    "currentVersion": "2.1.0",
     "projectType": "basic",
-    "totalReleases": 29
+    "totalReleases": 30
   },
   "releases": [
+    {
+      "version": "2.1.0",
+      "project_type": "basic",
+      "date": "2025-10-28",
+      "pr_number": 86,
+      "raw_summary": "Summary by CodeRabbit\n릴리스 노트\n\n\n새로운 기능\n\nWindows 환경 자동화 스크립트 추가로 프로젝트 통합 프로세스 간소화\n한글 경로 처리 기능 추가로 Windows 호환성 강화\nReact/Next.js 프로젝트용 CI/CD 워크플로우 추가\n\n\n\n문서\n\n플랫폼별 설치 가이드 개선 (Windows, macOS/Linux)\n대화형 모드 및 CLI 사용 방법 상세화\n\n\n\nChores\n\n버전 2.0.3 → 2.0.10 업데이트\nPython 아티팩트 제외 설정 추가\nSpring 프로젝트 워크플로우 활성화",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Windows 환경 자동화 스크립트 추가로 프로젝트 통합 프로세스 간소화",
+            "한글 경로 처리 기능 추가로 Windows 호환성 강화",
+            "React/Next.js 프로젝트용 CI/CD 워크플로우 추가"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "플랫폼별 설치 가이드 개선 (Windows, macOS/Linux)",
+            "대화형 모드 및 CLI 사용 방법 상세화"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 2.0.3 → 2.0.10 업데이트",
+            "Python 아티팩트 제외 설정 추가",
+            "Spring 프로젝트 워크플로우 활성화"
+          ]
+        }
+      }
+    },
     {
       "version": "2.0.3",
       "project_type": "basic",

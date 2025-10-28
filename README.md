@@ -61,6 +61,8 @@ cd your-project
 - 🗑️ 템플릿 전용 파일 자동 삭제
 
 **다른 프로젝트 타입으로 변경하려면?**
+
+🐧 **macOS / Linux**:
 ```bash
 # Spring Boot 프로젝트로 변경 (원격 실행)
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
@@ -68,9 +70,17 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 
 # 또는 수동으로 복사
 cp .github/workflows/project-types/spring/*.yaml .github/workflows/
-
-# version.yml 수정
 vi version.yml  # project_type: "spring"
+```
+
+🪟 **Windows (PowerShell)**:
+```powershell
+# Spring Boot 프로젝트로 변경 (원격 실행)
+iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content -Mode workflows -Type spring
+
+# 또는 수동으로 복사
+Copy-Item .github\workflows\project-types\spring\*.yaml .github\workflows\
+notepad version.yml  # project_type: "spring"
 ```
 
 ---
@@ -79,9 +89,23 @@ vi version.yml  # project_type: "spring"
 
 **이미 진행 중인 프로젝트에 템플릿 기능 추가**
 
+#### 🐧 macOS / Linux
+
 ```bash
 # 한 줄 명령어로 즉시 설치!
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+```
+
+#### 🪟 Windows (PowerShell)
+
+```powershell
+# PowerShell에서 한 줄 명령어로 즉시 설치!
+iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
+```
+
+**또는** (실행 정책 우회):
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iex (iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content"
 ```
 
 **대화형 모드로 쉽게 설정**:
@@ -106,6 +130,8 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 ```
 
 **CLI 모드 (자동화/스크립트용)**:
+
+🐧 **macOS / Linux**:
 ```bash
 # Spring Boot 프로젝트에 전체 통합
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
@@ -118,6 +144,18 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 # 버전 관리 시스템만 추가 (Node.js 프로젝트)
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
   --mode version --type node --force
+```
+
+🪟 **Windows (PowerShell)**:
+```powershell
+# Spring Boot 프로젝트에 전체 통합
+iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content -Mode full -Type spring -Version "1.0.0" -Force
+
+# 워크플로우만 추가 (React 프로젝트)
+.\template_integrator.ps1 -Mode workflows -Type react -Force
+
+# 버전 관리 시스템만 추가 (Node.js 프로젝트)
+.\template_integrator.ps1 -Mode version -Type node -Force
 ```
 
 ---
@@ -503,10 +541,18 @@ GitHub Actions → 해당 워크플로우 → 실패한 작업 클릭
 ### 방법 1 사용자 (GitHub 템플릿)
 1. ✅ "Use this template"으로 프로젝트 생성 완료
 2. 📝 프로젝트 타입 변경이 필요하면 원격 스크립트 실행:
+   
+   🐧 **macOS / Linux**:
    ```bash
    bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
      --mode workflows --type spring
    ```
+   
+   🪟 **Windows (PowerShell)**:
+   ```powershell
+   iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content -Mode workflows -Type spring
+   ```
+
 3. 🎉 코드 푸시하면 자동화 시작!
 
 ### 방법 2 사용자 (기존 프로젝트 통합)

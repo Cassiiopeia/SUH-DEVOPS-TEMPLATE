@@ -60,45 +60,19 @@ cd your-project
 - ✅ basic 타입, v0.0.0으로 시작
 - 🗑️ 템플릿 전용 파일 자동 삭제
 
-**다른 프로젝트 타입으로 변경하려면?**
-
-🐧 **macOS / Linux**:
-```bash
-# 대화형 모드로 워크플로우 재설정 (추천 - 자동 감지)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
-
-# 또는 수동으로 복사
-cp .github/workflows/project-types/spring/*.yaml .github/workflows/
-vi version.yml  # project_type: "spring"
-```
-
-🪟 **Windows (PowerShell)**:
-```powershell
-# 대화형 모드로 워크플로우 재설정 (추천 - 자동 감지)
-iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
-
-# 또는 수동으로 복사
-Copy-Item .github\workflows\project-types\spring\*.yaml .github\workflows\
-notepad version.yml  # project_type: "spring"
-```
-
----
-
 ### 방법 2: 📦 기존 프로젝트에 통합 (원격 스크립트 실행)
 
 **이미 진행 중인 프로젝트에 템플릿 기능 추가**
 
 #### 🐧 macOS / Linux
-
+- 한 줄 명령어로 즉시 설치! (대화형 모드 - 자동 감지)
 ```bash
-# 한 줄 명령어로 즉시 설치! (대화형 모드 - 자동 감지)
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
 ```
 
 #### 🪟 Windows (PowerShell)
-
+- PowerShell에서 한 줄 명령어로 즉시 설치! (대화형 모드 - 자동 감지)
 ```powershell
-# PowerShell에서 한 줄 명령어로 즉시 설치! (대화형 모드 - 자동 감지)
 iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
 ```
 
@@ -133,21 +107,22 @@ powershell -ExecutionPolicy Bypass -Command "iex (iwr -Uri 'https://raw.githubus
 **CLI 모드 (자동화/CI-CD용 - 대화 없이 실행)**:
 
 🐧 **macOS / Linux**:
+- 전체 통합 (타입/버전 자동 감지 + 확인 없이 실행)
 ```bash
-# 전체 통합 (타입/버전 자동 감지 + 확인 없이 실행)
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --force
-
-# 특정 타입 지정 (수동 설정)
+```
+- 특정 타입 지정 (수동 설정)
+```bash
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
   --mode full --type spring --version 1.0.0 --force
 ```
 
 🪟 **Windows (PowerShell)**:
+- 전체 통합 (타입/버전 자동 감지 + 확인 없이 실행)
 ```powershell
-# 전체 통합 (타입/버전 자동 감지 + 확인 없이 실행)
 iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Force"
-
-# 특정 타입 지정 (수동 설정)
+- 특정 타입 지정 (수동 설정)
+```powershell
 iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Type spring -Version '1.0.0' -Force"
 ```
 

@@ -1170,6 +1170,42 @@ function Copy-CursorFolder {
 }
 
 # ===================================================================
+# .claude 폴더 다운로드
+# ===================================================================
+
+function Copy-ClaudeFolder {
+    Print-Step ".claude 폴더 다운로드 여부 확인 중..."
+
+    $srcClaudeDir = Join-Path $TEMP_DIR ".claude"
+    if (-not (Test-Path $srcClaudeDir)) {
+        Print-Info ".claude 폴더가 템플릿에 없습니다. 건너뜁니다."
+        return
+    }
+
+    # 사용자 동의 확인
+    if (-not $Force) {
+        Print-SeparatorLine
+        Write-Host ""
+        Write-Host ".claude 폴더를 다운로드하시겠습니까? (Claude Code 설정)"
+        Write-Host "  Y/y - 예, 다운로드하기"
+        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
+        Write-Host ""
+
+        if (-not (Ask-YesNo "선택" "N")) {
+            Print-Info ".claude 폴더 다운로드 건너뜁니다"
+            return
+        }
+    }
+
+    # 다운로드 실행
+    if (-not (Test-Path ".claude")) {
+        New-Item -Path ".claude" -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$srcClaudeDir\*" -Destination ".claude\" -Recurse -Force -ErrorAction SilentlyContinue
+    Print-Success ".claude 폴더 다운로드 완료"
+}
+
+# ===================================================================
 # agent-prompts 폴더 다운로드
 # ===================================================================
 
@@ -1341,6 +1377,7 @@ function Start-Integration {
             Copy-CodeRabbitConfig
             Ensure-GitIgnore
             Copy-CursorFolder
+            Copy-ClaudeFolder
             Copy-AgentPrompts
             Copy-SetupGuide
         }

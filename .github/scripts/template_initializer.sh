@@ -500,38 +500,36 @@ EOF
 # 이슈 템플릿 assignee 업데이트
 update_issue_templates() {
     print_step "이슈 템플릿 assignee 업데이트 중..."
-    
+
+    # 처리 대상 이슈 템플릿 리스트 (새 템플릿 추가 시 여기에만 추가)
+    local templates=(
+        "bug_report.md"
+        "design_request.md"
+        "feature_request.md"
+        "qa_request.md"
+    )
+
     local updated=0
-    
-    # bug_report.md 업데이트
-    if [ -f ".github/ISSUE_TEMPLATE/bug_report.md" ]; then
-        # 임시 파일 사용 (macOS/Linux 호환)
-        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
-            .github/ISSUE_TEMPLATE/bug_report.md > .github/ISSUE_TEMPLATE/bug_report.md.tmp
-        mv .github/ISSUE_TEMPLATE/bug_report.md.tmp .github/ISSUE_TEMPLATE/bug_report.md
-        echo "  ✓ bug_report.md"
-        updated=$((updated + 1))
+
+    # 각 템플릿의 assignee를 REPO_OWNER로 변경
+    for template in "${templates[@]}"; do
+        local file_path=".github/ISSUE_TEMPLATE/$template"
+
+        if [ -f "$file_path" ]; then
+            # 임시 파일 사용 (macOS/Linux 호환)
+            sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
+                "$file_path" > "${file_path}.tmp"
+            mv "${file_path}.tmp" "$file_path"
+            echo "  ✓ $template"
+            updated=$((updated + 1))
+        fi
+    done
+
+    if [ $updated -eq 0 ]; then
+        print_warning "업데이트할 이슈 템플릿이 없습니다."
+    else
+        print_success "이슈 템플릿 $updated 개 업데이트 완료"
     fi
-    
-    # design_request.md 업데이트
-    if [ -f ".github/ISSUE_TEMPLATE/design_request.md" ]; then
-        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
-            .github/ISSUE_TEMPLATE/design_request.md > .github/ISSUE_TEMPLATE/design_request.md.tmp
-        mv .github/ISSUE_TEMPLATE/design_request.md.tmp .github/ISSUE_TEMPLATE/design_request.md
-        echo "  ✓ design_request.md"
-        updated=$((updated + 1))
-    fi
-    
-    # feature_request.md 업데이트
-    if [ -f ".github/ISSUE_TEMPLATE/feature_request.md" ]; then
-        sed "s/assignees: \\[Cassiiopeia\\]/assignees: [$REPO_OWNER]/" \
-            .github/ISSUE_TEMPLATE/feature_request.md > .github/ISSUE_TEMPLATE/feature_request.md.tmp
-        mv .github/ISSUE_TEMPLATE/feature_request.md.tmp .github/ISSUE_TEMPLATE/feature_request.md
-        echo "  ✓ feature_request.md"
-        updated=$((updated + 1))
-    fi
-    
-    print_success "이슈 템플릿 $updated 개 업데이트 완료"
 }
 
 # 초기화 완료 요약 출력

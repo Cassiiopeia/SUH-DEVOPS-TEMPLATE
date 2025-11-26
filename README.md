@@ -369,7 +369,6 @@ python3 .github/scripts/changelog_manager.py validate
 ## 🔧 조직 및 팀 설정
 
 ### Organization 저장소 필수 설정
-
 **⚠️ 중요: Organization 설정이 올바르지 않으면 자동화가 작동하지 않습니다**
 
 #### 1. Actions 권한 설정

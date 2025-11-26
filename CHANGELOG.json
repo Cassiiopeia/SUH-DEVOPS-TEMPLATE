@@ -1,11 +1,29 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-26T05:28:39Z",
-    "currentVersion": "2.1.12",
+    "lastUpdated": "2025-11-26T06:52:03Z",
+    "currentVersion": "2.1.13",
     "projectType": "basic",
-    "totalReleases": 34
+    "totalReleases": 35
   },
   "releases": [
+    {
+      "version": "2.1.13",
+      "project_type": "basic",
+      "date": "2025-11-26",
+      "pr_number": 100,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 애플리케이션이 버전 2.1.13(빌드 62)으로 업데이트되었습니다.\n  * 자동화된 빌드 및 배포 파이프라인이 강화되었습니다.\n  * 릴리스 배포 프로세스가 개선되어 더욱 안정적인 업데이트를 제공합니다.",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "애플리케이션이 버전 2.1.13(빌드 62)으로 업데이트되었습니다.",
+            "자동화된 빌드 및 배포 파이프라인이 강화되었습니다.",
+            "릴리스 배포 프로세스가 개선되어 더욱 안정적인 업데이트를 제공합니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.1.12",
       "project_type": "basic",

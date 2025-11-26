@@ -103,7 +103,7 @@ $script:ProjectVersion = $Version
 $script:DetectedBranch = ""
 $script:IsInteractiveMode = $false
 $script:WorkflowsCopied = 0
-$script:ValidTypes = @("spring", "flutter", "react", "react-native", "react-native-expo", "node", "python", "basic")
+$script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
 
 # ===================================================================
 # 출력 함수 (색상 지원)
@@ -303,7 +303,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Help                 이 도움말 표시
 
 지원 프로젝트 타입:
-  • node / react / react-native - Node.js 기반 프로젝트
+  • node / react / next / react-native - Node.js 기반 프로젝트
   • spring            - Spring Boot 백엔드
   • flutter           - Flutter 모바일 앱
   • python            - Python 프로젝트
@@ -311,6 +311,8 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
 
 자동 감지 기능:
   • package.json 발견 → Node.js 프로젝트로 감지
+  • "next" 의존성 → Next.js
+  • "react" 의존성 → React
   • @react-native 의존성 → React Native
   • build.gradle → Spring Boot
   • pubspec.yaml → Flutter
@@ -368,12 +370,18 @@ function Detect-ProjectType {
             }
         }
         
+        # Next.js 체크 (React보다 먼저 체크해야 함)
+        if ($packageJson -match '"next"') {
+            Print-Info "감지됨: Next.js"
+            return "next"
+        }
+
         # React 체크
         if ($packageJson -match '"react"') {
             Print-Info "감지됨: React"
             return "react"
         }
-        
+
         # 기본 Node.js
         Print-Info "감지됨: Node.js"
         return "node"
@@ -512,30 +520,32 @@ function Show-ProjectTypeMenu {
     Write-Host ""
     Write-Host "  1) spring            - Spring Boot 백엔드"
     Write-Host "  2) flutter           - Flutter 모바일 앱"
-    Write-Host "  3) react             - React 웹 앱"
-    Write-Host "  4) react-native      - React Native 모바일 앱"
-    Write-Host "  5) react-native-expo - React Native Expo 앱"
-    Write-Host "  6) node              - Node.js 프로젝트"
-    Write-Host "  7) python            - Python 프로젝트"
-    Write-Host "  8) basic             - 기타 프로젝트"
+    Write-Host "  3) next              - Next.js 웹 앱"
+    Write-Host "  4) react             - React 웹 앱"
+    Write-Host "  5) react-native      - React Native 모바일 앱"
+    Write-Host "  6) react-native-expo - React Native Expo 앱"
+    Write-Host "  7) node              - Node.js 프로젝트"
+    Write-Host "  8) python            - Python 프로젝트"
+    Write-Host "  9) basic             - 기타 프로젝트"
     Write-Host ""
-    
+
     while ($true) {
-        $choice = Read-SingleKey "선택 (1-8) "
-        
-        if ($choice -match '^[1-8]$') {
+        $choice = Read-SingleKey "선택 (1-9) "
+
+        if ($choice -match '^[1-9]$') {
             switch ($choice) {
                 "1" { return "spring" }
                 "2" { return "flutter" }
-                "3" { return "react" }
-                "4" { return "react-native" }
-                "5" { return "react-native-expo" }
-                "6" { return "node" }
-                "7" { return "python" }
-                "8" { return "basic" }
+                "3" { return "next" }
+                "4" { return "react" }
+                "5" { return "react-native" }
+                "6" { return "react-native-expo" }
+                "7" { return "node" }
+                "8" { return "python" }
+                "9" { return "basic" }
             }
         } else {
-            Print-Error "잘못된 입력입니다. 1-8 사이의 숫자를 입력해주세요."
+            Print-Error "잘못된 입력입니다. 1-9 사이의 숫자를 입력해주세요."
             Write-Host ""
         }
     }
@@ -806,7 +816,7 @@ function Create-VersionYml {
 # 프로젝트 타입별 동기화 파일:
 # - spring: build.gradle (version = "x.y.z")
 # - flutter: pubspec.yaml (version: x.y.z+i, buildNumber 포함)
-# - react/node: package.json ("version": "x.y.z")
+# - react/next/node: package.json ("version": "x.y.z")
 # - react-native: iOS Info.plist 또는 Android build.gradle
 # - react-native-expo: app.json (expo.version)
 # - python: pyproject.toml (version = "x.y.z")
@@ -824,7 +834,7 @@ function Create-VersionYml {
 
 version: "$Version"
 version_code: 1  # app build number
-project_type: "$Type"  # spring, flutter, react, react-native, react-native-expo, node, python, basic
+project_type: "$Type"  # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$currentDate"
   last_updated_by: "template_integrator"

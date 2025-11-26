@@ -72,7 +72,7 @@ check_required_tools() {
 
     # JSON 프로젝트는 jq 필요
     case "$project_type" in
-        "react"|"node"|"react-native-expo")
+        "react"|"next"|"node"|"react-native-expo")
             if ! command -v jq >/dev/null 2>&1; then
                 missing_tools+=("jq")
             fi
@@ -117,7 +117,7 @@ read_version_config() {
         "flutter")
             VERSION_FILE="pubspec.yaml"
             ;;
-        "react"|"node")
+        "react"|"next"|"node")
             VERSION_FILE="package.json"
             ;;
         "react-native")
@@ -290,7 +290,7 @@ get_project_file_version() {
             full_version=$(yq -r '.version // ""' "$VERSION_FILE")
             project_version=$(echo "$full_version" | cut -d'+' -f1)
             ;;
-        "react"|"node")
+        "react"|"next"|"node")
             # JSON: jq 사용
             project_version=$(jq -r '.version // ""' "$VERSION_FILE")
             ;;
@@ -398,7 +398,7 @@ update_project_file_version() {
 
             yq -i ".version = \"$full_version\"" "$VERSION_FILE"
             ;;
-        "react"|"node")
+        "react"|"next"|"node")
             # JSON: jq 사용
             jq ".version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
             ;;

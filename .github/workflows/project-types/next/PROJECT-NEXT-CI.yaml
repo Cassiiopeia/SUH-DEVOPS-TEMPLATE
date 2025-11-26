@@ -1,0 +1,180 @@
+# ===================================================================
+# Next.js 전용 CI 워크플로우
+# ===================================================================
+#
+# Next.js 프로젝트의 빌드 및 테스트를 위한 워크플로우입니다.
+# React와 달리 SSR/SSG 빌드 결과물을 생성합니다.
+#
+# ===================================================================
+
+name: PROJECT-NEXT-CI
+
+# ===================================================================
+# 필수 GitHub Secrets 설정 가이드
+# ===================================================================
+#
+# 필수 Secrets:
+# ┌─────────────────────────────┬────────────────────────────────────┐
+# │ Secret 이름                 │ 설명                               │
+# ├─────────────────────────────┼────────────────────────────────────┤
+# │ ENV                         │ 환경변수 파일 내용 (전체)         │
+# └─────────────────────────────┴────────────────────────────────────┘
+#
+# ===================================================================
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: "project"
+  NODE_VERSION: "20.15.0"
+  ENV_FILE: ".env"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  build:
+    name: Next.js 애플리케이션 빌드
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 소스코드 체크아웃
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # 2. 환경변수 파일 생성
+      - name: 환경변수 파일 생성 (${{ env.ENV_FILE }})
+        run: |
+          echo -e "${{ secrets.ENV }}" > ${{ env.ENV_FILE }}
+          echo "✅ ${{ env.ENV_FILE }} 파일 생성 완료"
+
+      # 3. Node.js 설정
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # 4. npm 의존성 캐싱
+      - name: npm 의존성 캐싱
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      # 5. node_modules 캐싱
+      - name: node_modules 캐싱
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      # 6. 의존성 설치
+      - name: 의존성 설치
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "📦 의존성 설치 중..."
+          npm ci
+          echo "✅ 의존성 설치 완료"
+
+      # 7. Next.js 빌드 캐싱 (.next/cache)
+      # 증분 빌드를 위해 .next/cache 폴더를 캐싱합니다
+      - name: Next.js 빌드 캐싱
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
+      # 8. 프로젝트 빌드 (SSR/SSG)
+      - name: 프로젝트 빌드
+        id: build
+        run: |
+          echo "🔨 Next.js 빌드 시작..."
+          echo "프로젝트: ${{ env.PROJECT_NAME }}"
+          echo "Node.js: ${{ env.NODE_VERSION }}"
+          echo ""
+
+          # 빌드 실행 및 로그 저장
+          npm run build > build_log.txt 2>&1 || {
+            echo "build_failed=true" >> $GITHUB_OUTPUT
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo ""
+            echo "❌ 빌드 실패"
+            exit 0
+          }
+
+          echo "build_failed=false" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "✅ 빌드 완료"
+
+          # 빌드 결과 확인
+          if [ -d ".next" ]; then
+            echo ""
+            echo "📁 빌드 결과물:"
+            echo "  - .next/ 폴더 생성됨"
+            du -sh .next/ || true
+          fi
+
+      # 9. 빌드 실패 시 에러 로그 출력
+      - name: 빌드 에러 로그 출력
+        if: steps.build.outputs.build_failed == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "❌ 빌드 실패 - 에러 로그"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+
+          if [ -f "build_log.txt" ]; then
+            tail -n 50 build_log.txt
+          else
+            echo "에러 로그 파일을 찾을 수 없습니다."
+          fi
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          exit 1
+
+      # 10. 빌드 로그 아티팩트 업로드
+      - name: 빌드 로그 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build_log.txt
+          retention-days: 7
+
+      # 11. 빌드 결과 요약
+      - name: 빌드 결과 요약
+        if: always()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ "${{ steps.build.outputs.status }}" = "success" ]; then
+            echo "🎉 Next.js 빌드 완료!"
+          else
+            echo "❌ Next.js 빌드 실패"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "📊 빌드 결과:"
+          echo "  📦 프로젝트: ${{ env.PROJECT_NAME }}"
+          echo "  📌 Node.js 버전: ${{ env.NODE_VERSION }}"
+          echo "  🆙 빌드 상태: ${{ steps.build.outputs.status }}"
+          echo "  🌿 브랜치: ${{ github.ref_name }}"
+          echo "  📝 커밋: ${{ github.sha }}"
+          echo "  🕐 시간: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -1,11 +1,20 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-26T05:01:20Z",
-    "currentVersion": "2.1.11",
+    "lastUpdated": "2025-11-26T05:28:39Z",
+    "currentVersion": "2.1.12",
     "projectType": "basic",
-    "totalReleases": 33
+    "totalReleases": 34
   },
   "releases": [
+    {
+      "version": "2.1.12",
+      "project_type": "basic",
+      "date": "2025-11-26",
+      "pr_number": 98,
+      "raw_summary": "Summary by CodeRabbit\n릴리스 노트\n\n신기능\n\n이슈 생성 시 자동으로 브랜치 이름 및 커밋 메시지 생성 기능 추가\n\n개선사항\n\n버전 업데이트 실패 시 상세한 진단 메시지 및 권장 수정 사항 제공\n자동 배포 워크플로우 최적화 및 안정성 강화\nQA 이슈 생성 프로세스 개선\n\nChores\n\n버전 2.1.12로 업데이트 (빌드 번호 61)",
+      "parsed_changes": {},
+      "parse_method": "markdown_failed"
+    },
     {
       "version": "2.1.11",
       "project_type": "basic",

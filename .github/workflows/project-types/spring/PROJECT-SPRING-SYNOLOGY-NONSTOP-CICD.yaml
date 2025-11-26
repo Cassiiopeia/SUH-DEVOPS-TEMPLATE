@@ -1,0 +1,425 @@
+name: PROJECT-SPRING-SYNOLOGY-NONSTOP-CICD
+
+on:
+  push:
+    branches:
+      - main
+      - test
+
+env:
+  PROJECT_NAME: romrom
+  DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_USERNAME }}
+  APP_IMAGE_SUFFIX: "-back"
+  DOMAIN_NAME: "api.romrom.xyz"
+  BLUE_PORT: "8080"
+  GREEN_PORT: "8081"
+  TEST_PORT: "8082"
+  APP_EXPOSE_PORT: "8080"
+  MOUNT_DIR: "/volume1/projects/romrom"
+  SPRING_PROFILE_MAIN: "prod"
+  SPRING_PROFILE_TEST: "prod"
+  NGINX_RP_CONF: "/etc/nginx/sites-enabled/server.ReverseProxy.conf"
+  NGINX_BACKUP_DIR: "/volume1/projects/backups/nginx"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Java 설정
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Gradle Wrapper 실행권한 부여
+        run: chmod +x gradlew
+
+      - name: application-prod.yml 생성
+        run: |
+          mkdir -p RomRom-Web/src/main/resources
+          cat << 'EOF' > ./RomRom-Web/src/main/resources/application-prod.yml
+          ${{ secrets.APPLICATION_PROD_YML }}
+          EOF
+
+      - name: Create Vertex AI Service Account Key
+        env:
+          VERTEX_SA_KEY: ${{ secrets.VERTEX_SA_KEY }}
+        run: |
+          echo "$VERTEX_SA_KEY" | sed 's/\\n/\n/g' > ./RomRom-Web/src/main/resources/gen-lang-client-0511951522-e0dc1d68cbcb.json
+
+      - name: Create firebase-admin-sdk.json from secret
+        env:
+          FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
+        run: |
+          echo "$FIREBASE_KEY_JSON" | sed 's/\\n/\n/g' > ./RomRom-Web/src/main/resources/firebase-admin-sdk.json
+
+      - name: Create firebase-messaging-sw.js from secret
+        run: |
+          mkdir -p RomRom-Web/src/main/resources/static
+          cat << 'EOF' > ./RomRom-Web/src/main/resources/static/firebase-messaging-sw.js
+          ${{ secrets.FIREBASE_MESSAGING_SW_JS }}
+          EOF
+
+      - name: price-prediction.prompt.yml 생성
+        run: |
+          mkdir -p RomRom-Web/src/main/resources
+          cat << 'EOF' > ./RomRom-Web/src/main/resources/price-prediction.prompt.yml
+          ${{ secrets.PRICE_PREDICTION_PROMPT_YML }}
+          EOF
+
+      - name: admin.yml 생성
+        run: |
+          mkdir -p RomRom-Web/src/main/resources
+          cat << 'EOF' > ./RomRom-Web/src/main/resources/admin.yml
+          ${{ secrets.ADMIN_YML }}
+          EOF
+
+      - name: Build with Gradle
+        run: ./gradlew clean build -x test -Dspring.profiles.active=prod
+
+      - name: Docker 빌드환경 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: DockerHub 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Docker 이미지 빌드 및 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}${{ env.APP_IMAGE_SUFFIX }}:${{ github.ref_name }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move Docker cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 2022
+          script: |
+            set -e
+            
+            echo "환경변수 설정.."
+            export PATH=$PATH:/usr/local/bin
+            PW=${{ secrets.SERVER_PASSWORD }}
+            BRANCH=${{ github.ref_name }}
+            REPO="${{ env.DOCKERHUB_REPO }}"
+            PROJECT="${{ env.PROJECT_NAME }}"
+            IMG_SUFFIX="${{ env.APP_IMAGE_SUFFIX }}"
+            IMAGE="${REPO}/${PROJECT}${IMG_SUFFIX}:${BRANCH}"
+            CONTAINER_NAME="${PROJECT}${IMG_SUFFIX}"
+            APP_PORT="${{ env.APP_EXPOSE_PORT }}"
+            MOUNT_DIR="${{ env.MOUNT_DIR }}"
+            
+            DOMAIN="${{ env.DOMAIN_NAME }}"
+            BLUE_PORT="${{ env.BLUE_PORT }}"
+            GREEN_PORT="${{ env.GREEN_PORT }}"
+            TEST_PORT="${{ env.TEST_PORT }}"
+            NGINX_RP_CONF="${{ env.NGINX_RP_CONF }}"
+            BACKUP_DIR="${{ env.NGINX_BACKUP_DIR }}"
+            
+            PROFILE_MAIN="${{ env.SPRING_PROFILE_MAIN }}"
+            PROFILE_TEST="${{ env.SPRING_PROFILE_TEST }}"
+            
+            echo "[도커 풀] ${IMAGE}"
+            echo "$PW" | sudo -S docker pull "${IMAGE}"
+            
+            # 테스트 브랜치
+            if [ "${BRANCH}" = "test" ]; then
+              CONTAINER_NAME="${CONTAINER_NAME}-test"
+              PORT="${TEST_PORT}"
+              echo "[test] ${CONTAINER_NAME} 을 포트 ${PORT}로 기동"
+            
+              echo "컨테이너 ${CONTAINER_NAME} 존재 여부 확인 중..."
+              if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+                echo "컨테이너 ${CONTAINER_NAME} 이(가) 존재합니다. 중지 및 삭제 중..."
+                echo "$PW" | sudo -S docker rm -f ${CONTAINER_NAME}
+                echo "컨테이너 ${CONTAINER_NAME} 이(가) 삭제되었습니다."
+              else
+                echo "존재하는 컨테이너 ${CONTAINER_NAME} 이(가) 없습니다."
+              fi
+            
+              echo "새로운 컨테이너 ${CONTAINER_NAME} 실행 중..."
+              echo "$PW" | sudo -S docker run -d -p ${PORT}:${APP_PORT} --name ${CONTAINER_NAME} \
+                -e TZ=Asia/Seoul \
+                -e "SPRING_PROFILES_ACTIVE=${PROFILE_TEST}" \
+                -v /etc/localtime:/etc/localtime:ro \
+                -v "${MOUNT_DIR}":/app \
+                "${IMAGE}"
+            
+              echo "[test] 헬스체크 (최대 60회, 1초간격)"
+              for i in $(seq 1 60); do
+                if curl -fsS "http://127.0.0.1:${PORT}/actuator/health" >/dev/null 2>&1 || \
+                   curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1 || \
+                   curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null 2>&1 || \
+                   curl -fsS "http://127.0.0.1:${PORT}/docs/swagger-ui/index.html" >/dev/null 2>&1 ; then
+                  echo "헬스체크 성공 (시도 ${i})"
+                  HEALTH_OK=1
+                  break
+                fi
+                echo "헬스체크 진행중... (시도 ${i}/60)"
+                sleep 1
+              done
+            
+              if [ "${HEALTH_OK:-0}" != "1" ]; then
+                echo "[오류] 헬스체크 실패 -> 배포 중단, 로그 출력"
+                echo "$PW" | sudo -S docker logs --tail=200 ${CONTAINER_NAME}
+                echo "배포 실패로 인한 컨테이너 정리 중..."
+                echo "$PW" | sudo -S docker rm -f ${CONTAINER_NAME} || true
+                exit 1
+              fi
+            
+              # <none> 태그로 남은 이미지 정리
+              echo "불필요한 dangling(<none>) 이미지 정리..."
+              echo "$PW" | sudo -S docker image prune -af
+            
+              echo "✅ test 서버 배포가 성공적으로 완료되었습니다."
+              exit 0
+            fi
+            
+            
+            # 메인 브랜치 무중단 배포
+            echo "[main] Blue/Green 무중단 배포 시작"
+            
+            BLUE_CONTAINER_NAME="${CONTAINER_NAME}-blue"
+            GREEN_CONTAINER_NAME="${CONTAINER_NAME}-green"
+            
+            echo "[main] nginx 백업 디렉터리 생성: ${BACKUP_DIR}"
+            echo "${PW}" | sudo -S mkdir -p "${BACKUP_DIR}"
+            
+            echo "[main] nginx 설정 파일 백업 생성 (${NGINX_RP_CONF})"
+            BACKUP_FILE="${BACKUP_DIR}/server.ReverseProxy.conf.$(date +%Y%m%d_%H%M%S).bak"
+            echo "$PW" | sudo -S cp "${NGINX_RP_CONF}" "${BACKUP_FILE}"
+            echo "[main] nginx 설정 백업 파일 생성 완료: ${BACKUP_FILE}"
+            
+            echo "[main] DSM 리버스프록시 설정에서 현재 활성 포트 찾기 (${NGINX_RP_CONF})"
+            ACTIVE_PORT=$(
+              printf '%s\n' "$PW" | sudo -S awk -v dom="${DOMAIN}" '
+                BEGIN {
+                  inserver=0; depth=0; entry_depth=0;
+                  # 모든 정규식 메타문자 이스케이프(방탄)
+                  dom_esc = dom;
+                  gsub(/[.[\]()+*?^$\\|]/, "\\\\&", dom_esc);
+                }
+                {
+                  raw = $0;
+            
+                  # [수정됨] 주석 제거 후 중괄호 추적(주석 내 { } 무시)
+                  line = raw;
+                  sub(/#.*/, "", line);
+                  depth += gsub(/\{/, "{", line);
+                  depth -= gsub(/\}/, "}", line);
+            
+                  # [수정됨] server_name 라인에서 토큰 단위로 정확 매칭 (여러 도메인 한 줄 대응)
+                  if (!inserver && line ~ /^[[:space:]]*server_name[[:space:]]+/) {
+                  tmp = line;
+                  sub(/^[[:space:]]*server_name[[:space:]]+/, "", tmp);
+                  sub(/[[:space:]]*;.*/, "", tmp);  # 세미콜론 이후 제거
+                  if (match(tmp, "(^|[[:space:]])" dom_esc "([[:space:]]|$)")) {
+                  inserver=1; entry_depth=depth;
+                  # 필요 시, 443 블록만 우선하고 싶다면 여기서 flag 달고 listen 443 본 뒤에만 추출하도록 확장 가능
+                }
+                }
+            
+                # 타겟 server 블록 내부의 proxy_pass에서 localhost/127.0.0.1:포트 추출
+                if (inserver && line ~ /proxy_pass[[:space:]]+https?:\/\/(localhost|127\.0\.0\.1):[0-9]{2,5}/) {
+                if (match(line, /https?:\/\/(localhost|127\.0\.0\.1):([0-9]{2,5})/, a)) { print a[2]; exit }
+              }
+            
+                # server 블록 종료(일반/단일라인 모두 대응)
+                if (inserver && (depth < entry_depth || (depth==0 && entry_depth==0))) inserver=0;
+              }
+              ' "${NGINX_RP_CONF}" || true
+            )
+            
+            if [ -z "${ACTIVE_PORT}" ]; then
+              echo "[경고] 활성 포트를 찾지 못했으므로 기본값 (${BLUE_PORT})을 활성으로 간주"
+              ACTIVE_PORT="${BLUE_PORT}"
+            fi
+            echo "현재 활성 포트: ${ACTIVE_PORT}"
+            
+            if [ "${ACTIVE_PORT}" = "${BLUE_PORT}" ]; then
+              PORT="${GREEN_PORT}"
+              CONTAINER_NAME="${GREEN_CONTAINER_NAME}"
+            else
+              PORT="${BLUE_PORT}"
+              CONTAINER_NAME="${BLUE_CONTAINER_NAME}"
+            fi
+            
+            echo "비활성 포트로 신규 배포: ${CONTAINER_NAME} (포트: ${PORT})"
+            
+            echo "[main] 컨테이너 ${CONTAINER_NAME} 존재 여부 확인 중..."
+            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+              echo "컨테이너 ${CONTAINER_NAME} 이(가) 존재합니다. 중지 및 삭제 중..."
+              echo "$PW" | sudo -S docker rm -f ${CONTAINER_NAME}
+              echo "컨테이너 ${CONTAINER_NAME} 이(가) 삭제되었습니다."
+            else
+              echo "존재하는 컨테이너 ${CONTAINER_NAME} 이(가) 없습니다."
+            fi
+            
+            echo "[main] 새로운 컨테이너 ${CONTAINER_NAME} 실행 중..."
+            echo "$PW" | sudo -S docker run -d -p ${PORT}:${APP_PORT} --name ${CONTAINER_NAME} \
+              -e TZ=Asia/Seoul \
+              -e "SPRING_PROFILES_ACTIVE=${PROFILE_MAIN}" \
+              -v /etc/localtime:/etc/localtime:ro \
+              -v "${MOUNT_DIR}":/app \
+              "${IMAGE}"
+            
+            echo "[main] 헬스체크 (최대 60회, 1초간격)"
+            for i in $(seq 1 60); do
+              if curl -fsS "http://127.0.0.1:${PORT}/actuator/health" >/dev/null 2>&1 || \
+                 curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1 || \
+                 curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null 2>&1 || \
+                 curl -fsS "http://127.0.0.1:${PORT}/docs/swagger-ui/index.html" >/dev/null 2>&1 ; then
+                echo "헬스체크 성공 (시도 ${i})"
+                HEALTH_OK=1
+                break
+              fi  
+              echo "헬스체크 진행중... (시도 ${i}/60)"
+              sleep 1
+            done
+            
+            if [ "${HEALTH_OK:-0}" != "1" ]; then
+              echo "[오류] 헬스체크 실패 -> 배포 중단, 로그 출력"
+              echo "$PW" | sudo -S docker logs --tail=200 ${CONTAINER_NAME}
+              exit 1
+            fi
+            
+            echo "[main] DSM 리버스프록시 대상 토글 (${ACTIVE_PORT} -> ${PORT})"
+            TMP_FILE="$(mktemp)"
+            sudo awk -v dom="${DOMAIN}" -v new_port="${PORT}" '
+              BEGIN {
+                inserver=0; depth=0; entry_depth=0;
+                # 모든 정규식 메타문자 이스케이프(방탄)
+                dom_esc = dom;
+                gsub(/[.[\]()+*?^$\\|]/, "\\\\&", dom_esc);
+              }
+              {
+                # server_name 매칭 시 현재 depth 기록
+                if ($0 ~ "server_name[[:space:]]+" dom_esc "[[:space:]]*;") {
+                  inserver=1;
+                  entry_depth=depth;
+                }
+
+                # 주석 제거 후 중괄호 추적(주석 내 { } 무시)
+                line = $0;
+                sub(/#.*/, "", line);
+                depth += gsub(/\{/, "{", line);
+                depth -= gsub(/\}/, "}", line);
+
+                # 타겟 서버 블록 내부 & proxy_pass가 localhost/127.0.0.1:포트면 포트만 치환
+                if (inserver && \
+                    $0 !~ /^[[:space:]]*#/ && \
+                    $0 ~ /proxy_pass[[:space:]]+https?:\/\/(localhost|127\.0\.0\.1):[0-9]{2,5}/) {
+                  sub(/:[0-9]{2,5}/, ":" new_port);
+                }
+
+                print;
+
+                # 종료 조건(일반 케이스 + 단일 라인 server 블록)
+                if (inserver && (depth < entry_depth || (depth == 0 && entry_depth == 0))) {
+                  inserver=0;
+                }
+              }
+            ' "${NGINX_RP_CONF}" > "${TMP_FILE}"
+            
+            # nginx 설정 적용 및 파일 검증
+            echo "[main] nginx 설정 파일 적용 및 검증 중..."
+            echo "$PW" | sudo -S cp "${TMP_FILE}" "${NGINX_RP_CONF}"
+            if ! (echo "$PW" | sudo -S nginx -t); then
+              echo "[오류] nginx 설정 파일 검증 실패 -> 백업 파일로 복구"
+              echo "$PW" | sudo -S cp "${BACKUP_FILE}" "${NGINX_RP_CONF}"
+              echo "[main] nginx 파일 복구 완료 - 백업 파일 삭제: ${BACKUP_FILE}"
+              echo "$PW" | sudo -S rm -f "${BACKUP_FILE}"
+              rm -f "${TMP_FILE}"
+              echo "[오류] 포트: ${PORT} 대상 컨테이너: ${CONTAINER_NAME} 삭제"
+              echo "$PW" | sudo -S docker rm -f "${CONTAINER_NAME}" || true
+              exit 1
+            fi
+            echo "nginx 설정 파일 검증 성공"
+            rm -f "${TMP_FILE}"
+            
+            echo "[main] nginx reload"
+            if ! (echo "$PW" | sudo -S systemctl reload nginx); then
+              echo "[main] reload 실패 → restart 시도"
+              if ! (echo "$PW" | sudo -S systemctl restart nginx); then
+                echo "[오류] nginx reload 및 restart 실패 -> 백업 파일로 복구"
+                echo "$PW" | sudo -S cp "${BACKUP_FILE}" "${NGINX_RP_CONF}"
+                echo "$PW" | sudo -S systemctl restart nginx
+                echo "[main] nginx 파일 복구 완료 - 백업 파일 삭제: ${BACKUP_FILE}"
+                echo "$PW" | sudo -S rm -f "${BACKUP_FILE}"
+                echo "[오류] 포트: ${PORT} 대상 컨테이너: ${CONTAINER_NAME} 삭제"
+                echo "$PW" | sudo -S docker rm -f "${CONTAINER_NAME}" || true
+                exit 1
+              fi
+            fi
+            
+            # nginx 재시작 후 도메인 접근 검증
+            echo "[main] nginx 재시작 후 도메인 접근 검증..."
+            for i in $(seq 1 10); do
+              if curl -fsS "https://${DOMAIN}/actuator/health" >/dev/null 2>&1 || \
+                 curl -fsS "https://${DOMAIN}/healthz" >/dev/null 2>&1 || \
+                 curl -fsS "https://${DOMAIN}/" >/dev/null 2>&1 || \
+                 curl -fsS "https://${DOMAIN}/docs/swagger-ui/index.html" >/dev/null 2>&1 ; then
+                echo "도메인 접근 검증 성공 (시도 ${i})"
+                DOMAIN_OK=1
+                break
+              fi
+              echo "도메인 접근 검증 중... (시도 ${i}/10)"
+              sleep 2
+            done
+            
+            if [ "${DOMAIN_OK:-0}" != "1" ]; then
+              echo "[경고] 도메인 접근 검증 실패: 배포 진행 (DNS 전파 지연 가능성)"
+            fi
+            
+            echo "[main] 이전 컨테이너 정리"
+            sleep 5
+            if [ "${ACTIVE_PORT}" = "${BLUE_PORT}" ]; then
+              OLD_CONTAINER_NAME="${BLUE_CONTAINER_NAME}"
+            else
+              OLD_CONTAINER_NAME="${GREEN_CONTAINER_NAME}"
+            fi
+            echo ${OLD_CONTAINER_NAME}을 제거합니다
+            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${OLD_CONTAINER_NAME}\$"; then
+              echo "$PW" | sudo -S docker rm -f "${OLD_CONTAINER_NAME}" || true
+            fi
+            
+            # <none> 태그로 남은 이미지 정리
+            echo "불필요한 dangling(<none>) 이미지 정리..."
+            echo "$PW" | sudo -S docker image prune -af
+            
+            # 성공 시 백업 파일 삭제
+            echo "[main] 배포 성공 - 백업 파일 최신 10개 보존 ${BACKUP_FILE}"
+            echo "$PW" | sudo -S /bin/bash -c "ls -1t '${BACKUP_DIR}'/server.ReverseProxy.conf.*.bak 2>/dev/null | tail -n +11 | xargs -r rm -f"
+            
+            echo "✅ main 서버 배포가 성공적으로 완료되었습니다."

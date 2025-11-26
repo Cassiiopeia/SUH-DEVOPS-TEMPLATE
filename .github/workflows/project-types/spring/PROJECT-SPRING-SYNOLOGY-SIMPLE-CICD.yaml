@@ -2,7 +2,7 @@
 # Spring Boot 전용 CI/CD 배포 워크플로우
 # ===================================================================
 
-name: PROJECT-SPRING-CICD
+name: PROJECT-SPRING-SYNOLOGY-CICD
 
 # ===================================================================
 # 📋 필수 GitHub Secrets 설정 가이드

@@ -1236,6 +1236,36 @@ copy_cursor_folder() {
     print_success ".cursor 폴더 다운로드 완료"
 }
 
+# .claude 폴더 다운로드
+copy_claude_folder() {
+    print_step ".claude 폴더 다운로드 여부 확인 중..."
+
+    if [ ! -d "$TEMP_DIR/.claude" ]; then
+        print_info ".claude 폴더가 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
+
+    # 사용자 동의 확인
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        print_separator_line
+        print_to_user ""
+        print_to_user ".claude 폴더를 다운로드하시겠습니까? (Claude Code 설정)"
+        print_to_user "  Y/y - 예, 다운로드하기"
+        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+        print_to_user ""
+
+        if ! ask_yes_no "선택: " "N"; then
+            print_info ".claude 폴더 다운로드 건너뜁니다"
+            return
+        fi
+    fi
+
+    # 다운로드 실행
+    mkdir -p .claude
+    cp -r "$TEMP_DIR/.claude/"* .claude/ 2>/dev/null || true
+    print_success ".claude 폴더 다운로드 완료"
+}
+
 # agent-prompts 폴더 다운로드
 copy_agent_prompts() {
     print_step "agent-prompts 폴더 다운로드 여부 확인 중..."
@@ -1442,6 +1472,7 @@ execute_integration() {
             copy_coderabbit_config
             ensure_gitignore
             copy_cursor_folder
+            copy_claude_folder
             copy_agent_prompts
             copy_setup_guide
             ;;

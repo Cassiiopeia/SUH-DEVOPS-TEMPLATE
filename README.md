@@ -6,7 +6,7 @@
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
 <!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v2.0.3 (2025-10-12)
+## 최신 버전 : v2.1.0 (2025-10-28)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 <!-- END-AUTO-VERSION-SECTION -->
@@ -206,7 +206,8 @@ iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TE
 - ✅ **자동 브랜치 가이드**: 새 이슈 생성 시 권장 브랜치명과 커밋 메시지 자동 제안
 - ✅ **외부 서비스 연동**: `lab.suhsaechan.me` API 통합으로 확장된 이슈 관리
 - ✅ **라벨 동기화**: 저장소 간 일관된 이슈 라벨 자동 동기화
-- ✅ **템플릿 자동화**: 이슈 템플릿 자동 설정 및 관리
+- ✅ **템플릿 자동화**: 이슈 템플릿 자동 설정 및 관리 (기능개발, 버그, 디자인, QA)
+- ✅ **QA 이슈 봇**: 이슈/PR 댓글에서 `@suh-lab create qa` 멘션 시 QA 템플릿 자동 생성
 
 ### 4. 🏗️ 멀티 플랫폼 빌드 시스템
 

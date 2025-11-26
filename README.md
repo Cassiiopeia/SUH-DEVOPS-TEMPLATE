@@ -6,7 +6,7 @@
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
 <!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v2.1.6 (2025-11-26)
+## 최신 버전 : v2.1.8 (2025-11-26)
 [전체 버전 기록 보기](CHANGELOG.md)
 <!-- END-AUTO-VERSION-SECTION -->
 
@@ -369,7 +369,6 @@ python3 .github/scripts/changelog_manager.py validate
 ## 🔧 조직 및 팀 설정
 
 ### Organization 저장소 필수 설정
-
 **⚠️ 중요: Organization 설정이 올바르지 않으면 자동화가 작동하지 않습니다**
 
 #### 1. Actions 권한 설정

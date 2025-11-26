@@ -76,6 +76,7 @@ ${BLUE}옵션:${NC}
                            지원 타입:
                              • spring          - Spring Boot 백엔드
                              • flutter         - Flutter 모바일 앱
+                             • next            - Next.js 웹 앱
                              • react           - React 웹 앱
                              • react-native    - React Native 모바일 앱
                              • react-native-expo - React Native Expo 앱
@@ -117,7 +118,7 @@ GITHUB_USER="${GITHUB_ACTOR:-$(whoami)}"
 REPO_OWNER="${GITHUB_REPOSITORY%/*}"
 
 # 지원하는 프로젝트 타입
-VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
+VALID_TYPES=("spring" "flutter" "next" "react" "react-native" "react-native-expo" "node" "python" "basic")
 
 # 파라미터 파싱
 while [[ $# -gt 0 ]]; do
@@ -242,7 +243,7 @@ create_version_yml() {
 # 프로젝트 타입별 동기화 파일:
 # - spring: build.gradle (version = "x.y.z")
 # - flutter: pubspec.yaml (version: x.y.z+i, buildNumber 포함)
-# - react/node: package.json ("version": "x.y.z")
+# - react/next/node: package.json ("version": "x.y.z")
 # - react-native: iOS Info.plist 또는 Android build.gradle
 # - react-native-expo: app.json (expo.version)
 # - python: pyproject.toml (version = "x.y.z")
@@ -255,7 +256,7 @@ create_version_yml() {
 
 version: "$version"
 version_code: 1  # app build number
-project_type: "$type" # spring, flutter, react, react-native, react-native-expo, node, python, basic
+project_type: "$type" # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "$user"
@@ -390,6 +391,16 @@ cleanup_unused_workflows() {
             continue
         fi
         
+        # Next.js
+        if [[ "$filename" =~ ^PROJECT-NEXT- ]]; then
+            if [ "$project_type" != "next" ]; then
+                rm -f "$workflow_file"
+                echo "  ✓ $filename 삭제 (Next.js 전용, 현재: $project_type)"
+                deleted=$((deleted + 1))
+            fi
+            continue
+        fi
+
         # Node
         if [[ "$filename" =~ ^PROJECT-NODE- ]]; then
             if [ "$project_type" != "node" ]; then

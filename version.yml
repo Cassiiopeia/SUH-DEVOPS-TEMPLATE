@@ -2,41 +2,31 @@
 # 프로젝트 버전 관리 파일
 # ===================================================================
 #
-# 이 파일은 다양한 프로젝트 타입에서 버전 정보를 중앙 관리하기 위한 파일입니다.
-# GitHub Actions 워크플로우가 이 파일을 읽어 자동으로 버전을 관리합니다.
+# 버전 형식: x.y.z (major.minor.patch)
 #
-# 사용법:
-# 1. version: "x.y.z" - 사용자에게 표시되는 버전
-# 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
-# 3. project_type: 프로젝트 타입 지정
+# [자동] patch(3번째 자리): 워크플로우가 자동으로 증가시킴
+# [자동] version_code: 빌드마다 자동 1씩 증가
 #
-# 자동 버전 업데이트:
-# - patch: 자동으로 세 번째 자리 증가 (x.x.x -> x.x.x+1)
-# - version_code: 매 빌드마다 자동으로 1씩 증가
-# - minor/major: 수동으로 직접 수정 필요
+# [수동] major/minor(1,2번째 자리)는 자동으로 올라가지 않습니다!
+#       → 사용자가 이 파일에서 직접 수정해야 합니다
+#       → 예: 1.0.5 → 1.1.0 또는 2.0.0 으로 올리고 싶으면 직접 수정
 #
-# 프로젝트 타입별 동기화 파일:
-# - spring: build.gradle (version = "x.y.z")
-# - flutter: pubspec.yaml (version: "x.y.z":n)
-# - react/node: package.json ("version": "x.y.z")
-# - react-native: iOS Info.plist 또는 Android build.gradle
-# - react-native-expo: app.json (expo.version)
-# - python: pyproject.toml (version = "x.y.z")
-# - basic/기타: version.yml 파일만 사용
+# 지원 타입: spring, flutter, next, react, react-native,
+#           react-native-expo, node, python, basic
 #
-# 연관된 워크플로우:
-# - .github/workflows/PROJECT-VERSION-CONTROL.yaml
-# - .github/workflows/PROJECT-README-VERSION-UPDATE.yaml
-# - .github/workflows/PROJECT-AUTO-CHANGELOG-CONTROL.yaml
-#
-# 주의사항:
-# - project_type은 최초 설정 후 변경하지 마세요
-# - 버전은 항상 높은 버전으로 자동 동기화됩니다
+# 타입별 동기화 파일:
+# - spring: build.gradle
+# - flutter: pubspec.yaml
+# - next/react/node: package.json
+# - react-native: Info.plist, build.gradle
+# - react-native-expo: app.json
+# - python: pyproject.toml
+# - basic: version.yml만 사용
 # ===================================================================
 
-version: "2.1.8"
-version_code: 57  # app build number
-project_type: "basic" # spring, flutter, react, react-native, react-native-expo, node, basic
+version: "2.1.11"
+version_code: 60 # app build number
+project_type: "basic" # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
 metadata:
-  last_updated: "2025-11-26 02:36:42"
+  last_updated: "2025-11-26 04:56:20"
   last_updated_by: "Cassiiopeia"

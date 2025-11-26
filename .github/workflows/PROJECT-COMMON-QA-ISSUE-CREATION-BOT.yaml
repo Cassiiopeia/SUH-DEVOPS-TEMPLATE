@@ -40,6 +40,15 @@ on:
   issue_comment:
     types: [created]
 
+# ===================================================================
+# 설정 변수
+# ===================================================================
+env:
+  # QA 이슈 기본 담당자 설정
+  # - 'default': 댓글 작성자가 담당자로 지정됨
+  # - GitHub ID (예: 'Cassiiopeia'): 해당 사용자가 담당자로 지정됨
+  DEFAULT_QA_ASSIGNEE: 'default'
+
 jobs:
   create-qa:
     # @suh-lab과 create, qa 키워드가 모두 포함되어 있으면 실행 (순서 무관)
@@ -72,11 +81,18 @@ jobs:
 
       - name: QA 이슈 생성
         uses: actions/github-script@v7
+        env:
+          DEFAULT_QA_ASSIGNEE: ${{ env.DEFAULT_QA_ASSIGNEE }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const issue = context.payload.issue;
             const commenter = context.payload.comment.user.login;
+
+            // 담당자 결정: 'default'면 댓글 작성자, 그 외에는 지정된 GitHub ID
+            const defaultAssignee = process.env.DEFAULT_QA_ASSIGNEE || 'default';
+            const assignee = (defaultAssignee === 'default') ? commenter : defaultAssignee;
+            console.log(`👤 담당자 설정: ${assignee} (설정값: ${defaultAssignee})`);
             const issueOrPrNumber = issue.number;
             const isPullRequest = !!issue.pull_request;
             
@@ -184,26 +200,28 @@ jobs:
                 title: qaTitle,
                 body: qaBody,
                 labels: ['작업 전'],
-                assignees: [commenter]
+                assignees: [assignee]
               });
             
               console.log(`✅ QA 이슈 생성 완료: #${qaIssue.number}`);
             
               // 원본 이슈/PR에 댓글
-              const commentBody = isPullRequest 
-                ? `✅ **시험 요청 이슈가 생성되었습니다!**
-            
-            📋 **QA Issue:** #${qaIssue.number}
-            🔗 **링크:** ${qaIssue.html_url}
-            🔗 **원본 Issue:** #${originalIssueNumber}
-            
-            시험 완료 후 결과를 QA 이슈에 기록해주세요.`
-                : `✅ **시험 요청 이슈가 생성되었습니다!**
-            
-            📋 **QA Issue:** #${qaIssue.number}
-            🔗 **링크:** ${qaIssue.html_url}
-            
-            시험 완료 후 결과를 QA 이슈에 기록해주세요.`;
+              const commentBody = isPullRequest
+                ? `✅ **시험(QA) 요청 이슈가 생성되었습니다!**
+
+📋 **시험(QA) 요청**
+- #${qaIssue.number}
+
+🔗 **이슈정보**
+- #${originalIssueNumber}
+
+시험 완료 후 결과를 QA 이슈에 기록해주세요.`
+                : `✅ **시험(QA) 요청 이슈가 생성되었습니다!**
+
+📋 **시험(QA) 요청**
+- #${qaIssue.number}
+
+시험 완료 후 결과를 QA 이슈에 기록해주세요.`;
             
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -218,7 +236,7 @@ jobs:
               console.log(`  • ${isPullRequest ? 'PR' : 'Issue'}: #${issueOrPrNumber}`);
               console.log(`  • 원본 Issue: #${originalIssueNumber}`);
               console.log(`  • QA Issue: #${qaIssue.number}`);
-              console.log(`  • 담당자: @${commenter}`);
+              console.log(`  • 담당자: @${assignee}`);
               console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
             } catch (error) {

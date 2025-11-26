@@ -447,7 +447,13 @@ cleanup_template_files() {
         rm -f template_integrator.sh
         echo "  ✓ template_integrator.sh 삭제 (원격 실행 전용)"
     fi
-    
+
+    # template_integrator.ps1 삭제 (원격 실행 전용 스크립트 - Windows)
+    if [ -f "template_integrator.ps1" ]; then
+        rm -f template_integrator.ps1
+        echo "  ✓ template_integrator.ps1 삭제 (원격 실행 전용)"
+    fi
+
     # LICENSE 파일 삭제
     if [ -f "LICENSE" ]; then
         rm -f LICENSE

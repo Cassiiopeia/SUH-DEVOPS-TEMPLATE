@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2025-10-28T08:12:07Z",
-    "currentVersion": "2.1.0",
+    "lastUpdated": "2025-11-26T01:34:35Z",
+    "currentVersion": "2.1.6",
     "projectType": "basic",
-    "totalReleases": 30
+    "totalReleases": 31
   },
   "releases": [
+    {
+      "version": "2.1.6",
+      "project_type": "basic",
+      "date": "2025-11-26",
+      "pr_number": 93,
+      "raw_summary": "NoteAdds QA issue-creation bot and Spring Synology CI/CD workflows, integrates Claude/Cursor utilities, updates init/integrator scripts, enhances README version updater, and bumps version to v2.1.6.\n\nCI/CD &amp; Automation:\n\nQA Bot: New workflow to auto-create QA issues from @suh-lab comment triggers (PROJECT-COMMON-QA-ISSUE-CREATION-BOT.yaml, common variant).\nSpring (Synology) Pipelines: Add blue/green nonstop and simple deploy workflows under project-types/spring/.\nREADME Version Updater: More robust header parsing, validation, and error messaging in PROJECT-COMMON-README-VERSION-UPDATE.yaml.\n\n\nDev Tools:\n\nClaude: Add .claude/commands/* (analyze/build/design/refactor/test/etc.).\nCursor: Add .cursor/scripts/common_util.py and README for Windows/KR path handling.\n\n\nTemplates &amp; Scripts:\n\nNew QA issue template (.github/ISSUE_TEMPLATE/qa_request.md).\nInitializer script improvements: broader cleanup, assignee updates loop, .ps1 removal; README init tweak.\nIntegrator scripts (sh/ps1): support copying .claude/, minor enhancements.\n\n\nDocs:\n\nREADME updated (feature highlights, version banner).\n\n\nVersion:\n\nUpdate version.yml to 2.1.6 and metadata.\n\n\n\nWritten by Cursor Bugbot for commit c04ba5f. This will update automatically on new commits. Configure here.\n\n\n\nSummary by CodeRabbit\n릴리스 노트\n\n\nNew Features\n\nQA 자동화 봇: 댓글에서 @suh-lab create qa 언급 시 QA 이슈 자동 생성\n파일 관리 유틸리티: 폴더 복사, 삭제, 디렉토리 관리 기능 추가\nSpring 프로젝트용 CI/CD 무중단 배포 워크플로우 (Blue/Green)\n\n\n\nDocumentation\n\n개발자 가이드 추가: 설계, 테스트, 리팩토링, 코드리뷰, 문제 해결 등\n\n\n\nChores\n\n버전 업데이트 (v2.1.0 → v2.1.6)\n이슈 템플릿 및 스크립트 개선\n\n\n\n✏️ Tip: You can customize this high-level summary in your review settings.",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "QA 자동화 봇: 댓글에서 @suh-lab create qa 언급 시 QA 이슈 자동 생성",
+            "파일 관리 유틸리티: 폴더 복사, 삭제, 디렉토리 관리 기능 추가",
+            "Spring 프로젝트용 CI/CD 무중단 배포 워크플로우 (Blue/Green)"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "개발자 가이드 추가: 설계, 테스트, 리팩토링, 코드리뷰, 문제 해결 등"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (v2.1.0 → v2.1.6)",
+            "이슈 템플릿 및 스크립트 개선"
+          ]
+        }
+      }
+    },
     {
       "version": "2.1.0",
       "project_type": "basic",

@@ -1,0 +1,61 @@
+# ===================================================
+# SUH-ISSUE-HELPER-MODULE
+# ===================================================
+#
+# GitHub Issue 생성/편집 시 브랜치명과 커밋 메시지 템플릿을 자동으로 댓글로 생성합니다.
+# Cassiiopeia/github-issue-helper 모듈을 사용합니다.
+#
+# 🔑 토큰 설정:
+#   - Public 레포: GITHUB_TOKEN 자동 사용 (별도 설정 불필요)
+#   - Private 레포: _GITHUB_PAT_TOKEN 시크릿 등록 권장
+#     1. GitHub에서 Personal Access Token 생성 (repo 권한 필요)
+#     2. Repository Settings > Secrets and variables > Actions
+#     3. New repository secret 클릭
+#     4. Name: _GITHUB_PAT_TOKEN, Value: 생성한 토큰
+#
+# 📌 토큰 우선순위:
+#   - _GITHUB_PAT_TOKEN이 설정되어 있으면 PAT 사용
+#   - 설정되어 있지 않으면 GITHUB_TOKEN으로 자동 fallback
+#
+# ⚙️ 커스터마이징 옵션:
+#   - branch_prefix: 브랜치 접두사 (기본: "feat/")
+#   - max_branch_length: 브랜치명 최대 길이 (기본: 100)
+#   - commit_template: 커밋 메시지 템플릿
+#     사용 가능한 변수: ${issueTitle}, ${issueUrl}, ${issueNumber}, ${branchName}, ${date}
+#   - comment_marker: 댓글 마커 (댓글 업데이트 시 기존 댓글을 찾는데 사용)
+#
+# ===================================================
+
+name: PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  generate-comment:
+    if: github.event.action == 'opened' || (github.event.action == 'edited' && github.event.changes.title)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Branch & Commit Comment
+        uses: Cassiiopeia/github-issue-helper@deploy
+        with:
+          # 토큰: PAT이 설정되어 있으면 PAT 사용, 없으면 GITHUB_TOKEN fallback
+          token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+          # 브랜치 접두사 설정 (예: feat/, fix/, hotfix/ 등)
+          branch_prefix: "feat/"
+
+          # 브랜치명 최대 길이 제한 (prefix 제외)
+          max_branch_length: 100
+
+          # 커밋 메시지 템플릿
+          # 사용 가능한 변수: ${issueTitle}, ${issueUrl}, ${issueNumber}, ${branchName}, ${date}
+          commit_template: "${issueTitle} : feat : {변경 사항에 대한 설명} ${issueUrl}"
+
+          # 댓글 마커 (댓글 업데이트 시 기존 댓글을 찾는데 사용)
+          comment_marker: "<!-- 이 댓글은 SUH-ISSUE-HELPER 에 의해 자동으로 생성되었습니다. - https://github.com/Cassiiopeia/github-issue-helper -->"

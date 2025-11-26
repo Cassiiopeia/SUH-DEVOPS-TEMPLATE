@@ -1,11 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-26T01:34:35Z",
-    "currentVersion": "2.1.6",
+    "lastUpdated": "2025-11-26T02:36:38Z",
+    "currentVersion": "2.1.7",
     "projectType": "basic",
-    "totalReleases": 31
+    "totalReleases": 32
   },
   "releases": [
+    {
+      "version": "2.1.7",
+      "project_type": "basic",
+      "date": "2025-11-26",
+      "pr_number": 95,
+      "raw_summary": "Summary by CodeRabbit\n릴리스 노트\n\n\n새로운 기능\n\n이슈 브랜치 및 커밋 메시지 자동 생성 모듈 추가\n이슈 작성 또는 편집 시 자동 댓글 기능 추가\n\n\n\n업데이트\n\n버전 2.1.7로 업그레이드\n메타데이터 업데이트\n\n\n\n✏️ Tip: You can customize this high-level summary in your review settings.",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "이슈 브랜치 및 커밋 메시지 자동 생성 모듈 추가",
+            "이슈 작성 또는 편집 시 자동 댓글 기능 추가"
+          ]
+        },
+        "업데이트": {
+          "title": "업데이트",
+          "items": [
+            "버전 2.1.7로 업그레이드",
+            "메타데이터 업데이트"
+          ]
+        }
+      }
+    },
     {
       "version": "2.1.6",
       "project_type": "basic",

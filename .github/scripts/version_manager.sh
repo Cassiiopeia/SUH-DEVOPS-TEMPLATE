@@ -418,15 +418,15 @@ update_version_yml() {
 
     log_debug "version.yml 업데이트: $new_version"
 
-    # version.yml 업데이트
-    sed -i.bak "s/version: *[\"']*[^\"']*[\"']*/version: \"$new_version\"/" version.yml
+    # version.yml 업데이트 (주석 제외 - 행 시작이 version:인 경우만)
+    sed -i.bak "s/^version: *[\"']*[^\"']*[\"']*/version: \"$new_version\"/" version.yml
 
-    # metadata 섹션 업데이트 (있는 경우만)
-    if grep -q "last_updated:" version.yml; then
-        sed -i.bak "s/last_updated: *[\"']*[^\"']*[\"']*/last_updated: \"$timestamp\"/" version.yml
+    # metadata 섹션 업데이트 (있는 경우만, 들여쓰기된 필드만 매칭)
+    if grep -q "^[[:space:]]*last_updated:" version.yml; then
+        sed -i.bak "s/^[[:space:]]*last_updated: *[\"']*[^\"']*[\"']*/  last_updated: \"$timestamp\"/" version.yml
     fi
-    if grep -q "last_updated_by:" version.yml; then
-        sed -i.bak "s/last_updated_by: *[\"']*[^\"']*[\"']*/last_updated_by: \"$user\"/" version.yml
+    if grep -q "^[[:space:]]*last_updated_by:" version.yml; then
+        sed -i.bak "s/^[[:space:]]*last_updated_by: *[\"']*[^\"']*[\"']*/  last_updated_by: \"$user\"/" version.yml
     fi
     rm -f version.yml.bak
 

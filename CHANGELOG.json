@@ -1,11 +1,29 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-26T06:52:03Z",
-    "currentVersion": "2.1.13",
+    "lastUpdated": "2025-11-26T16:04:10Z",
+    "currentVersion": "2.1.14",
     "projectType": "basic",
-    "totalReleases": 35
+    "totalReleases": 36
   },
   "releases": [
+    {
+      "version": "2.1.14",
+      "project_type": "basic",
+      "date": "2025-11-26",
+      "pr_number": 101,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 버전 2.1.14로 업데이트\n  * 자동화 워크플로우 구성 최적화\n  * 메타데이터 갱신",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 2.1.14로 업데이트",
+            "자동화 워크플로우 구성 최적화",
+            "메타데이터 갱신"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.1.13",
       "project_type": "basic",

@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-26T02:36:38Z",
-    "currentVersion": "2.1.7",
+    "lastUpdated": "2025-11-26T05:01:20Z",
+    "currentVersion": "2.1.11",
     "projectType": "basic",
-    "totalReleases": 32
+    "totalReleases": 33
   },
   "releases": [
+    {
+      "version": "2.1.11",
+      "project_type": "basic",
+      "date": "2025-11-26",
+      "pr_number": 97,
+      "raw_summary": "Summary by CodeRabbit\n릴리스 노트\n\n\n새로운 기능\n\nNext.js를 새로운 프로젝트 타입으로 지원 추가\nNext.js 프로젝트용 CI/CD 워크플로우 추가\n자동화된 빌드 및 Docker 배포 파이프라인 구현\n\n\n\n개선 사항\n\n버전 관리 도구 업그레이드 (v2.1.11)\n버전 추적 및 동기화 메커니즘 강화\n\n\n\nChores\n\n프로젝트 템플릿 및 설정 업데이트\n\n\n\n✏️ Tip: You can customize this high-level summary in your review settings.",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Next.js를 새로운 프로젝트 타입으로 지원 추가",
+            "Next.js 프로젝트용 CI/CD 워크플로우 추가",
+            "자동화된 빌드 및 Docker 배포 파이프라인 구현"
+          ]
+        },
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "버전 관리 도구 업그레이드 (v2.1.11)",
+            "버전 추적 및 동기화 메커니즘 강화"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "프로젝트 템플릿 및 설정 업데이트"
+          ]
+        }
+      }
+    },
     {
       "version": "2.1.7",
       "project_type": "basic",

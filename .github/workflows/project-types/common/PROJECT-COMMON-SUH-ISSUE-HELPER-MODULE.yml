@@ -48,7 +48,7 @@ jobs:
           token: ${{ secrets._GITHUB_PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
           # 브랜치 접두사 설정 (예: feat/, fix/, hotfix/ 등)
-          branch_prefix: "feat/"
+          branch_prefix: ""
 
           # 브랜치명 최대 길이 제한 (prefix 제외)
           max_branch_length: 100

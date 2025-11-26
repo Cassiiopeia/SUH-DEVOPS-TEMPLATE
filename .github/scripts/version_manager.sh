@@ -1,11 +1,16 @@
 #!/bin/bash
 
 # ===================================================================
-# 범용 버전 관리 스크립트 v2.0
+# 범용 버전 관리 스크립트 v3.0
 # ===================================================================
 #
 # 이 스크립트는 다양한 프로젝트 타입에서 버전 정보를 추출하고 업데이트합니다.
 # version.yml 파일의 설정에 따라 적절한 파일에서 버전을 읽고 업데이트합니다.
+#
+# v3.0 변경사항:
+# - YAML 파일은 yq로 정확하게 파싱 (주석 보존)
+# - JSON 파일은 jq로 정확하게 파싱
+# - Groovy/XML/TOML은 sed 유지
 #
 # 사용법:
 # ./version_manager.sh [command] [options]
@@ -16,6 +21,10 @@
 # - set: 특정 버전으로 설정
 # - validate: 버전 형식 검증
 # - sync: 버전 파일 간 동기화
+#
+# 필수 도구:
+# - yq: YAML 파싱
+# - jq: JSON 파싱
 #
 # ===================================================================
 
@@ -49,19 +58,57 @@ log_debug() {
     fi
 }
 
-# version.yml에서 설정 읽기
+# ===================================================================
+# 필수 도구 확인
+# ===================================================================
+check_required_tools() {
+    local project_type=$1
+    local missing_tools=()
+
+    # yq는 모든 프로젝트에 필요 (version.yml 처리)
+    if ! command -v yq >/dev/null 2>&1; then
+        missing_tools+=("yq")
+    fi
+
+    # JSON 프로젝트는 jq 필요
+    case "$project_type" in
+        "react"|"node"|"react-native-expo")
+            if ! command -v jq >/dev/null 2>&1; then
+                missing_tools+=("jq")
+            fi
+            ;;
+    esac
+
+    if [ ${#missing_tools[@]} -gt 0 ]; then
+        log_error "필수 도구가 설치되어 있지 않습니다: ${missing_tools[*]}"
+        log_error "GitHub Actions ubuntu-latest에는 기본 설치되어 있습니다."
+        log_error "로컬 설치:"
+        log_error "  yq: https://github.com/mikefarah/yq#install"
+        log_error "  jq: https://jqlang.github.io/jq/download/"
+        exit 1
+    fi
+
+    log_debug "필수 도구 확인 완료: yq, jq"
+}
+
+# ===================================================================
+# version.yml에서 설정 읽기 (yq 사용)
+# ===================================================================
 read_version_config() {
     if [ ! -f "version.yml" ]; then
         log_error "version.yml 파일을 찾을 수 없습니다!"
         exit 1
     fi
-    
-    log_debug "version.yml 파싱 시작"
-    
-    # 기본 파싱
-    PROJECT_TYPE=$(grep "^project_type:" version.yml | sed 's/project_type:[[:space:]]*[\"'\'']*\([^\"'\''#]*\)[\"'\''#]*.*/\1/' | sed 's/[[:space:]]*$//' | head -1)
-    CURRENT_VERSION=$(grep "^version:" version.yml | sed 's/version:[[:space:]]*[\"'\'']*\([^\"'\'']*\)[\"'\'']*$/\1/' | head -1)
-    
+
+    log_debug "version.yml 파싱 시작 (yq 사용)"
+
+    # yq로 정확한 값 추출 (따옴표 제거)
+    PROJECT_TYPE=$(yq -r '.project_type // "basic"' version.yml)
+    CURRENT_VERSION=$(yq -r '.version // "0.0.0"' version.yml)
+
+    # 필수 도구 확인
+    check_required_tools "$PROJECT_TYPE"
+
     # 프로젝트 타입별 버전 파일 설정
     case "$PROJECT_TYPE" in
         "spring")
@@ -75,7 +122,9 @@ read_version_config() {
             ;;
         "react-native")
             # iOS 우선, 없으면 Android
-            if find ios -name "Info.plist" -type f 2>/dev/null | head -1 | read -r ios_plist; then
+            local ios_plist
+            ios_plist=$(find ios -name "Info.plist" -type f 2>/dev/null | head -1 || true)
+            if [ -n "$ios_plist" ]; then
                 VERSION_FILE="$ios_plist"
             else
                 VERSION_FILE="android/app/build.gradle"
@@ -95,7 +144,9 @@ read_version_config() {
     log_info "  현재 버전: $CURRENT_VERSION"
 }
 
+# ===================================================================
 # 버전 형식 검증
+# ===================================================================
 validate_version() {
     local version=$1
     if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -106,7 +157,9 @@ validate_version() {
     fi
 }
 
+# ===================================================================
 # version_code 가져오기
+# ===================================================================
 get_version_code() {
     if [ ! -f "version.yml" ]; then
         log_warning "version.yml 파일이 없습니다. 기본값 1 반환"
@@ -114,21 +167,16 @@ get_version_code() {
         return
     fi
 
-    local code=$(grep "^version_code:" version.yml | sed 's/version_code:[[:space:]]*\([0-9]*\).*/\1/' | head -1)
+    local code
+    code=$(yq -r '.version_code // ""' version.yml)
 
-    if [ -z "$code" ]; then
+    if [ -z "$code" ] || [ "$code" = "null" ]; then
         log_warning "version_code 필드가 없습니다. 자동으로 추가합니다 (초기값: 1)"
 
-        # version.yml에 version_code 필드 추가 (version 다음 줄에)
-        if grep -q "^version:" version.yml; then
-            # macOS와 Linux 호환 방식으로 추가
-            awk '/^version:/ {print; print "version_code: 1  # app build number"; next} 1' version.yml > version.yml.tmp
-            mv version.yml.tmp version.yml
-            log_success "version_code 필드 추가 완료: 1"
-        else
-            log_error "version.yml에 version 필드가 없습니다."
-        fi
+        # yq로 version_code 필드 추가 (version 바로 다음에)
+        yq -i '.version_code = 1 | .version_code line_comment = "app build number"' version.yml
 
+        log_success "version_code 필드 추가 완료: 1"
         echo "1"
     else
         log_debug "현재 version_code: $code"
@@ -136,44 +184,44 @@ get_version_code() {
     fi
 }
 
+# ===================================================================
 # version_code 증가
+# ===================================================================
 increment_version_code() {
-    local current_code=$(get_version_code)
+    local current_code
+    current_code=$(get_version_code)
     local new_code=$((current_code + 1))
 
     log_info "VERSION_CODE 증가: $current_code → $new_code"
 
-    # version.yml 업데이트
-    if grep -q "^version_code:" version.yml; then
-        # 기존 필드 업데이트
-        sed -i.bak "s/^version_code:.*/version_code: $new_code  # app build number/" version.yml
-    else
-        # 필드 없으면 추가 (version 다음 줄에)
-        sed -i.bak "/^version:/a\\
-version_code: $new_code  # app build number" version.yml
-    fi
-    rm -f version.yml.bak
+    # yq로 version_code 업데이트
+    yq -i ".version_code = $new_code | .version_code line_comment = \"app build number\"" version.yml
 
     log_success "VERSION_CODE 업데이트 완료: $new_code"
     echo "$new_code"
 }
 
+# ===================================================================
 # patch 버전 증가
+# ===================================================================
 increment_patch_version() {
     local version=$1
     if ! validate_version "$version"; then
         return 1
     fi
 
-    local major=$(echo "$version" | cut -d. -f1)
-    local minor=$(echo "$version" | cut -d. -f2)
-    local patch=$(echo "$version" | cut -d. -f3)
+    local major minor patch
+    major=$(echo "$version" | cut -d. -f1)
+    minor=$(echo "$version" | cut -d. -f2)
+    patch=$(echo "$version" | cut -d. -f3)
 
     patch=$((patch + 1))
     echo "${major}.${minor}.${patch}"
 }
 
-# 버전 비교 함수 개선
+# ===================================================================
+# 버전 비교 함수
+# ===================================================================
 compare_versions() {
     local v1=$1
     local v2=$2
@@ -186,8 +234,9 @@ compare_versions() {
 
     # major, minor, patch 순서로 비교
     for i in 0 1 2; do
-        local a=$(echo "${v1_parts[$i]:-0}" | sed 's/^0*\([0-9]\)/\1/; s/^0*$/0/')
-        local b=$(echo "${v2_parts[$i]:-0}" | sed 's/^0*\([0-9]\)/\1/; s/^0*$/0/')
+        local a b
+        a=$(echo "${v1_parts[$i]:-0}" | sed 's/^0*\([0-9]\)/\1/; s/^0*$/0/')
+        b=$(echo "${v2_parts[$i]:-0}" | sed 's/^0*\([0-9]\)/\1/; s/^0*$/0/')
 
         if [ "$a" -gt "$b" ]; then
             log_debug "$v1 > $v2 (위치 $i: $a > $b)"
@@ -202,7 +251,9 @@ compare_versions() {
     return 0
 }
 
-# 높은 버전 반환 함수 단순화
+# ===================================================================
+# 높은 버전 반환 함수
+# ===================================================================
 get_higher_version() {
     local v1=$1
     local v2=$2
@@ -211,19 +262,15 @@ get_higher_version() {
 
     compare_versions "$v1" "$v2"
     case $? in
-        0) # 같음
-            echo "$v1"
-            ;;
-        1) # v1 > v2
-            echo "$v1"
-            ;;
-        2) # v1 < v2
-            echo "$v2"
-            ;;
+        0) echo "$v1" ;;  # 같음
+        1) echo "$v1" ;;  # v1 > v2
+        2) echo "$v2" ;;  # v1 < v2
     esac
 }
 
+# ===================================================================
 # 프로젝트 파일에서 실제 버전 추출
+# ===================================================================
 get_project_file_version() {
     if [ "$PROJECT_TYPE" = "basic" ] || [ ! -f "$VERSION_FILE" ]; then
         echo "$CURRENT_VERSION"
@@ -234,36 +281,35 @@ get_project_file_version() {
 
     case "$PROJECT_TYPE" in
         "spring")
+            # Groovy: sed 유지
             project_version=$(sed -nE "s/^[[:space:]]*version[[:space:]]*=[[:space:]]*['\"]([0-9]+\.[0-9]+\.[0-9]+)['\"].*/\1/p" "$VERSION_FILE" | head -1)
             ;;
         "flutter")
-            project_version=$(grep "^version:" "$VERSION_FILE" | sed 's/version: *\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/' | head -1)
+            # YAML: yq 사용 (버전에서 +buildNumber 제거)
+            local full_version
+            full_version=$(yq -r '.version // ""' "$VERSION_FILE")
+            project_version=$(echo "$full_version" | cut -d'+' -f1)
             ;;
         "react"|"node")
-            if command -v jq >/dev/null 2>&1; then
-                project_version=$(jq -r '.version // empty' "$VERSION_FILE" 2>/dev/null)
-            else
-                project_version=$(grep '"version":' "$VERSION_FILE" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
-            fi
+            # JSON: jq 사용
+            project_version=$(jq -r '.version // ""' "$VERSION_FILE")
             ;;
         "react-native")
             if [[ "$VERSION_FILE" == *"Info.plist" ]]; then
+                # plist: PlistBuddy 또는 sed
                 if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
-                    project_version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$VERSION_FILE" 2>/dev/null)
+                    project_version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$VERSION_FILE" 2>/dev/null || true)
                 else
                     project_version=$(grep -A1 "CFBundleShortVersionString" "$VERSION_FILE" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | head -1)
                 fi
             else
-                project_version=$(grep -oP 'versionName *"\K[^"]+' "$VERSION_FILE" | head -1)
+                # Groovy: sed 유지
+                project_version=$(grep -oP 'versionName *"\K[^"]+' "$VERSION_FILE" | head -1 || true)
             fi
             ;;
         "react-native-expo")
-            if command -v jq >/dev/null 2>&1; then
-                project_version=$(jq -r '.expo.version // empty' "$VERSION_FILE" 2>/dev/null)
-            else
-                # expo 객체 내의 version 필드만 추출
-                project_version=$(awk '/\"expo\":/,/^[[:space:]]*}/ { if ($0 ~ /\"version\":/) { gsub(/.*"version":[[:space:]]*"/, ""); gsub(/".*/, ""); print; exit } }' "$VERSION_FILE")
-            fi
+            # JSON: jq 사용
+            project_version=$(jq -r '.expo.version // ""' "$VERSION_FILE")
             ;;
         *)
             project_version="$CURRENT_VERSION"
@@ -279,7 +325,9 @@ get_project_file_version() {
     echo "$project_version"
 }
 
+# ===================================================================
 # 버전 동기화 함수
+# ===================================================================
 sync_versions() {
     local yml_version="$CURRENT_VERSION"
     local project_version
@@ -318,7 +366,9 @@ sync_versions() {
     fi
 }
 
+# ===================================================================
 # 프로젝트 파일 버전 업데이트
+# ===================================================================
 update_project_file_version() {
     local new_version=$1
 
@@ -331,7 +381,7 @@ update_project_file_version() {
 
     case "$PROJECT_TYPE" in
         "spring")
-            # 모든 build.gradle 파일 업데이트
+            # Groovy: sed 유지 (파서 없음)
             find . -maxdepth 2 -name "build.gradle" -type f | while read -r gradle_file; do
                 sed -i.bak "s/version = '[^']*'/version = '$new_version'/g; s/version = \"[^\"]*\"/version = \"$new_version\"/g" "$gradle_file"
                 rm -f "${gradle_file}.bak"
@@ -339,60 +389,46 @@ update_project_file_version() {
             done
             ;;
         "flutter")
-            # Flutter는 version: x.y.z+buildNumber 형식 사용
-            # version.yml의 version + version_code를 조합하여 pubspec.yaml에 저장
-            local code=$(get_version_code)
+            # YAML: yq 사용 (version + build number)
+            local code
+            code=$(get_version_code)
             local full_version="$new_version+$code"
-            
+
             log_debug "Flutter 버전 저장: $new_version (version) + $code (code) = $full_version"
-            
-            sed -i.bak "s/^version:.*/version: $full_version/" "$VERSION_FILE"
-            rm -f "${VERSION_FILE}.bak"
+
+            yq -i ".version = \"$full_version\"" "$VERSION_FILE"
             ;;
         "react"|"node")
-            if command -v jq >/dev/null 2>&1; then
-                jq ".version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
-            else
-                sed -i.bak "s/\"version\": *\"[^\"]*\"/\"version\": \"$new_version\"/" "$VERSION_FILE"
-                rm -f "${VERSION_FILE}.bak"
-            fi
+            # JSON: jq 사용
+            jq ".version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
             ;;
         "react-native")
             if [[ "$VERSION_FILE" == *"Info.plist" ]]; then
-                # iOS 업데이트
+                # plist: sed 유지 (XML 파서 복잡)
                 find ios -name "Info.plist" -type f | while read -r plist_file; do
                     if grep -q "CFBundleShortVersionString" "$plist_file"; then
-                        sed -i.bak '/CFBundleShortVersionString/{n;s/<string>[^<]*<\/string>/<string>'$new_version'<\/string>/;}' "$plist_file"
+                        sed -i.bak '/CFBundleShortVersionString/{n;s/<string>[^<]*<\/string>/<string>'"$new_version"'<\/string>/;}' "$plist_file"
                         rm -f "${plist_file}.bak"
                     fi
                 done
             else
-                # Android 업데이트
+                # Groovy: sed 유지
                 sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$new_version\"/" "$VERSION_FILE"
                 rm -f "${VERSION_FILE}.bak"
             fi
             ;;
         "react-native-expo")
-            if command -v jq >/dev/null 2>&1; then
-                jq ".expo.version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
-            else
-                # expo 객체 내의 version만 정확히 업데이트
-                awk -v new_ver="$new_version" '
-                    /^[[:space:]]*"expo"[[:space:]]*:/ { in_expo=1 }
-                    in_expo && /^[[:space:]]*"version"[[:space:]]*:/ {
-                        sub(/"version"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"version\": \"" new_ver "\"")
-                    }
-                    /^[[:space:]]*}/ && in_expo { in_expo=0 }
-                    { print }
-                ' "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
-            fi
+            # JSON: jq 사용
+            jq ".expo.version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
             ;;
     esac
 
     log_success "프로젝트 파일 업데이트 완료: $new_version"
 }
 
+# ===================================================================
 # 모든 버전 파일 업데이트
+# ===================================================================
 update_all_versions() {
     local new_version=$1
 
@@ -407,7 +443,9 @@ update_all_versions() {
     log_success "모든 버전 파일 업데이트 완료: $new_version"
 }
 
+# ===================================================================
 # version.yml 업데이트
+# ===================================================================
 update_version_yml() {
     local new_version=$1
     local timestamp
@@ -416,19 +454,18 @@ update_version_yml() {
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     user=${GITHUB_ACTOR:-$(whoami)}
 
-    log_debug "version.yml 업데이트: $new_version"
+    log_debug "version.yml 업데이트: $new_version (yq 사용)"
 
-    # version.yml 업데이트 (주석 제외 - 행 시작이 version:인 경우만)
-    sed -i.bak "s/^version: *[\"']*[^\"']*[\"']*/version: \"$new_version\"/" version.yml
+    # yq로 version 필드만 정확히 업데이트 (주석 보존)
+    yq -i ".version = \"$new_version\"" version.yml
 
-    # metadata 섹션 업데이트 (있는 경우만, 들여쓰기된 필드만 매칭)
-    if grep -q "^[[:space:]]*last_updated:" version.yml; then
-        sed -i.bak "s/^[[:space:]]*last_updated: *[\"']*[^\"']*[\"']*/  last_updated: \"$timestamp\"/" version.yml
+    # metadata 섹션 업데이트 (필드가 있는 경우만)
+    if yq -e '.metadata.last_updated' version.yml >/dev/null 2>&1; then
+        yq -i ".metadata.last_updated = \"$timestamp\"" version.yml
     fi
-    if grep -q "^[[:space:]]*last_updated_by:" version.yml; then
-        sed -i.bak "s/^[[:space:]]*last_updated_by: *[\"']*[^\"']*[\"']*/  last_updated_by: \"$user\"/" version.yml
+    if yq -e '.metadata.last_updated_by' version.yml >/dev/null 2>&1; then
+        yq -i ".metadata.last_updated_by = \"$user\"" version.yml
     fi
-    rm -f version.yml.bak
 
     # 전역 변수 업데이트
     CURRENT_VERSION="$new_version"
@@ -436,7 +473,9 @@ update_version_yml() {
     log_success "version.yml 업데이트 완료: $new_version"
 }
 
+# ===================================================================
 # 메인 함수
+# ===================================================================
 main() {
     local command=${1:-get}
 
@@ -453,7 +492,8 @@ main() {
             ;;
         "get-code")
             # 현재 version_code 반환
-            local code=$(get_version_code)
+            local code
+            code=$(get_version_code)
             log_success "현재 VERSION_CODE: $code"
             echo "$code"
             ;;
@@ -493,7 +533,7 @@ main() {
             echo "$new_version"
             ;;
         "set")
-            local new_version=$2
+            local new_version=${2:-}
             if [ -z "$new_version" ]; then
                 log_error "새 버전을 지정해주세요: $0 set 1.2.3"
                 exit 1
@@ -551,6 +591,10 @@ main() {
             echo "  $0 set 1.2.3" >&2
             echo "  $0 sync" >&2
             echo "  $0 validate 1.2.3" >&2
+            echo "" >&2
+            echo "필수 도구:" >&2
+            echo "  yq - YAML 파싱 " >&2
+            echo "  jq - JSON 파싱 " >&2
             exit 1
             ;;
     esac

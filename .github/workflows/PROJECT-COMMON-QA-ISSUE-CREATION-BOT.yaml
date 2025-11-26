@@ -207,21 +207,25 @@ jobs:
             
               // 원본 이슈/PR에 댓글
               const commentBody = isPullRequest
-                ? `✅ **시험(QA) 요청 이슈가 생성되었습니다!**
-
-📋 **시험(QA) 요청**
-- #${qaIssue.number}
-
-🔗 **이슈정보**
-- #${originalIssueNumber}
-
-시험 완료 후 결과를 QA 이슈에 기록해주세요.`
-                : `✅ **시험(QA) 요청 이슈가 생성되었습니다!**
-
-📋 **시험(QA) 요청**
-- #${qaIssue.number}
-
-시험 완료 후 결과를 QA 이슈에 기록해주세요.`;
+                ? [
+                    '✅ **시험(QA) 요청 이슈가 생성되었습니다!**',
+                    '',
+                    '📋 **시험(QA) 요청**',
+                    `- #${qaIssue.number}`,
+                    '',
+                    '🔗 **이슈정보**',
+                    `- #${originalIssueNumber}`,
+                    '',
+                    '시험 완료 후 결과를 QA 이슈에 기록해주세요.'
+                  ].join('\n')
+                : [
+                    '✅ **시험(QA) 요청 이슈가 생성되었습니다!**',
+                    '',
+                    '📋 **시험(QA) 요청**',
+                    `- #${qaIssue.number}`,
+                    '',
+                    '시험 완료 후 결과를 QA 이슈에 기록해주세요.'
+                  ].join('\n');
             
               await github.rest.issues.createComment({
                 owner: context.repo.owner,

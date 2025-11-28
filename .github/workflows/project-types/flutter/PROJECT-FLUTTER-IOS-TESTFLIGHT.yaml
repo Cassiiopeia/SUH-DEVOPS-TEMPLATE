@@ -308,7 +308,7 @@ jobs:
             --build-name="${{ needs.prepare-build.outputs.version }}" \
             --build-number="${{ needs.prepare-build.outputs.build_number }}"
 
-      # Archive 생성 (manual signing)
+      # Archive 생성 (manual signing - Runner 타겟에만 적용)
       - name: Create Archive
         run: |
           cd ios
@@ -318,9 +318,14 @@ jobs:
             -destination 'generic/platform=iOS' \
             archive \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            -xcconfig /dev/stdin <<EOF
+          // Runner 타겟에만 서명 설정 적용
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER = ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES
+          EOF
 
       # IPA 생성
       - name: Export IPA

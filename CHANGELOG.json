@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-26T16:04:10Z",
-    "currentVersion": "2.1.14",
+    "lastUpdated": "2025-11-28T01:13:04Z",
+    "currentVersion": "2.1.16",
     "projectType": "basic",
-    "totalReleases": 36
+    "totalReleases": 37
   },
   "releases": [
+    {
+      "version": "2.1.16",
+      "project_type": "basic",
+      "date": "2025-11-28",
+      "pr_number": 103,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * Flutter OAuth 키 생성기 도구 추가 - Android 키스토어에서 Google, Kakao, Facebook 등의 OAuth 키를 추출하는 기능 제공\n  * iOS TestFlight 시크릿 헬퍼 도구 추가 - GitHub Actions용 CI/CD 시크릿을 브라우저에서 생성하는 기능 제공\n\n* **Documentation**\n  * 두 개의 새로운 유틸리티 도구에 대한 사용 가이드 추가\n\n* **Chores**\n  * 버전을 2.1.14에서 2.1.16으로 업데이트\n  * iOS TestFlight 배포 워크플로우 개선",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Flutter OAuth 키 생성기 도구 추가 - Android 키스토어에서 Google, Kakao, Facebook 등의 OAuth 키를 추출하는 기능 제공",
+            "iOS TestFlight 시크릿 헬퍼 도구 추가 - GitHub Actions용 CI/CD 시크릿을 브라우저에서 생성하는 기능 제공"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "두 개의 새로운 유틸리티 도구에 대한 사용 가이드 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전을 2.1.14에서 2.1.16으로 업데이트",
+            "iOS TestFlight 배포 워크플로우 개선"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.1.14",
       "project_type": "basic",

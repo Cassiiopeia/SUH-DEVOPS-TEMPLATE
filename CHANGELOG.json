@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-28T01:13:04Z",
-    "currentVersion": "2.1.16",
+    "lastUpdated": "2025-11-28T02:07:49Z",
+    "currentVersion": "2.1.17",
     "projectType": "basic",
-    "totalReleases": 37
+    "totalReleases": 38
   },
   "releases": [
+    {
+      "version": "2.1.17",
+      "project_type": "basic",
+      "date": "2025-11-28",
+      "pr_number": 104,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 버전을 2.1.17로 업데이트했습니다.\n  * iOS 빌드 서명 구성을 개선했습니다.",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전을 2.1.17로 업데이트했습니다.",
+            "iOS 빌드 서명 구성을 개선했습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.1.16",
       "project_type": "basic",

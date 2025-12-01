@@ -1,11 +1,42 @@
 {
   "metadata": {
-    "lastUpdated": "2025-11-28T02:07:49Z",
-    "currentVersion": "2.1.17",
+    "lastUpdated": "2025-12-01T15:38:46Z",
+    "currentVersion": "2.2.0",
     "projectType": "basic",
-    "totalReleases": 38
+    "totalReleases": 39
   },
   "releases": [
+    {
+      "version": "2.2.0",
+      "project_type": "basic",
+      "date": "2025-12-01",
+      "pr_number": 106,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리즈 노트\n\n* **New Features**\n  * Flutter iOS TestFlight 배포를 위한 브라우저 기반 설정 마법사 추가 (자동 파일 생성 및 비밀번호 관리)\n  * Flutter Android Play Store 배포를 위한 통합 설정 마법사 추가 (Fastlane 자동화 포함)\n  * 마법사 기반 iOS/Android 배포 구성으로 설정 프로세스 간소화\n\n* **Bug Fixes**\n  * iOS TestFlight CI/CD 워크플로우 개선 및 환경 변수 관리 최적화\n\n* **Chores**\n  * 사용되지 않는 유틸리티 도구 제거\n  * 버전 업그레이드 (v2.1.16 → v2.2.0)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "Flutter iOS TestFlight 배포를 위한 브라우저 기반 설정 마법사 추가 (자동 파일 생성 및 비밀번호 관리)",
+            "Flutter Android Play Store 배포를 위한 통합 설정 마법사 추가 (Fastlane 자동화 포함)",
+            "마법사 기반 iOS/Android 배포 구성으로 설정 프로세스 간소화"
+          ]
+        },
+        "bug_fixes": {
+          "title": "Bug Fixes",
+          "items": [
+            "iOS TestFlight CI/CD 워크플로우 개선 및 환경 변수 관리 최적화"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "사용되지 않는 유틸리티 도구 제거",
+            "버전 업그레이드 (v2.1.16 → v2.2.0)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.1.17",
       "project_type": "basic",

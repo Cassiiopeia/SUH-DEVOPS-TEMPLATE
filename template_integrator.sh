@@ -1311,6 +1311,144 @@ copy_setup_guide() {
     print_info "📖 템플릿 사용법을 SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md에서 확인하세요"
 }
 
+# ===================================================================
+# 프로젝트 타입별 유틸리티 모듈 다운로드
+# ===================================================================
+# 프로젝트 타입에 따라 추가 유틸리티 모듈(마법사 등)을 다운로드합니다.
+# 현재 지원: flutter (ios-testflight-setup-wizard, android-playstore-setup-wizard)
+# 확장 가능: 다른 프로젝트 타입에도 util 모듈 추가 시 자동 지원
+# ===================================================================
+
+# util 모듈 설명 표시
+show_util_module_description() {
+    local project_type=$1
+
+    case $project_type in
+        flutter)
+            print_separator_line
+            print_to_user ""
+            print_to_user "📦 Flutter 추가 유틸리티 모듈:"
+            print_to_user ""
+            print_to_user "  🧙 ios-testflight-setup-wizard"
+            print_to_user "     iOS TestFlight 배포에 필요한 설정 파일들을"
+            print_to_user "     웹 브라우저에서 쉽게 생성할 수 있는 마법사입니다."
+            print_to_user "     → ExportOptions.plist, Fastfile 등 자동 생성"
+            print_to_user ""
+            print_to_user "  🧙 android-playstore-setup-wizard"
+            print_to_user "     Android Play Store 배포에 필요한 설정 파일들을"
+            print_to_user "     웹 브라우저에서 쉽게 생성할 수 있는 마법사입니다."
+            print_to_user "     → Fastfile, build.gradle 서명 설정 등 자동 생성"
+            print_to_user ""
+            ;;
+        # 다른 프로젝트 타입 추가 시 여기에 case 추가
+        # spring)
+        #     print_to_user "📦 Spring 추가 유틸리티 모듈:"
+        #     ...
+        #     ;;
+        *)
+            # 알 수 없는 타입은 일반 메시지
+            print_separator_line
+            print_to_user ""
+            print_to_user "📦 $project_type 추가 유틸리티 모듈이 있습니다."
+            print_to_user ""
+            ;;
+    esac
+}
+
+# util 모듈 사용 가이드 표시
+show_util_usage_guide() {
+    local project_type=$1
+
+    case $project_type in
+        flutter)
+            print_to_user ""
+            print_info "📖 Flutter 마법사 사용법:"
+            print_to_user "   iOS TestFlight:"
+            print_to_user "     1. 브라우저에서 열기:"
+            print_to_user "        .github/util/flutter/ios-testflight-setup-wizard/index.html"
+            print_to_user "     2. 필요한 정보 입력 후 파일 생성"
+            print_to_user "     3. 생성된 파일을 ios/ 폴더에 복사"
+            print_to_user ""
+            print_to_user "   Android Play Store:"
+            print_to_user "     1. 브라우저에서 열기:"
+            print_to_user "        .github/util/flutter/android-playstore-setup-wizard/index.html"
+            print_to_user "     2. 필요한 정보 입력 후 파일 생성"
+            print_to_user "     3. 생성된 파일을 android/ 폴더에 복사"
+            print_to_user ""
+            ;;
+        *)
+            print_to_user ""
+            print_info "📖 util 모듈 사용법:"
+            print_to_user "   .github/util/$project_type/ 폴더 내 README.md를 참고하세요."
+            print_to_user ""
+            ;;
+    esac
+}
+
+# 프로젝트 타입별 util 모듈 다운로드
+copy_util_modules() {
+    local project_type=$1
+    local util_src="$TEMP_DIR/.github/util/$project_type"
+    local util_dst=".github/util/$project_type"
+
+    # util 모듈 존재 확인
+    if [ ! -d "$util_src" ]; then
+        # util 모듈이 없으면 조용히 건너뜀 (모든 타입에 모듈이 있는 건 아님)
+        return
+    fi
+
+    print_step "$project_type 추가 유틸리티 모듈 확인 중..."
+
+    # 모듈 설명 표시
+    show_util_module_description "$project_type"
+
+    # 사용자 확인 (force 모드가 아니고 TTY 가용 시)
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        print_to_user "이 유틸리티 모듈을 다운로드하시겠습니까?"
+        print_to_user "  Y/y - 예, 다운로드하기"
+        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+        print_to_user ""
+
+        if ! ask_yes_no "선택: " "N"; then
+            print_info "util 모듈 다운로드 건너뜁니다"
+            return
+        fi
+    elif [ "$FORCE_MODE" = true ]; then
+        # Force 모드에서는 자동으로 다운로드
+        print_info "강제 모드: util 모듈 자동 다운로드"
+    else
+        # TTY 없고 Force도 아니면 건너뛰기
+        print_info "대화형 모드가 아닙니다. util 모듈을 건너뜁니다."
+        print_info "util 모듈을 다운로드하려면 --force 옵션을 사용하세요."
+        return
+    fi
+
+    # 다운로드 실행
+    mkdir -p "$util_dst"
+    cp -r "$util_src/"* "$util_dst/" 2>/dev/null || true
+
+    # 복사된 모듈 개수 계산
+    local module_count=0
+    for dir in "$util_dst"/*/; do
+        [ -d "$dir" ] && module_count=$((module_count + 1))
+    done
+
+    print_success "util 모듈 다운로드 완료 ($module_count 개 모듈)"
+
+    # 복사된 모듈 목록 표시
+    for dir in "$util_dst"/*/; do
+        [ -d "$dir" ] || continue
+        local module_name=$(basename "$dir")
+        echo "  ✓ $module_name"
+    done
+
+    # 사용 가이드 표시
+    show_util_usage_guide "$project_type"
+
+    # 복사된 모듈 수를 전역 변수로 저장 (최종 요약에서 사용)
+    UTIL_MODULES_COPIED=$module_count
+}
+
 
 # 대화형 모드
 interactive_mode() {
@@ -1467,6 +1605,7 @@ execute_integration() {
             add_version_section_to_readme "$VERSION"
             copy_workflows
             copy_scripts
+            copy_util_modules "$PROJECT_TYPE"
             copy_issue_templates
             copy_discussion_templates
             copy_coderabbit_config
@@ -1486,6 +1625,7 @@ execute_integration() {
         workflows)
             copy_workflows
             copy_scripts
+            copy_util_modules "$PROJECT_TYPE"
             copy_setup_guide
             ;;
         issues)
@@ -1517,6 +1657,9 @@ print_summary() {
             echo "  ✅ 버전 관리 시스템 (version.yml)" >&2
             echo "  ✅ README.md 자동 버전 업데이트" >&2
             echo "  ✅ GitHub Actions 워크플로우" >&2
+            if [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
+                echo "  ✅ 유틸리티 모듈 ($UTIL_MODULES_COPIED 개)" >&2
+            fi
             echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
             echo "  ✅ CodeRabbit AI 리뷰 설정" >&2
             echo "  ✅ .gitignore 필수 항목" >&2
@@ -1530,6 +1673,9 @@ print_summary() {
             ;;
         workflows)
             echo "  ✅ GitHub Actions 워크플로우" >&2
+            if [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
+                echo "  ✅ 유틸리티 모듈 ($UTIL_MODULES_COPIED 개)" >&2
+            fi
             echo "  ✅ 템플릿 설정 가이드 (SETUP-GUIDE.md)" >&2
             ;;
         issues)
@@ -1596,12 +1742,34 @@ print_summary() {
     echo "     └─ changelog_manager.py" >&2
     echo "" >&2
     
+    # util 모듈 정보 표시
+    if [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
+        echo "  🧙 유틸리티 모듈:" >&2
+        if [ -d ".github/util/$PROJECT_TYPE" ]; then
+            for dir in ".github/util/$PROJECT_TYPE"/*/; do
+                [ -d "$dir" ] || continue
+                local module_name=$(basename "$dir")
+                echo "     ├─ $module_name" >&2
+            done
+        fi
+        echo "" >&2
+    fi
+
     # 프로젝트 타입별 안내
     if [ "$PROJECT_TYPE" = "spring" ]; then
         echo "  💡 Spring 프로젝트 추가 설정:" >&2
         echo "     • build.gradle의 버전 정보가 자동 동기화됩니다" >&2
         echo "     • CI/CD 워크플로우에서 GitHub Secrets 설정이 필요합니다" >&2
         echo "     • 자세한 설정 방법: .github/workflows/project-types/spring/README.md" >&2
+        echo "" >&2
+    fi
+
+    # Flutter util 모듈 안내
+    if [ "$PROJECT_TYPE" = "flutter" ] && [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
+        echo "  💡 Flutter 배포 마법사 사용법:" >&2
+        echo "     • iOS TestFlight: .github/util/flutter/ios-testflight-setup-wizard/index.html" >&2
+        echo "     • Android Play Store: .github/util/flutter/android-playstore-setup-wizard/index.html" >&2
+        echo "     • 브라우저에서 열어 필요한 정보 입력 후 파일 생성" >&2
         echo "" >&2
     fi
     

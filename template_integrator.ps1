@@ -103,6 +103,7 @@ $script:ProjectVersion = $Version
 $script:DetectedBranch = ""
 $script:IsInteractiveMode = $false
 $script:WorkflowsCopied = 0
+$script:UtilModulesCopied = 0
 $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
 
 # ===================================================================
@@ -1271,6 +1272,134 @@ function Copy-SetupGuide {
 }
 
 # ===================================================================
+# 프로젝트 타입별 유틸리티 모듈 다운로드
+# ===================================================================
+# 프로젝트 타입에 따라 추가 유틸리티 모듈(마법사 등)을 다운로드합니다.
+# 현재 지원: flutter (ios-testflight-setup-wizard, android-playstore-setup-wizard)
+# 확장 가능: 다른 프로젝트 타입에도 util 모듈 추가 시 자동 지원
+# ===================================================================
+
+function Show-UtilModuleDescription {
+    param([string]$ProjectType)
+
+    switch ($ProjectType) {
+        "flutter" {
+            Print-SeparatorLine
+            Write-Host ""
+            Write-Host "📦 Flutter 추가 유틸리티 모듈:"
+            Write-Host ""
+            Write-Host "  🧙 ios-testflight-setup-wizard"
+            Write-Host "     iOS TestFlight 배포에 필요한 설정 파일들을"
+            Write-Host "     웹 브라우저에서 쉽게 생성할 수 있는 마법사입니다."
+            Write-Host "     → ExportOptions.plist, Fastfile 등 자동 생성"
+            Write-Host ""
+            Write-Host "  🧙 android-playstore-setup-wizard"
+            Write-Host "     Android Play Store 배포에 필요한 설정 파일들을"
+            Write-Host "     웹 브라우저에서 쉽게 생성할 수 있는 마법사입니다."
+            Write-Host "     → Fastfile, build.gradle 서명 설정 등 자동 생성"
+            Write-Host ""
+        }
+        # 다른 프로젝트 타입 추가 시 여기에 case 추가
+        default {
+            # 알 수 없는 타입은 일반 메시지
+            Print-SeparatorLine
+            Write-Host ""
+            Write-Host "📦 $ProjectType 추가 유틸리티 모듈이 있습니다."
+            Write-Host ""
+        }
+    }
+}
+
+function Show-UtilUsageGuide {
+    param([string]$ProjectType)
+
+    switch ($ProjectType) {
+        "flutter" {
+            Write-Host ""
+            Print-Info "📖 Flutter 마법사 사용법:"
+            Write-Host "   iOS TestFlight:"
+            Write-Host "     1. 브라우저에서 열기:"
+            Write-Host "        .github\util\flutter\ios-testflight-setup-wizard\index.html"
+            Write-Host "     2. 필요한 정보 입력 후 파일 생성"
+            Write-Host "     3. 생성된 파일을 ios\ 폴더에 복사"
+            Write-Host ""
+            Write-Host "   Android Play Store:"
+            Write-Host "     1. 브라우저에서 열기:"
+            Write-Host "        .github\util\flutter\android-playstore-setup-wizard\index.html"
+            Write-Host "     2. 필요한 정보 입력 후 파일 생성"
+            Write-Host "     3. 생성된 파일을 android\ 폴더에 복사"
+            Write-Host ""
+        }
+        default {
+            Write-Host ""
+            Print-Info "📖 util 모듈 사용법:"
+            Write-Host "   .github\util\$ProjectType\ 폴더 내 README.md를 참고하세요."
+            Write-Host ""
+        }
+    }
+}
+
+function Copy-UtilModules {
+    param([string]$ProjectType)
+
+    $utilSrc = Join-Path $TEMP_DIR ".github\util\$ProjectType"
+    $utilDst = ".github\util\$ProjectType"
+
+    # util 모듈 존재 확인
+    if (-not (Test-Path $utilSrc)) {
+        # util 모듈이 없으면 조용히 건너뜀 (모든 타입에 모듈이 있는 건 아님)
+        return
+    }
+
+    Print-Step "$ProjectType 추가 유틸리티 모듈 확인 중..."
+
+    # 모듈 설명 표시
+    Show-UtilModuleDescription $ProjectType
+
+    # 사용자 확인 (force 모드가 아닐 때만)
+    if (-not $Force) {
+        Write-Host "이 유틸리티 모듈을 다운로드하시겠습니까?"
+        Write-Host "  Y/y - 예, 다운로드하기"
+        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
+        Write-Host ""
+
+        if (-not (Ask-YesNo "선택" "N")) {
+            Print-Info "util 모듈 다운로드 건너뜁니다"
+            return
+        }
+    } else {
+        # Force 모드에서는 자동으로 다운로드
+        Print-Info "강제 모드: util 모듈 자동 다운로드"
+    }
+
+    # 다운로드 실행
+    if (-not (Test-Path $utilDst)) {
+        New-Item -Path $utilDst -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$utilSrc\*" -Destination $utilDst -Recurse -Force -ErrorAction SilentlyContinue
+
+    # 복사된 모듈 개수 계산
+    $moduleCount = 0
+    $moduleDirs = Get-ChildItem -Path $utilDst -Directory -ErrorAction SilentlyContinue
+    if ($moduleDirs) {
+        $moduleCount = $moduleDirs.Count
+    }
+
+    Print-Success "util 모듈 다운로드 완료 ($moduleCount 개 모듈)"
+
+    # 복사된 모듈 목록 표시
+    foreach ($dir in $moduleDirs) {
+        Write-Host "  ✓ $($dir.Name)"
+    }
+
+    # 사용 가이드 표시
+    Show-UtilUsageGuide $ProjectType
+
+    # 복사된 모듈 수를 전역 변수로 저장 (최종 요약에서 사용)
+    $script:UtilModulesCopied = $moduleCount
+}
+
+# ===================================================================
 # 대화형 모드
 # ===================================================================
 
@@ -1390,6 +1519,7 @@ function Start-Integration {
             Copy-ClaudeFolder
             Copy-AgentPrompts
             Copy-SetupGuide
+            Copy-UtilModules $script:ProjectType
         }
         "version" {
             Create-VersionYml $script:ProjectVersion $script:ProjectType $script:DetectedBranch
@@ -1402,6 +1532,7 @@ function Start-Integration {
             Copy-Workflows
             Copy-Scripts
             Copy-SetupGuide
+            Copy-UtilModules $script:ProjectType
         }
         "issues" {
             Copy-IssueTemplates
@@ -1469,7 +1600,24 @@ function Show-Summary {
     Write-Host "     ├─ version_manager.sh"
     Write-Host "     └─ changelog_manager.py"
     Write-Host ""
-    
+
+    # util 모듈 정보 표시
+    if ($script:UtilModulesCopied -gt 0) {
+        Write-Host "  📦 유틸리티 모듈:"
+        Write-Host "     ✅ $($script:UtilModulesCopied)개 모듈 복사됨 (.github/util/$($script:ProjectType)/)"
+        Write-Host ""
+
+        # Flutter인 경우 상세 안내
+        if ($script:ProjectType -eq "flutter") {
+            Write-Host "  💡 Flutter 유틸리티 모듈 사용법:"
+            Write-Host "     • iOS TestFlight 마법사: .github/util/flutter/ios-testflight-setup-wizard/"
+            Write-Host "       → index.html을 브라우저에서 열어 설정 파일 생성"
+            Write-Host "     • Android Play Store 마법사: .github/util/flutter/android-playstore-setup-wizard/"
+            Write-Host "       → init.ps1 또는 init.sh 실행하여 설정 시작"
+            Write-Host ""
+        }
+    }
+
     # 프로젝트 타입별 안내
     if ($script:ProjectType -eq "spring") {
         Write-Host "  💡 Spring 프로젝트 추가 설정:"

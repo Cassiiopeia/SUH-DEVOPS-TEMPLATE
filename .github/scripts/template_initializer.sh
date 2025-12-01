@@ -330,111 +330,6 @@ update_workflow_triggers() {
     fi
 }
 
-# 불필요한 워크플로우 삭제 (타입별 필터링, 패턴 기반)
-cleanup_unused_workflows() {
-    local project_type=$1
-    
-    print_step "프로젝트 타입에 맞지 않는 워크플로우 삭제 중..."
-    print_info "프로젝트 타입: $project_type"
-    
-    local deleted=0
-    
-    # .github/workflows/ 폴더의 모든 YAML 파일 검사
-    for workflow_file in .github/workflows/*.yaml .github/workflows/*.yml; do
-        [ -e "$workflow_file" ] || continue
-        
-        local filename=$(basename "$workflow_file")
-        
-        # 1. 템플릿 전용 워크플로우 삭제 (항상 삭제)
-        if [[ "$filename" == "PROJECT-TEMPLATE-INITIALIZER.yaml" ]]; then
-            rm -f "$workflow_file"
-            echo "  ✓ $filename 삭제 (템플릿 전용)"
-            deleted=$((deleted + 1))
-            continue
-        fi
-        
-        # 2. Common 워크플로우는 항상 유지
-        if [[ "$filename" =~ ^PROJECT-COMMON- ]]; then
-            continue
-        fi
-        
-        # 3. 타입별 워크플로우 필터링
-        # Spring
-        if [[ "$filename" =~ ^PROJECT-SPRING- ]]; then
-            if [ "$project_type" != "spring" ]; then
-                rm -f "$workflow_file"
-                echo "  ✓ $filename 삭제 (Spring 전용, 현재: $project_type)"
-                deleted=$((deleted + 1))
-            fi
-            continue
-        fi
-        
-        # Flutter
-        if [[ "$filename" =~ ^PROJECT-FLUTTER- ]]; then
-            if [ "$project_type" != "flutter" ]; then
-                rm -f "$workflow_file"
-                echo "  ✓ $filename 삭제 (Flutter 전용, 현재: $project_type)"
-                deleted=$((deleted + 1))
-            fi
-            continue
-        fi
-        
-        # React
-        if [[ "$filename" =~ ^PROJECT-REACT- ]]; then
-            if [ "$project_type" != "react" ] && \
-               [ "$project_type" != "react-native" ] && \
-               [ "$project_type" != "react-native-expo" ]; then
-                rm -f "$workflow_file"
-                echo "  ✓ $filename 삭제 (React 전용, 현재: $project_type)"
-                deleted=$((deleted + 1))
-            fi
-            continue
-        fi
-        
-        # Next.js
-        if [[ "$filename" =~ ^PROJECT-NEXT- ]]; then
-            if [ "$project_type" != "next" ]; then
-                rm -f "$workflow_file"
-                echo "  ✓ $filename 삭제 (Next.js 전용, 현재: $project_type)"
-                deleted=$((deleted + 1))
-            fi
-            continue
-        fi
-
-        # Node
-        if [[ "$filename" =~ ^PROJECT-NODE- ]]; then
-            if [ "$project_type" != "node" ]; then
-                rm -f "$workflow_file"
-                echo "  ✓ $filename 삭제 (Node 전용, 현재: $project_type)"
-                deleted=$((deleted + 1))
-            fi
-            continue
-        fi
-        
-        # Python
-        if [[ "$filename" =~ ^PROJECT-PYTHON- ]]; then
-            if [ "$project_type" != "python" ]; then
-                rm -f "$workflow_file"
-                echo "  ✓ $filename 삭제 (Python 전용, 현재: $project_type)"
-                deleted=$((deleted + 1))
-            fi
-            continue
-        fi
-        
-        # 4. 기타 프로젝트별 워크플로우 (PROJECT-로 시작하지만 위에 매칭 안된 경우)
-        # 사용자 정의 워크플로우로 간주하여 보존
-        if [[ ! "$filename" =~ ^PROJECT- ]]; then
-            print_info "$filename 유지 (사용자 정의 워크플로우)"
-        fi
-    done
-    
-    if [ $deleted -eq 0 ]; then
-        print_info "삭제할 워크플로우가 없습니다"
-    else
-        print_success "$deleted 개 불필요한 워크플로우 삭제 완료"
-    fi
-}
-
 # 템플릿 관련 파일 삭제
 cleanup_template_files() {
     print_step "템플릿 관련 파일 삭제 중..."
@@ -571,7 +466,6 @@ print_summary() {
     echo "  ✅ CHANGELOG 파일 삭제"
     echo "  ✅ LICENSE, CONTRIBUTING.md 삭제"
     echo "  ✅ 테스트 폴더 삭제"
-    echo "  ✅ 타입별 워크플로우 필터링 (프로젝트 타입: $PROJECT_TYPE)"
     echo "  ✅ README.md 초기화"
     echo "  ✅ 이슈 템플릿 assignee 변경"
     echo ""
@@ -626,11 +520,7 @@ main() {
     # 3. 템플릿 파일 삭제
     cleanup_template_files
     echo ""
-    
-    # 3-1. 타입별 불필요한 워크플로우 삭제
-    cleanup_unused_workflows "$PROJECT_TYPE"
-    echo ""
-    
+
     # 4. README 초기화
     initialize_readme "$PROJECT_NAME" "$VERSION"
     echo ""

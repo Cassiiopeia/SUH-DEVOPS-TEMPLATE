@@ -1,0 +1,24 @@
+{
+  "name": "Android Play Store Setup Wizard",
+  "version": "1.0.0",
+  "description": "Flutter Android 앱을 Play Store에 배포하기 위한 설정 마법사",
+  "lastUpdated": "2024-12-01",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2024-12-01",
+      "changes": [
+        "초기 릴리즈",
+        "키스토어 생성 및 서명 설정",
+        "Play Store 서비스 계정 연동",
+        "Fastlane 설정 자동화"
+      ]
+    }
+  ],
+  "compatibility": {
+    "flutter": ">=3.0.0",
+    "android_sdk": ">=33",
+    "fastlane": ">=2.220.0"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}

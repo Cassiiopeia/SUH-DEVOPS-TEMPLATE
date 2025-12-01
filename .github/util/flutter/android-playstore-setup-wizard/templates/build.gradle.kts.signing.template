@@ -1,0 +1,106 @@
+// =============================================================================
+// build.gradle.kts - Release Signing Configuration Template
+// =============================================================================
+// This is a template for adding release signing configuration to your
+// Flutter project's android/app/build.gradle.kts file.
+//
+// Replace the following placeholders:
+//   {{APPLICATION_ID}} - Your app's application ID (e.g., com.example.app)
+//   {{NAMESPACE}} - Usually same as application ID
+// =============================================================================
+
+import java.util.Properties
+import java.io.FileInputStream
+
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Load key.properties file
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = "{{NAMESPACE}}"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+
+    // =========================================================================
+    // Signing Configurations
+    // =========================================================================
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String? ?: ""
+            keyPassword = keystoreProperties["keyPassword"] as String? ?: ""
+            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as String? ?: ""
+        }
+    }
+
+    defaultConfig {
+        applicationId = "{{APPLICATION_ID}}"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            // Use release signing config
+            signingConfig = signingConfigs.getByName("release")
+
+            // Enable code shrinking and resource shrinking for smaller APK/AAB
+            isMinifyEnabled = true
+            isShrinkResources = true
+
+            // ProGuard rules
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+
+        debug {
+            // Debug builds use debug signing (default)
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+// =============================================================================
+// Notes:
+// =============================================================================
+// 1. Create android/key.properties file with:
+//    storeFile=keystore/key.jks
+//    storePassword=your_store_password
+//    keyAlias=your_key_alias
+//    keyPassword=your_key_password
+//
+// 2. Place your keystore file at android/app/keystore/key.jks
+//
+// 3. Add to .gitignore:
+//    android/key.properties
+//    android/app/keystore/
+//    *.jks
+//    *.keystore
+// =============================================================================

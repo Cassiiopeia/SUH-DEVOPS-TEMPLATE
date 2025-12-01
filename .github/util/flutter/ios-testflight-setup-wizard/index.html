@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS TestFlight 배포 마법사</title>
+    <!-- 버전 정보 (version.json과 동기화 필요) -->
+    <script type="application/json" id="versionJson">
+{
+  "name": "iOS TestFlight Setup Wizard",
+  "version": "1.0.0",
+  "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
+  "lastUpdated": "2024-12-01",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2024-12-01",
+      "changes": [
+        "초기 릴리즈",
+        "9단계 마법사 구성 (시작 → 인증서 → App ID → Profile → ASC등록 → 앱정보 → API Key → Fastlane → 완료)",
+        "JSON/TXT 다운로드 기능",
+        "localStorage 기반 진행상태 저장"
+      ]
+    }
+  ],
+  "compatibility": {
+    "flutter": ">=3.0.0",
+    "xcode": ">=15.0",
+    "fastlane": ">=2.220.0"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}
+
+    </script>
+    <!-- Pretendard 폰트 -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard Variable', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            text: '#e2e8f0',
+                            muted: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Tooltip Styles */
+        .tooltip-container {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .tooltip-trigger {
+            cursor: help;
+            margin-left: 6px;
+        }
+        .tooltip-content {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            width: 280px;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            line-height: 1.5;
+        }
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #475569;
+        }
+        .tooltip-container:hover .tooltip-content {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Code Block */
+        .code-block {
+            position: relative;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .code-block pre {
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #e2e8f0;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* File Upload Styles */
+        .file-upload {
+            border: 2px dashed #3f3f46;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 16px;
+            background: #1e293b;
+        }
+        .file-upload:hover {
+            border-color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+        .file-upload.dragover {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+        .file-upload.has-file {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+        .file-upload .icon {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+        .file-upload input {
+            display: none;
+        }
+        .file-info {
+            margin-top: 12px;
+            padding: 8px;
+            background: rgba(34, 197, 94, 0.2);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #22c55e;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #22c55e;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Validation */
+        .input-error {
+            border-color: #ef4444 !important;
+        }
+        .error-message {
+            color: #ef4444;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .success-message {
+            color: #22c55e;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        /* Skip Button */
+        .skip-btn {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-decoration: underline;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        .skip-btn:hover {
+            color: #e2e8f0;
+        }
+
+        /* Result Item */
+        .result-item {
+            background: #18181b;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            border: 1px solid #3f3f46;
+        }
+        .result-item .key {
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        .result-item .value {
+            background: #27272a;
+            padding: 8px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            max-height: 80px;
+            overflow-y: auto;
+            color: #cbd5e1;
+        }
+        .copy-btn-small {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            background: #3f3f46;
+            border: none;
+            border-radius: 4px;
+            color: #e4e4e7;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .copy-btn-small:hover {
+            background: #52525b;
+        }
+        .copy-btn-small.copied {
+            background: #22c55e;
+        }
+
+        /* Dependency Flow */
+        .dependency-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 16px;
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .dependency-item {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .dependency-arrow {
+            color: #64748b;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
+    <!-- 보안 경고 -->
+    <div id="securityWarning" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-900/90 border border-yellow-700 text-yellow-200 px-6 py-3 rounded-lg shadow-xl z-50 max-w-2xl hidden">
+        <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div class="flex-1">
+                <p class="text-sm font-medium">이 페이지를 닫으면 입력한 데이터가 사라집니다 (localStorage에 임시 저장됨)</p>
+            </div>
+            <button onclick="closeSecurityWarning()" class="text-yellow-400 hover:text-yellow-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3" style="background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                🚀 iOS TestFlight 배포 마법사
+            </h1>
+            <p class="text-zinc-400 text-base md:text-lg flex items-center justify-center gap-3">
+                <a href="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" target="_blank" rel="noopener"
+                   class="hover:text-blue-400 transition inline-flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    SUH-DEVOPS-TEMPLATE
+                </a>
+                <span class="text-slate-600">|</span>
+                <button onclick="openChangelogModal()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border border-blue-500/30 rounded-full text-sm text-blue-400 hover:text-blue-300 transition cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                    <span id="versionBadge">v1.0.0</span>
+                </button>
+            </p>
+        </header>
+
+        <!-- Progress Steps (9단계) -->
+        <div class="flex justify-between mb-8 px-2 overflow-x-auto">
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="1">
+                <div class="step-circle w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white flex items-center justify-center font-bold text-xs z-10 shadow-lg shadow-blue-500/30">1</div>
+                <span class="text-[9px] mt-1 text-slate-400 text-center hidden md:block">시작</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="2">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">2</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">인증서</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="3">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">3</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">App ID</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="4">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">4</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">Profile</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="5">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">5</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">ASC등록</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="6">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">6</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">앱정보</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="7">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">7</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">API Key</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative min-w-[40px]" data-step="8">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">8</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">Fastlane</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 min-w-[40px]" data-step="9">
+                <div class="step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10">9</div>
+                <span class="text-[9px] mt-1 text-slate-500 text-center hidden md:block">완료</span>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 1: 시작하기 -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content fade-in" data-step="1">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-sm">1</span>
+                시작하기
+            </h2>
+
+            <!-- 의존성 흐름 설명 -->
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-200 mb-3">📋 iOS 배포를 위해 필요한 것들과 순서</p>
+                <div class="dependency-flow">
+                    <div class="dependency-item bg-purple-600 text-white text-[11px]">① 인증서</div>
+                    <span class="dependency-arrow">→</span>
+                    <div class="dependency-item bg-blue-600 text-white text-[11px]">② App ID</div>
+                    <span class="dependency-arrow">→</span>
+                    <div class="dependency-item bg-green-600 text-white text-[11px]">③ Profile</div>
+                    <span class="dependency-arrow">→</span>
+                    <div class="dependency-item bg-pink-600 text-white text-[11px]">④ ASC 등록</div>
+                    <span class="dependency-arrow">→</span>
+                    <div class="dependency-item bg-purple-600 text-white text-[11px]">⑤ API Key</div>
+                </div>
+                <p class="text-xs text-slate-400 text-center mt-2">
+                    순서대로 진행해야 합니다! <span class="text-pink-400">App Store Connect 앱 등록</span>이 있어야 TestFlight 업로드가 가능해요.
+                </p>
+            </div>
+
+            <!-- 준비물 체크리스트 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-slate-300 mb-3">✅ 시작 전 확인사항</p>
+                <ul class="text-xs text-slate-300 space-y-2">
+                    <li class="flex items-center gap-2">
+                        <input type="checkbox" id="check-apple-dev" class="w-4 h-4 rounded">
+                        <label for="check-apple-dev">Apple Developer Program 가입 완료 ($99/년)</label>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <input type="checkbox" id="check-mac" class="w-4 h-4 rounded">
+                        <label for="check-mac">Mac 컴퓨터 (키체인 접근용)</label>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <input type="checkbox" id="check-flutter" class="w-4 h-4 rounded">
+                        <label for="check-flutter">Flutter 프로젝트 준비됨</label>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 프로젝트 경로 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Flutter 프로젝트 절대 경로
+                </label>
+                <div class="flex gap-3">
+                    <input type="text" id="projectPath"
+                        class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                        placeholder="/Users/username/my-flutter-project (절대 경로로 입력)">
+                    <button class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition flex items-center gap-2" onclick="selectProjectFolder()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        폴더
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-8">
+                <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">
+                    다음: 인증서 만들기 →
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 2: Distribution 인증서 (.p12) -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="2">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-sm">2</span>
+                Distribution 인증서 만들기
+                <span class="text-xs font-normal text-purple-400 bg-purple-500/20 px-2 py-1 rounded">가장 먼저!</span>
+            </h2>
+
+            <!-- 왜 먼저인지 설명 -->
+            <div class="bg-purple-900/30 border border-purple-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-purple-200">
+                    🔑 <strong>인증서가 가장 먼저인 이유:</strong> Provisioning Profile을 만들 때 인증서가 필요합니다!
+                </p>
+            </div>
+
+            <!-- 바로가기 버튼 -->
+            <div class="mb-4">
+                <a href="https://developer.apple.com/account/resources/certificates/list"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    Apple Developer Certificates 페이지 열기
+                </a>
+            </div>
+
+            <!-- 인증서 생성 가이드 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-3">📋 새 인증서 만드는 방법</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-2">
+                    <li>위 버튼 클릭 → Certificates 페이지 열기</li>
+                    <li><span class="text-blue-400 font-bold text-sm">+</span> 버튼 클릭</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">⚠️ 중요! 올바른 타입 선택:</span>
+                            <div class="mt-2 space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-green-400 text-lg">✅</span>
+                                    <span class="text-green-400 font-bold">Apple Distribution</span>
+                                    <span class="text-slate-400">- App Store 배포용 (이것 선택!)</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-slate-500">
+                                    <span class="text-red-400">❌</span>
+                                    <span>iOS Distribution - 구버전 (선택 금지)</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-slate-500">
+                                    <span class="text-red-400">❌</span>
+                                    <span>Apple Development - 개발용 (배포 불가)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>CSR 파일 업로드가 필요합니다 (아래 참고)</li>
+                    <li>인증서 생성 후 Download</li>
+                    <li>다운로드한 .cer 파일 더블클릭 → 키체인에 자동 설치</li>
+                </ol>
+            </div>
+
+            <!-- CSR 파일 만드는 방법 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">📝 CSR(인증서 서명 요청) 파일 만드는 방법</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs space-y-2">
+                    <div class="text-slate-400">1. 키체인 접근 앱 열기</div>
+                    <div class="text-slate-400">2. 메뉴: 키체인 접근 → 인증서 지원 → 인증 기관에서 인증서 요청</div>
+                    <div class="text-slate-400">3. 사용자 이메일: <span class="text-yellow-400">Apple Developer 계정 이메일</span></div>
+                    <div class="text-slate-400">4. 일반 이름: 아무거나 (예: MyApp Distribution)</div>
+                    <div class="text-slate-400">5. "디스크에 저장" 선택 → 저장</div>
+                    <div class="text-green-400 mt-2">→ CertificateSigningRequest.certSigningRequest 파일 생성됨</div>
+                </div>
+            </div>
+
+            <!-- 키체인에서 .p12 내보내기 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-2">📤 키체인에서 .p12 파일 내보내기</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                    <li>Mac에서 <span class="text-yellow-400">"키체인 접근"</span> 앱 열기 (⌘+Space → "키체인")</li>
+                    <li>왼쪽: <span class="text-yellow-400">"로그인"</span> 키체인 → 상단: <span class="text-yellow-400">"인증서"</span> 카테고리</li>
+                    <li><span class="text-green-400 font-bold">"Apple Distribution: [팀이름]"</span> 인증서 찾기</li>
+                    <li>우클릭 → <span class="text-yellow-400">"[인증서명] 내보내기"</span></li>
+                    <li>파일 포맷: <span class="text-orange-400 font-bold">.p12</span> 선택</li>
+                    <li>비밀번호 설정 (아래에 입력)</li>
+                </ol>
+            </div>
+
+            <!-- 키체인 시각화 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">📍 키체인 접근 앱에서 찾는 위치</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs overflow-x-auto">
+                    <div class="flex gap-4">
+                        <div class="border-r border-slate-700 pr-4">
+                            <div class="text-slate-500 text-[10px] mb-1">키체인</div>
+                            <div class="text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">로그인</div>
+                            <div class="text-slate-500 px-2 py-0.5">시스템</div>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-slate-500 text-[10px] mb-1">카테고리</div>
+                            <div class="flex gap-2 mb-3">
+                                <span class="text-slate-500 px-2 py-0.5">모든 항목</span>
+                                <span class="text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">인증서</span>
+                                <span class="text-slate-500 px-2 py-0.5">암호</span>
+                            </div>
+                            <div class="border border-slate-700 rounded">
+                                <div class="border-l-4 border-green-500 p-2 bg-green-900/20 flex items-center gap-2">
+                                    <span class="text-lg">📜</span>
+                                    <div>
+                                        <div class="text-green-400 font-bold">Apple Distribution: Your Team Name</div>
+                                        <div class="text-slate-500 text-[10px]">만료: 2025년 12월 31일</div>
+                                    </div>
+                                </div>
+                                <div class="text-green-400 text-[10px] pl-6 py-1">↑ 이 인증서 우클릭 → "내보내기"</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 파일 업로드 -->
+            <div class="file-upload" id="p12-upload" onclick="document.getElementById('p12-input').click()">
+                <div class="icon">📄</div>
+                <div class="text-slate-300">.p12 파일을 드래그하거나 클릭하세요</div>
+                <input type="file" id="p12-input" accept=".p12" onchange="handleP12Upload(event)">
+                <div class="file-info" id="p12-info" style="display:none"></div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">.p12 비밀번호</label>
+                <input type="password" id="p12-password" placeholder="내보낼 때 설정한 비밀번호"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none">
+            </div>
+
+            <div class="flex justify-between items-center mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <div class="flex gap-2 items-center">
+                    <span class="skip-btn" onclick="skipStep(2)">이미 있어요 →</span>
+                    <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: App ID →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 3: App ID (Bundle ID) 등록 -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="3">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm">3</span>
+                App ID (Bundle ID) 등록
+            </h2>
+
+            <!-- 설명 -->
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-200">
+                    📱 <strong>App ID란?</strong> 앱의 고유 식별자입니다. Flutter의 Bundle ID와 동일하게 설정해야 합니다!
+                </p>
+            </div>
+
+            <!-- 바로가기 버튼 -->
+            <div class="mb-4">
+                <a href="https://developer.apple.com/account/resources/identifiers/list"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    Apple Developer Identifiers 페이지 열기
+                </a>
+            </div>
+
+            <!-- 생성 가이드 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-3">📋 App ID 등록 방법</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-2">
+                    <li>위 버튼 클릭 → Identifiers 페이지 열기</li>
+                    <li><span class="text-blue-400 font-bold text-sm">+</span> 버튼 클릭</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-green-500">
+                            <span class="text-green-400 font-bold">1단계: Register a new identifier</span>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="text-green-400">◉</span>
+                                <span class="text-green-400 font-bold">App IDs</span>
+                                <span class="text-slate-400">← 이것 선택!</span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-green-500">
+                            <span class="text-green-400 font-bold">2단계: Select a type</span>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="text-green-400">◉</span>
+                                <span class="text-green-400 font-bold">App</span>
+                                <span class="text-slate-400">← 이것 선택! (App Clip 아님)</span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">3단계: Bundle ID 설정</span>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <span class="text-slate-400">Description:</span>
+                                    <span class="text-white">앱 이름 (예: My Flutter App)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-green-400">◉</span>
+                                    <span class="text-green-400 font-bold">Explicit</span>
+                                    <span class="text-slate-400">← 이것 선택!</span>
+                                </div>
+                                <div class="text-slate-400">Bundle ID: <span class="text-orange-400 font-bold">kr.suhsaechan.suhDevopsTemplate</span></div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>Capabilities: 필요한 기능만 체크 (Push Notifications 등)</li>
+                    <li><span class="text-green-400 font-bold">Register</span> 클릭!</li>
+                </ol>
+            </div>
+
+            <!-- 시각화 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">📍 Identifiers 페이지 미리보기</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs overflow-x-auto">
+                    <div class="flex gap-4">
+                        <div class="border-r border-slate-700 pr-4 text-slate-500">
+                            <div class="py-1">Certificates</div>
+                            <div class="py-1 text-blue-400 bg-blue-900/30 px-2 rounded">Identifiers</div>
+                            <div class="py-1">Devices</div>
+                            <div class="py-1">Profiles</div>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-slate-300 font-bold">Identifiers</span>
+                                <span class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">+</span>
+                                <span class="text-green-400 text-[10px]">← 클릭!</span>
+                            </div>
+                            <div class="border border-slate-700 rounded">
+                                <div class="grid grid-cols-2 gap-2 p-2 bg-slate-800 text-slate-500 text-[10px]">
+                                    <span>NAME</span>
+                                    <span>IDENTIFIER</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 p-2 text-slate-300">
+                                    <span>SuhDevopsTemplate</span>
+                                    <span class="text-blue-400">kr.suhsaechan.suhDevopsTemplate</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bundle ID 네이밍 가이드 -->
+            <div class="bg-gradient-to-r from-emerald-900/30 to-blue-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-emerald-400 mb-3">💡 Bundle ID 네이밍 가이드</p>
+                <div class="text-xs text-slate-300 space-y-2">
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <span class="text-slate-400">권장 형식:</span>
+                        <span class="text-orange-400 font-mono">[역도메인].[앱이름]</span>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-400">✅</span>
+                            <code class="text-green-400">kr.suhsaechan.suhDevopsTemplate</code>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-400">✅</span>
+                            <code class="text-green-400">com.suhsaechan.earloclaert</code>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-400">✅</span>
+                            <code class="text-green-400">io.github.username.appname</code>
+                        </div>
+                        <div class="flex items-center gap-2 text-slate-500">
+                            <span class="text-red-400">❌</span>
+                            <code>myapp</code> - 너무 짧음
+                        </div>
+                        <div class="flex items-center gap-2 text-slate-500">
+                            <span class="text-red-400">❌</span>
+                            <code>MyApp</code> - 대문자 비권장
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bundle ID 입력 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    등록한 Bundle ID 입력 <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="bundleId"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                    placeholder="kr.suhsaechan.suhDevopsTemplate">
+                <p class="text-xs text-slate-500 mt-1">Flutter 프로젝트의 ios/Runner.xcodeproj Bundle Identifier와 동일해야 합니다</p>
+            </div>
+
+            <div class="flex justify-between items-center mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <div class="flex gap-2 items-center">
+                    <span class="skip-btn" onclick="skipStep(3)">이미 있어요 →</span>
+                    <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: Profile →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 4: Provisioning Profile -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="4">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-sm">4</span>
+                Provisioning Profile 생성
+            </h2>
+
+            <!-- 설명 -->
+            <div class="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-green-200">
+                    🔗 <strong>Provisioning Profile이란?</strong> 인증서 + App ID를 묶어서 "이 앱은 이 인증서로 서명됨"을 증명하는 파일입니다.
+                </p>
+                <p class="text-xs text-slate-400 mt-2">
+                    ⚠️ Step 2 인증서 + Step 3 App ID가 있어야 만들 수 있습니다!
+                </p>
+            </div>
+
+            <!-- 바로가기 버튼 -->
+            <div class="mb-4">
+                <a href="https://developer.apple.com/account/resources/profiles/list"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    Apple Developer Profiles 페이지 열기
+                </a>
+            </div>
+
+            <!-- 생성 가이드 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-3">📋 Provisioning Profile 생성 방법</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-2">
+                    <li>위 버튼 클릭 → Profiles 페이지 열기</li>
+                    <li><span class="text-blue-400 font-bold text-sm">+</span> 버튼 클릭</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">⚠️ Distribution 타입 선택 (Development 아님!)</span>
+                            <div class="mt-2 space-y-1">
+                                <div class="text-slate-500">Development</div>
+                                <div class="text-slate-500 pl-4">○ iOS App Development</div>
+                                <div class="text-slate-300 font-bold">Distribution</div>
+                                <div class="flex items-center gap-2 pl-4">
+                                    <span class="text-green-400">◉</span>
+                                    <span class="text-green-400 font-bold">App Store Connect</span>
+                                    <span class="text-slate-400">← 이것 선택!</span>
+                                </div>
+                                <div class="text-slate-500 pl-4">○ Ad Hoc</div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-blue-500">
+                            <span class="text-blue-400 font-bold">App ID 선택</span>
+                            <div class="mt-2">
+                                <span class="text-slate-400">Step 3에서 만든</span>
+                                <span class="text-orange-400 font-bold" id="display-bundle-id">kr.suhsaechan.suhDevopsTemplate</span>
+                                <span class="text-slate-400">선택</span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-purple-500">
+                            <span class="text-purple-400 font-bold">Certificate 선택</span>
+                            <div class="mt-2">
+                                <span class="text-slate-400">Step 2에서 만든</span>
+                                <span class="text-purple-400 font-bold">Apple Distribution</span>
+                                <span class="text-slate-400">인증서 체크</span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">Profile 이름 입력</span>
+                            <div class="mt-2 text-slate-400">
+                                예: <span class="text-orange-400">MyApp AppStore Distribution</span>
+                            </div>
+                        </div>
+                    </li>
+                    <li><span class="text-green-400 font-bold">Generate</span> → <span class="text-blue-400 font-bold">Download</span></li>
+                </ol>
+            </div>
+
+            <!-- Profile 이름 네이밍 가이드 -->
+            <div class="bg-gradient-to-r from-emerald-900/30 to-blue-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-emerald-400 mb-3">💡 Profile 이름 네이밍 가이드</p>
+                <div class="text-xs text-slate-300 space-y-2">
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <span class="text-slate-400">권장 형식:</span>
+                        <span class="text-orange-400 font-mono">[앱이름] [용도] [타입]</span>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-400">✅</span>
+                            <code class="text-green-400">EarLocAlert AppStore Distribution</code>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-400">✅</span>
+                            <code class="text-green-400">MyApp App Store Dist</code>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-400">✅</span>
+                            <code class="text-green-400">ProjectName-AppStore-2024</code>
+                        </div>
+                    </div>
+                    <p class="text-yellow-400 mt-2">⚠️ 이 이름을 정확히 기억하세요! GitHub Secrets에 입력해야 합니다.</p>
+                    <p class="text-red-400 mt-1">🚨 <strong>띄어쓰기까지 완벽히 일치해야 합니다!</strong> 한 글자라도 다르면 빌드 실패!</p>
+                </div>
+            </div>
+
+            <!-- 파일 업로드 -->
+            <div class="file-upload" id="provision-upload" onclick="document.getElementById('provision-input').click()">
+                <div class="icon">📄</div>
+                <div class="text-slate-300">.mobileprovision 파일을 드래그하거나 클릭하세요</div>
+                <input type="file" id="provision-input" accept=".mobileprovision" onchange="handleProvisionUpload(event)">
+                <div class="file-info" id="provision-info" style="display:none"></div>
+            </div>
+
+            <!-- Profile 이름 입력 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Provisioning Profile 이름 <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="profileName"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                    placeholder="MyApp AppStore Distribution">
+                <p class="text-xs text-slate-500 mt-1">Apple Developer에서 입력한 이름과 정확히 동일하게!</p>
+            </div>
+
+            <div class="flex justify-between items-center mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <div class="flex gap-2 items-center">
+                    <span class="skip-btn" onclick="skipStep(4)">이미 있어요 →</span>
+                    <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: ASC 앱등록 →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 5: App Store Connect 앱 등록 (신규!) -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="5">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center text-sm">5</span>
+                App Store Connect 앱 등록
+                <span class="text-xs font-normal text-pink-400 bg-pink-500/20 px-2 py-1 rounded">TestFlight 필수!</span>
+            </h2>
+
+            <!-- 왜 필요한지 설명 -->
+            <div class="bg-pink-900/30 border border-pink-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-pink-200">
+                    🎯 <strong>이 단계가 필수인 이유:</strong> App Store Connect에 앱이 등록되어 있어야 TestFlight에 업로드할 수 있습니다!
+                </p>
+                <p class="text-xs text-slate-400 mt-2">
+                    Fastlane의 <code class="text-pink-400">pilot</code>/<code class="text-pink-400">upload_to_testflight</code>가 Bundle ID로 앱을 찾습니다.
+                    <span class="text-red-400 font-bold">앱이 없으면 "App not found" 에러 발생!</span>
+                </p>
+            </div>
+
+            <!-- 바로가기 버튼 -->
+            <div class="mb-4">
+                <a href="https://appstoreconnect.apple.com/apps"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    App Store Connect - My Apps 열기
+                </a>
+            </div>
+
+            <!-- 생성 가이드 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-3">📋 새 앱 등록 방법</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-2">
+                    <li>위 버튼 클릭 → App Store Connect 열기</li>
+                    <li>
+                        <span class="text-blue-400 font-bold text-sm">+</span> 버튼 클릭 →
+                        <span class="text-pink-400 font-bold">New App</span> 선택
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-blue-500">
+                            <span class="text-blue-400 font-bold">New App 다이얼로그 입력</span>
+                            <div class="mt-3 space-y-3">
+                                <!-- Platforms -->
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-400 w-28">Platforms:</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-green-400">☑</span>
+                                        <span class="text-green-400 font-bold">iOS</span>
+                                        <span class="text-slate-500">☐ macOS</span>
+                                        <span class="text-slate-500">☐ tvOS</span>
+                                    </div>
+                                </div>
+                                <!-- Name -->
+                                <div class="flex items-start gap-2">
+                                    <span class="text-slate-400 w-28">Name:</span>
+                                    <div>
+                                        <span class="text-orange-400 font-bold">앱 표시 이름</span>
+                                        <div class="text-slate-500 text-[10px]">App Store에 표시됨 (예: 귀 위치 알림)</div>
+                                    </div>
+                                </div>
+                                <!-- Primary Language -->
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-400 w-28">Primary Language:</span>
+                                    <span class="text-white">Korean (한국어)</span>
+                                </div>
+                                <!-- Bundle ID -->
+                                <div class="flex items-start gap-2">
+                                    <span class="text-slate-400 w-28">Bundle ID:</span>
+                                    <div>
+                                        <span class="text-green-400 font-bold" id="display-bundle-id-asc">kr.suhsaechan.suhDevopsTemplate</span>
+                                        <div class="text-green-400 text-[10px]">↑ Step 3에서 등록한 Bundle ID 드롭다운에서 선택!</div>
+                                    </div>
+                                </div>
+                                <!-- SKU -->
+                                <div class="flex items-start gap-2">
+                                    <span class="text-slate-400 w-28">SKU:</span>
+                                    <div>
+                                        <span class="text-yellow-400 font-bold">SUHDEVOPSTEMPLATE</span>
+                                        <div class="text-slate-500 text-[10px]">내부 식별용 (아무 고유값, 다른 앱과 겹치면 안됨)</div>
+                                    </div>
+                                </div>
+                                <!-- User Access -->
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-400 w-28">User Access:</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-green-400">◉</span>
+                                        <span class="text-green-400 font-bold">Full Access</span>
+                                        <span class="text-slate-500">○ Limited Access</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li><span class="text-pink-400 font-bold">Create</span> 버튼 클릭!</li>
+                </ol>
+            </div>
+
+            <!-- 페이지 시각화 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">📍 App Store Connect 페이지 미리보기</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs overflow-x-auto">
+                    <div class="border border-slate-600 rounded">
+                        <!-- Header -->
+                        <div class="flex items-center gap-4 p-3 bg-slate-800 border-b border-slate-600">
+                            <span class="text-blue-400 font-bold">My Apps</span>
+                            <span class="text-slate-500">App Analytics</span>
+                            <span class="text-slate-500">Users and Access</span>
+                        </div>
+                        <!-- Content -->
+                        <div class="p-4">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-lg">+</span>
+                                <span class="text-green-400 text-[10px]">← 이 버튼 클릭 → "New App"</span>
+                            </div>
+                            <div class="text-slate-400 mb-2">Your Apps</div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="p-3 border border-slate-700 rounded-lg text-center">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl mx-auto mb-2"></div>
+                                    <div class="text-slate-300 text-[11px]">My App 1</div>
+                                </div>
+                                <div class="p-3 border border-slate-700 rounded-lg text-center">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl mx-auto mb-2"></div>
+                                    <div class="text-slate-300 text-[11px]">My App 2</div>
+                                </div>
+                                <div class="p-3 border-2 border-dashed border-pink-500 rounded-lg text-center bg-pink-900/20">
+                                    <div class="w-12 h-12 border-2 border-dashed border-pink-400 rounded-xl mx-auto mb-2 flex items-center justify-center text-pink-400 text-2xl">+</div>
+                                    <div class="text-pink-400 text-[11px] font-bold">새 앱 추가!</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pro Tips -->
+            <div class="bg-gradient-to-r from-emerald-900/30 to-blue-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-emerald-400 mb-3">💡 Pro Tips</p>
+                <ul class="text-xs text-slate-300 space-y-2">
+                    <li class="flex items-start gap-2">
+                        <span class="text-emerald-400">✓</span>
+                        <span><strong class="text-emerald-300">Name은 나중에 변경 가능!</strong> App Store Connect에서 언제든 수정할 수 있어요.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-yellow-400">⚠️</span>
+                        <span><strong class="text-yellow-300">Bundle ID는 변경 불가!</strong> 한번 연결하면 앱 삭제 전까지 바꿀 수 없어요.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-emerald-400">✓</span>
+                        <span><strong class="text-emerald-300">SKU는 내부용!</strong> 사용자에게 보이지 않아요. 고유값이기만 하면 됩니다.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-emerald-400">✓</span>
+                        <span><strong class="text-emerald-300">앱 정보 입력은 나중에!</strong> 지금은 앱 "껍데기"만 만들면 됩니다. 아이콘, 스크린샷은 나중에.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 확인 체크박스 -->
+            <div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg mb-6">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="asc-app-created" class="w-5 h-5 rounded text-pink-500 bg-slate-900 border-slate-600 focus:ring-pink-500">
+                    <span class="text-sm text-slate-200">App Store Connect에 앱을 등록했습니다</span>
+                </label>
+            </div>
+
+            <div class="flex justify-between items-center mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <div class="flex gap-2 items-center">
+                    <span class="skip-btn" onclick="skipStep(5)">이미 등록함 →</span>
+                    <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: 앱 정보 →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 6: 앱 정보 확인 -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-sm">6</span>
+                앱 정보 확인 및 추가 설정
+            </h2>
+
+            <!-- 설명 -->
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-200">
+                    ✅ 앞 단계에서 입력한 정보를 확인하고, 추가 정보를 입력하세요.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4 mb-6">
+                <!-- Bundle ID (자동 채워짐) -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        Bundle ID
+                        <span class="text-xs text-green-400">(Step 3에서 입력됨)</span>
+                    </label>
+                    <input type="text" id="bundleId-confirm"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                        placeholder="kr.suhsaechan.suhDevopsTemplate">
+                </div>
+
+                <!-- Team ID -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        <span class="tooltip-container">
+                            Apple Team ID <span class="text-red-400">*</span>
+                            <span class="tooltip-trigger">
+                                <svg class="w-4 h-4 text-slate-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </span>
+                            <div class="tooltip-content" style="width: 280px;">
+                                <strong class="text-yellow-400">📍 찾는 방법</strong><br>
+                                Apple Developer → Membership → Team ID<br>
+                                <span class="text-slate-400 text-[11px]">10자리 영문+숫자 (예: ABC1234DEF)</span>
+                            </div>
+                        </span>
+                    </label>
+                    <input type="text" id="teamId" maxlength="10"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm uppercase focus:border-blue-500 outline-none"
+                        placeholder="ABC1234DEF">
+                </div>
+
+                <!-- Profile Name (자동 채워짐) -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        Provisioning Profile 이름
+                        <span class="text-xs text-green-400">(Step 4에서 입력됨)</span>
+                    </label>
+                    <input type="text" id="profileName-confirm"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                        placeholder="MyApp AppStore Distribution">
+                </div>
+
+                <!-- 앱 이름 -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">앱 이름 (선택)</label>
+                    <input type="text" id="appName"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                        placeholder="My App">
+                </div>
+            </div>
+
+            <!-- Team ID 찾기 가이드 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-2">📍 Team ID 찾는 방법</p>
+                <div class="flex gap-2 items-center mb-2">
+                    <a href="https://developer.apple.com/account#MembershipDetailsCard"
+                       target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-xs font-medium transition">
+                        Apple Developer Membership 페이지 열기
+                    </a>
+                </div>
+                <p class="text-xs text-slate-400">페이지에서 "Team ID" 항목을 찾으세요 (10자리 영문+숫자)</p>
+            </div>
+
+            <!-- 암호화 설정 -->
+            <div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg mb-6">
+                <label class="block text-sm font-medium mb-3 text-slate-300">🔐 앱 암호화 설정</label>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-slate-600/50 transition">
+                        <input type="radio" name="encryptionType" value="none" checked
+                            class="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-sm font-medium text-slate-200">None - HTTPS만 사용 (권장)</span>
+                            <p class="text-xs text-slate-400">일반적인 앱</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-slate-600/50 transition">
+                        <input type="radio" name="encryptionType" value="standard"
+                            class="w-4 h-4 text-blue-500 bg-slate-900 border-slate-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-sm font-medium text-slate-200">Standard encryption</span>
+                            <p class="text-xs text-slate-400">표준 암호화 사용 앱</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: API Key →</button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 7: API Key (.p8) -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="7">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm">7</span>
+                App Store Connect API Key (.p8)
+            </h2>
+
+            <!-- 설명 -->
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-200">
+                    🔑 <strong>API Key란?</strong> Fastlane이 자동으로 TestFlight에 업로드할 때 사용하는 인증 키입니다.
+                </p>
+            </div>
+
+            <!-- 바로가기 버튼 -->
+            <div class="mb-4">
+                <a href="https://appstoreconnect.apple.com/access/integrations/api"
+                   target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    App Store Connect API Keys 페이지 열기
+                </a>
+            </div>
+
+            <!-- 생성 가이드 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-2">📋 API Key 생성 방법</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                    <li>위 버튼 클릭 → App Store Connect 열기</li>
+                    <li>Team Keys 탭에서 <span class="text-blue-400 font-bold">+</span> 버튼 클릭</li>
+                    <li>Name: 알아보기 쉬운 이름 (예: MY-PROJECT-KEY)</li>
+                    <li>Access: <span class="text-orange-400 font-bold">Admin</span> 선택 (권장)</li>
+                    <li>Generate → <span class="text-red-400 font-bold">.p8 파일 즉시 다운로드!</span></li>
+                </ol>
+            </div>
+
+            <!-- 페이지 구조 시각화 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">📍 App Store Connect 페이지에서 찾는 위치</p>
+                <div class="bg-slate-900 rounded-lg p-4 font-mono text-xs overflow-x-auto">
+                    <div class="text-slate-500 mb-2">Users and Access → Integrations → App Store Connect API</div>
+                    <div class="border border-slate-600 rounded p-3">
+                        <!-- Issuer ID 섹션 -->
+                        <div class="border-l-4 border-yellow-500 pl-3 mb-4 py-2 bg-yellow-900/20 rounded-r">
+                            <div class="text-slate-400 text-[10px] mb-1">⬇️ 페이지 중간에 별도로 표시됨</div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-slate-400">Issuer ID</span>
+                                <span class="text-slate-500">ⓘ</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-yellow-400 font-bold">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>
+                                <span class="text-blue-400 text-[10px] border border-blue-400 rounded px-1">Copy</span>
+                            </div>
+                            <div class="text-green-400 text-[10px] mt-1">↑ 여기서 Copy 버튼 클릭!</div>
+                        </div>
+
+                        <!-- Active Keys 테이블 -->
+                        <div class="text-slate-400 mb-2">Active Keys <span class="text-green-500">●</span></div>
+                        <div class="border border-slate-700 rounded overflow-hidden">
+                            <div class="grid grid-cols-4 gap-2 p-2 bg-slate-800 text-slate-500 text-[10px]">
+                                <span>NAME</span>
+                                <span>GENERATED BY</span>
+                                <span class="text-orange-400">KEY ID</span>
+                                <span>ACCESS</span>
+                            </div>
+                            <div class="border-l-4 border-orange-500 grid grid-cols-4 gap-2 p-2 text-slate-300 bg-orange-900/20">
+                                <span>MY-PROJECT-KEY</span>
+                                <span class="text-slate-500">홍길동</span>
+                                <span class="text-orange-400 font-bold">XXXXXXXXXX</span>
+                                <span class="text-purple-400">Admin</span>
+                            </div>
+                            <div class="text-green-400 text-[10px] pl-6 py-1">↑ Key ID는 테이블에서 복사!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pro Tips -->
+            <div class="bg-gradient-to-r from-emerald-900/30 to-blue-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-emerald-400 mb-3">💡 Pro Tips</p>
+                <ul class="text-xs text-slate-300 space-y-2">
+                    <li class="flex items-start gap-2">
+                        <span class="text-emerald-400">✓</span>
+                        <span><strong class="text-emerald-300">Admin Key 하나로 모든 프로젝트 관리!</strong> 여러 앱에 동일한 API Key를 사용할 수 있어요.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-emerald-400">✓</span>
+                        <span><strong class="text-emerald-300">Issuer ID는 팀 전체 공유!</strong> 모든 API Key가 동일한 Issuer ID를 사용합니다.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-yellow-400">⚠️</span>
+                        <span><strong class="text-yellow-300">.p8 파일은 딱 한 번만 다운로드 가능!</strong> 생성 직후 반드시 백업하세요.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 파일 업로드 -->
+            <div class="file-upload" id="p8-upload" onclick="document.getElementById('p8-input').click()">
+                <div class="icon">📄</div>
+                <div class="text-slate-300">.p8 파일을 드래그하거나 클릭하세요</div>
+                <input type="file" id="p8-input" accept=".p8" onchange="handleP8Upload(event)">
+                <div class="file-info" id="p8-info" style="display:none"></div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        <span class="tooltip-container">
+                            API Key ID
+                            <span class="tooltip-trigger">
+                                <svg class="w-4 h-4 text-slate-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </span>
+                            <div class="tooltip-content" style="width: 260px;">
+                                <strong class="text-orange-400">📍 위치</strong><br>
+                                Active Keys 테이블의 <span class="text-orange-400">"KEY ID"</span> 열<br>
+                                <span class="text-slate-400 text-[11px]">예: XXXXXXXXXX (10자리)</span>
+                            </div>
+                        </span>
+                    </label>
+                    <input type="text" id="api-key-id" placeholder="XXXXXXXXXX"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        <span class="tooltip-container">
+                            Issuer ID
+                            <span class="tooltip-trigger">
+                                <svg class="w-4 h-4 text-slate-400 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </span>
+                            <div class="tooltip-content" style="width: 300px;">
+                                <strong class="text-yellow-400">📍 위치 (주의!)</strong><br>
+                                테이블 <span class="text-yellow-400 font-bold">위쪽</span>에 별도로 표시됨!<br>
+                                <span class="text-slate-400 text-[11px]">"Issuer ID" 라벨 옆의 Copy 버튼 클릭</span>
+                            </div>
+                        </span>
+                    </label>
+                    <input type="text" id="issuer-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <div class="flex gap-2 items-center">
+                    <span class="skip-btn" onclick="skipStep(7)">이미 있어요 →</span>
+                    <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: Fastlane →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 8: Fastlane 설정 -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="8">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center text-sm">8</span>
+                Fastlane 파일 생성
+            </h2>
+
+            <div class="bg-pink-900/30 border border-pink-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-pink-200">
+                    🚀 <strong>Fastlane이란?</strong> iOS 빌드 & 배포를 자동화하는 도구입니다. GitHub Actions에서 사용합니다.
+                </p>
+            </div>
+
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-1">생성되는 파일:</p>
+                <ul class="text-xs text-slate-300 list-disc list-inside">
+                    <li>ios/Gemfile</li>
+                    <li>ios/fastlane/Appfile</li>
+                    <li>ios/fastlane/Fastfile</li>
+                    <li>ios/ExportOptions.plist</li>
+                </ul>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">터미널에서 실행:</label>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="initCmd">cd "/path/to/project" && bash ".github/util/flutter-ios-testflight-init/init.sh" ...</pre>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition" onclick="nextStep()">다음: 완료! →</button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 9: 완료 & GitHub Secrets -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="9">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-sm">✓</span>
+                완료! GitHub Secrets 설정값
+            </h2>
+
+            <div class="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-green-200">🎉 모든 설정이 완료되었습니다! 아래 값들을 GitHub Secrets에 등록하세요.</p>
+            </div>
+
+            <!-- GitHub Secrets 등록 방법 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-2">📍 GitHub Secrets 등록 방법</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                    <li>GitHub 저장소 → Settings → Secrets and variables → Actions</li>
+                    <li>"New repository secret" 클릭</li>
+                    <li>아래 각 항목의 Name과 Value를 입력</li>
+                </ol>
+            </div>
+
+            <h3 class="text-lg font-semibold mb-4 text-slate-200">등록할 Secrets 목록</h3>
+            <div id="results-container"></div>
+
+            <div class="mt-6 p-4 bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-700 rounded-lg">
+                <p class="text-center text-slate-300 mb-4">💾 Secrets 정보를 파일로 저장하세요</p>
+                <div class="flex justify-center gap-4">
+                    <button class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition flex items-center gap-2" onclick="downloadAsJson()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        JSON 다운로드
+                    </button>
+                    <button class="px-6 py-3 bg-slate-600 hover:bg-slate-500 rounded-lg font-medium transition flex items-center gap-2" onclick="downloadAsTxt()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        TXT 다운로드
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-slate-600 hover:bg-slate-500 rounded-lg font-medium transition" onclick="resetWizard()">🔄 처음부터 다시</button>
+            </div>
+
+            <!-- Star 부탁 -->
+            <div class="mt-6 flex items-center justify-center gap-3 text-slate-400 text-sm">
+                <span>도움이 되셨다면 소중한 ⭐️를 눌러주세요!!</span>
+                <a href="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg>
+                    누르러가기
+                </a>
+            </div>
+        </div>
+
+        <footer class="text-center text-slate-500 text-sm py-8">
+            <p>🔒 로컬 실행 전용 - 서버에 데이터가 전송되지 않습니다</p>
+        </footer>
+    </div>
+
+    <!-- Modal -->
+    <div id="guideModal" class="modal-backdrop hidden" onclick="closeGuideModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold" id="guideTitle">가이드</h3>
+                <button class="text-slate-400 hover:text-slate-200" onclick="closeGuideModal()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="guideContent"></div>
+        </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div id="changelogModal" class="modal-backdrop hidden" onclick="closeChangelogModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 500px;">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Changelog</h3>
+                        <p class="text-xs text-slate-400">iOS TestFlight Setup Wizard</p>
+                    </div>
+                </div>
+                <button class="text-slate-400 hover:text-slate-200 hover:bg-slate-700 p-2 rounded-lg transition" onclick="closeChangelogModal()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="changelogContent" class="space-y-4">
+                <!-- Changelog items will be inserted here -->
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-700 flex justify-between items-center text-xs text-slate-500">
+                <span id="changelogLastUpdated"></span>
+                <a href="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" target="_blank" class="text-blue-400 hover:text-blue-300 transition">View on GitHub →</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="wizard.js"></script>
+</body>
+</html>

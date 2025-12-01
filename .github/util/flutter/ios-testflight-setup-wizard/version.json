@@ -1,0 +1,24 @@
+{
+  "name": "iOS TestFlight Setup Wizard",
+  "version": "1.0.0",
+  "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
+  "lastUpdated": "2024-12-01",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2024-12-01",
+      "changes": [
+        "초기 릴리즈",
+        "9단계 마법사 구성 (시작 → 인증서 → App ID → Profile → ASC등록 → 앱정보 → API Key → Fastlane → 완료)",
+        "JSON/TXT 다운로드 기능",
+        "localStorage 기반 진행상태 저장"
+      ]
+    }
+  ],
+  "compatibility": {
+    "flutter": ">=3.0.0",
+    "xcode": ">=15.0",
+    "fastlane": ">=2.220.0"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}

@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Fastlane - iOS 빌드 자동화
+gem "fastlane", "~> 2.225"
+
+# CocoaPods - iOS 의존성 관리
+gem "cocoapods", "~> 1.15"

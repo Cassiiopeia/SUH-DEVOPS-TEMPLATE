@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flutter Play Store CI/CD 설정 마법사</title>
+    <!-- Pretendard 폰트 -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Pretendard Variable"', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            text: '#e2e8f0',
+                            muted: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Pretendard 기본 적용 */
+        * {
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        }
+
+        /* 코드 블록은 모노스페이스 유지 */
+        code, pre, .font-mono, textarea {
+            font-family: 'Consolas', 'Monaco', 'Menlo', monospace !important;
+        }
+
+        /* Tooltip Styles */
+        .tooltip-container {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .tooltip-trigger {
+            cursor: help;
+            margin-left: 6px;
+        }
+        .tooltip-content {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            width: 280px;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            line-height: 1.5;
+        }
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #475569;
+        }
+        .tooltip-container:hover .tooltip-content {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Code Block */
+        .code-block {
+            position: relative;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .code-block pre {
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #e2e8f0;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* File Upload */
+        .file-upload {
+            border: 2px dashed #475569;
+            transition: all 0.3s;
+        }
+        .file-upload:hover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .file-upload.dragover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.2);
+        }
+        .file-upload.has-file {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen">
+    <div class="max-w-4xl mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <header class="text-center py-8 mb-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl">
+            <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">
+                Flutter Play Store CI/CD 설정 마법사
+            </h1>
+            <p class="text-blue-100 text-sm md:text-base">
+                Play Store 내부 테스트 자동 배포를 위한 단계별 설정 가이드
+            </p>
+        </header>
+
+        <!-- Progress Steps -->
+        <div class="flex justify-between mb-8 px-2">
+            <div class="step-indicator flex flex-col items-center flex-1 relative" data-step="1">
+                <div class="step-circle w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm z-10 shadow-lg">1</div>
+                <span class="text-xs mt-2 text-slate-400 text-center hidden md:block">프로젝트 분석</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative" data-step="2">
+                <div class="step-circle w-10 h-10 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-sm z-10">2</div>
+                <span class="text-xs mt-2 text-slate-500 text-center hidden md:block">Keystore 생성</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative" data-step="3">
+                <div class="step-circle w-10 h-10 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-sm z-10">3</div>
+                <span class="text-xs mt-2 text-slate-500 text-center hidden md:block">서명 설정</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative" data-step="4">
+                <div class="step-circle w-10 h-10 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-sm z-10">4</div>
+                <span class="text-xs mt-2 text-slate-500 text-center hidden md:block">Service Account</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative" data-step="5">
+                <div class="step-circle w-10 h-10 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-sm z-10">5</div>
+                <span class="text-xs mt-2 text-slate-500 text-center hidden md:block">Fastlane</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1 relative" data-step="6">
+                <div class="step-circle w-10 h-10 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-sm z-10">6</div>
+                <span class="text-xs mt-2 text-slate-500 text-center hidden md:block">.gitignore</span>
+            </div>
+            <div class="step-indicator flex flex-col items-center flex-1" data-step="7">
+                <div class="step-circle w-10 h-10 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-sm z-10">7</div>
+                <span class="text-xs mt-2 text-slate-500 text-center hidden md:block">완료</span>
+            </div>
+        </div>
+
+        <!-- Step 1: Project Analysis -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content fade-in" data-step="1">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">1</span>
+                프로젝트 분석
+                <span class="tooltip-container">
+                    <svg class="w-5 h-5 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="tooltip-content">
+                        <strong>프로젝트 분석이란?</strong><br>
+                        Flutter 프로젝트의 설정 파일들을 읽어서 Application ID, 버전 정보, 기존 설정 상태 등을 자동으로 파악합니다.
+                    </div>
+                </span>
+            </h2>
+
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-blue-300 mb-1">사용 방법</p>
+                        <p class="text-sm text-slate-300">
+                            1. 아래에서 Flutter 프로젝트 폴더를 선택하세요.<br>
+                            2. 생성된 명령어를 터미널에서 실행하세요.<br>
+                            3. 출력된 JSON을 아래에 붙여넣으세요.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 프로젝트 폴더 선택 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Step 1: Flutter 프로젝트 폴더 선택
+                    <span class="tooltip-container">
+                        <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="tooltip-content">
+                            pubspec.yaml 파일이 있는 Flutter 프로젝트의 루트 폴더를 선택하세요.<br><br>
+                            폴더 선택 후 자동으로 cd 명령어가 생성됩니다.
+                        </div>
+                    </span>
+                </label>
+                <div class="flex gap-3">
+                    <input type="text" id="projectPath" readonly
+                        class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 cursor-pointer"
+                        placeholder="폴더를 선택하세요..." onclick="selectProjectFolder()">
+                    <button class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition flex items-center gap-2" onclick="selectProjectFolder()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        폴더 선택
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">
+                    💡 경로 확인 방법: 터미널에서 프로젝트 폴더로 이동 후 <code class="bg-slate-700 px-1.5 py-0.5 rounded">pwd</code> (Mac/Linux) 또는 <code class="bg-slate-700 px-1.5 py-0.5 rounded">(pwd).Path</code> (PowerShell) 입력
+                </p>
+                <p class="text-xs text-slate-500 mt-1">
+                    * 더블클릭하여 직접 입력할 수도 있습니다.
+                </p>
+            </div>
+
+            <!-- 생성된 명령어 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Step 2: 터미널에서 실행할 명령어
+                </label>
+
+                <div class="mb-4">
+                    <p class="text-xs text-slate-400 mb-2">Mac / Linux / Git Bash:</p>
+                    <div class="code-block">
+                        <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                        <pre id="macCommand">cd /path/to/your/project && bash .github/util/flutter/android-playstore-setup-wizard/init.sh</pre>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs text-slate-400 mb-2">Windows PowerShell:</p>
+                    <div class="code-block">
+                        <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                        <pre id="windowsCommand">cd "C:\path\to\your\project"; powershell -ExecutionPolicy Bypass -File .github\util\flutter/android-playstore-setup-wizard\init.ps1</pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    스크립트 출력 결과 붙여넣기:
+                    <span class="tooltip-container">
+                        <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="tooltip-content">
+                            스크립트를 실행하면 JSON 형식의 프로젝트 정보가 출력됩니다.<br><br>
+                            예시:<br>
+                            <code>{"applicationId": "com.example.app", ...}</code>
+                        </div>
+                    </span>
+                </label>
+                <textarea id="scriptOutput"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-sm font-mono text-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                    rows="5"
+                    placeholder='{"applicationId": "com.example.app", "versionName": "1.0.0", ...}'></textarea>
+            </div>
+
+            <button class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition" onclick="parseProjectInfo()">
+                분석하기
+            </button>
+
+            <div id="detectedInfo" class="mt-6 hidden">
+                <h4 class="text-sm font-semibold text-slate-400 mb-3">감지된 프로젝트 정보:</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="bg-slate-900 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">Application ID</p>
+                        <p id="detectedAppId" class="text-sm font-medium text-slate-200 break-all">-</p>
+                    </div>
+                    <div class="bg-slate-900 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">버전</p>
+                        <p id="detectedVersion" class="text-sm font-medium text-slate-200">-</p>
+                    </div>
+                    <div class="bg-slate-900 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">버전 코드</p>
+                        <p id="detectedVersionCode" class="text-sm font-medium text-slate-200">-</p>
+                    </div>
+                    <div class="bg-slate-900 rounded-lg p-3">
+                        <p class="text-xs text-slate-500 mb-1">Gradle 타입</p>
+                        <p id="detectedGradleType" class="text-sm font-medium text-slate-200">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-8">
+                <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition flex items-center gap-2" onclick="nextStep()">
+                    다음 단계
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Keystore Generation -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="2">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">2</span>
+                Release Keystore 생성
+                <span class="tooltip-container">
+                    <svg class="w-5 h-5 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="tooltip-content">
+                        <strong>Keystore란?</strong><br>
+                        Android 앱에 디지털 서명을 하기 위한 암호화된 파일입니다.
+                        Play Store에 앱을 업로드하려면 반드시 동일한 Keystore로 서명해야 합니다.<br><br>
+                        <span class="text-yellow-400">⚠️ 분실 시 앱 업데이트 불가!</span>
+                    </div>
+                </span>
+            </h2>
+
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-yellow-300 mb-1">중요: Keystore 백업 필수!</p>
+                        <p class="text-sm text-slate-300">
+                            Keystore 파일을 분실하면 앱을 업데이트할 수 없습니다.
+                            생성 후 안전한 곳에 반드시 백업하세요. (Google Drive, USB 등)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        Key Alias (키 별칭)
+                        <span class="tooltip-container">
+                            <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="tooltip-content">
+                                Keystore 내부에서 특정 키를 식별하는 이름입니다.<br><br>
+                                예: <code>my-app-release-key</code><br><br>
+                                보통 앱 이름과 관련된 이름을 사용합니다.
+                            </div>
+                        </span>
+                    </label>
+                    <input type="text" id="keyAlias"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                        placeholder="예: my-app-release-key">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        Keystore 비밀번호
+                        <span class="tooltip-container">
+                            <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="tooltip-content">
+                                Keystore 파일 자체를 보호하는 비밀번호입니다.<br><br>
+                                최소 6자 이상의 강력한 비밀번호를 사용하세요.
+                            </div>
+                        </span>
+                    </label>
+                    <input type="password" id="storePassword"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                        placeholder="강력한 비밀번호 입력">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        Key 비밀번호
+                        <span class="tooltip-container">
+                            <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="tooltip-content">
+                                Keystore 내의 개별 키를 보호하는 비밀번호입니다.<br><br>
+                                Keystore 비밀번호와 동일하게 설정해도 됩니다.
+                            </div>
+                        </span>
+                    </label>
+                    <input type="password" id="keyPassword"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                        placeholder="Keystore 비밀번호와 동일해도 됨">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        유효 기간 (일)
+                        <span class="tooltip-container">
+                            <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="tooltip-content">
+                                키의 유효 기간입니다. Google은 최소 25년(9125일)을 권장합니다.<br><br>
+                                기본값 10000일은 약 27년입니다.
+                            </div>
+                        </span>
+                    </label>
+                    <input type="number" id="validityDays" value="10000"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition">
+                </div>
+            </div>
+
+            <details class="mb-6">
+                <summary class="cursor-pointer text-sm font-medium text-slate-400 hover:text-slate-300 transition">
+                    인증서 정보 (선택사항) ▼
+                </summary>
+                <div class="grid md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-700">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-slate-300">이름 (CN)</label>
+                        <input type="text" id="certCN"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                            placeholder="홍길동">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-slate-300">조직 (O)</label>
+                        <input type="text" id="certO"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                            placeholder="My Company">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-slate-300">도시 (L)</label>
+                        <input type="text" id="certL"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                            placeholder="서울">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-slate-300">국가 코드 (C)</label>
+                        <input type="text" id="certC" maxlength="2"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                            placeholder="KR">
+                    </div>
+                </div>
+            </details>
+
+            <button class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition mb-6" onclick="generateKeytoolCommand()">
+                명령어 생성
+            </button>
+
+            <div id="keytoolCommand" class="hidden mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    터미널에서 이 명령어를 실행하세요:
+                </label>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="keytoolCommandText"></pre>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    생성된 Keystore 파일 업로드 (.jks)
+                    <span class="tooltip-container">
+                        <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="tooltip-content">
+                            위 명령어로 생성된 <code>.jks</code> 파일을 여기에 업로드하면 Base64로 인코딩됩니다.<br><br>
+                            Base64 인코딩된 값을 GitHub Secrets에 저장합니다.
+                        </div>
+                    </span>
+                </label>
+                <div class="file-upload rounded-lg p-8 text-center cursor-pointer" id="keystoreUpload" onclick="document.getElementById('keystoreFile').click()">
+                    <input type="file" id="keystoreFile" accept=".jks,.keystore" class="hidden" onchange="handleKeystoreUpload(this)">
+                    <svg class="w-12 h-12 mx-auto text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p class="text-slate-400">클릭하거나 .jks 파일을 드래그하세요</p>
+                </div>
+            </div>
+
+            <div id="keystoreBase64Result" class="hidden mb-6">
+                <div class="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-4">
+                    <div class="flex gap-3">
+                        <svg class="w-6 h-6 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <div>
+                            <p class="font-semibold text-green-300">Keystore Base64 인코딩 완료!</p>
+                            <p class="text-sm text-slate-300 mt-1">
+                                아래 값을 <code class="bg-slate-700 px-1 rounded">RELEASE_KEYSTORE_BASE64</code> Secret으로 등록하세요.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="keystoreBase64" class="max-h-24 overflow-y-auto"></pre>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2" onclick="prevStep()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    이전
+                </button>
+                <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition flex items-center gap-2" onclick="nextStep()">
+                    다음 단계
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Signing Configuration -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="3">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">3</span>
+                Release 서명 설정
+                <span class="tooltip-container">
+                    <svg class="w-5 h-5 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="tooltip-content">
+                        <strong>서명 설정이란?</strong><br>
+                        build.gradle.kts 파일에 Keystore 정보를 연결하여 Release 빌드 시 자동으로 서명하도록 설정합니다.
+                    </div>
+                </span>
+            </h2>
+
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-blue-300 mb-1">설정 파일 수정 필요</p>
+                        <p class="text-sm text-slate-300">
+                            <code class="bg-slate-700 px-1 rounded">android/app/build.gradle.kts</code> 파일을 아래 코드로 교체하세요.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    build.gradle.kts 전체 코드:
+                </label>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="signingConfigCode" class="max-h-96 overflow-y-auto"></pre>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    key.properties 파일 내용:
+                    <span class="tooltip-container">
+                        <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="tooltip-content">
+                            Keystore 비밀번호 등 민감한 정보를 저장하는 파일입니다.<br><br>
+                            <code>android/key.properties</code> 경로에 생성하세요.<br><br>
+                            <span class="text-yellow-400">⚠️ 절대 Git에 커밋하면 안 됩니다!</span>
+                        </div>
+                    </span>
+                </label>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="keyPropertiesContent"></pre>
+                </div>
+            </div>
+
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-yellow-300 mb-1">보안 주의!</p>
+                        <p class="text-sm text-slate-300">
+                            <code class="bg-slate-700 px-1 rounded">android/key.properties</code>를 반드시 <code>.gitignore</code>에 추가하세요!
+                            Step 6에서 자세히 안내합니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2" onclick="prevStep()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    이전
+                </button>
+                <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition flex items-center gap-2" onclick="nextStep()">
+                    다음 단계
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 4: Google Play Service Account -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="4">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">4</span>
+                Google Play Service Account 설정
+                <span class="tooltip-container">
+                    <svg class="w-5 h-5 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="tooltip-content">
+                        <strong>Service Account란?</strong><br>
+                        GitHub Actions가 Play Store API에 접근하여 자동으로 앱을 업로드할 수 있게 해주는 인증 계정입니다.<br><br>
+                        사람이 아닌 프로그램이 사용하는 특수한 계정입니다.
+                    </div>
+                </span>
+            </h2>
+
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-blue-300 mb-1">단계별 가이드</p>
+                        <p class="text-sm text-slate-300">
+                            아래 가이드를 따라 Google Play Console과 Google Cloud Console에서 설정을 완료하세요.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guide Steps -->
+            <div class="space-y-4 mb-6">
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                        <div>
+                            <p class="font-medium text-slate-200">Play Console 접속</p>
+                            <p class="text-sm text-slate-400 mt-1">
+                                <a href="https://play.google.com/console" target="_blank" class="text-blue-400 hover:underline">
+                                    https://play.google.com/console
+                                </a>
+                                → 설정 (⚙️) → <strong>API 액세스</strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                        <div>
+                            <p class="font-medium text-slate-200">서비스 계정 만들기</p>
+                            <p class="text-sm text-slate-400 mt-1">
+                                "서비스 계정 만들기" 또는 Google Cloud Console 링크 클릭
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                        <div>
+                            <p class="font-medium text-slate-200">Google Cloud Console에서 설정</p>
+                            <p class="text-sm text-slate-400 mt-1">
+                                IAM 및 관리자 → 서비스 계정 → 만들기<br>
+                                • 이름: <code class="bg-slate-700 px-1 rounded">play-store-deploy</code><br>
+                                • 역할: 설정 불필요 (Play Console에서 설정)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                        <div>
+                            <p class="font-medium text-slate-200">JSON 키 생성</p>
+                            <p class="text-sm text-slate-400 mt-1">
+                                생성된 서비스 계정 클릭 → 키 탭 → 키 추가 → 새 키 만들기 → <strong>JSON</strong> 선택 → 만들기<br>
+                                <span class="text-yellow-400">→ JSON 파일이 자동 다운로드됩니다</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">5</span>
+                        <div>
+                            <p class="font-medium text-slate-200">Play Console에서 권한 부여</p>
+                            <p class="text-sm text-slate-400 mt-1">
+                                Play Console API 액세스 페이지로 돌아가기<br>
+                                → 생성된 서비스 계정에 "액세스 권한 부여"<br>
+                                → 권한: <strong>릴리스 관리자</strong> 또는 <strong>내부 테스트 트랙 관리</strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Service Account JSON 파일 업로드
+                    <span class="tooltip-container">
+                        <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="tooltip-content">
+                            Google Cloud Console에서 다운로드한 JSON 파일을 업로드하세요.<br><br>
+                            Base64로 인코딩되어 GitHub Secrets에 저장됩니다.
+                        </div>
+                    </span>
+                </label>
+                <div class="file-upload rounded-lg p-8 text-center cursor-pointer" id="serviceAccountUpload" onclick="document.getElementById('serviceAccountFile').click()">
+                    <input type="file" id="serviceAccountFile" accept=".json" class="hidden" onchange="handleServiceAccountUpload(this)">
+                    <svg class="w-12 h-12 mx-auto text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p class="text-slate-400">클릭하거나 JSON 파일을 드래그하세요</p>
+                </div>
+            </div>
+
+            <div id="serviceAccountBase64Result" class="hidden mb-6">
+                <div class="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-4">
+                    <div class="flex gap-3">
+                        <svg class="w-6 h-6 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <div>
+                            <p class="font-semibold text-green-300">Service Account JSON 인코딩 완료!</p>
+                            <p class="text-sm text-slate-300 mt-1">
+                                아래 값을 <code class="bg-slate-700 px-1 rounded">GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64</code> Secret으로 등록하세요.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="serviceAccountBase64" class="max-h-24 overflow-y-auto"></pre>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2" onclick="prevStep()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    이전
+                </button>
+                <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition flex items-center gap-2" onclick="nextStep()">
+                    다음 단계
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 5: Fastlane Setup -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="5">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">5</span>
+                Fastlane 설정
+                <span class="tooltip-container">
+                    <svg class="w-5 h-5 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="tooltip-content">
+                        <strong>Fastlane이란?</strong><br>
+                        모바일 앱 배포를 자동화하는 도구입니다. Play Store, App Store 업로드를 명령어 한 줄로 처리할 수 있습니다.
+                    </div>
+                </span>
+            </h2>
+
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-blue-300 mb-1">Fastfile 생성</p>
+                        <p class="text-sm text-slate-300">
+                            아래 내용을 <code class="bg-slate-700 px-1 rounded">android/fastlane/Fastfile.playstore</code>로 저장하세요.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Fastfile.playstore 내용:
+                </label>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="fastfileContent" class="max-h-96 overflow-y-auto"></pre>
+                </div>
+            </div>
+
+            <h4 class="text-sm font-semibold text-slate-400 mb-4">추가 파일 (선택사항)</h4>
+
+            <div class="grid md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        google-services.json
+                        <span class="tooltip-container">
+                            <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="tooltip-content">
+                                Firebase를 사용하는 경우 필요합니다.<br>
+                                Firebase Console에서 다운로드할 수 있습니다.
+                            </div>
+                        </span>
+                    </label>
+                    <div class="file-upload rounded-lg p-4 text-center cursor-pointer" onclick="document.getElementById('googleServicesFile').click()">
+                        <input type="file" id="googleServicesFile" accept=".json" class="hidden" onchange="handleGoogleServicesUpload(this)">
+                        <p class="text-sm text-slate-400">Firebase 사용 시 업로드</p>
+                    </div>
+                    <div id="googleServicesResult" class="hidden mt-2 text-sm text-green-400">✓ 업로드 완료</div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-slate-300">
+                        .env 파일 내용
+                        <span class="tooltip-container">
+                            <svg class="w-4 h-4 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="tooltip-content">
+                                앱에서 사용하는 환경변수들입니다.<br>
+                                API 키, URL 등을 여기에 입력합니다.
+                            </div>
+                        </span>
+                    </label>
+                    <textarea id="envFileContent"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm font-mono text-slate-300 focus:border-blue-500 outline-none"
+                        rows="4"
+                        placeholder="API_KEY=your_api_key&#10;BASE_URL=https://api.example.com"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2" onclick="prevStep()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    이전
+                </button>
+                <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition flex items-center gap-2" onclick="nextStep()">
+                    다음 단계
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 6: .gitignore Update -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-sm">6</span>
+                .gitignore 업데이트
+                <span class="tooltip-container">
+                    <svg class="w-5 h-5 text-slate-400 tooltip-trigger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="tooltip-content">
+                        <strong>.gitignore란?</strong><br>
+                        Git이 추적하지 않을 파일들을 지정하는 파일입니다.<br><br>
+                        민감한 정보가 담긴 파일들이 GitHub에 올라가지 않도록 반드시 설정해야 합니다!
+                    </div>
+                </span>
+            </h2>
+
+            <div class="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-red-300 mb-1">보안 경고: 이 단계를 반드시 완료하세요!</p>
+                        <p class="text-sm text-slate-300">
+                            Keystore 파일과 비밀번호가 GitHub에 업로드되면 앱 보안이 심각하게 위협받습니다.<br>
+                            아래 내용을 <code class="bg-slate-700 px-1 rounded">.gitignore</code>에 추가하세요.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    .gitignore에 추가할 내용:
+                </label>
+                <div class="code-block">
+                    <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                    <pre id="gitignoreContent"># ==============================================
+# Play Store CI/CD - 민감한 파일 (절대 커밋 금지!)
+# ==============================================
+
+# Keystore 파일 및 비밀번호
+android/key.properties
+android/app/keystore/
+*.jks
+*.keystore
+
+# Service Account JSON (로컬 테스트용)
+**/service-account*.json
+
+# 환경 변수 파일
+.env
+.env.local
+.env.*.local
+
+# Firebase 설정 (선택 - 공개해도 되지만 권장하지 않음)
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist</pre>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-lg p-4 mb-6">
+                <h4 class="font-medium text-slate-200 mb-3">체크리스트</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="check1" class="w-5 h-5 rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500">
+                        <span class="text-sm text-slate-300">.gitignore에 위 내용을 추가했습니다</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="check2" class="w-5 h-5 rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500">
+                        <span class="text-sm text-slate-300">key.properties 파일이 Git에 추적되지 않는지 확인했습니다</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="check3" class="w-5 h-5 rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-500">
+                        <span class="text-sm text-slate-300">keystore 폴더가 Git에 추적되지 않는지 확인했습니다</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-blue-300 mb-1">Git 상태 확인 명령어</p>
+                        <p class="text-sm text-slate-300">
+                            아래 명령어로 민감한 파일이 추적되지 않는지 확인하세요:
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-block mb-6">
+                <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
+                <pre># 추적 상태 확인
+git status
+
+# key.properties가 목록에 없어야 함!
+# 만약 있다면:
+git rm --cached android/key.properties
+git rm --cached -r android/app/keystore/</pre>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2" onclick="prevStep()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    이전
+                </button>
+                <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition flex items-center gap-2" onclick="generateFinalResult()">
+                    최종 결과 보기
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 7: Final Result -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="7">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-sm">✓</span>
+                설정 완료!
+            </h2>
+
+            <div class="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-green-300 mb-1">모든 설정이 준비되었습니다!</p>
+                        <p class="text-sm text-slate-300">
+                            아래 GitHub Secrets를 저장소에 등록하면 CI/CD가 작동합니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-semibold mb-4">GitHub Secrets 등록 목록</h3>
+
+            <div class="bg-slate-900 rounded-lg overflow-hidden mb-6">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-medium text-slate-300">Secret 이름</th>
+                            <th class="px-4 py-3 text-left font-medium text-slate-300">상태</th>
+                            <th class="px-4 py-3 text-right font-medium text-slate-300">복사</th>
+                        </tr>
+                    </thead>
+                    <tbody id="secretsTableBody" class="divide-y divide-slate-700">
+                        <!-- Dynamically generated -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+                <div class="flex gap-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-blue-300 mb-1">GitHub Secrets 등록 방법</p>
+                        <p class="text-sm text-slate-300">
+                            GitHub 저장소 → Settings → Secrets and variables → Actions → New repository secret
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-semibold mb-4">다음 단계</h3>
+
+            <div class="space-y-3 mb-6">
+                <div class="bg-slate-900 rounded-lg p-4 flex items-start gap-3">
+                    <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                    <div>
+                        <p class="font-medium text-slate-200">GitHub Secrets 등록</p>
+                        <p class="text-sm text-slate-400 mt-1">위 목록의 모든 Secret을 GitHub에 등록하세요.</p>
+                    </div>
+                </div>
+                <div class="bg-slate-900 rounded-lg p-4 flex items-start gap-3">
+                    <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                    <div>
+                        <p class="font-medium text-slate-200">Play Console에서 첫 번째 AAB 수동 업로드</p>
+                        <p class="text-sm text-slate-400 mt-1">CI/CD 이전에 Play Console에서 앱 정보(스크린샷, 설명 등)를 먼저 설정해야 합니다.</p>
+                    </div>
+                </div>
+                <div class="bg-slate-900 rounded-lg p-4 flex items-start gap-3">
+                    <span class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                    <div>
+                        <p class="font-medium text-slate-200">deploy 브랜치로 푸시</p>
+                        <p class="text-sm text-slate-400 mt-1"><code class="bg-slate-700 px-1 rounded">deploy</code> 브랜치에 코드를 푸시하면 자동으로 CI/CD가 실행됩니다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition flex items-center gap-2" onclick="prevStep()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    이전
+                </button>
+                <button class="px-6 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition flex items-center gap-2" onclick="downloadConfig()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    설정 JSON 다운로드
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        let currentStep = 1;
+        let projectInfo = {};
+        let secrets = {};
+
+        // Project Folder Selection
+        async function selectProjectFolder() {
+            const projectPathInput = document.getElementById('projectPath');
+            const macCommand = document.getElementById('macCommand');
+            const windowsCommand = document.getElementById('windowsCommand');
+
+            // Try using File System Access API (Chrome/Edge)
+            if ('showDirectoryPicker' in window) {
+                try {
+                    const dirHandle = await window.showDirectoryPicker();
+                    const folderName = dirHandle.name;
+
+                    // Since we can't get the full path due to security restrictions,
+                    // show the folder name and provide instructions
+                    projectPathInput.value = folderName + ' (선택됨 - 전체 경로는 터미널에서 확인)';
+
+                    // Update commands with a note
+                    macCommand.textContent = `# 선택한 폴더(${folderName})에서 실행:\nbash .github/util/flutter/android-playstore-setup-wizard/init.sh`;
+                    windowsCommand.textContent = `# 선택한 폴더(${folderName})에서 실행:\npowershell -ExecutionPolicy Bypass -File .github\\util\\flutter/android-playstore-setup-wizard\\init.ps1`;
+
+                    return;
+                } catch (err) {
+                    // User cancelled or API not supported
+                    if (err.name !== 'AbortError') {
+                        console.log('Directory picker failed:', err);
+                    }
+                }
+            }
+
+            // Fallback: prompt for manual input
+            const path = prompt(
+                '프로젝트 경로를 입력하세요.\n\n' +
+                '예시:\n' +
+                '• Mac/Linux: /Users/username/projects/my-flutter-app\n' +
+                '• Windows: C:\\Users\\username\\projects\\my-flutter-app\n\n' +
+                '터미널에서 프로젝트 폴더로 이동 후 pwd(Mac/Linux) 또는 pwd.Path(PowerShell)를 입력하면 경로를 확인할 수 있습니다.'
+            );
+
+            if (path && path.trim()) {
+                updateProjectPath(path.trim());
+            }
+        }
+
+        function updateProjectPath(path) {
+            const projectPathInput = document.getElementById('projectPath');
+            const macCommand = document.getElementById('macCommand');
+            const windowsCommand = document.getElementById('windowsCommand');
+
+            projectPathInput.value = path;
+
+            // Detect OS type from path format
+            const isWindowsPath = path.includes('\\') || /^[A-Za-z]:/.test(path);
+
+            if (isWindowsPath) {
+                // Convert to proper format for each OS
+                const winPath = path.replace(/\//g, '\\');
+                const unixPath = path.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
+
+                macCommand.textContent = `cd "${unixPath}" && bash .github/util/flutter/android-playstore-setup-wizard/init.sh`;
+                windowsCommand.textContent = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter/android-playstore-setup-wizard\\init.ps1`;
+            } else {
+                // Unix-style path
+                const winPath = path.replace(/\//g, '\\');
+
+                macCommand.textContent = `cd "${path}" && bash .github/util/flutter/android-playstore-setup-wizard/init.sh`;
+                windowsCommand.textContent = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter/android-playstore-setup-wizard\\init.ps1`;
+            }
+        }
+
+        // Allow manual editing of project path input
+        document.addEventListener('DOMContentLoaded', function() {
+            const projectPathInput = document.getElementById('projectPath');
+            if (projectPathInput) {
+                // Make it editable on double-click
+                projectPathInput.addEventListener('dblclick', function() {
+                    this.readOnly = false;
+                    this.classList.add('border-blue-500');
+                    this.focus();
+                });
+
+                projectPathInput.addEventListener('blur', function() {
+                    this.readOnly = true;
+                    this.classList.remove('border-blue-500');
+                    if (this.value.trim()) {
+                        updateProjectPath(this.value.trim());
+                    }
+                });
+
+                projectPathInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        this.blur();
+                    }
+                });
+            }
+        });
+
+        // Step Navigation
+        function updateStepUI() {
+            document.querySelectorAll('.step-content').forEach(el => {
+                el.classList.add('hidden');
+                el.classList.remove('fade-in');
+                if (parseInt(el.dataset.step) === currentStep) {
+                    el.classList.remove('hidden');
+                    el.classList.add('fade-in');
+                }
+            });
+
+            document.querySelectorAll('.step-indicator').forEach(el => {
+                const step = parseInt(el.dataset.step);
+                const circle = el.querySelector('.step-circle');
+                const label = el.querySelector('span:last-child');
+
+                circle.classList.remove('bg-blue-600', 'bg-green-600', 'bg-slate-700');
+                circle.classList.remove('text-white', 'text-slate-400');
+
+                if (step === currentStep) {
+                    circle.classList.add('bg-blue-600', 'text-white');
+                    if (label) label.classList.replace('text-slate-500', 'text-slate-300');
+                } else if (step < currentStep) {
+                    circle.classList.add('bg-green-600', 'text-white');
+                    circle.innerHTML = '✓';
+                } else {
+                    circle.classList.add('bg-slate-700', 'text-slate-400');
+                    circle.innerHTML = step;
+                }
+            });
+
+            // Generate content for each step
+            if (currentStep === 3) generateSigningConfig();
+            if (currentStep === 5) generateFastfileContent();
+        }
+
+        function nextStep() {
+            if (currentStep < 7) {
+                currentStep++;
+                updateStepUI();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepUI();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Step 1: Parse Project Info
+        function parseProjectInfo() {
+            const output = document.getElementById('scriptOutput').value.trim();
+
+            if (!output) {
+                // Manual entry fallback
+                projectInfo = {
+                    applicationId: 'com.example.app',
+                    versionName: '1.0.0',
+                    versionCode: 1,
+                    gradleType: 'kts'
+                };
+            } else {
+                try {
+                    projectInfo = JSON.parse(output);
+                } catch (e) {
+                    alert('JSON 파싱 실패. 형식을 확인해주세요.\n\n예시:\n{"applicationId": "com.example.app", "versionName": "1.0.0", "versionCode": 1, "gradleType": "kts"}');
+                    return;
+                }
+            }
+
+            document.getElementById('detectedAppId').textContent = projectInfo.applicationId || '-';
+            document.getElementById('detectedVersion').textContent = projectInfo.versionName || '-';
+            document.getElementById('detectedVersionCode').textContent = projectInfo.versionCode || '-';
+            document.getElementById('detectedGradleType').textContent = projectInfo.gradleType || '-';
+            document.getElementById('detectedInfo').classList.remove('hidden');
+
+            // Auto-generate key alias
+            if (projectInfo.applicationId) {
+                const suggestedAlias = projectInfo.applicationId.split('.').pop() + '-release-key';
+                document.getElementById('keyAlias').value = suggestedAlias;
+            }
+        }
+
+        // Step 2: Keystore
+        function generateKeytoolCommand() {
+            const alias = document.getElementById('keyAlias').value || 'release-key';
+            const storePass = document.getElementById('storePassword').value || 'changeit';
+            const keyPass = document.getElementById('keyPassword').value || storePass;
+            const validity = document.getElementById('validityDays').value || '10000';
+
+            const cn = document.getElementById('certCN').value || 'Unknown';
+            const o = document.getElementById('certO').value || 'Unknown';
+            const l = document.getElementById('certL').value || 'Unknown';
+            const c = document.getElementById('certC').value || 'KR';
+
+            secrets.RELEASE_KEY_ALIAS = alias;
+            secrets.RELEASE_KEYSTORE_PASSWORD = storePass;
+            secrets.RELEASE_KEY_PASSWORD = keyPass;
+
+            const dname = `CN=${cn}, O=${o}, L=${l}, C=${c}`;
+
+            const command = `keytool -genkey -v \\
+  -keystore release-key.jks \\
+  -keyalg RSA \\
+  -keysize 2048 \\
+  -validity ${validity} \\
+  -alias ${alias} \\
+  -storepass "${storePass}" \\
+  -keypass "${keyPass}" \\
+  -dname "${dname}"`;
+
+            document.getElementById('keytoolCommandText').textContent = command;
+            document.getElementById('keytoolCommand').classList.remove('hidden');
+        }
+
+        function handleKeystoreUpload(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64 = e.target.result.split(',')[1];
+                    secrets.RELEASE_KEYSTORE_BASE64 = base64;
+
+                    document.getElementById('keystoreBase64').textContent = base64;
+                    document.getElementById('keystoreBase64Result').classList.remove('hidden');
+                    document.getElementById('keystoreUpload').classList.add('has-file');
+                    document.getElementById('keystoreUpload').querySelector('p').textContent = `${file.name} (업로드 완료)`;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Step 3: Signing Config
+        function generateSigningConfig() {
+            const alias = secrets.RELEASE_KEY_ALIAS || 'release-key';
+            const appId = projectInfo.applicationId || 'com.example.app';
+
+            const signingCode = `import java.util.Properties
+import java.io.FileInputStream
+
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+// key.properties 파일 로드
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = "${appId}"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+
+    // 서명 설정
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String? ?: ""
+            keyPassword = keystoreProperties["keyPassword"] as String? ?: ""
+            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as String? ?: ""
+        }
+    }
+
+    defaultConfig {
+        applicationId = "${appId}"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}`;
+
+            const keyProperties = `storeFile=keystore/key.jks
+storePassword=${secrets.RELEASE_KEYSTORE_PASSWORD || 'YOUR_STORE_PASSWORD'}
+keyAlias=${alias}
+keyPassword=${secrets.RELEASE_KEY_PASSWORD || 'YOUR_KEY_PASSWORD'}`;
+
+            document.getElementById('signingConfigCode').textContent = signingCode;
+            document.getElementById('keyPropertiesContent').textContent = keyProperties;
+        }
+
+        // Step 4: Service Account
+        function handleServiceAccountUpload(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64 = btoa(e.target.result);
+                    secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 = base64;
+
+                    document.getElementById('serviceAccountBase64').textContent = base64;
+                    document.getElementById('serviceAccountBase64Result').classList.remove('hidden');
+                    document.getElementById('serviceAccountUpload').classList.add('has-file');
+                    document.getElementById('serviceAccountUpload').querySelector('p').textContent = `${file.name} (업로드 완료)`;
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Step 5: Fastlane
+        function generateFastfileContent() {
+            const appId = projectInfo.applicationId || 'com.example.app';
+
+            const fastfile = `# Play Store 내부 테스트 배포용 Fastfile
+# 경로: android/fastlane/Fastfile.playstore
+
+default_platform(:android)
+
+platform :android do
+  desc "Play Store 내부 테스트로 배포"
+  lane :deploy_internal do
+    # 환경 변수
+    aab_path = ENV["AAB_PATH"] || "../build/app/outputs/bundle/release/app-release.aab"
+    json_key = ENV["GOOGLE_PLAY_JSON_KEY"] || "~/.config/gcloud/service-account.json"
+
+    puts "========================================="
+    puts "Play Store 내부 테스트 배포 시작"
+    puts "========================================="
+    puts "AAB 경로: #{aab_path}"
+    puts "Service Account: #{json_key}"
+
+    # AAB 파일 확인
+    unless File.exist?(aab_path)
+      UI.user_error!("AAB 파일을 찾을 수 없습니다: #{aab_path}")
+    end
+
+    # Service Account 확인
+    unless File.exist?(json_key)
+      UI.user_error!("Service Account JSON을 찾을 수 없습니다: #{json_key}")
+    end
+
+    # Play Store 업로드
+    upload_to_play_store(
+      package_name: "${appId}",
+      track: "internal",
+      aab: aab_path,
+      json_key: json_key,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      release_status: "completed"
+    )
+
+    puts ""
+    puts "========================================="
+    puts "내부 테스트 배포 성공!"
+    puts "========================================="
+  end
+
+  desc "Service Account JSON 검증"
+  lane :validate do
+    json_key = ENV["GOOGLE_PLAY_JSON_KEY"] || "~/.config/gcloud/service-account.json"
+
+    validate_play_store_json_key(
+      json_key: json_key
+    )
+
+    puts "Service Account 검증 성공!"
+  end
+end`;
+
+            document.getElementById('fastfileContent').textContent = fastfile;
+        }
+
+        function handleGoogleServicesUpload(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    secrets.GOOGLE_SERVICES_JSON = e.target.result;
+                    document.getElementById('googleServicesResult').classList.remove('hidden');
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Step 7: Final Result
+        function generateFinalResult() {
+            const envContent = document.getElementById('envFileContent').value;
+            if (envContent) {
+                secrets.ENV_FILE = envContent;
+            }
+
+            currentStep = 7;
+            updateStepUI();
+
+            const tbody = document.getElementById('secretsTableBody');
+            tbody.innerHTML = '';
+
+            const secretsList = [
+                { name: 'RELEASE_KEYSTORE_BASE64', value: secrets.RELEASE_KEYSTORE_BASE64, required: true, desc: 'Keystore 파일 (Base64)' },
+                { name: 'RELEASE_KEYSTORE_PASSWORD', value: secrets.RELEASE_KEYSTORE_PASSWORD, required: true, desc: 'Keystore 비밀번호' },
+                { name: 'RELEASE_KEY_ALIAS', value: secrets.RELEASE_KEY_ALIAS, required: true, desc: '키 별칭' },
+                { name: 'RELEASE_KEY_PASSWORD', value: secrets.RELEASE_KEY_PASSWORD, required: true, desc: '키 비밀번호' },
+                { name: 'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64', value: secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64, required: true, desc: 'Service Account (Base64)' },
+                { name: 'GOOGLE_SERVICES_JSON', value: secrets.GOOGLE_SERVICES_JSON, required: false, desc: 'Firebase 설정' },
+                { name: 'ENV_FILE', value: secrets.ENV_FILE, required: false, desc: '환경 변수' }
+            ];
+
+            secretsList.forEach(secret => {
+                if (secret.value || secret.required) {
+                    const tr = document.createElement('tr');
+                    const hasValue = !!secret.value;
+
+                    tr.innerHTML = `
+                        <td class="px-4 py-3">
+                            <code class="text-blue-400">${secret.name}</code>
+                            <p class="text-xs text-slate-500 mt-1">${secret.desc}</p>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="${hasValue ? 'text-green-400' : 'text-red-400'}">
+                                ${hasValue ? '✓ 설정됨' : '✗ 미설정'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button
+                                class="px-3 py-1 ${hasValue ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-700 cursor-not-allowed'} rounded text-xs transition"
+                                onclick="copySecret('${secret.name}')"
+                                ${!hasValue ? 'disabled' : ''}>
+                                복사
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            });
+        }
+
+        function copySecret(name) {
+            if (secrets[name]) {
+                navigator.clipboard.writeText(secrets[name]);
+                alert(`${name} 복사 완료!`);
+            }
+        }
+
+        function copyCode(btn) {
+            const pre = btn.parentElement.querySelector('pre');
+            navigator.clipboard.writeText(pre.textContent);
+            const originalText = btn.textContent;
+            btn.textContent = '복사됨!';
+            btn.classList.add('bg-green-600');
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('bg-green-600');
+            }, 2000);
+        }
+
+        function downloadConfig() {
+            const config = {
+                projectInfo,
+                generatedAt: new Date().toISOString(),
+                secrets: Object.keys(secrets).reduce((acc, key) => {
+                    acc[key] = secrets[key] ? '[설정됨]' : null;
+                    return acc;
+                }, {})
+            };
+
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'playstore-cicd-config.json';
+            a.click();
+        }
+
+        // Drag and Drop
+        document.querySelectorAll('.file-upload').forEach(el => {
+            el.addEventListener('dragover', e => {
+                e.preventDefault();
+                el.classList.add('dragover');
+            });
+            el.addEventListener('dragleave', () => {
+                el.classList.remove('dragover');
+            });
+            el.addEventListener('drop', e => {
+                e.preventDefault();
+                el.classList.remove('dragover');
+                const input = el.querySelector('input');
+                if (input && e.dataTransfer.files.length > 0) {
+                    input.files = e.dataTransfer.files;
+                    input.dispatchEvent(new Event('change'));
+                }
+            });
+        });
+
+        // Initialize
+        updateStepUI();
+    </script>
+</body>
+</html>

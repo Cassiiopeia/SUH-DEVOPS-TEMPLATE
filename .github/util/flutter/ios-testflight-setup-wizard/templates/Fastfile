@@ -1,0 +1,121 @@
+# ============================================
+# Fastfile for iOS TestFlight Deployment
+# ============================================
+#
+# 이 파일은 flutter-ios-testflight-init 마법사에 의해 생성됩니다.
+# GitHub Actions 워크플로우에서 이 파일을 직접 사용합니다.
+#
+# 빌드 파이프라인:
+#   1. flutter build ios --no-codesign (Flutter 빌드)
+#   2. xcodebuild archive (Xcode 아카이브 생성)
+#   3. xcodebuild -exportArchive (IPA 생성)
+#   4. fastlane upload_testflight (이 파일의 lane 실행)
+#
+# 필요한 환경변수:
+#   - APP_STORE_CONNECT_API_KEY_ID: App Store Connect API Key ID
+#   - APP_STORE_CONNECT_ISSUER_ID: App Store Connect Issuer ID
+#   - API_KEY_PATH: API Key 파일 경로 (.p8)
+#   - IPA_PATH: 업로드할 IPA 파일 경로
+#   - RELEASE_NOTES: 릴리즈 노트 (한국어/영어 동시 적용)
+#
+# 사용법 (CI):
+#   fastlane upload_testflight
+#
+# 사용법 (로컬):
+#   bundle exec fastlane upload_testflight
+#   bundle exec fastlane build_and_deploy changelog:"릴리즈 노트"
+#
+# ============================================
+
+default_platform(:ios)
+
+platform :ios do
+  desc "TestFlight에 IPA 업로드 (CI용 - IPA가 이미 빌드된 상태)"
+  lane :upload_testflight do
+    UI.message("🚀 TestFlight 업로드 시작")
+
+    # App Store Connect API Key 설정
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_filepath: ENV["API_KEY_PATH"],
+      duration: 1200,
+      in_house: false
+    )
+
+    # IPA 파일 확인
+    ipa_path = ENV["IPA_PATH"]
+    if ipa_path.nil? || ipa_path.empty?
+      ipa_path = Dir.glob("build/ipa/*.ipa").first
+    end
+
+    UI.message("📦 IPA 경로: #{ipa_path}")
+
+    # 릴리즈 노트 설정
+    release_notes = ENV["RELEASE_NOTES"] || "새로운 빌드가 업로드되었습니다."
+    UI.message("📝 릴리즈 노트: #{release_notes}")
+
+    # TestFlight 업로드 (upload_to_testflight = pilot)
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: ipa_path,
+      changelog: release_notes,
+      localized_build_info: {
+        "ko" => { whats_new: release_notes },
+        "en-US" => { whats_new: release_notes }
+      },
+      skip_waiting_for_build_processing: ENV["SKIP_WAITING_FOR_BUILD_PROCESSING"] == "true",
+      distribute_external: false,
+      notify_external_testers: false,
+      uses_non_exempt_encryption: ENV["USES_NON_EXEMPT_ENCRYPTION"] == "true"
+    )
+
+    UI.success("✅ TestFlight 업로드 완료!")
+  end
+
+  desc "로컬에서 IPA 빌드 및 TestFlight 업로드 (개발용)"
+  lane :build_and_deploy do |options|
+    UI.message("🏗️ 로컬 빌드 및 배포 시작")
+    
+    # App Store Connect API Key 설정
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_filepath: ENV["API_KEY_PATH"],
+      duration: 1200,
+      in_house: false
+    )
+
+    # Archive 생성
+    UI.message("📦 Archive 생성 중...")
+    sh("xcodebuild -workspace Runner.xcworkspace " \
+       "-scheme Runner " \
+       "-archivePath build/Runner.xcarchive " \
+       "-destination 'generic/platform=iOS' " \
+       "archive " \
+       "CODE_SIGN_STYLE=Manual " \
+       "PROVISIONING_PROFILE_SPECIFIER='#{ENV['IOS_PROVISIONING_PROFILE_NAME']}' " \
+       "CODE_SIGN_IDENTITY='Apple Distribution'")
+
+    # IPA 내보내기
+    UI.message("📦 IPA 내보내기 중...")
+    sh("xcodebuild -exportArchive " \
+       "-archivePath build/Runner.xcarchive " \
+       "-exportPath build/ipa " \
+       "-exportOptionsPlist ExportOptions.plist")
+
+    # TestFlight 업로드
+    ipa_path = Dir.glob("build/ipa/*.ipa").first
+    pilot(
+      api_key: api_key,
+      ipa: ipa_path,
+      changelog: options[:changelog] || "새로운 빌드가 업로드되었습니다.",
+      skip_waiting_for_build_processing: ENV["SKIP_WAITING_FOR_BUILD_PROCESSING"] == "true",
+      distribute_external: false,
+      notify_external_testers: false,
+      uses_non_exempt_encryption: false
+    )
+
+    UI.success("✅ 빌드 및 TestFlight 업로드 완료!")
+  end
+end

@@ -364,6 +364,46 @@ python3 .github/scripts/changelog_manager.py validate
 - ✅ **JSON + Markdown**: 구조화된 데이터와 가독성 동시 제공
 - ✅ **내보내기**: 릴리즈 노트 다양한 형식으로 추출
 
+### 🧙 Flutter 유틸리티 마법사 (iOS/Android)
+
+**Flutter 프로젝트의 배포 설정을 웹 UI로 쉽게 생성**
+
+> 📍 위치: `.github/util/flutter/`
+
+#### iOS TestFlight 마법사
+```bash
+# 브라우저에서 index.html 열기
+open .github/util/flutter/ios-testflight-setup-wizard/index.html
+
+# 생성되는 파일들:
+# - ExportOptions.plist (배포 설정)
+# - Fastfile (자동화 스크립트)
+# - Gemfile (의존성)
+```
+
+**주요 기능:**
+- ✅ Team ID, Bundle ID 등 입력하면 설정 파일 자동 생성
+- ✅ TestFlight 업로드에 필요한 모든 파일 한번에 생성
+- ✅ 복잡한 Xcode 설정 없이 웹 UI로 간편 설정
+
+#### Android Play Store 마법사
+```bash
+# 초기화 스크립트 실행
+.github/util/flutter/android-playstore-setup-wizard/init.sh   # macOS/Linux
+.github/util/flutter/android-playstore-setup-wizard/init.ps1  # Windows
+
+# 생성되는 파일들:
+# - Fastfile (Play Store 업로드 자동화)
+# - build.gradle.kts 서명 설정
+```
+
+**주요 기능:**
+- ✅ Play Store 배포에 필요한 Fastlane 설정 자동 생성
+- ✅ 서명 키 설정 가이드 제공
+- ✅ 단계별 대화형 설정으로 쉬운 구성
+
+> 💡 **팁**: `template_integrator`로 Flutter 프로젝트 통합 시 이 마법사들을 함께 다운로드할 수 있습니다!
+
 ---
 
 ## 🔧 조직 및 팀 설정

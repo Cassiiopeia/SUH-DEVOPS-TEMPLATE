@@ -1,12 +1,12 @@
 #!/bin/bash
 # ============================================
-# version.json → index.html 동기화 스크립트
-# 사용법: ./sync-version.sh
+# version.json → testflight-wizard.html 동기화 스크립트
+# 사용법: ./version-sync.sh
 # ============================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VERSION_FILE="$SCRIPT_DIR/version.json"
-INDEX_FILE="$SCRIPT_DIR/index.html"
+INDEX_FILE="$SCRIPT_DIR/testflight-wizard.html"
 
 # 파일 존재 확인
 if [ ! -f "$VERSION_FILE" ]; then
@@ -15,7 +15,7 @@ if [ ! -f "$VERSION_FILE" ]; then
 fi
 
 if [ ! -f "$INDEX_FILE" ]; then
-    echo "❌ index.html 파일을 찾을 수 없습니다: $INDEX_FILE"
+    echo "❌ testflight-wizard.html 파일을 찾을 수 없습니다: $INDEX_FILE"
     exit 1
 fi
 
@@ -58,5 +58,5 @@ with open(index_file, 'w', encoding='utf-8') as f:
     f.write(new_content)
 
 print("✅ 버전 정보 동기화 완료!")
-print("   - version.json → index.html")
+print("   - version.json → testflight-wizard.html")
 EOF

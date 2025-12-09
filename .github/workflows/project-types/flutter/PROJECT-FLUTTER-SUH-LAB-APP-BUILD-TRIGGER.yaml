@@ -1,0 +1,321 @@
+# ===================================================================
+# Flutter 테스트 앱 빌드 트리거 워크플로우 (SUH-LAB)
+# ===================================================================
+#
+# 이 워크플로우는 PR 또는 이슈에 댓글로 "@suh-lab build app"을 작성하면
+# Android와 iOS 테스트 앱 빌드를 자동으로 트리거합니다.
+#
+# 주요 특징:
+# - PR/이슈 댓글 감지: "@suh-lab build app" 키워드 감지
+# - repository_dispatch 이벤트로 빌드 워크플로우 트리거
+# - PR/이슈 번호 + 빌드 횟수로 고유한 빌드 번호 생성 (예: 38700, 38701...)
+# - 브랜치명에서 이슈 번호 자동 추출 (YYYYMMDD_#이슈번호_내용 형식)
+# - 테스트 버전 0.0.0 고정으로 운영 버전과 분리
+#
+# 사용 방법:
+# - PR에 댓글 작성: "@suh-lab build app"
+# - 이슈에 댓글 작성: "@suh-lab build app" (Guide by SUH-LAB 댓글 필요)
+#
+# 트리거되는 워크플로우:
+# - PROJECT-FLUTTER-ANDROID-TEST-APK.yaml (event_type: build-android-app)
+# - PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml (event_type: build-ios-app)
+#
+# ===================================================================
+
+name: PROJECT-Flutter-SUH-LAB-App-Build-Trigger
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  trigger-builds:
+    name: 빌드 워크플로우 트리거
+    # @suh-lab, build, app 키워드가 모두 포함되어 있으면 실행
+    if: |
+      contains(github.event.comment.body, '@suh-lab') &&
+      contains(github.event.comment.body, 'build') &&
+      contains(github.event.comment.body, 'app')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 댓글에 👀 리액션 추가
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentId = context.payload.comment.id;
+
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              content: 'eyes'
+            });
+
+            console.log('👀 댓글에 확인 리액션 추가 완료');
+
+      - name: PR/이슈 정보 확인 및 추출
+        id: source_info
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = context.payload.issue.number;
+            let sourceType = '';
+            let sourceNumber = '';
+            let branchName = '';
+            let headSha = '';
+            let relatedIssueNumber = '';
+
+            // 1. 먼저 PR인지 확인
+            try {
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: issueNumber
+              });
+
+              sourceType = 'PR';
+              sourceNumber = pr.data.number.toString();
+              branchName = pr.data.head.ref;
+              headSha = pr.data.head.sha;
+
+              console.log(`✅ PR 확인: #${sourceNumber}`);
+              console.log(`🌿 브랜치명: ${branchName}`);
+              console.log(`📝 커밋 해시: ${headSha}`);
+
+              // 브랜치명에서 이슈 번호 추출 (#280 형식)
+              const issueMatch = branchName.match(/#(\d+)/);
+              relatedIssueNumber = issueMatch ? issueMatch[1] : '';
+
+              if (relatedIssueNumber) {
+                console.log(`📌 추출된 이슈 번호: #${relatedIssueNumber}`);
+              }
+
+            } catch (error) {
+              console.log('ℹ️ PR이 아닙니다. 이슈에서 브랜치 정보를 찾습니다...');
+
+              // 2. PR이 아니면 이슈에서 "Guide by SUH-LAB" 댓글 찾기
+              sourceType = 'ISSUE';
+              sourceNumber = issueNumber.toString();
+              relatedIssueNumber = issueNumber.toString();
+
+              try {
+                const comments = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  per_page: 100
+                });
+
+                // "Guide by SUH-LAB" 댓글 찾기
+                const guideComment = comments.data.find(c =>
+                  c.body.includes('Guide by SUH-LAB')
+                );
+
+                if (!guideComment) {
+                  console.log('❌ "Guide by SUH-LAB" 댓글을 찾을 수 없습니다.');
+                  core.setOutput('found', 'false');
+                  core.setOutput('errorMessage', '이슈에서 "Guide by SUH-LAB" 댓글을 찾을 수 없습니다. 브랜치 정보가 포함된 댓글이 필요합니다.');
+                  return;
+                }
+
+                console.log('✅ "Guide by SUH-LAB" 댓글 발견');
+
+                // 브랜치명 추출 (### 브랜치 다음 ``` 블록 내용)
+                const branchMatch = guideComment.body.match(/### 브랜치\s*```\s*([\s\S]*?)\s*```/);
+
+                if (!branchMatch) {
+                  console.log('❌ 브랜치 정보를 파싱할 수 없습니다.');
+                  core.setOutput('found', 'false');
+                  core.setOutput('errorMessage', '"Guide by SUH-LAB" 댓글에서 브랜치 정보를 파싱할 수 없습니다. 댓글 형식을 확인해주세요.');
+                  return;
+                }
+
+                branchName = branchMatch[1].trim();
+                console.log(`🌿 추출된 브랜치명: ${branchName}`);
+                console.log(`✅ 이슈 #${sourceNumber}에서 빌드 정보 추출 완료`);
+
+              } catch (commentError) {
+                console.log('❌ 이슈 댓글 조회 중 오류 발생:', commentError.message);
+                core.setOutput('found', 'false');
+                core.setOutput('errorMessage', `이슈 댓글 조회 중 오류가 발생했습니다: ${commentError.message}`);
+                return;
+              }
+            }
+
+            // 결과 출력
+            core.setOutput('found', 'true');
+            core.setOutput('sourceType', sourceType);
+            core.setOutput('sourceNumber', sourceNumber);
+            core.setOutput('branchName', branchName);
+            core.setOutput('headSha', headSha);
+            core.setOutput('relatedIssueNumber', relatedIssueNumber);
+
+      - name: 브랜치 정보를 찾을 수 없는 경우 에러 댓글 작성
+        if: steps.source_info.outputs.found != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = context.payload.issue.number;
+            const errorMessage = '${{ steps.source_info.outputs.errorMessage }}';
+
+            const body = `❌ **앱 빌드 트리거 실패**
+
+            ${errorMessage}
+
+            **해결 방법:**
+            - PR에서 빌드하는 경우: PR 페이지에서 댓글을 작성해주세요.
+            - 이슈에서 빌드하는 경우: "Guide by SUH-LAB" 댓글이 있어야 합니다.
+              - 댓글에 \`### 브랜치\` 섹션과 브랜치명이 포함되어 있어야 합니다.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: body
+            });
+
+            core.setFailed(errorMessage);
+
+      - name: 빌드 횟수 조회 및 빌드 번호 생성
+        id: build_number_calc
+        if: steps.source_info.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceNumber = parseInt('${{ steps.source_info.outputs.sourceNumber }}');
+            const sourceType = '${{ steps.source_info.outputs.sourceType }}';
+
+            console.log(`📊 ${sourceType} #${sourceNumber}의 빌드 횟수 조회 중...`);
+
+            // PR/이슈의 모든 댓글 조회
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: sourceNumber,
+              per_page: 100
+            });
+
+            // "앱 빌드 트리거 완료" 댓글 개수 = 이전 빌드 횟수
+            const buildCount = comments.data.filter(c =>
+              c.body.includes('앱 빌드 트리거 완료')
+            ).length;
+
+            // 빌드 번호: 소스번호 + 2자리 카운트 (38800, 38801, 38802...)
+            const buildNumber = `${sourceNumber}${String(buildCount).padStart(2, '0')}`;
+
+            console.log(`📊 ${sourceType} #${sourceNumber}: ${buildCount}번째 빌드 (이전 빌드 ${buildCount}회)`);
+            console.log(`📦 생성된 빌드 번호: ${buildNumber}`);
+
+            core.setOutput('buildCount', buildCount.toString());
+            core.setOutput('buildNumber', buildNumber);
+
+      - name: Android 빌드 워크플로우 트리거
+        if: steps.source_info.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceType = '${{ steps.source_info.outputs.sourceType }}';
+            const sourceNumber = '${{ steps.source_info.outputs.sourceNumber }}';
+            const branchName = '${{ steps.source_info.outputs.branchName }}';
+            const relatedIssueNumber = '${{ steps.source_info.outputs.relatedIssueNumber }}';
+            const buildNumber = '${{ steps.build_number_calc.outputs.buildNumber }}';
+
+            console.log(`🚀 Android 빌드 워크플로우 트리거 시작...`);
+            console.log(`   ${sourceType} 번호: #${sourceNumber}`);
+            console.log(`   빌드 번호: ${buildNumber}`);
+            console.log(`   브랜치: ${branchName}`);
+            console.log(`   관련 이슈 번호: ${relatedIssueNumber || '없음'}`);
+
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'build-android-app',
+              client_payload: {
+                pr_number: sourceNumber,
+                build_number: buildNumber,
+                branch_name: branchName,
+                issue_number: relatedIssueNumber || '',
+                triggered_by: `${sourceType.toLowerCase()}-comment`,
+                comment_id: context.payload.comment.id.toString(),
+                source_type: sourceType
+              }
+            });
+
+            console.log('✅ Android 빌드 워크플로우 트리거 완료');
+
+      - name: iOS 빌드 워크플로우 트리거
+        if: steps.source_info.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceType = '${{ steps.source_info.outputs.sourceType }}';
+            const sourceNumber = '${{ steps.source_info.outputs.sourceNumber }}';
+            const branchName = '${{ steps.source_info.outputs.branchName }}';
+            const relatedIssueNumber = '${{ steps.source_info.outputs.relatedIssueNumber }}';
+            const buildNumber = '${{ steps.build_number_calc.outputs.buildNumber }}';
+
+            console.log(`🚀 iOS 빌드 워크플로우 트리거 시작...`);
+            console.log(`   ${sourceType} 번호: #${sourceNumber}`);
+            console.log(`   빌드 번호: ${buildNumber}`);
+            console.log(`   브랜치: ${branchName}`);
+            console.log(`   관련 이슈 번호: ${relatedIssueNumber || '없음'}`);
+
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'build-ios-app',
+              client_payload: {
+                pr_number: sourceNumber,
+                build_number: buildNumber,
+                branch_name: branchName,
+                issue_number: relatedIssueNumber || '',
+                triggered_by: `${sourceType.toLowerCase()}-comment`,
+                comment_id: context.payload.comment.id.toString(),
+                source_type: sourceType
+              }
+            });
+
+            console.log('✅ iOS 빌드 워크플로우 트리거 완료');
+
+      - name: 트리거 완료 댓글 작성
+        if: steps.source_info.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceType = '${{ steps.source_info.outputs.sourceType }}';
+            const sourceNumber = '${{ steps.source_info.outputs.sourceNumber }}';
+            const branchName = '${{ steps.source_info.outputs.branchName }}';
+            const buildNumber = '${{ steps.build_number_calc.outputs.buildNumber }}';
+            const buildCount = '${{ steps.build_number_calc.outputs.buildCount }}';
+
+            const body = `🚀 **앱 빌드 트리거 완료**
+
+            Android와 iOS 빌드 워크플로우를 시작했습니다.
+
+            - 앱 버전: \`0.0.0(${buildNumber})\`
+            - PR/ISSUE: **#${sourceNumber}** (${buildCount}번째 빌드)
+            - 브랜치: \`${branchName}\`
+
+            ⏳ 빌드가 완료되면 자동으로 결과 댓글이 작성됩니다.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(sourceNumber),
+              body: body
+            });
+
+            console.log('✅ 트리거 완료 댓글 작성 완료');

@@ -386,6 +386,86 @@ cleanup_template_files() {
     print_success "템플릿 관련 파일 삭제 완료"
 }
 
+# .gitignore 생성 또는 업데이트
+ensure_gitignore() {
+    print_step ".gitignore 파일 확인 및 업데이트 중..."
+    
+    local required_entries=(
+        "/.idea"
+        "/.claude/settings.local.json"
+        "/.report"
+    )
+    
+    # .gitignore가 없으면 생성
+    if [ ! -f ".gitignore" ]; then
+        print_info ".gitignore 파일이 없습니다. 생성합니다."
+        
+        cat > .gitignore << 'EOF'
+# IDE Settings
+/.idea
+
+# Claude AI Settings
+/.claude/settings.local.json
+
+# Implementation Reports (자동 생성)
+/.report
+EOF
+        
+        print_success ".gitignore 파일 생성 완료"
+        return
+    fi
+    
+    # 기존 파일이 있으면 누락된 항목만 추가
+    print_info "기존 .gitignore 파일 발견. 필수 항목 확인 중..."
+    
+    local added=0
+    local entries_to_add=()
+    
+    for entry in "${required_entries[@]}"; do
+        # 간단한 존재 여부 확인 (정규화 없이)
+        if ! grep -q "^${entry}$" .gitignore && ! grep -q "^${entry#/}$" .gitignore; then
+            entries_to_add+=("$entry")
+            added=$((added + 1))
+        fi
+    done
+    
+    if [ $added -eq 0 ]; then
+        print_info "필수 항목이 이미 모두 존재합니다. 건너뜁니다."
+        return
+    fi
+    
+    # 항목 추가
+    print_info "$added 개 항목 추가 중..."
+    
+    # 파일 끝에 빈 줄이 없으면 추가
+    if [ -n "$(tail -c 1 .gitignore 2>/dev/null)" ]; then
+        echo "" >> .gitignore
+    fi
+    
+    # 섹션 헤더 추가
+    echo "" >> .gitignore
+    echo "# ====================================================================" >> .gitignore
+    echo "# SUH-DEVOPS-TEMPLATE: Auto-added entries" >> .gitignore
+    echo "# ====================================================================" >> .gitignore
+    
+    for entry in "${entries_to_add[@]}"; do
+        echo "$entry" >> .gitignore
+        print_info "  ✓ $entry"
+    done
+    
+    # .report 폴더가 이미 Git에 추적 중인 경우 제거
+    if printf '%s\n' "${entries_to_add[@]}" | grep -q "^/.report$"; then
+        if git ls-files --error-unmatch .report >/dev/null 2>&1; then
+            print_info ".report 폴더가 Git에 추적 중입니다. 추적 해제 중..."
+            if git rm -r --cached .report >/dev/null 2>&1; then
+                print_success ".report 폴더의 Git 추적이 해제되었습니다"
+            fi
+        fi
+    fi
+    
+    print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
+}
+
 # README.md 초기화
 initialize_readme() {
     local project_name=$1
@@ -466,6 +546,7 @@ print_summary() {
     echo "  ✅ CHANGELOG 파일 삭제"
     echo "  ✅ LICENSE, CONTRIBUTING.md 삭제"
     echo "  ✅ 테스트 폴더 삭제"
+    echo "  ✅ .gitignore 생성/업데이트"
     echo "  ✅ README.md 초기화"
     echo "  ✅ 이슈 템플릿 assignee 변경"
     echo ""
@@ -519,6 +600,10 @@ main() {
     
     # 3. 템플릿 파일 삭제
     cleanup_template_files
+    echo ""
+    
+    # 3-1. .gitignore 생성 또는 업데이트
+    ensure_gitignore
     echo ""
 
     # 4. README 초기화

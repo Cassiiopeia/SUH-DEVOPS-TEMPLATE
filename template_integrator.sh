@@ -1209,6 +1209,7 @@ ensure_gitignore() {
     local required_entries=(
         "/.idea"
         "/.claude/settings.local.json"
+        "/.report"
     )
     
     # .gitignore가 없으면 생성
@@ -1221,6 +1222,9 @@ ensure_gitignore() {
 
 # Claude AI Settings
 /.claude/settings.local.json
+
+# Implementation Reports (자동 생성)
+/.report
 EOF
         
         print_success ".gitignore 파일 생성 완료"
@@ -1264,6 +1268,16 @@ EOF
         echo "$entry" >> .gitignore
         print_info "  ✓ $entry"
     done
+    
+    # .report 폴더가 이미 Git에 추적 중인 경우 제거
+    if printf '%s\n' "${entries_to_add[@]}" | grep -q "^/.report$"; then
+        if git ls-files --error-unmatch .report >/dev/null 2>&1; then
+            print_info ".report 폴더가 Git에 추적 중입니다. 추적 해제 중..."
+            if git rm -r --cached .report >/dev/null 2>&1; then
+                print_success ".report 폴더의 Git 추적이 해제되었습니다"
+            fi
+        fi
+    fi
     
     print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }

@@ -1157,7 +1157,8 @@ function Ensure-GitIgnore {
     
     $requiredEntries = @(
         "/.idea",
-        "/.claude/settings.local.json"
+        "/.claude/settings.local.json",
+        "/.report"
     )
     
     # .gitignore가 없으면 생성
@@ -1170,6 +1171,9 @@ function Ensure-GitIgnore {
 
 # Claude AI Settings
 /.claude/settings.local.json
+
+# Implementation Reports (자동 생성)
+/.report
 "@
         
         Set-Content -Path ".gitignore" -Value $gitignoreContent -Encoding UTF8
@@ -1213,6 +1217,22 @@ function Ensure-GitIgnore {
     }
     
     Add-Content -Path ".gitignore" -Value $appendContent -Encoding UTF8
+    
+    # .report 폴더가 이미 Git에 추적 중인 경우 제거
+    if ($entriesToAdd -contains "/.report") {
+        try {
+            git ls-files --error-unmatch .report 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Print-Info ".report 폴더가 Git에 추적 중입니다. 추적 해제 중..."
+                git rm -r --cached .report 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    Print-Success ".report 폴더의 Git 추적이 해제되었습니다"
+                }
+            }
+        } catch {
+            # Git 명령 실패 시 무시 (Git 저장소가 아닐 수 있음)
+        }
+    }
     
     Print-Success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }

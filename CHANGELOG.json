@@ -1,11 +1,35 @@
 {
   "metadata": {
-    "lastUpdated": "2025-12-12T01:13:47Z",
-    "currentVersion": "2.2.8",
+    "lastUpdated": "2025-12-12T01:40:22Z",
+    "currentVersion": "2.2.9",
     "projectType": "basic",
-    "totalReleases": 40
+    "totalReleases": 41
   },
   "releases": [
+    {
+      "version": "2.2.9",
+      "project_type": "basic",
+      "date": "2025-12-12",
+      "pr_number": 115,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리스 노트\n\n* **Documentation**\n  * 구현 보고서 작성 가이드 및 템플릿 추가\n\n* **Chores**\n  * 자동화된 워크플로우 개선으로 배포 프로세스 강화\n  * 프로젝트 설정 및 무시 파일 관리 기능 확장\n  * 버전 업데이트 (v2.2.8 → v2.2.9)",
+      "parsed_changes": {
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "구현 보고서 작성 가이드 및 템플릿 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "자동화된 워크플로우 개선으로 배포 프로세스 강화",
+            "프로젝트 설정 및 무시 파일 관리 기능 확장",
+            "버전 업데이트 (v2.2.8 → v2.2.9)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.2.8",
       "project_type": "basic",

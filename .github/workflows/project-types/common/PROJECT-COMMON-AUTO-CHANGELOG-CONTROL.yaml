@@ -279,13 +279,43 @@ jobs:
           PR_HEAD=$(gh pr view ${{ github.event.pull_request.number }} --json headRefName -q .headRefName)
           PR_BASE=$(gh pr view ${{ github.event.pull_request.number }} --json baseRefName -q .baseRefName)
 
-          echo "PR head: $PR_HEAD, base: $PR_BASE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 PR 정보:"
+          echo "  • HEAD 브랜치: $PR_HEAD"
+          echo "  • BASE 브랜치: $PR_BASE"
+          echo "  • 목표: $PR_BASE 브랜치에 $PR_HEAD의 변경사항을 머지"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+          # 원격 브랜치 최신화
+          echo "🔄 원격 브랜치 최신화 중..."
           git fetch origin $PR_HEAD
-          git checkout $PR_HEAD
           git fetch origin $PR_BASE
-          git merge --no-edit origin/$PR_BASE || true
-          git push origin HEAD
+
+          # BASE 브랜치(deploy)로 체크아웃
+          echo "📦 $PR_BASE 브랜치로 체크아웃 중..."
+          git checkout $PR_BASE
+          git pull origin $PR_BASE
+
+          # HEAD 브랜치(main)의 변경사항을 BASE(deploy)에 머지
+          echo "🔀 $PR_HEAD의 변경사항을 $PR_BASE에 머지 중..."
+          if git merge --no-edit origin/$PR_HEAD; then
+            echo "✅ 머지 성공"
+          else
+            echo "⚠️ 머지 충돌 발생"
+            echo "충돌 파일:"
+            git diff --name-only --diff-filter=U || true
+            echo "❌ 머지 충돌로 인해 실패했습니다. 수동으로 해결 후 다시 시도하세요."
+            exit 1
+          fi
+
+          # deploy 브랜치에 푸시 (다른 워크플로우 트리거)
+          echo "🚀 $PR_BASE 브랜치에 푸시 중..."
+          if git push origin $PR_BASE; then
+            echo "✅ $PR_BASE 브랜치에 푸시 완료 (배포 워크플로우 트리거됨)"
+          else
+            echo "❌ 푸시 실패"
+            exit 1
+          fi
 
       - name: 자동 PR Merge
         env:
@@ -295,28 +325,33 @@ jobs:
           PR_STATE_VALUE=$(echo "$PR_STATE" | cut -d',' -f1)
           PR_MERGEABLE=$(echo "$PR_STATE" | cut -d',' -f2)
 
-          echo "PR 상태: $PR_STATE_VALUE (병합 가능: $PR_MERGEABLE)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 PR 상태 확인:"
+          echo "  • 상태: $PR_STATE_VALUE"
+          echo "  • 병합 가능: $PR_MERGEABLE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
           if [ "$PR_STATE_VALUE" = "CLOSED" ] || [ "$PR_STATE_VALUE" = "MERGED" ]; then
-            echo "PR이 이미 닫혔거나 병합되었습니다"
+            echo "✅ PR이 이미 닫혔거나 병합되었습니다"
             exit 0
           fi
 
           if [ "$PR_MERGEABLE" = "true" ]; then
-            echo "PR 병합 중..."
-            gh pr merge ${{ github.event.pull_request.number }} --merge --admin --delete-branch=false
-            echo "✅ PR 병합 완료"
+            echo "🔀 PR 병합 중..."
+            if gh pr merge ${{ github.event.pull_request.number }} --merge --admin --delete-branch=false; then
+              echo "✅ PR 병합 완료"
+            else
+              echo "⚠️ PR 병합 실패 (이미 머지되었을 수 있음)"
+            fi
           else
-            echo "⚠️ PR을 병합할 수 없습니다. 직접 변경사항 적용..."
-            PR_HEAD=$(gh pr view ${{ github.event.pull_request.number }} --json headRefName -q .headRefName)
-
-            git checkout deploy
-            git pull origin deploy
-            git merge --no-edit $PR_HEAD
-            git push origin deploy
-
-            gh pr merge ${{ github.event.pull_request.number }} --merge --admin --delete-branch=false || \
-            gh pr comment ${{ github.event.pull_request.number }} --body "✅ 변경사항이 자동으로 deploy 브랜치에 적용되었습니다."
+            echo "⚠️ PR을 GitHub API로 병합할 수 없습니다"
+            echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 deploy 브랜치에 적용되었습니다"
+            echo "📝 PR 상태를 업데이트합니다..."
+            
+            # PR에 댓글 추가
+            gh pr comment ${{ github.event.pull_request.number }} --body "✅ 변경사항이 자동으로 deploy 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
+            
+            echo "✅ PR 상태 업데이트 완료"
           fi
 
       - name: 배포 완료 알림

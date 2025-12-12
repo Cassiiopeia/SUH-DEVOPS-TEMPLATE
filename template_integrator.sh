@@ -844,9 +844,17 @@ add_version_section_to_readme() {
         return
     fi
     
-    # 이미 버전 섹션이 있는지 확인
-    if grep -q "<!-- AUTO-VERSION-SECTION" README.md; then
-        print_info "이미 버전 관리 섹션이 있습니다. 건너뜁니다."
+    # 이미 버전 섹션이 있는지 확인 (다중 패턴 체크로 강화)
+    # 1. 주석 체크 (가장 확실한 방법)
+    if grep -qiE "(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION)" README.md; then
+        print_info "이미 버전 관리 섹션이 있습니다. (주석 감지)"
+        return
+    fi
+    
+    # 2. 버전 라인 체크 (버전 번호 포함 필수 - False Positive 방지)
+    # 버전 번호 패턴(v1.0.0 형식)이 포함된 경우만 버전 섹션으로 인식
+    if grep -qiE "##[[:space:]]*(최신[[:space:]]*버전|최신버전|Version|버전)[[:space:]]*:[[:space:]]*v[0-9]+\.[0-9]+\.[0-9]+" README.md; then
+        print_info "이미 버전 관리 섹션이 있습니다. (버전 라인 감지)"
         return
     fi
     

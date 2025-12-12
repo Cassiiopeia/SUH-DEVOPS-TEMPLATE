@@ -1148,6 +1148,60 @@ copy_coderabbit_config() {
     print_info "💡 CodeRabbit AI 리뷰가 활성화됩니다 (language: ko-KR)"
 }
 
+# gitignore 항목 정규화 함수 (중복 체크용)
+# 예: "/.idea" -> ".idea", ".idea" -> ".idea", "./idea" -> ".idea"
+# 예: "/.claude/settings.local.json" -> ".claude/settings.local.json"
+normalize_gitignore_entry() {
+    local entry="$1"
+    # 주석 제거
+    entry="${entry%%#*}"
+    # 앞뒤 공백 제거
+    entry=$(echo "$entry" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    # 앞의 슬래시 제거 (루트 경로 표시 제거)
+    entry="${entry#/}"
+    # "./" 제거 (현재 디렉토리 표시 제거, 하지만 ".idea" 같은 숨김 폴더는 보존)
+    entry="${entry#./}"
+    # 뒤의 슬래시 제거 (디렉토리 표시 제거)
+    entry="${entry%/}"
+    # 빈 문자열이면 원본 반환
+    if [ -z "$entry" ]; then
+        echo "$1"
+    else
+        echo "$entry"
+    fi
+}
+
+# gitignore 파일에서 항목 존재 여부 확인 (정규화된 비교)
+check_gitignore_entry_exists() {
+    local target_entry="$1"
+    local gitignore_file="$2"
+    
+    # 정규화된 타겟 항목
+    local normalized_target=$(normalize_gitignore_entry "$target_entry")
+    
+    # gitignore 파일의 각 라인 확인
+    while IFS= read -r line || [ -n "$line" ]; do
+        # 주석 라인 건너뛰기
+        if [[ "$line" =~ ^[[:space:]]*# ]]; then
+            continue
+        fi
+        
+        # 빈 라인 건너뛰기
+        if [[ -z "$line" || "$line" =~ ^[[:space:]]*$ ]]; then
+            continue
+        fi
+        
+        # 정규화된 라인과 비교
+        local normalized_line=$(normalize_gitignore_entry "$line")
+        
+        if [ "$normalized_line" = "$normalized_target" ]; then
+            return 0  # 존재함
+        fi
+    done < "$gitignore_file"
+    
+    return 1  # 존재하지 않음
+}
+
 # .gitignore 생성 또는 업데이트
 ensure_gitignore() {
     print_step ".gitignore 파일 확인 및 업데이트 중..."
@@ -1180,8 +1234,8 @@ EOF
     local entries_to_add=()
     
     for entry in "${required_entries[@]}"; do
-        # 정확한 매칭 확인 (주석 제외)
-        if ! grep -qxF "$entry" .gitignore 2>/dev/null; then
+        # 정규화된 비교로 중복 체크
+        if ! check_gitignore_entry_exists "$entry" ".gitignore"; then
             entries_to_add+=("$entry")
             added=$((added + 1))
         fi

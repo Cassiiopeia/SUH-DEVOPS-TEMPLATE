@@ -1087,6 +1087,71 @@ function Copy-CodeRabbitConfig {
 # .gitignore 생성 또는 업데이트
 # ===================================================================
 
+# gitignore 항목 정규화 함수 (중복 체크용)
+# 예: "/.idea" -> ".idea", ".idea" -> ".idea", "./idea" -> ".idea"
+# 예: "/.claude/settings.local.json" -> ".claude/settings.local.json"
+function Normalize-GitIgnoreEntry {
+    param(
+        [string]$Entry
+    )
+    
+    # 주석 제거
+    $normalized = $Entry -replace '#.*$', ''
+    # 앞뒤 공백 제거
+    $normalized = $normalized.Trim()
+    # 앞의 슬래시 제거 (루트 경로 표시 제거)
+    $normalized = $normalized -replace '^/+', ''
+    # "./" 제거 (현재 디렉토리 표시 제거, 하지만 ".idea" 같은 숨김 폴더는 보존)
+    $normalized = $normalized -replace '^\./', ''
+    # 뒤의 슬래시 제거 (디렉토리 표시 제거)
+    $normalized = $normalized -replace '/+$', ''
+    
+    # 빈 문자열이면 원본 반환
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        return $Entry
+    }
+    
+    return $normalized
+}
+
+# gitignore 파일에서 항목 존재 여부 확인 (정규화된 비교)
+function Test-GitIgnoreEntryExists {
+    param(
+        [string]$TargetEntry,
+        [string]$GitIgnoreFile
+    )
+    
+    # 정규화된 타겟 항목
+    $normalizedTarget = Normalize-GitIgnoreEntry -Entry $TargetEntry
+    
+    # gitignore 파일의 각 라인 확인
+    $lines = Get-Content -Path $GitIgnoreFile -ErrorAction SilentlyContinue
+    if ($null -eq $lines) {
+        return $false
+    }
+    
+    foreach ($line in $lines) {
+        # 주석 라인 건너뛰기
+        if ($line -match '^\s*#') {
+            continue
+        }
+        
+        # 빈 라인 건너뛰기
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+        
+        # 정규화된 라인과 비교
+        $normalizedLine = Normalize-GitIgnoreEntry -Entry $line
+        
+        if ($normalizedLine -eq $normalizedTarget) {
+            return $true  # 존재함
+        }
+    }
+    
+    return $false  # 존재하지 않음
+}
+
 function Ensure-GitIgnore {
     Print-Step ".gitignore 파일 확인 및 업데이트 중..."
     
@@ -1116,13 +1181,12 @@ function Ensure-GitIgnore {
     # 기존 파일이 있으면 누락된 항목만 추가
     Print-Info "기존 .gitignore 파일 발견. 필수 항목 확인 중..."
     
-    $gitignoreContent = Get-Content ".gitignore" -Raw -ErrorAction SilentlyContinue
     $added = 0
     $entriesToAdd = @()
     
     foreach ($entry in $requiredEntries) {
-        # 정확한 매칭 확인
-        if ($gitignoreContent -notmatch [regex]::Escape($entry)) {
+        # 정규화된 비교로 중복 체크
+        if (-not (Test-GitIgnoreEntryExists -TargetEntry $entry -GitIgnoreFile ".gitignore")) {
             $entriesToAdd += $entry
             $added++
         }

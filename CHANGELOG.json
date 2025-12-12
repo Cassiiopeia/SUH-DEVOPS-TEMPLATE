@@ -1,11 +1,45 @@
 {
   "metadata": {
-    "lastUpdated": "2025-12-01T15:38:46Z",
-    "currentVersion": "2.2.0",
+    "lastUpdated": "2025-12-12T01:13:47Z",
+    "currentVersion": "2.2.8",
     "projectType": "basic",
-    "totalReleases": 39
+    "totalReleases": 40
   },
   "releases": [
+    {
+      "version": "2.2.8",
+      "project_type": "basic",
+      "date": "2025-12-12",
+      "pr_number": 114,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * 자동 테스트 케이스 생성 기능 추가\n  * Flutter 안드로이드 테스트 APK 빌드 자동화\n  * Flutter iOS TestFlight 배포 자동화 추가\n  * 앱 빌드 트리거 시스템 구현\n  * .gitignore 항목 정규화 및 중복 제거 기능 추가\n\n* **개선 사항**\n  * Flutter 설정 워크플로우 재구조화\n  * 에이전트 프롬프트 복사 기능 제거\n\n* **기타**\n  * 버전 업데이트 (v2.2.8)\n  * 내부 문서화 정리",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "자동 테스트 케이스 생성 기능 추가",
+            "Flutter 안드로이드 테스트 APK 빌드 자동화",
+            "Flutter iOS TestFlight 배포 자동화 추가",
+            "앱 빌드 트리거 시스템 구현",
+            ".gitignore 항목 정규화 및 중복 제거 기능 추가"
+          ]
+        },
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "Flutter 설정 워크플로우 재구조화",
+            "에이전트 프롬프트 복사 기능 제거"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전 업데이트 (v2.2.8)",
+            "내부 문서화 정리"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.2.0",
       "project_type": "basic",

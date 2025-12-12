@@ -1217,42 +1217,6 @@ function Copy-ClaudeFolder {
 }
 
 # ===================================================================
-# agent-prompts 폴더 다운로드
-# ===================================================================
-
-function Copy-AgentPrompts {
-    Print-Step "agent-prompts 폴더 다운로드 여부 확인 중..."
-    
-    $srcAgentDir = Join-Path $TEMP_DIR "agent-prompts"
-    if (-not (Test-Path $srcAgentDir)) {
-        Print-Info "agent-prompts 폴더가 템플릿에 없습니다. 건너뜁니다."
-        return
-    }
-    
-    # 사용자 동의 확인
-    if (-not $Force) {
-        Print-SeparatorLine
-        Write-Host ""
-        Write-Host "agent-prompts 폴더를 다운로드하시겠습니까? (AI 개발 가이드라인)"
-        Write-Host "  Y/y - 예, 다운로드하기"
-        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
-        Write-Host ""
-        
-        if (-not (Ask-YesNo "선택" "N")) {
-            Print-Info "agent-prompts 폴더 다운로드 건너뜁니다"
-            return
-        }
-    }
-    
-    # 다운로드 실행
-    if (-not (Test-Path "agent-prompts")) {
-        New-Item -Path "agent-prompts" -ItemType Directory -Force | Out-Null
-    }
-    Copy-Item -Path "$srcAgentDir\*" -Destination "agent-prompts\" -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success "agent-prompts 폴더 다운로드 완료"
-}
-
-# ===================================================================
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
 # ===================================================================
 
@@ -1517,7 +1481,6 @@ function Start-Integration {
             Ensure-GitIgnore
             Copy-CursorFolder
             Copy-ClaudeFolder
-            Copy-AgentPrompts
             Copy-SetupGuide
             Copy-UtilModules $script:ProjectType
         }

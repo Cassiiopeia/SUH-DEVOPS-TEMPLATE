@@ -1,11 +1,35 @@
 {
   "metadata": {
-    "lastUpdated": "2025-12-12T01:40:22Z",
-    "currentVersion": "2.2.9",
+    "lastUpdated": "2025-12-12T01:59:16Z",
+    "currentVersion": "2.2.10",
     "projectType": "basic",
-    "totalReleases": 41
+    "totalReleases": 42
   },
   "releases": [
+    {
+      "version": "2.2.10",
+      "project_type": "basic",
+      "date": "2025-12-12",
+      "pr_number": 116,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * 블루/그린 배포 전략을 통한 무중단 CI/CD 파이프라인 구현\n  * Docker 기반 자동화된 빌드 및 원격 배포 오케스트레이션 추가\n\n* **Chores**\n  * 버전을 2.2.10으로 업데이트\n  * 프로젝트 관련 설정 파일 업데이트",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "블루/그린 배포 전략을 통한 무중단 CI/CD 파이프라인 구현",
+            "Docker 기반 자동화된 빌드 및 원격 배포 오케스트레이션 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전을 2.2.10으로 업데이트",
+            "프로젝트 관련 설정 파일 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.2.9",
       "project_type": "basic",

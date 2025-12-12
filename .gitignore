@@ -1,5 +1,6 @@
 /.idea
 /.claude/settings.local.json
+/.report
 
 # Python
 __pycache__/

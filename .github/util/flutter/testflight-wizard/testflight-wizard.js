@@ -692,7 +692,7 @@ function generateInitCommand() {
     const profileName = state.profileName || 'Profile Name';
     const usesNonExemptEncryption = state.encryptionType === 'standard' ? 'true' : 'false';
 
-    const cmd = `cd "${projectPath}" && bash ".github/util/flutter-ios-testflight-init/init.sh" "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
+    const cmd = `cd "${projectPath}" && bash ".github/util/flutter/testflight-wizard/testflight-wizard-setup.sh" "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
     setElementText('initCmd', cmd);
 }
 

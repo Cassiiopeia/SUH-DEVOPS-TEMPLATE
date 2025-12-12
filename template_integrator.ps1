@@ -736,10 +736,19 @@ function Add-VersionSectionToReadme {
         return
     }
     
-    # 이미 버전 섹션이 있는지 확인
+    # 이미 버전 섹션이 있는지 확인 (다중 패턴 체크로 강화)
     $readmeContent = Get-Content "README.md" -Raw
-    if ($readmeContent -match "<!-- AUTO-VERSION-SECTION") {
-        Print-Info "이미 버전 관리 섹션이 있습니다. 건너뜁니다."
+    
+    # 1. 주석 체크 (가장 확실한 방법)
+    if ($readmeContent -match "(?i)(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION)") {
+        Print-Info "이미 버전 관리 섹션이 있습니다. (주석 감지)"
+        return
+    }
+    
+    # 2. 버전 라인 체크 (버전 번호 포함 필수 - False Positive 방지)
+    # 버전 번호 패턴(v1.0.0 형식)이 포함된 경우만 버전 섹션으로 인식
+    if ($readmeContent -match "(?i)##\s*(최신\s*버전|최신버전|Version|버전)\s*:\s*v\d+\.\d+\.\d+") {
+        Print-Info "이미 버전 관리 섹션이 있습니다. (버전 라인 감지)"
         return
     }
     
@@ -1078,6 +1087,71 @@ function Copy-CodeRabbitConfig {
 # .gitignore 생성 또는 업데이트
 # ===================================================================
 
+# gitignore 항목 정규화 함수 (중복 체크용)
+# 예: "/.idea" -> ".idea", ".idea" -> ".idea", "./idea" -> ".idea"
+# 예: "/.claude/settings.local.json" -> ".claude/settings.local.json"
+function Normalize-GitIgnoreEntry {
+    param(
+        [string]$Entry
+    )
+    
+    # 주석 제거
+    $normalized = $Entry -replace '#.*$', ''
+    # 앞뒤 공백 제거
+    $normalized = $normalized.Trim()
+    # 앞의 슬래시 제거 (루트 경로 표시 제거)
+    $normalized = $normalized -replace '^/+', ''
+    # "./" 제거 (현재 디렉토리 표시 제거, 하지만 ".idea" 같은 숨김 폴더는 보존)
+    $normalized = $normalized -replace '^\./', ''
+    # 뒤의 슬래시 제거 (디렉토리 표시 제거)
+    $normalized = $normalized -replace '/+$', ''
+    
+    # 빈 문자열이면 원본 반환
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        return $Entry
+    }
+    
+    return $normalized
+}
+
+# gitignore 파일에서 항목 존재 여부 확인 (정규화된 비교)
+function Test-GitIgnoreEntryExists {
+    param(
+        [string]$TargetEntry,
+        [string]$GitIgnoreFile
+    )
+    
+    # 정규화된 타겟 항목
+    $normalizedTarget = Normalize-GitIgnoreEntry -Entry $TargetEntry
+    
+    # gitignore 파일의 각 라인 확인
+    $lines = Get-Content -Path $GitIgnoreFile -ErrorAction SilentlyContinue
+    if ($null -eq $lines) {
+        return $false
+    }
+    
+    foreach ($line in $lines) {
+        # 주석 라인 건너뛰기
+        if ($line -match '^\s*#') {
+            continue
+        }
+        
+        # 빈 라인 건너뛰기
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+        
+        # 정규화된 라인과 비교
+        $normalizedLine = Normalize-GitIgnoreEntry -Entry $line
+        
+        if ($normalizedLine -eq $normalizedTarget) {
+            return $true  # 존재함
+        }
+    }
+    
+    return $false  # 존재하지 않음
+}
+
 function Ensure-GitIgnore {
     Print-Step ".gitignore 파일 확인 및 업데이트 중..."
     
@@ -1107,13 +1181,12 @@ function Ensure-GitIgnore {
     # 기존 파일이 있으면 누락된 항목만 추가
     Print-Info "기존 .gitignore 파일 발견. 필수 항목 확인 중..."
     
-    $gitignoreContent = Get-Content ".gitignore" -Raw -ErrorAction SilentlyContinue
     $added = 0
     $entriesToAdd = @()
     
     foreach ($entry in $requiredEntries) {
-        # 정확한 매칭 확인
-        if ($gitignoreContent -notmatch [regex]::Escape($entry)) {
+        # 정규화된 비교로 중복 체크
+        if (-not (Test-GitIgnoreEntryExists -TargetEntry $entry -GitIgnoreFile ".gitignore")) {
             $entriesToAdd += $entry
             $added++
         }
@@ -1214,42 +1287,6 @@ function Copy-ClaudeFolder {
     }
     Copy-Item -Path "$srcClaudeDir\*" -Destination ".claude\" -Recurse -Force -ErrorAction SilentlyContinue
     Print-Success ".claude 폴더 다운로드 완료"
-}
-
-# ===================================================================
-# agent-prompts 폴더 다운로드
-# ===================================================================
-
-function Copy-AgentPrompts {
-    Print-Step "agent-prompts 폴더 다운로드 여부 확인 중..."
-    
-    $srcAgentDir = Join-Path $TEMP_DIR "agent-prompts"
-    if (-not (Test-Path $srcAgentDir)) {
-        Print-Info "agent-prompts 폴더가 템플릿에 없습니다. 건너뜁니다."
-        return
-    }
-    
-    # 사용자 동의 확인
-    if (-not $Force) {
-        Print-SeparatorLine
-        Write-Host ""
-        Write-Host "agent-prompts 폴더를 다운로드하시겠습니까? (AI 개발 가이드라인)"
-        Write-Host "  Y/y - 예, 다운로드하기"
-        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
-        Write-Host ""
-        
-        if (-not (Ask-YesNo "선택" "N")) {
-            Print-Info "agent-prompts 폴더 다운로드 건너뜁니다"
-            return
-        }
-    }
-    
-    # 다운로드 실행
-    if (-not (Test-Path "agent-prompts")) {
-        New-Item -Path "agent-prompts" -ItemType Directory -Force | Out-Null
-    }
-    Copy-Item -Path "$srcAgentDir\*" -Destination "agent-prompts\" -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success "agent-prompts 폴더 다운로드 완료"
 }
 
 # ===================================================================
@@ -1517,7 +1554,6 @@ function Start-Integration {
             Ensure-GitIgnore
             Copy-CursorFolder
             Copy-ClaudeFolder
-            Copy-AgentPrompts
             Copy-SetupGuide
             Copy-UtilModules $script:ProjectType
         }

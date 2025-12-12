@@ -1,0 +1,562 @@
+# ===================================================================
+# Flutter Android 테스트용 APK 빌드 워크플로우
+# ===================================================================
+#
+# 이 워크플로우는 기능 브랜치에서 수동으로 실행하여
+# 테스트용 Android APK를 빌드합니다.
+#
+# 주요 특징:
+# - workflow_dispatch로 수동 실행 또는 repository_dispatch로 트리거
+# - 버전 관리 불필요 (Android는 버전 제약 없음)
+# - 브랜치명에서 이슈 번호 자동 추출 (YYYYMMDD_#이슈번호_내용 형식)
+# - GitHub API로 이슈 정보 가져와서 빌드 정보에 포함
+# - APK 파일만 생성 (Play Store 배포 제거)
+# - 아티팩트로 업로드하여 다운로드 가능 (최대 500MB/아티팩트)
+# - 아티팩트 이름에 브랜치명 포함하여 구분 용이
+#
+# 사용 방법:
+# 1. 기능 브랜치로 체크아웃
+# 2. GitHub Actions에서 이 워크플로우 선택
+# 3. "Run workflow" 버튼 클릭
+# 4. 빌드 완료 후 아티팩트에서 APK 다운로드
+#
+# ===================================================================
+# 📋 필요한 GitHub Secrets
+# ===================================================================
+#
+# 📝 환경 설정 (선택):
+#   - ENV                       : .env 파일 내용 (앱에서 사용하는 환경변수)
+#   - DEBUG_KEYSTORE            : debug.keystore 파일 (base64 인코딩)
+#   - GOOGLE_SERVICES_JSON      : google-services.json 내용 (Firebase 사용 시)
+#
+# ===================================================================
+
+name: PROJECT-Flutter-Android-Test-APK
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [build-android-app]
+
+# ============================================
+# 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
+# ============================================
+env:
+  FLUTTER_VERSION: "3.35.5"
+  JAVA_VERSION: "17"
+  ENV_FILE_PATH: ".env"
+
+jobs:
+  prepare-test-build:
+    name: 테스트 빌드 준비
+    runs-on: ubuntu-latest
+
+    outputs:
+      issue_url: ${{ steps.issue_info.outputs.issue_url }}
+      issue_title: ${{ steps.issue_info.outputs.issue_title }}
+      issue_number: ${{ steps.issue_info.outputs.issue_number }}
+      branch_name: ${{ steps.issue_info.outputs.branch_name }}
+      branch_name_safe: ${{ steps.issue_info.outputs.branch_name_safe }}
+      commit_hash: ${{ steps.build_info.outputs.commit_hash }}
+      pr_number: ${{ steps.build_info.outputs.pr_number }}
+      build_number: ${{ steps.build_info.outputs.build_number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref }}
+
+      - name: Pull latest changes
+        run: |
+          BRANCH_NAME="${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+          echo "🌿 브랜치: $BRANCH_NAME"
+          git pull origin "$BRANCH_NAME" || echo "⚠️ Pull 실패 (이미 최신 상태일 수 있음)"
+
+      # 브랜치명에서 이슈 번호 추출 및 GitHub API로 이슈 정보 가져오기
+      - name: 브랜치명에서 이슈 정보 추출
+        id: issue_info
+        run: |
+          # repository_dispatch인 경우 client_payload에서 브랜치명 가져오기
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            BRANCH_NAME="${{ github.event.client_payload.branch_name }}"
+            ISSUE_NUMBER="${{ github.event.client_payload.issue_number }}"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+            # 브랜치명에서 이슈 번호 추출 (#387 형식)
+            ISSUE_NUMBER=$(echo "$BRANCH_NAME" | sed -n 's/.*#\([0-9]*\).*/\1/p')
+          fi
+
+          echo "🌿 브랜치명: $BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+          # 브랜치명을 아티팩트 이름에 사용 가능한 형식으로 변환
+          # 특수문자를 밑줄로 대체
+          BRANCH_NAME_SAFE=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9_-]/_/g' | cut -c1-50)
+          echo "branch_name_safe=$BRANCH_NAME_SAFE" >> $GITHUB_OUTPUT
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "⚠️ 브랜치명에서 이슈 번호를 찾을 수 없습니다."
+            echo "issue_url=" >> $GITHUB_OUTPUT
+            echo "issue_title=" >> $GITHUB_OUTPUT
+            echo "issue_number=" >> $GITHUB_OUTPUT
+          else
+            echo "✅ 추출된 이슈 번호: #$ISSUE_NUMBER"
+            ISSUE_URL="https://github.com/${{ github.repository }}/issues/$ISSUE_NUMBER"
+            echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+            echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+
+            # GitHub API로 이슈 정보 가져오기
+            echo "🔍 GitHub API로 이슈 정보 조회 중..."
+            ISSUE_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER")
+
+            ISSUE_TITLE=$(echo "$ISSUE_RESPONSE" | jq -r '.title // "이슈 정보 없음"')
+            ISSUE_STATE=$(echo "$ISSUE_RESPONSE" | jq -r '.state // "unknown"')
+
+            if [ "$ISSUE_TITLE" = "null" ] || [ "$ISSUE_TITLE" = "이슈 정보 없음" ]; then
+              echo "⚠️ 이슈 #$ISSUE_NUMBER를 찾을 수 없습니다."
+              echo "issue_title=" >> $GITHUB_OUTPUT
+            else
+              echo "📋 이슈 제목: $ISSUE_TITLE"
+              echo "📌 이슈 상태: $ISSUE_STATE"
+              echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      # 빌드 정보 생성
+      - name: 빌드 정보 생성
+        id: build_info
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_SHORT=$(echo "$COMMIT_SHA" | cut -c1-7)
+          BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+          # repository_dispatch 이벤트인 경우 PR 번호를 빌드 번호로 사용
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            BUILD_NUMBER="${{ github.event.client_payload.build_number }}"
+            PR_NUMBER="${{ github.event.client_payload.pr_number }}"
+            echo "📋 repository_dispatch 이벤트 감지"
+            echo "  PR 번호: #$PR_NUMBER"
+            echo "  빌드 번호: $BUILD_NUMBER (PR 번호 사용)"
+          else
+            BUILD_NUMBER="${{ github.run_number }}"
+            PR_NUMBER=""
+            echo "📋 workflow_dispatch 이벤트 감지"
+            echo "  빌드 번호: $BUILD_NUMBER (기본값)"
+          fi
+
+          echo "commit_hash=$COMMIT_SHORT" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+          echo "📋 빌드 정보:"
+          echo "  빌드 번호: #$BUILD_NUMBER"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "  PR 번호: #$PR_NUMBER"
+          fi
+          echo "  커밋 해시: $COMMIT_SHORT"
+          echo "  빌드 날짜: $BUILD_DATE"
+
+  build-android-test:
+    name: Android 테스트 APK 빌드
+    runs-on: ubuntu-latest
+    needs: prepare-test-build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref }}
+
+      - name: Pull latest changes
+        run: git pull origin ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}
+
+      # Debug Keystore 설정 (선택적)
+      - name: Setup Debug Keystore
+        run: |
+          mkdir -p ~/.android
+          if [ -n "${{ secrets.DEBUG_KEYSTORE }}" ]; then
+            echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ~/.android/debug.keystore
+            echo "✅ Debug Keystore created from secrets"
+          else
+            echo "ℹ️ DEBUG_KEYSTORE secret not provided, using default"
+          fi
+          ls -la ~/.android/ || true
+
+      # .env 파일 생성
+      - name: Create .env file
+        run: |
+          cat << 'EOF' > ${{ env.ENV_FILE_PATH }}
+          ${{ secrets.ENV }}
+          EOF
+          echo "✅ ${{ env.ENV_FILE_PATH }} file created"
+
+      # Keystore와 key.properties 설정 (선택적)
+      - name: Setup Keystore and key.properties
+        run: |
+          mkdir -p android/app/keystore
+          if [ -n "${{ secrets.DEBUG_KEYSTORE }}" ]; then
+            echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > android/app/keystore/key.jks
+            echo "✅ Keystore created from DEBUG_KEYSTORE"
+            echo "storeFile=keystore/key.jks" > android/key.properties
+            echo "storePassword=android" >> android/key.properties
+            echo "keyAlias=androiddebugkey" >> android/key.properties
+            echo "keyPassword=android" >> android/key.properties
+            echo "✅ key.properties created"
+          else
+            echo "ℹ️ DEBUG_KEYSTORE not provided, skipping keystore setup"
+          fi
+          ls -la android/ || true
+
+      # google-services.json 생성 (선택적)
+      - name: Create google-services.json
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            mkdir -p android/app
+            printf '%s' "${GOOGLE_SERVICES_JSON}" > android/app/google-services.json
+            echo "✅ google-services.json created"
+          else
+            echo "ℹ️ GOOGLE_SERVICES_JSON secret not provided, skipping"
+          fi
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+
+      # Flutter 설정
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Verify Flutter version
+        run: |
+          echo "✅ Flutter setup completed"
+          flutter --version
+
+      # Flutter 및 Gradle 캐시
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-flutter-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-flutter-pub-
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # 프로젝트 의존성 설치
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          echo "✅ Dependencies installed"
+
+      # Gradle 셋업
+      - name: Setup Gradle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          echo "✅ Gradle wrapper permissions set"
+
+      # Java 설정
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Verify Java version
+        run: |
+          echo "✅ Java setup completed"
+          java -version
+
+      # Android SDK 설정
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Verify Android SDK setup
+        run: echo "✅ Android SDK setup completed"
+
+      # Ruby 설정
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4.1"
+          bundler-cache: true
+
+      - name: Verify Ruby version
+        run: |
+          echo "✅ Ruby setup completed"
+          ruby -v
+
+      # Fastlane 설치
+      - name: Install Fastlane
+        run: |
+          gem install fastlane
+          echo "✅ Fastlane installed"
+          fastlane --version
+
+      # APK 파일명 생성
+      - name: Generate APK filename
+        id: apk_filename
+        run: |
+          COMMIT_SHORT="${{ needs.prepare-test-build.outputs.commit_hash }}"
+          BUILD_NUMBER="${{ needs.prepare-test-build.outputs.build_number }}"
+          APK_NAME="flutter-test-${BUILD_NUMBER}-${COMMIT_SHORT}.apk"
+          echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
+          echo "📦 APK 파일명: $APK_NAME"
+
+      # APK 빌드 (Fastlane 또는 직접 빌드)
+      - name: Build APK
+        run: |
+          # Fastlane Fastfile이 있으면 사용, 없으면 직접 빌드
+          if [ -f "android/fastlane/Fastfile" ]; then
+            echo "📦 Fastlane을 사용하여 빌드..."
+            cd android
+            fastlane build --verbose || flutter build apk --release
+          else
+            echo "📦 Flutter 직접 빌드..."
+            flutter build apk --release
+          fi
+          ls -la ./build/app/outputs/flutter-apk/ || true
+          echo "✅ APK built"
+
+      # APK 파일 이름 변경 및 준비
+      - name: Rename and Prepare APK
+        run: |
+          mkdir -p ./android/app/build/outputs/apk/release/
+          APK_NAME="${{ steps.apk_filename.outputs.apk_name }}"
+          mv ./build/app/outputs/flutter-apk/app-release.apk ./android/app/build/outputs/apk/release/${APK_NAME}
+          echo "✅ APK renamed to ${APK_NAME}"
+          ls -la ./android/app/build/outputs/apk/release/
+
+          # APK 파일 크기 확인
+          APK_SIZE=$(stat -c%s "./android/app/build/outputs/apk/release/${APK_NAME}" 2>/dev/null || stat -f%z "./android/app/build/outputs/apk/release/${APK_NAME}" 2>/dev/null || echo "0")
+          APK_SIZE_MB=$(echo "scale=2; $APK_SIZE / 1024 / 1024" | bc)
+          echo "📦 APK 파일 크기: ${APK_SIZE_MB}MB"
+
+          # 아티팩트 용량 제한 확인 (500MB)
+          if [ "$APK_SIZE" -gt 524288000 ]; then
+            echo "⚠️ 경고: APK 파일 크기가 500MB를 초과합니다 (${APK_SIZE_MB}MB)"
+          else
+            echo "✅ APK 파일 크기가 아티팩트 제한 내입니다 (${APK_SIZE_MB}MB / 500MB)"
+          fi
+
+      # 빌드 정보 파일 생성
+      - name: Create build info file
+        run: |
+          BUILD_NUMBER="${{ needs.prepare-test-build.outputs.build_number }}"
+          PR_NUMBER="${{ needs.prepare-test-build.outputs.pr_number }}"
+          BRANCH_NAME="${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_SHORT="${{ needs.prepare-test-build.outputs.commit_hash }}"
+          BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+          cat > build-info.txt << EOF
+          테스트 APK 빌드 정보
+
+          빌드 번호: #$BUILD_NUMBER
+          EOF
+
+          if [ -n "$PR_NUMBER" ]; then
+            cat >> build-info.txt << EOF
+          PR 번호: #$PR_NUMBER
+          EOF
+          fi
+
+          cat >> build-info.txt << EOF
+          브랜치: $BRANCH_NAME
+          커밋: $COMMIT_SHORT
+          전체 커밋 해시: $COMMIT_SHA
+          빌드 날짜: $BUILD_DATE
+
+          EOF
+
+          # 이슈 정보가 있으면 추가
+          if [ -n "${{ needs.prepare-test-build.outputs.issue_number }}" ]; then
+            ISSUE_NUMBER="${{ needs.prepare-test-build.outputs.issue_number }}"
+            ISSUE_TITLE="${{ needs.prepare-test-build.outputs.issue_title }}"
+            ISSUE_URL="${{ needs.prepare-test-build.outputs.issue_url }}"
+
+            cat >> build-info.txt << EOF
+          관련 이슈:
+          - #$ISSUE_NUMBER: $ISSUE_TITLE
+          - URL: $ISSUE_URL
+
+          EOF
+          fi
+
+          echo "📋 빌드 정보 파일 생성 완료:"
+          cat build-info.txt
+
+      # 빌드 메타데이터 파일 생성 (댓글 작성 워크플로우용)
+      - name: Create build metadata file
+        run: |
+          cat > build-metadata.json << EOF
+          {
+            "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
+            "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
+            "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
+            "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+          }
+          EOF
+          cat build-metadata.json
+
+      # APK와 빌드 정보를 아티팩트로 업로드 (브랜치명 포함)
+      - name: Upload APK and build info as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ needs.prepare-test-build.outputs.branch_name_safe }}-${{ needs.prepare-test-build.outputs.build_number }}
+          path: |
+            ./android/app/build/outputs/apk/release/*.apk
+            build-info.txt
+            build-metadata.json
+          retention-days: 7
+          if-no-files-found: error
+
+      # 성공 알림
+      - name: Notify Build Success
+        if: success()
+        run: |
+          echo "✅ Android 테스트 APK 빌드 성공!"
+          echo "빌드 번호: ${{ needs.prepare-test-build.outputs.build_number }}"
+          if [ -n "${{ needs.prepare-test-build.outputs.pr_number }}" ]; then
+            echo "PR 번호: ${{ needs.prepare-test-build.outputs.pr_number }}"
+          fi
+          echo "브랜치: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+          echo "커밋: ${{ needs.prepare-test-build.outputs.commit_hash }}"
+          if [ -n "${{ needs.prepare-test-build.outputs.issue_url }}" ]; then
+            echo "관련 이슈: ${{ needs.prepare-test-build.outputs.issue_url }}"
+          fi
+          echo ""
+          echo "📦 아티팩트에서 APK 파일을 다운로드할 수 있습니다."
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Android 테스트 APK 빌드 실패!"
+          echo "로그를 확인해주세요."
+
+      # PR/ISSUE에 빌드 완료 댓글 작성 (repository_dispatch로 트리거된 경우)
+      - name: 빌드 성공 댓글 작성
+        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceType = '${{ github.event.client_payload.source_type }}' || 'PR';
+            const prNumber = parseInt('${{ github.event.client_payload.pr_number }}');
+            const issueNumber = '${{ needs.prepare-test-build.outputs.issue_number }}';
+            const buildNumber = '${{ needs.prepare-test-build.outputs.build_number }}';
+            const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
+            const branchName = '${{ needs.prepare-test-build.outputs.branch_name }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const artifactUrl = `${runUrl}#artifacts`;
+
+            const body = `🤖 ✅ **Android 테스트 APK 빌드 완료**
+
+            - 앱 버전: \`0.0.0(${buildNumber})\`
+            - 브랜치: \`${branchName}\`
+            - 커밋: \`${commitHash}\`
+
+            📦 **[아티팩트 다운로드](${artifactUrl})**
+
+            🔗 [워크플로우 실행 로그](${runUrl})`;
+
+            if (sourceType === 'PR') {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+              console.log(`✅ PR #${prNumber}에 빌드 성공 댓글 작성 완료`);
+
+              if (issueNumber && issueNumber !== '' && parseInt(issueNumber) !== prNumber) {
+                const issueBody = `🤖 ✅ **Android 테스트 APK 빌드 완료**
+
+            - 앱 버전: \`0.0.0(${buildNumber})\`
+            - 커밋: \`${commitHash}\`
+
+            📦 **[아티팩트 다운로드](${artifactUrl})**`;
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber),
+                  body: issueBody
+                });
+                console.log(`✅ 이슈 #${issueNumber}에도 빌드 성공 댓글 작성 완료`);
+              }
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+              console.log(`✅ ${sourceType} #${prNumber}에 빌드 성공 댓글 작성 완료`);
+            }
+
+      - name: 빌드 실패 댓글 작성
+        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceType = '${{ github.event.client_payload.source_type }}' || 'PR';
+            const prNumber = parseInt('${{ github.event.client_payload.pr_number }}');
+            const issueNumber = '${{ needs.prepare-test-build.outputs.issue_number }}';
+            const buildNumber = '${{ needs.prepare-test-build.outputs.build_number }}';
+            const branchName = '${{ needs.prepare-test-build.outputs.branch_name }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const body = `🤖 ❌ **Android 테스트 APK 빌드 실패**
+
+            - 앱 버전: \`0.0.0(${buildNumber})\`
+            - 브랜치: \`${branchName}\`
+
+            ❌ 빌드 중 오류가 발생했습니다.
+
+            🔗 [워크플로우 실행 로그 확인](${runUrl})`;
+
+            if (sourceType === 'PR') {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+              console.log(`✅ PR #${prNumber}에 빌드 실패 댓글 작성 완료`);
+
+              if (issueNumber && issueNumber !== '' && parseInt(issueNumber) !== prNumber) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber),
+                  body: body
+                });
+                console.log(`✅ 이슈 #${issueNumber}에도 빌드 실패 댓글 작성 완료`);
+              }
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+              console.log(`✅ ${sourceType} #${prNumber}에 빌드 실패 댓글 작성 완료`);
+            }

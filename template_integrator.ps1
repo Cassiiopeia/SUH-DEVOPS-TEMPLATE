@@ -82,6 +82,16 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # ===================================================================
+# SSL 인증서 관련 환경 변수 초기화
+# 사용자 환경에서 잘못 설정된 CA 경로 문제 방지
+# (예: curl: (77) error setting certificate verify locations: CAfile: /tmp/cacert.pem)
+# ===================================================================
+$env:CURL_CA_BUNDLE = $null
+$env:SSL_CERT_FILE = $null
+$env:SSL_CERT_DIR = $null
+$env:REQUESTS_CA_BUNDLE = $null
+
+# ===================================================================
 # 상수 정의
 # ===================================================================
 

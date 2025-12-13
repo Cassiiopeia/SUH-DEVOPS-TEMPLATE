@@ -61,6 +61,16 @@
 
 set -e  # 에러 발생 시 스크립트 중단
 
+# ===================================================================
+# SSL 인증서 관련 환경 변수 초기화
+# 사용자 환경에서 잘못 설정된 CA 경로 문제 방지
+# (예: curl: (77) error setting certificate verify locations: CAfile: /tmp/cacert.pem)
+# ===================================================================
+unset CURL_CA_BUNDLE
+unset SSL_CERT_FILE
+unset SSL_CERT_DIR
+unset REQUESTS_CA_BUNDLE
+
 # stdin 모드 및 TTY 가용성 감지
 STDIN_MODE=false
 TTY_AVAILABLE=true

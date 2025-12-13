@@ -891,10 +891,25 @@ create_version_yml() {
     local version=$1
     local type=$2
     local branch=$3
+    local existing_version_code=1  # 기본값
     
     print_step "version.yml 생성 중..."
     
     if [ -f "version.yml" ]; then
+        # 기존 version.yml에서 version_code 추출
+        if command -v yq >/dev/null 2>&1; then
+            existing_version_code=$(yq -r '.version_code // 1' version.yml 2>/dev/null || echo "1")
+        else
+            existing_version_code=$(grep -oP 'version_code:\s*\K[0-9]+' version.yml 2>/dev/null || echo "1")
+        fi
+        
+        # 숫자 검증 (0보다 큰 정수만 허용)
+        if ! [[ "$existing_version_code" =~ ^[0-9]+$ ]] || [ "$existing_version_code" -le 0 ]; then
+            existing_version_code=1
+        fi
+        
+        print_info "기존 version_code 감지: $existing_version_code"
+        
         print_warning "version.yml이 이미 존재합니다"
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_separator_line
@@ -949,7 +964,7 @@ create_version_yml() {
 # ===================================================================
 
 version: "$version"
-version_code: 1  # app build number
+version_code: $existing_version_code  # app build number
 project_type: "$type"  # spring, flutter, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"

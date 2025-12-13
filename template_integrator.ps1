@@ -793,9 +793,21 @@ function Create-VersionYml {
         [string]$Branch
     )
     
+    $existingVersionCode = 1  # 기본값
+    
     Print-Step "version.yml 생성 중..."
     
     if (Test-Path "version.yml") {
+        # 기존 version.yml에서 version_code 추출
+        $content = Get-Content "version.yml" -Raw -ErrorAction SilentlyContinue
+        if ($content -match 'version_code:\s*(\d+)') {
+            $parsedValue = [int]$matches[1]
+            if ($parsedValue -gt 0) {
+                $existingVersionCode = $parsedValue
+                Print-Info "기존 version_code 감지: $existingVersionCode"
+            }
+        }
+        
         Print-Warning "version.yml이 이미 존재합니다"
         if (-not $Force) {
             Print-SeparatorLine
@@ -853,7 +865,7 @@ function Create-VersionYml {
 # ===================================================================
 
 version: "$Version"
-version_code: 1  # app build number
+version_code: $existingVersionCode  # app build number
 project_type: "$Type"  # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$currentDate"

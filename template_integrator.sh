@@ -1776,7 +1776,7 @@ print_summary() {
                 existing_workflows+=("$filename")
             elif [[ "$filename" =~ ^${WORKFLOW_COMMON_PREFIX}- ]]; then
                 common_workflows+=("$filename")
-            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-${PROJECT_TYPE^^}- ]]; then
+            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-$(echo "$PROJECT_TYPE" | tr '[:lower:]' '[:upper:]')- ]]; then
                 type_workflows+=("$filename")
             fi
         done

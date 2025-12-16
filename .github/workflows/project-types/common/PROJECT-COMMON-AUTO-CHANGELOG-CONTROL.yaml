@@ -318,6 +318,8 @@ jobs:
           fi
 
       - name: 자동 PR Merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           
@@ -349,11 +351,11 @@ jobs:
             echo "⚠️ PR을 GitHub API로 병합할 수 없습니다"
             echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 deploy 브랜치에 적용되었습니다"
             echo "📝 PR 상태를 업데이트합니다..."
-            
+          
             # PR에 댓글 추가
             export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
             gh pr comment $PR_NUMBER --body "✅ 변경사항이 자동으로 deploy 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
-            
+          
             echo "✅ PR 상태 업데이트 완료"
             exit 0
           fi
@@ -375,7 +377,7 @@ jobs:
           else
             echo "⚠️ GITHUB_TOKEN으로 병합 실패"
             echo "   출력: $MERGE_OUTPUT"
-            
+          
             # PR 상태 재확인 (다른 프로세스가 머지했을 수 있음)
             PR_STATE_CHECK=$(gh pr view $PR_NUMBER --json state -q .state)
             if [ "$PR_STATE_CHECK" = "MERGED" ]; then
@@ -389,17 +391,17 @@ jobs:
             echo ""
             echo "🔀 2차 시도: PAT 토큰으로 PR 병합 중 (--admin 플래그 사용)..."
             export GH_TOKEN=${{ secrets._GITHUB_PAT_TOKEN }}
-            
+          
             MERGE_OUTPUT=$(gh pr merge $PR_NUMBER --merge --admin --delete-branch=false 2>&1)
             MERGE_EXIT_CODE=$?
-            
+          
             if [ $MERGE_EXIT_CODE -eq 0 ] && echo "$MERGE_OUTPUT" | grep -q "merged\|Merged"; then
               echo "✅ PAT 토큰으로 PR 병합 성공"
               MERGE_SUCCESS="true"
             else
               echo "❌ PAT 토큰으로도 병합 실패"
               echo "   출력: $MERGE_OUTPUT"
-              
+          
               # PR 상태 재확인
               PR_STATE_CHECK=$(gh pr view $PR_NUMBER --json state -q .state)
               if [ "$PR_STATE_CHECK" = "MERGED" ]; then
@@ -415,7 +417,7 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "❌ PR 자동 병합 실패"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            
+          
             if [ "$PAT_AVAILABLE" = "false" ]; then
               echo ""
               echo "⚠️ PAT 토큰이 설정되어 있지 않습니다."
@@ -449,7 +451,7 @@ jobs:
               echo "4. 필수 리뷰 승인이 없음"
               echo ""
             fi
-            
+          
             # PR에 댓글 추가
             export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
             ERROR_COMMENT="❌ 자동 병합 실패. 수동으로 병합해주세요."
@@ -457,7 +459,7 @@ jobs:
               ERROR_COMMENT="❌ 자동 병합 실패: PAT 토큰이 설정되어 있지 않습니다. Settings > Secrets에 \`_GITHUB_PAT_TOKEN\`을 등록하거나 Branch Protection Rules에서 GitHub Actions bot을 예외로 추가해주세요."
             fi
             gh pr comment $PR_NUMBER --body "$ERROR_COMMENT"
-            
+          
             exit 1
           fi
           

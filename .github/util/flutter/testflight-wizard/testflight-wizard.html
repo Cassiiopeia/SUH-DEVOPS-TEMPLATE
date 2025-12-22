@@ -240,6 +240,18 @@
             padding: 24px;
         }
 
+        /* Step Indicator 클릭 가능 */
+        .step-indicator {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .step-indicator:hover {
+            transform: translateY(-2px);
+        }
+        .step-indicator:hover .step-circle {
+            box-shadow: 0 4px 12px rgba(96, 165, 250, 0.4);
+        }
+
         /* Skip Button */
         .skip-btn {
             color: #94a3b8;

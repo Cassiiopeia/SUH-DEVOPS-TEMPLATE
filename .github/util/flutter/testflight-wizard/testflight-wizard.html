@@ -8,10 +8,18 @@
     <script type="application/json" id="versionJson">
 {
   "name": "iOS TestFlight Setup Wizard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2024-12-01",
+  "lastUpdated": "2024-12-22",
   "changelog": [
+    {
+      "version": "1.0.1",
+      "date": "2024-12-22",
+      "changes": [
+        "상단 Step Indicator 클릭으로 스텝 이동 기능 추가",
+        "Step hover 효과 추가"
+      ]
+    },
     {
       "version": "1.0.0",
       "date": "2024-12-01",
@@ -238,6 +246,18 @@
             max-height: 80vh;
             overflow-y: auto;
             padding: 24px;
+        }
+
+        /* Step Indicator 클릭 가능 */
+        .step-indicator {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .step-indicator:hover {
+            transform: translateY(-2px);
+        }
+        .step-indicator:hover .step-circle {
+            box-shadow: 0 4px 12px rgba(96, 165, 250, 0.4);
         }
 
         /* Skip Button */

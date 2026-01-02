@@ -61,6 +61,16 @@
 
 set -e  # 에러 발생 시 스크립트 중단
 
+# ===================================================================
+# SSL 인증서 관련 환경 변수 초기화
+# 사용자 환경에서 잘못 설정된 CA 경로 문제 방지
+# (예: curl: (77) error setting certificate verify locations: CAfile: /tmp/cacert.pem)
+# ===================================================================
+unset CURL_CA_BUNDLE
+unset SSL_CERT_FILE
+unset SSL_CERT_DIR
+unset REQUESTS_CA_BUNDLE
+
 # stdin 모드 및 TTY 가용성 감지
 STDIN_MODE=false
 TTY_AVAILABLE=true
@@ -308,6 +318,7 @@ ${BLUE}통합 모드:${NC}
   ${GREEN}version${NC}     - 버전 관리 시스템만 (version.yml + scripts)
   ${GREEN}workflows${NC}   - GitHub Actions 워크플로우만
   ${GREEN}issues${NC}      - 이슈/PR 템플릿만
+  ${GREEN}commands${NC}    - Custom Command만 (Cursor/Claude 설정)
   ${GREEN}interactive${NC} - 대화형 선택 (기본값, 추천)
 
 ${BLUE}옵션:${NC}
@@ -350,6 +361,9 @@ ${BLUE}사용 예시:${NC}
 
   # 수동 설정
   ${GREEN}./template_integrator.sh --mode full --version 1.0.0 --type node${NC}
+
+  # Custom Command만 설치 (Cursor/Claude 설정)
+  ${GREEN}./template_integrator.sh --mode commands${NC}
 
 ${BLUE}통합 후 작업:${NC}
   1. ${CYAN}README.md${NC} - 버전 정보 섹션 자동 추가됨 (기존 내용 보존)
@@ -881,10 +895,27 @@ create_version_yml() {
     local version=$1
     local type=$2
     local branch=$3
+    local existing_version_code=1  # 기본값
     
     print_step "version.yml 생성 중..."
     
     if [ -f "version.yml" ]; then
+        # 기존 version.yml에서 version_code 추출
+        # 주석이 아닌 실제 데이터 라인에서만 추출 (주석 내 'version_code: 1' 오탐지 방지)
+        if command -v yq >/dev/null 2>&1; then
+            existing_version_code=$(yq -r '.version_code // 1' version.yml 2>/dev/null || echo "1")
+        else
+            # grep: 주석(#)으로 시작하지 않는 라인에서만 version_code 추출
+            existing_version_code=$(grep -E '^version_code:\s*[0-9]+' version.yml 2>/dev/null | grep -oP '\d+' | head -1 || echo "1")
+        fi
+        
+        # 숫자 검증 (0보다 큰 정수만 허용)
+        if ! [[ "$existing_version_code" =~ ^[0-9]+$ ]] || [ "$existing_version_code" -le 0 ]; then
+            existing_version_code=1
+        fi
+        
+        print_info "기존 version_code 감지: $existing_version_code"
+        
         print_warning "version.yml이 이미 존재합니다"
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_separator_line
@@ -939,7 +970,7 @@ create_version_yml() {
 # ===================================================================
 
 version: "$version"
-version_code: 1  # app build number
+version_code: $existing_version_code  # app build number
 project_type: "$type"  # spring, flutter, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
@@ -1342,6 +1373,126 @@ copy_claude_folder() {
     print_success ".claude 폴더 다운로드 완료"
 }
 
+# ===================================================================
+# Custom Command 설치 (백업 없이 덮어쓰기)
+# ===================================================================
+
+install_custom_command() {
+    local folder_name=$1
+    local display_name=$2
+    local src="$TEMP_DIR/$folder_name"
+
+    if [ ! -d "$src" ]; then
+        print_warning "$display_name 폴더가 템플릿에 없습니다"
+        return 1
+    fi
+
+    print_step "$display_name 설정 설치 중..."
+
+    # 기존 폴더 삭제 (백업 없이)
+    if [ -d "$folder_name" ]; then
+        rm -rf "$folder_name"
+        print_info "기존 $folder_name 폴더 삭제됨"
+    fi
+
+    # 새 폴더 복사
+    mkdir -p "$folder_name"
+    cp -r "$src/"* "$folder_name/" 2>/dev/null || true
+    print_success "$display_name 설정 설치 완료"
+    return 0
+}
+
+copy_custom_commands() {
+    local target=$1  # "cursor", "claude", "all"
+
+    # 경고 메시지
+    print_warning "⚠️  기존 설정이 완전히 삭제되고 새로운 설정으로 대체됩니다!"
+    print_to_user ""
+
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        print_to_user "계속 진행하시겠습니까?"
+        print_to_user "  Y/y - 예, 계속 진행"
+        print_to_user "  N/n - 아니오, 취소 (기본)"
+        print_to_user ""
+
+        if ! ask_yes_no "선택: " "N"; then
+            print_info "취소되었습니다"
+            return
+        fi
+    fi
+
+    # 템플릿 다운로드 (필요시)
+    if [ ! -d "$TEMP_DIR" ]; then
+        download_template
+    fi
+
+    local installed=0
+
+    case $target in
+        cursor)
+            if install_custom_command ".cursor" "Cursor IDE"; then
+                installed=$((installed + 1))
+            fi
+            ;;
+        claude)
+            if install_custom_command ".claude" "Claude Code"; then
+                installed=$((installed + 1))
+            fi
+            ;;
+        all)
+            if install_custom_command ".cursor" "Cursor IDE"; then
+                installed=$((installed + 1))
+            fi
+            if install_custom_command ".claude" "Claude Code"; then
+                installed=$((installed + 1))
+            fi
+            ;;
+    esac
+
+    # 임시 폴더 정리
+    rm -rf "$TEMP_DIR"
+
+    if [ $installed -gt 0 ]; then
+        print_to_user ""
+        print_success "Custom Command 설치 완료 ($installed 개 폴더)"
+    fi
+}
+
+show_custom_command_menu() {
+    print_question_header "📦" "어떤 Custom Command를 설치하시겠습니까?"
+
+    print_to_user "  1) Cursor IDE 설정 (.cursor 폴더)"
+    print_to_user "  2) Claude Code 설정 (.claude 폴더)"
+    print_to_user "  3) 모두 설치"
+    print_to_user "  4) 취소"
+    print_to_user ""
+
+    local choice
+    local valid_input=false
+
+    while [ "$valid_input" = false ]; do
+        if safe_read "선택 (1-4): " choice "-n 1"; then
+            print_to_user ""
+
+            if [[ "$choice" =~ ^[1-4]$ ]]; then
+                valid_input=true
+                case $choice in
+                    1) copy_custom_commands "cursor" ;;
+                    2) copy_custom_commands "claude" ;;
+                    3) copy_custom_commands "all" ;;
+                    4) print_info "취소되었습니다" ;;
+                esac
+            else
+                print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+                print_to_user ""
+            fi
+        else
+            print_error "입력을 읽을 수 없습니다"
+            return 1
+        fi
+    done
+}
+
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
 copy_setup_guide() {
     print_step "템플릿 설정 가이드 다운로드 중..."
@@ -1548,38 +1699,40 @@ interactive_mode() {
     detect_and_confirm_project
     
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
-    
+
     print_to_user "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
     print_to_user "  2) 버전 관리 시스템만"
     print_to_user "  3) GitHub Actions 워크플로우만"
     print_to_user "  4) 이슈/PR 템플릿만"
-    print_to_user "  5) 취소"
+    print_to_user "  5) Custom Command만 (Cursor/Claude 설정)"
+    print_to_user "  6) 취소"
     print_to_user ""
-    
+
     local choice
     local valid_input=false
-    
-    # 입력 검증 루프 - 올바른 값(1-5)이 입력될 때까지 반복
+
+    # 입력 검증 루프 - 올바른 값(1-6)이 입력될 때까지 반복
     while [ "$valid_input" = false ]; do
-        if safe_read "선택 (1-5): " choice "-n 1"; then
+        if safe_read "선택 (1-6): " choice "-n 1"; then
             print_to_user ""
-            
-            # 입력값 검증: 1-5 숫자만 허용
-            if [[ "$choice" =~ ^[1-5]$ ]]; then
+
+            # 입력값 검증: 1-6 숫자만 허용
+            if [[ "$choice" =~ ^[1-6]$ ]]; then
                 valid_input=true
                 case $choice in
                     1) MODE="full" ;;
                     2) MODE="version" ;;
                     3) MODE="workflows" ;;
                     4) MODE="issues" ;;
-                    5) 
+                    5) MODE="commands" ;;
+                    6)
                         print_info "취소되었습니다"
                         exit 0
                         ;;
                 esac
             else
                 # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
-                print_error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
+                print_error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
                 print_to_user ""
             fi
         else
@@ -1677,11 +1830,15 @@ execute_integration() {
             copy_issue_templates
             copy_discussion_templates
             ;;
+        commands)
+            show_custom_command_menu
+            return  # commands 모드는 자체적으로 정리하고 종료
+            ;;
     esac
-    
+
     # 3. 임시 파일 정리
     rm -rf "$TEMP_DIR"
-    
+
     # 완료 메시지
     print_summary
 }
@@ -1751,7 +1908,7 @@ print_summary() {
                 existing_workflows+=("$filename")
             elif [[ "$filename" =~ ^${WORKFLOW_COMMON_PREFIX}- ]]; then
                 common_workflows+=("$filename")
-            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-${PROJECT_TYPE^^}- ]]; then
+            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-$(echo "$PROJECT_TYPE" | tr '[:lower:]' '[:upper:]')- ]]; then
                 type_workflows+=("$filename")
             fi
         done

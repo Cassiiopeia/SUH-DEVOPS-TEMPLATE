@@ -82,6 +82,16 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # ===================================================================
+# SSL 인증서 관련 환경 변수 초기화
+# 사용자 환경에서 잘못 설정된 CA 경로 문제 방지
+# (예: curl: (77) error setting certificate verify locations: CAfile: /tmp/cacert.pem)
+# ===================================================================
+$env:CURL_CA_BUNDLE = $null
+$env:SSL_CERT_FILE = $null
+$env:SSL_CERT_DIR = $null
+$env:REQUESTS_CA_BUNDLE = $null
+
+# ===================================================================
 # 상수 정의
 # ===================================================================
 
@@ -293,6 +303,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   version     - 버전 관리 시스템만 (version.yml + scripts)
   workflows   - GitHub Actions 워크플로우만
   issues      - 이슈/PR 템플릿만
+  commands    - Custom Command만 (Cursor/Claude 설정)
   interactive - 대화형 선택 (기본값, 추천)
 
 옵션:
@@ -334,6 +345,9 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
 
   # 수동 설정
   .\template_integrator.ps1 -Mode full -Version "1.0.0" -Type node
+
+  # Custom Command만 설치 (Cursor/Claude 설정)
+  .\template_integrator.ps1 -Mode commands
 
 통합 후 작업:
   1. README.md - 버전 정보 섹션 자동 추가됨 (기존 내용 보존)
@@ -783,9 +797,30 @@ function Create-VersionYml {
         [string]$Branch
     )
     
+    $existingVersionCode = 1  # 기본값
+    
     Print-Step "version.yml 생성 중..."
     
     if (Test-Path "version.yml") {
+        # 기존 version.yml에서 version_code 추출
+        # 주석이 아닌 실제 데이터 라인에서만 추출 (주석 내 'version_code: 1' 오탐지 방지)
+        $lines = Get-Content "version.yml" -ErrorAction SilentlyContinue
+        foreach ($line in $lines) {
+            # 주석 라인 건너뛰기 (# 으로 시작하는 라인)
+            if ($line -match '^\s*#') {
+                continue
+            }
+            # version_code 값 추출 (라인 시작부터 매칭)
+            if ($line -match '^version_code:\s*(\d+)') {
+                $parsedValue = [int]$matches[1]
+                if ($parsedValue -gt 0) {
+                    $existingVersionCode = $parsedValue
+                    Print-Info "기존 version_code 감지: $existingVersionCode"
+                }
+                break
+            }
+        }
+        
         Print-Warning "version.yml이 이미 존재합니다"
         if (-not $Force) {
             Print-SeparatorLine
@@ -843,7 +878,7 @@ function Create-VersionYml {
 # ===================================================================
 
 version: "$Version"
-version_code: 1  # app build number
+version_code: $existingVersionCode  # app build number
 project_type: "$Type"  # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
 metadata:
   last_updated: "$currentDate"
@@ -1310,6 +1345,115 @@ function Copy-ClaudeFolder {
 }
 
 # ===================================================================
+# Custom Command 설치 (백업 없이 덮어쓰기)
+# ===================================================================
+
+function Install-CustomCommand {
+    param(
+        [string]$FolderName,
+        [string]$DisplayName
+    )
+
+    $src = Join-Path $TEMP_DIR $FolderName
+    if (-not (Test-Path $src)) {
+        Print-Warning "$DisplayName 폴더가 템플릿에 없습니다"
+        return $false
+    }
+
+    Print-Step "$DisplayName 설정 설치 중..."
+
+    # 기존 폴더 삭제 (백업 없이)
+    if (Test-Path $FolderName) {
+        Remove-Item -Path $FolderName -Recurse -Force
+        Print-Info "기존 $FolderName 폴더 삭제됨"
+    }
+
+    # 새 폴더 복사
+    New-Item -Path $FolderName -ItemType Directory -Force | Out-Null
+    Copy-Item -Path "$src\*" -Destination "$FolderName\" -Recurse -Force -ErrorAction SilentlyContinue
+    Print-Success "$DisplayName 설정 설치 완료"
+    return $true
+}
+
+function Copy-CustomCommands {
+    param(
+        [string]$Target  # "cursor", "claude", "all"
+    )
+
+    # 경고 메시지
+    Print-Warning "⚠️  기존 설정이 완전히 삭제되고 새로운 설정으로 대체됩니다!"
+    Write-Host ""
+
+    if (-not $Force) {
+        Write-Host "계속 진행하시겠습니까?"
+        Write-Host "  Y/y - 예, 계속 진행"
+        Write-Host "  N/n - 아니오, 취소 (기본)"
+        Write-Host ""
+
+        if (-not (Ask-YesNo "선택" "N")) {
+            Print-Info "취소되었습니다"
+            return
+        }
+    }
+
+    # 템플릿 다운로드 (필요시)
+    if (-not (Test-Path $TEMP_DIR)) {
+        Download-Template
+    }
+
+    $installed = 0
+
+    switch ($Target) {
+        "cursor" {
+            if (Install-CustomCommand ".cursor" "Cursor IDE") { $installed++ }
+        }
+        "claude" {
+            if (Install-CustomCommand ".claude" "Claude Code") { $installed++ }
+        }
+        "all" {
+            if (Install-CustomCommand ".cursor" "Cursor IDE") { $installed++ }
+            if (Install-CustomCommand ".claude" "Claude Code") { $installed++ }
+        }
+    }
+
+    # 임시 폴더 정리
+    if (Test-Path $TEMP_DIR) {
+        Remove-Item -Path $TEMP_DIR -Recurse -Force
+    }
+
+    if ($installed -gt 0) {
+        Write-Host ""
+        Print-Success "Custom Command 설치 완료 ($installed 개 폴더)"
+    }
+}
+
+function Show-CustomCommandMenu {
+    Print-QuestionHeader "📦" "어떤 Custom Command를 설치하시겠습니까?"
+
+    Write-Host "  1) Cursor IDE 설정 (.cursor 폴더)"
+    Write-Host "  2) Claude Code 설정 (.claude 폴더)"
+    Write-Host "  3) 모두 설치"
+    Write-Host "  4) 취소"
+    Write-Host ""
+
+    while ($true) {
+        $choice = Read-SingleKey "선택 (1-4) "
+
+        if ($choice -match '^[1-4]$') {
+            switch ($choice) {
+                "1" { Copy-CustomCommands -Target "cursor"; return }
+                "2" { Copy-CustomCommands -Target "claude"; return }
+                "3" { Copy-CustomCommands -Target "all"; return }
+                "4" { Print-Info "취소되었습니다"; return }
+            }
+        } else {
+            Print-Error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+            Write-Host ""
+        }
+    }
+}
+
+# ===================================================================
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
 # ===================================================================
 
@@ -1482,32 +1626,34 @@ function Start-InteractiveMode {
     Detect-AndConfirmProject
     
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
-    
+
     Write-Host "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
     Write-Host "  2) 버전 관리 시스템만"
     Write-Host "  3) GitHub Actions 워크플로우만"
     Write-Host "  4) 이슈/PR 템플릿만"
-    Write-Host "  5) 취소"
+    Write-Host "  5) Custom Command만 (Cursor/Claude 설정)"
+    Write-Host "  6) 취소"
     Write-Host ""
-    
+
     # 입력 검증 루프
     while ($true) {
-        $choice = Read-SingleKey "선택 (1-5) "
-        
-        if ($choice -match '^[1-5]$') {
+        $choice = Read-SingleKey "선택 (1-6) "
+
+        if ($choice -match '^[1-6]$') {
             switch ($choice) {
                 "1" { $script:Mode = "full"; break }
                 "2" { $script:Mode = "version"; break }
                 "3" { $script:Mode = "workflows"; break }
                 "4" { $script:Mode = "issues"; break }
-                "5" { 
+                "5" { $script:Mode = "commands"; break }
+                "6" {
                     Print-Info "취소되었습니다"
                     exit 0
                 }
             }
             break
         } else {
-            Print-Error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
+            Print-Error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
             Write-Host ""
         }
     }
@@ -1594,13 +1740,17 @@ function Start-Integration {
             Copy-IssueTemplates
             Copy-DiscussionTemplates
         }
+        "commands" {
+            Show-CustomCommandMenu
+            return  # commands 모드는 자체적으로 정리하고 종료
+        }
     }
-    
+
     # 3. 임시 파일 정리
     if (Test-Path $TEMP_DIR) {
         Remove-Item -Path $TEMP_DIR -Recurse -Force
     }
-    
+
     # 완료 메시지
     Show-Summary
 }
@@ -1722,7 +1872,7 @@ function Main {
     }
     
     # 파라미터 검증
-    $validModes = @("interactive", "full", "version", "workflows", "issues")
+    $validModes = @("interactive", "full", "version", "workflows", "issues", "commands")
     if ($Mode -ne "" -and $Mode -notin $validModes) {
         Print-Error "잘못된 모드: $Mode"
         Write-Host "지원되는 모드: $($validModes -join ', ')"

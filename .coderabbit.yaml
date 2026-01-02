@@ -5,7 +5,7 @@ reviews:
   profile: "chill"
   request_changes_workflow: false
   high_level_summary: true
-  poem: true
+  poem: false
   review_status: true
   collapse_walkthrough: false
   auto_review:
@@ -14,3 +14,6 @@ reviews:
     base_branches: ["main"]
 chat:
   auto_reply: true
+issue_enrichment:
+  auto_enrich:
+    enabled: false

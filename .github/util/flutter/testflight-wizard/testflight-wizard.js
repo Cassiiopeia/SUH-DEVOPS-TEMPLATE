@@ -584,6 +584,34 @@ function skipStep(stepNumber) {
     }
 }
 
+function goToStep(targetStep) {
+    // 유효 범위 체크
+    if (targetStep < 1 || targetStep > state.totalSteps) return;
+
+    // 현재 스텝이면 무시
+    if (targetStep === state.currentStep) return;
+
+    // 현재 데이터 저장
+    saveCurrentStepData();
+
+    // 스텝 이동
+    state.currentStep = targetStep;
+    showStep(state.currentStep);
+    updateProgress();
+    saveState();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setupStepClickHandlers() {
+    $$('.step-indicator').forEach((indicator) => {
+        indicator.style.cursor = 'pointer';
+        indicator.addEventListener('click', () => {
+            const targetStep = parseInt(indicator.dataset.step, 10);
+            goToStep(targetStep);
+        });
+    });
+}
+
 function resetWizard() {
     if (confirm('모든 데이터를 초기화하시겠습니까?')) {
         state.currentStep = 1;
@@ -990,6 +1018,7 @@ function initialize() {
 
     setupInputHandlers();
     setupDragAndDrop();
+    setupStepClickHandlers();
     showSecurityWarning();
 }
 

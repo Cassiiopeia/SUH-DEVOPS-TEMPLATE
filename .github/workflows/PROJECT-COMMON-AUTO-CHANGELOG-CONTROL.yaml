@@ -319,9 +319,19 @@ jobs:
 
       - name: 자동 PR Merge
         env:
-          GH_TOKEN: ${{ secrets._GITHUB_PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_STATE=$(gh pr view ${{ github.event.pull_request.number }} --json state,mergeable -q '.state + "," + (.mergeable | tostring)')
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          # PAT 토큰 존재 여부 확인
+          if [ -z "${{ secrets._GITHUB_PAT_TOKEN }}" ]; then
+            PAT_AVAILABLE="false"
+          else
+            PAT_AVAILABLE="true"
+          fi
+          
+          # PR 상태 확인
+          PR_STATE=$(gh pr view $PR_NUMBER --json state,mergeable -q '.state + "," + (.mergeable | tostring)')
           PR_STATE_VALUE=$(echo "$PR_STATE" | cut -d',' -f1)
           PR_MERGEABLE=$(echo "$PR_STATE" | cut -d',' -f2)
 
@@ -329,6 +339,7 @@ jobs:
           echo "📋 PR 상태 확인:"
           echo "  • 상태: $PR_STATE_VALUE"
           echo "  • 병합 가능: $PR_MERGEABLE"
+          echo "  • PAT 토큰 사용 가능: $PAT_AVAILABLE"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
           if [ "$PR_STATE_VALUE" = "CLOSED" ] || [ "$PR_STATE_VALUE" = "MERGED" ]; then
@@ -336,23 +347,124 @@ jobs:
             exit 0
           fi
 
-          if [ "$PR_MERGEABLE" = "true" ]; then
-            echo "🔀 PR 병합 중..."
-            if gh pr merge ${{ github.event.pull_request.number }} --merge --admin --delete-branch=false; then
-              echo "✅ PR 병합 완료"
-            else
-              echo "⚠️ PR 병합 실패 (이미 머지되었을 수 있음)"
-            fi
-          else
+          if [ "$PR_MERGEABLE" != "true" ]; then
             echo "⚠️ PR을 GitHub API로 병합할 수 없습니다"
             echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 deploy 브랜치에 적용되었습니다"
             echo "📝 PR 상태를 업데이트합니다..."
             
             # PR에 댓글 추가
-            gh pr comment ${{ github.event.pull_request.number }} --body "✅ 변경사항이 자동으로 deploy 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
+            export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            gh pr comment $PR_NUMBER --body "✅ 변경사항이 자동으로 deploy 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
             
             echo "✅ PR 상태 업데이트 완료"
+            exit 0
           fi
+
+          # 머지 성공 여부 추적 변수
+          MERGE_SUCCESS="false"
+
+          # 1차 시도: GITHUB_TOKEN으로 머지 시도 (--admin 없이)
+          echo ""
+          echo "🔀 1차 시도: GITHUB_TOKEN으로 PR 병합 중..."
+          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          
+          MERGE_OUTPUT=$(gh pr merge $PR_NUMBER --merge --delete-branch=false 2>&1)
+          MERGE_EXIT_CODE=$?
+          
+          if [ $MERGE_EXIT_CODE -eq 0 ] && echo "$MERGE_OUTPUT" | grep -q "merged\|Merged"; then
+            echo "✅ GITHUB_TOKEN으로 PR 병합 성공"
+            MERGE_SUCCESS="true"
+          else
+            echo "⚠️ GITHUB_TOKEN으로 병합 실패"
+            echo "   출력: $MERGE_OUTPUT"
+            
+            # PR 상태 재확인 (다른 프로세스가 머지했을 수 있음)
+            PR_STATE_CHECK=$(gh pr view $PR_NUMBER --json state -q .state)
+            if [ "$PR_STATE_CHECK" = "MERGED" ]; then
+              echo "✅ PR이 이미 머지되었습니다"
+              MERGE_SUCCESS="true"
+            fi
+          fi
+
+          # 2차 시도: PAT 토큰으로 재시도 (--admin 플래그 사용)
+          if [ "$MERGE_SUCCESS" = "false" ] && [ "$PAT_AVAILABLE" = "true" ]; then
+            echo ""
+            echo "🔀 2차 시도: PAT 토큰으로 PR 병합 중 (--admin 플래그 사용)..."
+            export GH_TOKEN=${{ secrets._GITHUB_PAT_TOKEN }}
+            
+            MERGE_OUTPUT=$(gh pr merge $PR_NUMBER --merge --admin --delete-branch=false 2>&1)
+            MERGE_EXIT_CODE=$?
+            
+            if [ $MERGE_EXIT_CODE -eq 0 ] && echo "$MERGE_OUTPUT" | grep -q "merged\|Merged"; then
+              echo "✅ PAT 토큰으로 PR 병합 성공"
+              MERGE_SUCCESS="true"
+            else
+              echo "❌ PAT 토큰으로도 병합 실패"
+              echo "   출력: $MERGE_OUTPUT"
+              
+              # PR 상태 재확인
+              PR_STATE_CHECK=$(gh pr view $PR_NUMBER --json state -q .state)
+              if [ "$PR_STATE_CHECK" = "MERGED" ]; then
+                echo "✅ PR이 이미 머지되었습니다"
+                MERGE_SUCCESS="true"
+              fi
+            fi
+          fi
+
+          # 최종 실패 처리
+          if [ "$MERGE_SUCCESS" = "false" ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "❌ PR 자동 병합 실패"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            if [ "$PAT_AVAILABLE" = "false" ]; then
+              echo ""
+              echo "⚠️ PAT 토큰이 설정되어 있지 않습니다."
+              echo ""
+              echo "📋 해결 방법:"
+              echo "1. GitHub에서 Personal Access Token 생성"
+              echo "   - https://github.com/settings/tokens"
+              echo "   - 권한: repo (전체 권한)"
+              echo ""
+              echo "2. Repository Secrets에 등록"
+              echo "   - Settings > Secrets and variables > Actions"
+              echo "   - New repository secret"
+              echo "   - Name: _GITHUB_PAT_TOKEN"
+              echo "   - Value: 생성한 토큰"
+              echo ""
+              echo "또는"
+              echo ""
+              echo "3. Branch Protection Rules 조정"
+              echo "   - Settings > Branches > Branch protection rules"
+              echo "   - 'Allow specified actors to bypass required pull requests'"
+              echo "   - GitHub Actions bot을 예외로 추가"
+              echo ""
+            else
+              echo ""
+              echo "⚠️ GITHUB_TOKEN과 PAT 토큰 모두로 병합에 실패했습니다."
+              echo ""
+              echo "📋 가능한 원인:"
+              echo "1. Branch Protection Rules가 너무 엄격함"
+              echo "2. PR에 충돌이 있음"
+              echo "3. 필수 상태 체크가 통과하지 않음"
+              echo "4. 필수 리뷰 승인이 없음"
+              echo ""
+            fi
+            
+            # PR에 댓글 추가
+            export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            ERROR_COMMENT="❌ 자동 병합 실패. 수동으로 병합해주세요."
+            if [ "$PAT_AVAILABLE" = "false" ]; then
+              ERROR_COMMENT="❌ 자동 병합 실패: PAT 토큰이 설정되어 있지 않습니다. Settings > Secrets에 \`_GITHUB_PAT_TOKEN\`을 등록하거나 Branch Protection Rules에서 GitHub Actions bot을 예외로 추가해주세요."
+            fi
+            gh pr comment $PR_NUMBER --body "$ERROR_COMMENT"
+            
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ PR 자동 병합 완료"
 
       - name: 배포 완료 알림
         run: |

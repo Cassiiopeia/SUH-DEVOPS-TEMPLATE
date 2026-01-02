@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2025-12-12T01:59:16Z",
-    "currentVersion": "2.2.10",
+    "lastUpdated": "2026-01-02T05:58:45Z",
+    "currentVersion": "2.3.0",
     "projectType": "basic",
-    "totalReleases": 42
+    "totalReleases": 43
   },
   "releases": [
+    {
+      "version": "2.3.0",
+      "project_type": "basic",
+      "date": "2026-01-02",
+      "pr_number": 128,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * TestFlight 마법사에 Step Indicator 클릭 기능과 호버 효과 추가\n  * Template Integrator에 Custom Command 설치 모드 추가 지원\n  * PR 자동 병합 워크플로우 개선으로 더욱 안정적인 통합 지원\n\n* **Documentation**\n  * 개발 워크플로우 및 명령 가이드 업데이트\n\n* **Chores**\n  * 버전 2.3.0 릴리스",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "TestFlight 마법사에 Step Indicator 클릭 기능과 호버 효과 추가",
+            "Template Integrator에 Custom Command 설치 모드 추가 지원",
+            "PR 자동 병합 워크플로우 개선으로 더욱 안정적인 통합 지원"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "개발 워크플로우 및 명령 가이드 업데이트"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 2.3.0 릴리스"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.2.10",
       "project_type": "basic",

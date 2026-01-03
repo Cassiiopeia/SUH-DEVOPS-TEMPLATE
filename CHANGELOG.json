@@ -1,11 +1,39 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-02T05:58:45Z",
-    "currentVersion": "2.3.0",
+    "lastUpdated": "2026-01-03T08:03:07Z",
+    "currentVersion": "2.3.1",
     "projectType": "basic",
-    "totalReleases": 43
+    "totalReleases": 44
   },
   "releases": [
+    {
+      "version": "2.3.1",
+      "project_type": "basic",
+      "date": "2026-01-03",
+      "pr_number": 130,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **신규 기능**\n  * Spring Boot 프로젝트용 PR 프리뷰 환경 자동화 워크플로우 추가\n\n* **문서**\n  * Spring Boot 테스트 생성기 가이드 추가\n\n* **기타**\n  * 버전 2.3.1로 업데이트",
+      "parsed_changes": {
+        "신규_기능": {
+          "title": "신규 기능",
+          "items": [
+            "Spring Boot 프로젝트용 PR 프리뷰 환경 자동화 워크플로우 추가"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "Spring Boot 테스트 생성기 가이드 추가"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전 2.3.1로 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.3.0",
       "project_type": "basic",

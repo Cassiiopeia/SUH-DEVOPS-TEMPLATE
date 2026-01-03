@@ -6,7 +6,7 @@
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
 <!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->
-## 최신 버전 : v2.2.10 (2025-12-12)
+## 최신 버전 : v2.3.0 (2026-01-02)
 [전체 버전 기록 보기](CHANGELOG.md)
 <!-- END-AUTO-VERSION-SECTION -->
 
@@ -95,6 +95,7 @@ powershell -ExecutionPolicy Bypass -Command "iex (iwr -Uri 'https://raw.githubus
    [ ] 버전 관리 시스템만
    [ ] GitHub Actions 워크플로우만
    [ ] 이슈/PR 템플릿만
+   [ ] Custom Command만 (Cursor/Claude 설정)
 
 4️⃣ 자동 설치 완료!
    ✅ Spring Boot 전용 워크플로우 8개 설치
@@ -136,6 +137,7 @@ iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TE
 | [SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md](SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md) | 🚀 **빠른 시작**: 프로젝트 초기 설정 가이드 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 🤝 **기여 가이드**: 개발 환경 설정, 코드 스타일, PR 프로세스 |
 | [CHANGELOG.md](CHANGELOG.md) | 📝 **변경 이력**: 버전별 변경사항 (자동 생성) |
+| [docs/TEMPLATE-INTEGRATOR.md](docs/TEMPLATE-INTEGRATOR.md) | 🔧 **통합 스크립트**: template_integrator 상세 가이드 |
 
 ---
 

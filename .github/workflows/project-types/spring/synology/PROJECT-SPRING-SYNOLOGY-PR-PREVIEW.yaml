@@ -1,0 +1,529 @@
+# ===================================================================
+# Spring Boot + Synology PR Preview 시스템
+# ===================================================================
+#
+# PR 코멘트 명령어를 통해 Preview 환경을 자동으로 관리합니다.
+# Traefik 리버스 프록시를 통해 동적 라우팅됩니다.
+#
+# 🚀 사용법:
+#   @suh-lab pr build    - PR 빌드 및 배포 (기존 컨테이너 자동 교체)
+#   @suh-lab pr destroy  - Preview 환경 삭제
+#   @suh-lab pr status   - 현재 상태 확인
+#
+# ⚙️ 프로젝트별 필수 수정 사항:
+#   아래 env 섹션의 값들을 프로젝트에 맞게 수정하세요.
+#
+# 🔑 필수 GitHub Secrets:
+#   - APPLICATION_YML: Spring application.yml 전체 내용
+#   - DOCKERHUB_USERNAME: Docker Hub 사용자명
+#   - DOCKERHUB_TOKEN: Docker Hub 액세스 토큰
+#   - SERVER_HOST: 시놀로지 서버 호스트 (예: suh-project.synology.me)
+#   - SERVER_USER: SSH 사용자명
+#   - SERVER_PASSWORD: SSH 비밀번호
+#
+# 📋 사전 요구사항:
+#   - Traefik 컨테이너 실행 중 (traefik-network)
+#   - 와일드카드 DNS 설정: *.pr.suhsaechan.kr → 서버
+#   - 서버에 프로젝트 디렉토리 존재
+#
+# 🌐 Traefik 대시보드:
+#   https://traefik.suhsaechan.kr/dashboard/#/
+#
+#   대시보드에서 확인 가능한 정보:
+#   - Entrypoints: 트래픽 진입점 (web:80, traefik:8080)
+#   - HTTP Routers: PR Preview 라우팅 규칙 목록
+#   - HTTP Services: 연결된 컨테이너 서비스 목록
+#   - Middlewares: 적용된 미들웨어 (인증, 리다이렉트 등)
+#   - Providers: Docker 프로바이더 상태
+#
+#   배포 후 대시보드에서 새로운 Router/Service가 추가되었는지 확인할 수 있습니다.
+#   예: Router "suh-project-utility-pr-123" → Service "suh-project-utility-pr-123"
+#
+# 📊 리소스 네이밍 규칙:
+#   - 컨테이너: {PROJECT_NAME}-pr-{PR번호}
+#   - 이미지: {DOCKERHUB_USERNAME}/{PROJECT_NAME}:pr-{PR번호}
+#   - 도메인: {PROJECT_NAME}-pr-{PR번호}.pr.suhsaechan.kr
+#   - Preview URL: http://{도메인}:8079
+#
+# ===================================================================
+
+name: PROJECT-SPRING-SYNOLOGY-PR-PREVIEW
+
+# ===================================================================
+# ⚠️ 프로젝트별 설정 - 다른 프로젝트에서 사용 시 이 섹션만 수정하세요
+# ===================================================================
+env:
+  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)(프로젝트별 수정 필요)
+  PROJECT_NAME: suh-project-utility
+
+  # Spring Boot 빌드 설정 (프로젝트별 수정 필요)
+  JAVA_VERSION: '17'
+  GRADLE_BUILD_CMD: './gradlew clean build -x test -Dspring.profiles.active=prod'
+  JAR_PATH: 'Suh-Web/build/libs/app.jar'
+  APPLICATION_YML_PATH: 'Suh-Web/src/main/resources/application.yml'
+
+  # Docker 설정 (프로젝트별 수정 필요)
+  DOCKERFILE_PATH: './Dockerfile'
+  INTERNAL_PORT: '8080'
+
+  # Traefik & Preview 도메인 설정 (환경 구축 후 수정 금지) 
+  TRAEFIK_NETWORK: traefik-network
+  PREVIEW_DOMAIN_SUFFIX: pr.suhsaechan.kr
+  PREVIEW_PORT: '8079'
+
+  # SSH 포트 (시놀로지 포트 환경 구축 후 수정 금지)
+  SSH_PORT: '2022'
+
+# ===================================================================
+# 트리거 설정
+# ===================================================================
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# ===================================================================
+# Jobs
+# ===================================================================
+jobs:
+  # -----------------------------------------------------------------
+  # Job 1: 명령어 파싱
+  # -----------------------------------------------------------------
+  check-command:
+    name: 명령어 확인
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    outputs:
+      command: ${{ steps.parse.outputs.command }}
+      is_valid: ${{ steps.parse.outputs.is_valid }}
+    steps:
+      - name: 댓글에 👀 리액션 추가
+        if: contains(github.event.comment.body, '@suh-lab') && contains(github.event.comment.body, 'pr')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+
+      - name: 커맨드 파싱
+        id: parse
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+
+          if [[ "$COMMENT" =~ @suh-lab[[:space:]]+pr[[:space:]]+build ]]; then
+            echo "command=build" >> $GITHUB_OUTPUT
+            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "✅ 명령어 감지: build"
+          elif [[ "$COMMENT" =~ @suh-lab[[:space:]]+pr[[:space:]]+destroy ]]; then
+            echo "command=destroy" >> $GITHUB_OUTPUT
+            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "✅ 명령어 감지: destroy"
+          elif [[ "$COMMENT" =~ @suh-lab[[:space:]]+pr[[:space:]]+status ]]; then
+            echo "command=status" >> $GITHUB_OUTPUT
+            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "✅ 명령어 감지: status"
+          else
+            echo "is_valid=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ @suh-lab pr 명령어가 아님"
+          fi
+
+  # -----------------------------------------------------------------
+  # Job 2: 빌드 & 배포
+  # -----------------------------------------------------------------
+  build-preview:
+    name: Preview 빌드 & 배포
+    needs: check-command
+    if: needs.check-command.outputs.is_valid == 'true' && needs.check-command.outputs.command == 'build'
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR 정보 가져오기
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            core.setOutput('ref', pr.data.head.ref);
+            core.setOutput('sha', pr.data.head.sha.substring(0, 7));
+            return pr.data.number;
+
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.ref }}
+
+      - name: JDK 설정
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+
+      - name: Gradle 권한 설정
+        run: chmod +x gradlew
+
+      - name: application.yml 생성
+        run: |
+          mkdir -p $(dirname ${{ env.APPLICATION_YML_PATH }})
+          echo "${{ secrets.APPLICATION_YML }}" > ${{ env.APPLICATION_YML_PATH }}
+
+      - name: Gradle 빌드
+        run: ${{ env.GRADLE_BUILD_CMD }}
+
+      - name: Docker 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker 이미지 빌드 & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:pr-${{ github.event.issue.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 서버에 배포
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            set -e
+
+            # 환경 변수 설정 (시놀로지 NAS용)
+            export PATH=$PATH:/usr/local/bin
+            export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 변수 설정
+            PR_NUMBER=${{ github.event.issue.number }}
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+            CONTAINER_NAME="${PROJECT_NAME}-pr-${PR_NUMBER}"
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:pr-${PR_NUMBER}"
+            DOMAIN="${PROJECT_NAME}-pr-${PR_NUMBER}.${{ env.PREVIEW_DOMAIN_SUFFIX }}"
+            INTERNAL_PORT="${{ env.INTERNAL_PORT }}"
+            TRAEFIK_NETWORK="${{ env.TRAEFIK_NETWORK }}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🚀 PR Preview 배포 시작"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📦 프로젝트: ${PROJECT_NAME}"
+            echo "🔢 PR 번호: #${PR_NUMBER}"
+            echo "📛 컨테이너: ${CONTAINER_NAME}"
+            echo "🌐 도메인: ${DOMAIN}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # 이미지 Pull
+            echo "📥 Docker 이미지 Pull 중..."
+            echo $PW | sudo -S docker pull "${IMAGE}"
+
+            # 기존 컨테이너 삭제
+            echo "🗑️ 기존 컨테이너 정리 중..."
+            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+
+            # 새 컨테이너 실행
+            echo "🐳 새 컨테이너 실행 중..."
+            echo $PW | sudo -S docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --network "${TRAEFIK_NETWORK}" \
+              --label "traefik.enable=true" \
+              --label "traefik.http.routers.${CONTAINER_NAME}.rule=Host(\`${DOMAIN}\`)" \
+              --label "traefik.http.routers.${CONTAINER_NAME}.entrypoints=web" \
+              --label "traefik.http.services.${CONTAINER_NAME}.loadbalancer.server.port=${INTERNAL_PORT}" \
+              -e TZ=Asia/Seoul \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -v /etc/localtime:/etc/localtime:ro \
+              "${IMAGE}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "✅ 배포 완료!"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: 배포 완료 코멘트
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const projectName = '${{ env.PROJECT_NAME }}';
+            const domainSuffix = '${{ env.PREVIEW_DOMAIN_SUFFIX }}';
+            const previewPort = '${{ env.PREVIEW_PORT }}';
+            const domain = `${projectName}-pr-${prNumber}.${domainSuffix}`;
+            const previewUrl = `http://${domain}:${previewPort}`;
+            const sha = '${{ steps.pr.outputs.sha }}';
+
+            const body = [
+              '## 🚀 Preview 배포 완료!',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **Preview URL** | ${previewUrl} |`,
+              `| **컨테이너** | \`${projectName}-pr-${prNumber}\` |`,
+              `| **커밋** | \`${sha}\` |`,
+              '',
+              '### 📋 명령어',
+              '| 명령어 | 설명 |',
+              '|--------|------|',
+              '| `@suh-lab pr build` | 최신 커밋으로 재배포 |',
+              '| `@suh-lab pr destroy` | Preview 환경 삭제 |',
+              '| `@suh-lab pr status` | 현재 상태 확인 |',
+              '',
+              '---',
+              '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
+
+      - name: 빌드 실패 시 에러 코멘트
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const projectName = '${{ env.PROJECT_NAME }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              '## ❌ Preview 빌드 실패!',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **프로젝트** | ${projectName} |`,
+              `| **PR** | #${prNumber} |`,
+              '',
+              `**[📋 빌드 로그 확인](${runUrl})**`,
+              '',
+              '### 💡 다음 단계',
+              '1. 위 링크에서 빌드 로그를 확인하세요',
+              '2. 문제를 수정한 후 다시 시도하세요: `@suh-lab pr build`',
+              '',
+              '---',
+              '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
+
+  # -----------------------------------------------------------------
+  # Job 3: Preview 삭제
+  # -----------------------------------------------------------------
+  destroy-preview:
+    name: Preview 삭제
+    needs: check-command
+    if: |
+      (github.event_name == 'issue_comment' && needs.check-command.outputs.is_valid == 'true' && needs.check-command.outputs.command == 'destroy') ||
+      (github.event_name == 'pull_request' && github.event.action == 'closed')
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR 번호 가져오기
+        id: pr_number
+        run: |
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 컨테이너 & 이미지 삭제
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            # 환경 변수 설정 (시놀로지 NAS용)
+            export PATH=$PATH:/usr/local/bin
+            export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            PR_NUMBER=${{ steps.pr_number.outputs.number }}
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+            CONTAINER_NAME="${PROJECT_NAME}-pr-${PR_NUMBER}"
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:pr-${PR_NUMBER}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🗑️ PR Preview 삭제"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📦 프로젝트: ${PROJECT_NAME}"
+            echo "🔢 PR 번호: #${PR_NUMBER}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # 컨테이너 삭제
+            echo "🐳 컨테이너 삭제 중..."
+            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+
+            # 이미지 삭제
+            echo "🖼️ 이미지 삭제 중..."
+            echo $PW | sudo -S docker rmi "${IMAGE}" 2>/dev/null || true
+
+            echo "✅ 삭제 완료!"
+
+      - name: 삭제 완료 코멘트
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const projectName = '${{ env.PROJECT_NAME }}';
+
+            const body = [
+              '## 🗑️ Preview 환경 삭제 완료!',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **컨테이너** | \`${projectName}-pr-${prNumber}\` |`,
+              '| **상태** | 삭제됨 |',
+              '',
+              '다시 배포하려면: `@suh-lab pr build`',
+              '',
+              '---',
+              '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
+
+  # -----------------------------------------------------------------
+  # Job 4: 상태 확인
+  # -----------------------------------------------------------------
+  check-status:
+    name: Preview 상태 확인
+    needs: check-command
+    if: needs.check-command.outputs.is_valid == 'true' && needs.check-command.outputs.command == 'status'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 컨테이너 상태 확인
+        id: status
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            # 환경 변수 설정 (시놀로지 NAS용)
+            export PATH=$PATH:/usr/local/bin
+
+            PR_NUMBER=${{ github.event.issue.number }}
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+            CONTAINER_NAME="${PROJECT_NAME}-pr-${PR_NUMBER}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🔍 PR Preview 상태 확인"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            if docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}" | grep -q "${CONTAINER_NAME}"; then
+              echo "STATUS=running"
+              echo "✅ 컨테이너 실행 중"
+              docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}\t{{.RunningFor}}"
+            else
+              echo "STATUS=not_found"
+              echo "❌ 컨테이너 없음"
+            fi
+
+      - name: 상태 코멘트 (실행 중)
+        uses: appleboy/ssh-action@v1.0.3
+        id: check_running
+        continue-on-error: true
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            # 환경 변수 설정 (시놀로지 NAS용)
+            export PATH=$PATH:/usr/local/bin
+
+            PR_NUMBER=${{ github.event.issue.number }}
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+            CONTAINER_NAME="${PROJECT_NAME}-pr-${PR_NUMBER}"
+            docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}" | grep -q "${CONTAINER_NAME}"
+
+      - name: 상태 코멘트 작성
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const projectName = '${{ env.PROJECT_NAME }}';
+            const domainSuffix = '${{ env.PREVIEW_DOMAIN_SUFFIX }}';
+            const previewPort = '${{ env.PREVIEW_PORT }}';
+            const domain = `${projectName}-pr-${prNumber}.${domainSuffix}`;
+            const previewUrl = `http://${domain}:${previewPort}`;
+            const isRunning = '${{ steps.check_running.outcome }}' === 'success';
+
+            let body;
+            if (isRunning) {
+              body = [
+                '## ✅ Preview 환경 실행 중',
+                '',
+                '| 항목 | 값 |',
+                '|------|-----|',
+                `| **Preview URL** | ${previewUrl} |`,
+                `| **컨테이너** | \`${projectName}-pr-${prNumber}\` |`,
+                '| **상태** | 🟢 Running |',
+                '',
+                '### 📋 명령어',
+                '| 명령어 | 설명 |',
+                '|--------|------|',
+                '| `@suh-lab pr build` | 최신 커밋으로 재배포 |',
+                '| `@suh-lab pr destroy` | Preview 환경 삭제 |',
+                '',
+                '---',
+                '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
+              ].join('\n');
+            } else {
+              body = [
+                '## ❌ Preview 환경 없음',
+                '',
+                '| 항목 | 값 |',
+                '|------|-----|',
+                `| **컨테이너** | \`${projectName}-pr-${prNumber}\` |`,
+                '| **상태** | 🔴 Not Found |',
+                '',
+                '배포하려면: `@suh-lab pr build`',
+                '',
+                '---',
+                '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
+              ].join('\n');
+            }
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });

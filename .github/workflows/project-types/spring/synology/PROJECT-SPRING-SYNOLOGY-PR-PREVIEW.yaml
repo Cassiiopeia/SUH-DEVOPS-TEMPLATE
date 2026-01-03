@@ -13,18 +13,30 @@
 # ⚙️ 프로젝트별 필수 수정 사항:
 #   아래 env 섹션의 값들을 프로젝트에 맞게 수정하세요.
 #
-# 🔑 필수 GitHub Secrets:
-#   - APPLICATION_YML: Spring application.yml 전체 내용
+# 🔑 GitHub Secrets:
+#
+#   [필수] 모든 프로젝트 공통:
+#   - APPLICATION_PROD_YML: Spring application-prod.yml 전체 내용
 #   - DOCKERHUB_USERNAME: Docker Hub 사용자명
 #   - DOCKERHUB_TOKEN: Docker Hub 액세스 토큰
 #   - SERVER_HOST: 시놀로지 서버 호스트 (예: suh-project.synology.me)
 #   - SERVER_USER: SSH 사용자명
 #   - SERVER_PASSWORD: SSH 비밀번호
 #
+#   [선택] 프로젝트별 추가 (필요 없으면 해당 step 삭제):
+#   - VERTEX_SA_KEY: Vertex AI 서비스 계정 키
+#   - FIREBASE_KEY_JSON: Firebase Admin SDK 키
+#   - FIREBASE_MESSAGING_SW_JS: Firebase Messaging Service Worker
+#   - 기타 프로젝트별 Secret...
+#
 # 📋 사전 요구사항:
 #   - Traefik 컨테이너 실행 중 (traefik-network)
 #   - 와일드카드 DNS 설정: *.pr.suhsaechan.kr → 서버
 #   - 서버에 프로젝트 디렉토리 존재
+#
+#   ※ Health Check는 자동으로 최적 방식 선택 (추가 설정 불필요):
+#     - Spring Actuator 있으면 → /actuator/health 사용
+#     - 없으면 → 기동 로그 패턴으로 확인 ("Started ... in ... seconds")
 #
 # 🌐 Traefik 대시보드:
 #   https://traefik.suhsaechan.kr/dashboard/#/
@@ -50,23 +62,23 @@
 name: PROJECT-SPRING-SYNOLOGY-PR-PREVIEW
 
 # ===================================================================
-# ⚠️ 프로젝트별 설정 - 다른 프로젝트에서 사용 시 이 섹션만 수정하세요
+# ⚠️ [영역 1] 프로젝트별 설정 - 다른 프로젝트에서 사용 시 이 섹션만 수정하세요
 # ===================================================================
 env:
-  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)(프로젝트별 수정 필요)
+  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용) (프로젝트별 수정 필요)
   PROJECT_NAME: suh-project-utility
 
   # Spring Boot 빌드 설정 (프로젝트별 수정 필요)
   JAVA_VERSION: '17'
   GRADLE_BUILD_CMD: './gradlew clean build -x test -Dspring.profiles.active=prod'
-  JAR_PATH: 'Suh-Web/build/libs/app.jar'
-  APPLICATION_YML_PATH: 'Suh-Web/src/main/resources/application.yml'
+  JAR_PATH: 'Suh-Web/build/libs/*.jar'
+  APPLICATION_YML_PATH: 'Suh-Web/src/main/resources/application-prod.yml'
 
   # Docker 설정 (프로젝트별 수정 필요)
   DOCKERFILE_PATH: './Dockerfile'
   INTERNAL_PORT: '8080'
 
-  # Traefik & Preview 도메인 설정 (환경 구축 후 수정 금지) 
+  # Traefik & Preview 도메인 설정 (환경 구축 후 수정 금지)
   TRAEFIK_NETWORK: traefik-network
   PREVIEW_DOMAIN_SUFFIX: pr.suhsaechan.kr
   PREVIEW_PORT: '8079'
@@ -161,6 +173,43 @@ jobs:
             core.setOutput('sha', pr.data.head.sha.substring(0, 7));
             return pr.data.number;
 
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # 진행 상황 댓글 시스템
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 진행 상황 댓글 생성
+        id: progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const startTime = Date.now();
+
+            const body = [
+              '## 🚀 PR Preview 빌드 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              '| 🔨 프로젝트 빌드 | ⏳ 진행 중... | - |',
+              '| 🐳 Docker 이미지 생성 | ⏸️ 대기 | - |',
+              '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
+
+            core.setOutput('comment_id', comment.id);
+            core.setOutput('start_time', startTime);
+
       - name: 코드 체크아웃
         uses: actions/checkout@v4
         with:
@@ -176,13 +225,90 @@ jobs:
       - name: Gradle 권한 설정
         run: chmod +x gradlew
 
-      - name: application.yml 생성
+      # =================================================================
+      # ⚠️ [영역 2] 프로젝트별 Secret 파일 생성
+      # =================================================================
+      #
+      # 📋 필수 (모든 Spring Boot 프로젝트):
+      #   - application-prod.yml
+      #
+      # 📋 선택 (프로젝트에 따라 추가/제거):
+      #   - Firebase: firebase-admin-sdk.json, firebase-messaging-sw.js
+      #   - Vertex AI: gen-lang-client-xxx.json
+      #   - 기타 설정 파일: admin.yml, prompt.yml 등
+      #
+      # ⚠️ 다른 프로젝트에서 사용 시:
+      #   1. 필요 없는 step은 삭제하세요
+      #   2. 필요한 step을 추가하세요
+      #   3. 파일 경로를 프로젝트에 맞게 수정하세요
+      # =================================================================
+
+      # [필수] Spring Boot 설정 파일
+      - name: "[필수] application-prod.yml 생성"
         run: |
           mkdir -p $(dirname ${{ env.APPLICATION_YML_PATH }})
-          echo "${{ secrets.APPLICATION_YML }}" > ${{ env.APPLICATION_YML_PATH }}
+          cat << 'EOF' > ${{ env.APPLICATION_YML_PATH }}
+          ${{ secrets.APPLICATION_PROD_YML }}
+          EOF
+
+      # [선택] 아래는 예시입니다. 필요 없으면 삭제하세요.
+      # - name: "[선택] Vertex AI Service Account Key 생성"
+      #   env:
+      #     VERTEX_SA_KEY: ${{ secrets.VERTEX_SA_KEY }}
+      #   run: |
+      #     echo "$VERTEX_SA_KEY" | sed 's/\\n/\n/g' > ./Suh-Web/src/main/resources/vertex-ai-key.json
+
+      # - name: "[선택] Firebase Admin SDK 생성"
+      #   env:
+      #     FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
+      #   run: |
+      #     echo "$FIREBASE_KEY_JSON" | sed 's/\\n/\n/g' > ./Suh-Web/src/main/resources/firebase-admin-sdk.json
+
+      # =================================================================
+      # ⚠️ [영역 2 끝] 프로젝트별 Secret 파일 생성 끝
+      # =================================================================
 
       - name: Gradle 빌드
         run: ${{ env.GRADLE_BUILD_CMD }}
+
+      - name: 진행 상황 - 빌드 완료
+        id: build_progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = ${{ steps.progress.outputs.comment_id }};
+            const startTime = ${{ steps.progress.outputs.start_time }};
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            const buildDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              '## 🚀 PR Preview 빌드 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
+              '| 🐳 Docker 이미지 생성 | ⏳ 진행 중... | - |',
+              '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            core.setOutput('build_duration', buildDuration);
+            core.setOutput('docker_start', now);
 
       - name: Docker 로그인
         uses: docker/login-action@v3
@@ -202,6 +328,47 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:pr-${{ github.event.issue.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: 진행 상황 - Docker 완료
+        id: docker_progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = ${{ steps.progress.outputs.comment_id }};
+            const buildDuration = '${{ steps.build_progress.outputs.build_duration }}';
+            const dockerStart = ${{ steps.build_progress.outputs.docker_start }};
+            const now = Date.now();
+            const dockerElapsed = now - dockerStart;
+            const minutes = Math.floor(dockerElapsed / 60000);
+            const seconds = Math.floor((dockerElapsed % 60000) / 1000);
+            const dockerDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              '## 🚀 PR Preview 빌드 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
+              `| 🐳 Docker 이미지 생성 | ✅ 완료 | ${dockerDuration} |`,
+              '| 🚀 서버 배포 & Health Check | ⏳ 진행 중... | - |',
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            core.setOutput('build_duration', buildDuration);
+            core.setOutput('docker_duration', dockerDuration);
+            core.setOutput('deploy_start', now);
 
       - name: 서버에 배포
         uses: appleboy/ssh-action@v1.0.3
@@ -257,25 +424,108 @@ jobs:
               -v /etc/localtime:/etc/localtime:ro \
               "${IMAGE}"
 
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # Health Check (최대 120초 대기) - 하이브리드 방식
+            # 1. Actuator 있으면 → /actuator/health 사용
+            # 2. 없으면 → 로그 패턴 매칭 ("Started ... in ... seconds")
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            echo ""
+            echo "⏳ Health Check 시작 (최대 120초 대기)..."
+            MAX_RETRIES=24
+            RETRY_COUNT=0
+            HEALTH_CHECK_PASSED=false
+            HEALTH_CHECK_METHOD=""
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              sleep 5
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+
+              # 1. 컨테이너 상태 확인
+              STATUS=$(echo $PW | sudo -S docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+
+              if [ "$STATUS" = "exited" ]; then
+                echo "❌ 컨테이너 비정상 종료!"
+                echo ""
+                echo "📋 컨테이너 로그 (최근 100줄):"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                exit 1
+              fi
+
+              if [ "$STATUS" = "running" ]; then
+                # 2. Actuator Health Check 시도 (wget 사용 - alpine 기본 포함)
+                HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" wget -qO- http://localhost:${INTERNAL_PORT}/actuator/health 2>/dev/null || echo "")
+
+                if echo "$HEALTH" | grep -q '"status":"UP"'; then
+                  echo "✅ Spring Boot 정상 기동 확인! (Actuator)"
+                  HEALTH_CHECK_PASSED=true
+                  HEALTH_CHECK_METHOD="Actuator"
+                  break
+                fi
+
+                # 3. Actuator 없으면 로그 패턴 매칭으로 폴백
+                STARTED=$(echo $PW | sudo -S docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "Started .* in [0-9.]+ seconds" || echo "")
+
+                if [ -n "$STARTED" ]; then
+                  echo "✅ Spring Boot 정상 기동 확인! (로그 패턴)"
+                  echo "   $STARTED"
+                  HEALTH_CHECK_PASSED=true
+                  HEALTH_CHECK_METHOD="Log"
+                  break
+                fi
+              fi
+
+              echo "⏳ 대기 중... ($RETRY_COUNT/$MAX_RETRIES) - 상태: $STATUS"
+            done
+
+            if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
+              echo ""
+              echo "❌ Health Check 타임아웃 (120초)"
+              echo ""
+              echo "📋 컨테이너 로그 (최근 100줄):"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              exit 1
+            fi
+
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "✅ 배포 완료!"
+            echo "✅ 배포 및 Health Check 완료! (방식: ${HEALTH_CHECK_METHOD})"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: 배포 완료 코멘트
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.issue.number;
+            const commentId = ${{ steps.progress.outputs.comment_id }};
+            const buildDuration = '${{ steps.docker_progress.outputs.build_duration }}';
+            const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
+            const deployStart = ${{ steps.docker_progress.outputs.deploy_start }};
+            const now = Date.now();
+            const deployElapsed = now - deployStart;
+            const minutes = Math.floor(deployElapsed / 60000);
+            const seconds = Math.floor((deployElapsed % 60000) / 1000);
+            const deployDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
             const projectName = '${{ env.PROJECT_NAME }}';
             const domainSuffix = '${{ env.PREVIEW_DOMAIN_SUFFIX }}';
             const previewPort = '${{ env.PREVIEW_PORT }}';
+            const prNumber = context.issue.number;
             const domain = `${projectName}-pr-${prNumber}.${domainSuffix}`;
             const previewUrl = `http://${domain}:${previewPort}`;
             const sha = '${{ steps.pr.outputs.sha }}';
 
             const body = [
-              '## 🚀 Preview 배포 완료!',
+              '## ✅ PR Preview 배포 완료!',
               '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
+              `| 🐳 Docker 이미지 생성 | ✅ 완료 | ${dockerDuration} |`,
+              `| 🚀 서버 배포 & Health Check | ✅ 완료 | ${deployDuration} |`,
+              '',
+              '### 🌐 Preview 환경',
               '| 항목 | 값 |',
               '|------|-----|',
               `| **Preview URL** | ${previewUrl} |`,
@@ -293,46 +543,97 @@ jobs:
               '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
             ].join('\n');
 
-            github.rest.issues.createComment({
+            await github.rest.issues.updateComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: prNumber,
+              comment_id: commentId,
               body: body
             });
 
-      - name: 빌드 실패 시 에러 코멘트
+      - name: 빌드/배포 실패 시 에러 코멘트
         if: failure()
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.issue.number;
+            const commentId = ${{ steps.progress.outputs.comment_id || 0 }};
             const projectName = '${{ env.PROJECT_NAME }}';
+            const prNumber = context.issue.number;
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
+            // 진행 상황에 따라 어디서 실패했는지 표시
+            const buildDuration = '${{ steps.build_progress.outputs.build_duration }}';
+            const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
+
+            // 실패 지점 판단 - 초기 단계 실패도 구분
+            let buildStatus, dockerStatus, deployStatus;
+            let buildTime = '-', dockerTime = '-';
+
+            if (!commentId) {
+              // 진행 상황 댓글 생성 전 실패 (초기화 단계)
+              buildStatus = '⚠️ 초기화 실패';
+              dockerStatus = '-';
+              deployStatus = '-';
+            } else if (!buildDuration || buildDuration === '') {
+              // 빌드 단계에서 실패
+              buildStatus = '❌ 실패';
+              dockerStatus = '⏸️ 대기';
+              deployStatus = '⏸️ 대기';
+            } else if (!dockerDuration || dockerDuration === '') {
+              // Docker 단계에서 실패
+              buildStatus = '✅ 완료';
+              dockerStatus = '❌ 실패';
+              deployStatus = '⏸️ 대기';
+              buildTime = buildDuration;
+            } else {
+              // 배포 단계에서 실패
+              buildStatus = '✅ 완료';
+              dockerStatus = '✅ 완료';
+              deployStatus = '❌ 실패';
+              buildTime = buildDuration;
+              dockerTime = dockerDuration;
+            }
+
             const body = [
-              '## ❌ Preview 빌드 실패!',
+              '## ❌ PR Preview 배포 실패!',
               '',
-              '| 항목 | 값 |',
-              '|------|-----|',
-              `| **프로젝트** | ${projectName} |`,
-              `| **PR** | #${prNumber} |`,
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔨 프로젝트 빌드 | ${buildStatus} | ${buildTime} |`,
+              `| 🐳 Docker 이미지 생성 | ${dockerStatus} | ${dockerTime} |`,
+              `| 🚀 서버 배포 & Health Check | ${deployStatus} | - |`,
               '',
-              `**[📋 빌드 로그 확인](${runUrl})**`,
+              `**[📋 빌드/배포 로그 확인](${runUrl})**`,
+              '',
+              '### 🔍 가능한 원인',
+              '- Gradle 빌드 실패',
+              '- Docker 이미지 빌드 실패',
+              '- 컨테이너 시작 실패 (Spring Boot 기동 오류)',
+              '- Health Check 타임아웃 (120초 내 기동 완료 안됨)',
               '',
               '### 💡 다음 단계',
-              '1. 위 링크에서 빌드 로그를 확인하세요',
+              '1. 위 링크에서 빌드/배포 로그를 확인하세요',
               '2. 문제를 수정한 후 다시 시도하세요: `@suh-lab pr build`',
               '',
               '---',
               '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
             ].join('\n');
 
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: body
-            });
+            // 진행 상황 댓글이 있으면 업데이트, 없으면 새로 생성
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+            }
 
   # -----------------------------------------------------------------
   # Job 3: Preview 삭제

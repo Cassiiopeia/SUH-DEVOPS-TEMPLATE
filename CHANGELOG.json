@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-03T08:03:07Z",
-    "currentVersion": "2.3.1",
+    "lastUpdated": "2026-01-03T19:00:55Z",
+    "currentVersion": "2.4.0",
     "projectType": "basic",
-    "totalReleases": 44
+    "totalReleases": 45
   },
   "releases": [
+    {
+      "version": "2.4.0",
+      "project_type": "basic",
+      "date": "2026-01-03",
+      "pr_number": 131,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * PR 미리보기 배포 프로세스에 실시간 진행 상황 추적 시스템 추가\n  * 배포 피드백 개선으로 빌드, 도커, 배포 각 단계의 소요 시간 표시\n  * 향상된 오류 메시지로 문제 발생 위치 명확화\n\n* **Bug Fixes**\n  * 배포 중 상태 검사 개선으로 서비스 가용성 확인 신뢰도 향상\n\n* **Chores**\n  * 버전 업데이트 (2.4.0)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "PR 미리보기 배포 프로세스에 실시간 진행 상황 추적 시스템 추가",
+            "배포 피드백 개선으로 빌드, 도커, 배포 각 단계의 소요 시간 표시",
+            "향상된 오류 메시지로 문제 발생 위치 명확화"
+          ]
+        },
+        "bug_fixes": {
+          "title": "Bug Fixes",
+          "items": [
+            "배포 중 상태 검사 개선으로 서비스 가용성 확인 신뢰도 향상"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (2.4.0)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.3.1",
       "project_type": "basic",

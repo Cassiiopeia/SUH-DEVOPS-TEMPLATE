@@ -1,11 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-03T19:00:55Z",
-    "currentVersion": "2.4.0",
+    "lastUpdated": "2026-01-05T07:02:42Z",
+    "currentVersion": "2.4.2",
     "projectType": "basic",
-    "totalReleases": 45
+    "totalReleases": 46
   },
   "releases": [
+    {
+      "version": "2.4.2",
+      "project_type": "basic",
+      "date": "2026-01-05",
+      "pr_number": 135,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **문서화**\n  * 민감 정보 마스킹 지침 추가: API 키, 비밀번호, 토큰 등의 마스킹 규칙 및 올바른 마스킹 예시 포함\n\n* **개선 사항**\n  * 자동화 워크플로우 안정성 강화 (race condition 방지)\n  * PowerShell 호환성 개선\n\n* **기타**\n  * 버전 업데이트 (v2.4.2)",
+      "parsed_changes": {
+        "문서화": {
+          "title": "문서화",
+          "items": [
+            "민감 정보 마스킹 지침 추가: API 키, 비밀번호, 토큰 등의 마스킹 규칙 및 올바른 마스킹 예시 포함"
+          ]
+        },
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "자동화 워크플로우 안정성 강화 (race condition 방지)",
+            "PowerShell 호환성 개선"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전 업데이트 (v2.4.2)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.4.0",
       "project_type": "basic",

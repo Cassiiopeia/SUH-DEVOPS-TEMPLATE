@@ -296,6 +296,10 @@ jobs:
           git checkout $PR_BASE
           git pull origin $PR_BASE
 
+          # HEAD 브랜치(main)의 최신 변경사항 다시 가져오기 (race condition 방지)
+          echo "🔄 $PR_HEAD 브랜치의 최신 변경사항 가져오는 중..."
+          git fetch origin $PR_HEAD
+
           # HEAD 브랜치(main)의 변경사항을 BASE(deploy)에 머지
           echo "🔀 $PR_HEAD의 변경사항을 $PR_BASE에 머지 중..."
           if git merge --no-edit origin/$PR_HEAD; then

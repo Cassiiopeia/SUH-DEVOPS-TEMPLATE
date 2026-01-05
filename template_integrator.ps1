@@ -919,18 +919,24 @@ function Copy-Workflows {
     Print-Info "공통 워크플로우 다운로드 중..."
     $commonDir = Join-Path $projectTypesDir "common"
     if (Test-Path $commonDir) {
-        $workflows = Get-ChildItem -Path $commonDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-        $workflows += Get-ChildItem -Path $commonDir -Filter "*.yml" -ErrorAction SilentlyContinue
-        
+        # PowerShell 5.1 호환성: 배열 초기화 후 추가 (null += 방지)
+        $workflows = @()
+        $yamlFiles = Get-ChildItem -Path $commonDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $commonDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $workflows += $yamlFiles }
+        if ($ymlFiles) { $workflows += $ymlFiles }
+
         foreach ($workflow in $workflows) {
             $filename = $workflow.Name
             $destPath = Join-Path $WORKFLOWS_DIR $filename
-            
+
             if (Test-Path $destPath) {
+                # PowerShell 5.1 호환성: 명시적 문자열 연결
+                $backupPath = [string]$destPath + ".bak"
                 Print-Warning "$filename 이미 존재 → ${filename}.bak으로 백업"
-                Move-Item -Path $destPath -Destination "$destPath.bak" -Force
+                Move-Item -Path $destPath -Destination $backupPath -Force
             }
-            
+
             Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
             Write-Host "  ✓ $filename"
             $copied++
@@ -943,19 +949,25 @@ function Copy-Workflows {
     $typeDir = Join-Path $projectTypesDir $script:ProjectType
     if (Test-Path $typeDir) {
         Print-Info "$($script:ProjectType) 전용 워크플로우 다운로드 중..."
-        
-        $workflows = Get-ChildItem -Path $typeDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-        $workflows += Get-ChildItem -Path $typeDir -Filter "*.yml" -ErrorAction SilentlyContinue
-        
+
+        # PowerShell 5.1 호환성: 배열 초기화 후 추가 (null += 방지)
+        $workflows = @()
+        $yamlFiles = Get-ChildItem -Path $typeDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $typeDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $workflows += $yamlFiles }
+        if ($ymlFiles) { $workflows += $ymlFiles }
+
         foreach ($workflow in $workflows) {
             $filename = $workflow.Name
             $destPath = Join-Path $WORKFLOWS_DIR $filename
-            
+
             if (Test-Path $destPath) {
+                # PowerShell 5.1 호환성: 명시적 문자열 연결
+                $backupPath = [string]$destPath + ".bak"
                 Print-Warning "$filename 이미 존재 → ${filename}.bak으로 백업"
-                Move-Item -Path $destPath -Destination "$destPath.bak" -Force
+                Move-Item -Path $destPath -Destination $backupPath -Force
             }
-            
+
             Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
             Write-Host "  ✓ $filename"
             $copied++
@@ -1101,13 +1113,16 @@ function Copy-CodeRabbitConfig {
                 Print-Info ".coderabbit.yaml 다운로드 건너뜁니다"
                 return
             }
-            
-            # 백업
-            Copy-Item -Path ".coderabbit.yaml" -Destination ".coderabbit.yaml.bak" -Force
+
+            # PowerShell 5.1 호환성: 백업 경로를 변수로 분리
+            $backupPath = ".coderabbit.yaml.bak"
+            Copy-Item -Path ".coderabbit.yaml" -Destination $backupPath -Force
             Print-Info "기존 파일을 .coderabbit.yaml.bak으로 백업했습니다"
         } elseif ($Force) {
             # Force 모드에서는 백업하고 덮어쓰기
-            Copy-Item -Path ".coderabbit.yaml" -Destination ".coderabbit.yaml.bak" -Force -ErrorAction SilentlyContinue
+            # PowerShell 5.1 호환성: 백업 경로를 변수로 분리
+            $backupPath = ".coderabbit.yaml.bak"
+            Copy-Item -Path ".coderabbit.yaml" -Destination $backupPath -Force -ErrorAction SilentlyContinue
             Print-Info "강제 모드: 기존 파일 덮어씁니다"
         }
     }

@@ -366,45 +366,40 @@ python3 .github/scripts/changelog_manager.py validate
 - ✅ **JSON + Markdown**: 구조화된 데이터와 가독성 동시 제공
 - ✅ **내보내기**: 릴리즈 노트 다양한 형식으로 추출
 
-### 🧙 Flutter 유틸리티 마법사 (iOS/Android)
+### 📱 Flutter CI/CD 시스템
 
-**Flutter 프로젝트의 배포 설정을 웹 UI로 쉽게 생성**
+**Flutter 프로젝트를 위한 완전 자동화된 배포 파이프라인**
 
-> 📍 위치: `.github/util/flutter/`
+#### 마법사 도구
 
-#### iOS TestFlight 마법사
-```bash
-# 브라우저에서 index.html 열기
-open .github/util/flutter/ios-testflight-setup-wizard/index.html
+| 마법사 | 설명 | 상세 가이드 |
+|--------|------|------------|
+| **TestFlight 마법사** | iOS 배포 설정 자동 생성 (ExportOptions.plist, Fastfile) | [가이드](docs/FLUTTER-TESTFLIGHT-WIZARD.md) |
+| **Play Store 마법사** | Android 배포 설정 자동 생성 (Fastfile, 서명 설정) | [가이드](docs/FLUTTER-PLAYSTORE-WIZARD.md) |
 
-# 생성되는 파일들:
-# - ExportOptions.plist (배포 설정)
-# - Fastfile (자동화 스크립트)
-# - Gemfile (의존성)
-```
+#### 테스트 빌드 트리거
 
-**주요 기능:**
-- ✅ Team ID, Bundle ID 등 입력하면 설정 파일 자동 생성
-- ✅ TestFlight 업로드에 필요한 모든 파일 한번에 생성
-- ✅ 복잡한 Xcode 설정 없이 웹 UI로 간편 설정
+PR/이슈에 `@suh-lab build app` 댓글 작성 → Android APK + iOS TestFlight 자동 빌드
 
-#### Android Play Store 마법사
-```bash
-# 초기화 스크립트 실행
-.github/util/flutter/android-playstore-setup-wizard/init.sh   # macOS/Linux
-.github/util/flutter/android-playstore-setup-wizard/init.ps1  # Windows
+| 기능 | 설명 |
+|------|------|
+| **트리거 키워드** | `@suh-lab build app` |
+| **지원 컨텍스트** | PR, 이슈 |
+| **빌드 결과** | 자동 댓글 작성 (성공/실패, 다운로드 링크) |
+| **버전 형식** | `0.0.0(빌드번호)` - 테스트 전용 |
 
-# 생성되는 파일들:
-# - Fastfile (Play Store 업로드 자동화)
-# - build.gradle.kts 서명 설정
-```
+상세 가이드: [테스트 빌드 트리거](docs/FLUTTER-TEST-BUILD-TRIGGER.md)
 
-**주요 기능:**
-- ✅ Play Store 배포에 필요한 Fastlane 설정 자동 생성
-- ✅ 서명 키 설정 가이드 제공
-- ✅ 단계별 대화형 설정으로 쉬운 구성
+#### 워크플로우 목록
 
-> 💡 **팁**: `template_integrator`로 Flutter 프로젝트 통합 시 이 마법사들을 함께 다운로드할 수 있습니다!
+| 워크플로우 | 용도 | 트리거 |
+|-----------|------|--------|
+| `PROJECT-FLUTTER-IOS-TESTFLIGHT` | iOS 본 배포 | deploy 브랜치 |
+| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Android 본 배포 | deploy 브랜치 |
+| `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | iOS 테스트 빌드 | 댓글 트리거 |
+| `PROJECT-FLUTTER-ANDROID-TEST-APK` | Android 테스트 APK | 댓글 트리거 |
+
+> 📚 **전체 가이드**: [Flutter CI/CD 전체 가이드](docs/FLUTTER-CICD-OVERVIEW.md)
 
 ---
 

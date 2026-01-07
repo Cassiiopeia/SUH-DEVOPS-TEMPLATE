@@ -1,0 +1,272 @@
+# iOS TestFlight 마법사 상세 가이드
+
+> Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사
+
+---
+
+## 목차
+
+- [개요](#개요)
+- [사전 요구사항](#사전-요구사항)
+- [마법사 사용법](#마법사-사용법)
+- [생성되는 파일](#생성되는-파일)
+- [GitHub Secrets 설정](#github-secrets-설정)
+- [연관 워크플로우](#연관-워크플로우)
+- [트러블슈팅](#트러블슈팅)
+
+---
+
+## 개요
+
+TestFlight 마법사는 웹 UI를 통해 iOS 배포에 필요한 설정 파일들을 자동으로 생성해주는 도구입니다.
+
+**위치:** `.github/util/flutter/testflight-wizard/`
+
+**버전:** 1.0.1
+
+**호환성:**
+- Flutter >= 3.0.0
+- Xcode >= 15.0
+- Fastlane >= 2.220.0
+
+---
+
+## 사전 요구사항
+
+마법사 실행 전에 Apple Developer Portal에서 다음 항목들을 준비해야 합니다:
+
+### 1. Apple Developer Program 등록
+- [developer.apple.com](https://developer.apple.com) 에서 등록
+- 연간 $99 비용
+
+### 2. 인증서 생성
+- **Apple Distribution** 인증서 필요
+- Keychain Access 또는 Xcode에서 생성
+- `.p12` 파일로 내보내기
+
+### 3. App ID 등록
+- Identifiers에서 App ID 생성
+- Bundle ID 설정 (예: `com.company.appname`)
+
+### 4. Provisioning Profile 생성
+- **App Store** 타입 선택
+- 생성한 App ID 연결
+- 배포 인증서 연결
+
+### 5. App Store Connect API Key 생성
+- App Store Connect → Users and Access → Integrations → Keys
+- **App Manager** 또는 **Admin** 권한 선택
+- `.p8` 파일 다운로드 (한 번만 가능!)
+
+---
+
+## 마법사 사용법
+
+### 실행 방법
+
+```bash
+# 브라우저에서 마법사 열기
+open .github/util/flutter/testflight-wizard/testflight-wizard.html
+```
+
+### 9단계 마법사 진행
+
+| 단계 | 내용 | 입력 정보 |
+|------|------|-----------|
+| 1 | 시작 | 마법사 소개 |
+| 2 | 인증서 | 인증서 생성 가이드 |
+| 3 | App ID | Bundle ID 등록 가이드 |
+| 4 | Profile | Provisioning Profile 생성 가이드 |
+| 5 | ASC 등록 | App Store Connect 앱 등록 |
+| 6 | 앱 정보 | Team ID, Bundle ID, Profile Name 입력 |
+| 7 | API Key | App Store Connect API Key 정보 입력 |
+| 8 | Fastlane | 생성된 설정 파일 다운로드 |
+| 9 | 완료 | 설정 완료 확인 |
+
+### 입력해야 할 정보
+
+```yaml
+# Step 6: 앱 정보
+Team ID: "XXXXXXXXXX"           # Apple Developer Team ID (10자리)
+Bundle ID: "com.company.app"    # 앱의 Bundle Identifier
+Profile Name: "App Distribution" # Provisioning Profile 이름
+
+# Step 7: API Key
+API Key ID: "XXXXXXXXXX"        # App Store Connect API Key ID
+Issuer ID: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Issuer ID (UUID)
+```
+
+---
+
+## 생성되는 파일
+
+### 1. ExportOptions.plist
+
+IPA 내보내기 설정 파일입니다.
+
+**위치:** `ios/ExportOptions.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+    <key>teamID</key>
+    <string>{{TEAM_ID}}</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>{{BUNDLE_ID}}</key>
+        <string>{{PROFILE_NAME}}</string>
+    </dict>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>Apple Distribution</string>
+</dict>
+</plist>
+```
+
+### 2. Fastfile
+
+Fastlane 배포 자동화 스크립트입니다.
+
+**위치:** `ios/fastlane/Fastfile`
+
+**제공하는 lane:**
+- `upload_testflight` - CI용 (IPA가 이미 빌드된 상태)
+- `build_and_deploy` - 로컬 개발용 (빌드 + 업로드)
+
+**필요한 환경변수:**
+- `APP_STORE_CONNECT_API_KEY_ID`
+- `APP_STORE_CONNECT_ISSUER_ID`
+- `API_KEY_PATH`
+- `IPA_PATH`
+- `RELEASE_NOTES`
+
+### 3. Gemfile
+
+Fastlane 의존성 파일입니다.
+
+**위치:** `ios/Gemfile`
+
+```ruby
+source "https://rubygems.org"
+
+gem "fastlane"
+```
+
+---
+
+## GitHub Secrets 설정
+
+워크플로우 실행을 위해 다음 Secrets를 설정해야 합니다:
+
+| Secret 이름 | 설명 | 값 형식 |
+|------------|------|---------|
+| `IOS_CERTIFICATE_BASE64` | Apple Distribution 인증서 (.p12) | Base64 인코딩 |
+| `IOS_CERTIFICATE_PASSWORD` | 인증서 비밀번호 | 문자열 |
+| `IOS_PROVISIONING_PROFILE_BASE64` | Provisioning Profile (.mobileprovision) | Base64 인코딩 |
+| `IOS_PROVISIONING_PROFILE_NAME` | Provisioning Profile 이름 | 문자열 |
+| `APP_STORE_CONNECT_API_KEY_ID` | API Key ID | 문자열 |
+| `APP_STORE_CONNECT_API_ISSUER_ID` | Issuer ID | UUID 형식 |
+| `APP_STORE_CONNECT_API_KEY_CONTENT` | API Key 내용 (.p8 파일 내용) | 문자열 |
+
+### Base64 인코딩 방법
+
+```bash
+# 인증서 인코딩
+base64 -i Certificates.p12 | pbcopy
+
+# Provisioning Profile 인코딩
+base64 -i AppDistribution.mobileprovision | pbcopy
+```
+
+---
+
+## 연관 워크플로우
+
+### 본 배포
+- **파일:** `PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml`
+- **트리거:** deploy 브랜치 push
+- **용도:** 정식 TestFlight 배포
+
+### 테스트 빌드
+- **파일:** `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml`
+- **트리거:** `@suh-lab build app` 댓글 (repository_dispatch)
+- **용도:** PR/이슈에서 테스트 빌드
+
+---
+
+## 트러블슈팅
+
+### 인증서 관련 오류
+
+```
+❌ Error: No signing certificate "Apple Distribution" found
+```
+
+**해결:**
+1. `IOS_CERTIFICATE_BASE64` Secret이 올바르게 설정되었는지 확인
+2. 인증서가 만료되지 않았는지 확인
+3. 인증서 비밀번호가 맞는지 확인
+
+### Provisioning Profile 오류
+
+```
+❌ Error: No profile matching 'App Distribution' found
+```
+
+**해결:**
+1. `IOS_PROVISIONING_PROFILE_NAME`이 실제 Profile 이름과 일치하는지 확인
+2. Profile이 유효한지 Apple Developer Portal에서 확인
+3. Profile과 인증서가 연결되어 있는지 확인
+
+### App Store Connect API 오류
+
+```
+❌ Error: Could not authenticate with App Store Connect
+```
+
+**해결:**
+1. API Key ID와 Issuer ID가 맞는지 확인
+2. API Key에 적절한 권한(App Manager 이상)이 있는지 확인
+3. API Key 내용이 완전히 복사되었는지 확인 (-----BEGIN PRIVATE KEY----- 포함)
+
+### ExportOptions.plist 오류
+
+```
+❌ Error: exportArchive: No applicable devices found
+```
+
+**해결:**
+1. `teamID`가 정확한지 확인
+2. `provisioningProfiles`의 Bundle ID가 앱과 일치하는지 확인
+3. Profile 이름이 정확한지 확인
+
+---
+
+## 파일 구조
+
+```
+.github/util/flutter/testflight-wizard/
+├── testflight-wizard.html      # 마법사 웹 UI
+├── testflight-wizard.js        # 마법사 로직
+├── testflight-wizard-setup.sh  # 설정 스크립트
+├── version.json                # 버전 정보
+├── version-sync.sh             # 버전 동기화 스크립트
+├── images/                     # 가이드 이미지
+└── templates/
+    ├── ExportOptions.plist     # 템플릿
+    ├── Fastfile                # 템플릿
+    └── Gemfile                 # 템플릿
+```
+
+---
+
+## 관련 문서
+
+- [Flutter CI/CD 전체 가이드](FLUTTER-CICD-OVERVIEW.md)
+- [테스트 빌드 트리거](FLUTTER-TEST-BUILD-TRIGGER.md)
+- [Apple Developer 공식 문서](https://developer.apple.com/documentation/)

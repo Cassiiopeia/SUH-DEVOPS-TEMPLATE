@@ -715,7 +715,6 @@ function Download-Template {
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
     Print-Info "템플릿 내부 문서 제외 중..."
     $docsToRemove = @(
-        "ARCHITECTURE.md",
         "CONTRIBUTING.md",
         "CLAUDE.md"
     )

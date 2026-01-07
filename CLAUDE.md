@@ -228,7 +228,6 @@ irm https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/templ
 
 **통합 시 복사되지 않는 템플릿 전용 문서**:
 ```
-ARCHITECTURE.md
 CONTRIBUTING.md
 CLAUDE.md
 ```

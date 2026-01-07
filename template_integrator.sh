@@ -827,7 +827,6 @@ download_template() {
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
     print_info "템플릿 내부 문서 제외 중..."
     local docs_to_remove=(
-        "ARCHITECTURE.md"
         "CONTRIBUTING.md"
         "CLAUDE.md"
     )

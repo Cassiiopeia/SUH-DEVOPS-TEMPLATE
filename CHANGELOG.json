@@ -1,11 +1,43 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-05T07:02:42Z",
-    "currentVersion": "2.4.2",
+    "lastUpdated": "2026-01-07T06:52:30Z",
+    "currentVersion": "2.4.4",
     "projectType": "basic",
-    "totalReleases": 46
+    "totalReleases": 47
   },
   "releases": [
+    {
+      "version": "2.4.4",
+      "project_type": "basic",
+      "date": "2026-01-07",
+      "pr_number": 137,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리스 노트\n\n* **새로운 기능**\n  * Flutter CI/CD 자동화 시스템 출시: Android Play Store와 iOS TestFlight 배포를 위한 완벽한 마법사 도구 추가\n  * 서명 키, 키스토어, 보안 구성 자동 생성 및 설정 기능\n  * Git 작업의 신뢰성 향상: 경합 조건 방지를 위한 재시도 메커니즘 추가\n\n* **문서**\n  * Flutter CI/CD 시스템 전체 가이드 및 워크플로우 문서 추가\n  * Play Store 및 TestFlight 마법사 사용 설명서 제공\n  * 테스트 빌드 트리거 워크플로우 가이드 추가\n\n* **기타**\n  * 버전 2.4.2 → 2.4.4 업데이트",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Flutter CI/CD 자동화 시스템 출시: Android Play Store와 iOS TestFlight 배포를 위한 완벽한 마법사 도구 추가",
+            "서명 키, 키스토어, 보안 구성 자동 생성 및 설정 기능",
+            "Git 작업의 신뢰성 향상: 경합 조건 방지를 위한 재시도 메커니즘 추가"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "Flutter CI/CD 시스템 전체 가이드 및 워크플로우 문서 추가",
+            "Play Store 및 TestFlight 마법사 사용 설명서 제공",
+            "테스트 빌드 트리거 워크플로우 가이드 추가"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전 2.4.2 → 2.4.4 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.4.2",
       "project_type": "basic",

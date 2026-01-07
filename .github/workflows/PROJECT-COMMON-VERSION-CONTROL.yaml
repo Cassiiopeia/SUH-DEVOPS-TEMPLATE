@@ -1,8 +1,8 @@
 # ===================================================================
-# 범용 프로젝트 버전 자동 관리 워크플로우 v2.0
+# 범용 프로젝트 버전 자동 관리 워크플로우 v2.1
 # ===================================================================
 #
-# 이 워크플로우는 다양한 프로젝트 타입에서 main 브랜치에 푸시될 때마다 
+# 이 워크플로우는 다양한 프로젝트 타입에서 main 브랜치에 푸시될 때마다
 # patch 버전을 자동으로 증가시키고 모든 관련 파일을 동기화합니다.
 #
 # 주요 개선사항:
@@ -10,6 +10,7 @@
 # - 에러 처리 강화
 # - 로깅 개선
 # - 스크립트 안정성 향상
+# - [v2.1] Race Condition 방지를 위한 pull-rebase + retry 로직 추가
 #
 # 지원 프로젝트 타입:
 # - spring: build.gradle
@@ -103,7 +104,7 @@ jobs:
 
           # 모든 변경사항 스테이징
           git add -A
-          
+
           # 변경사항이 있는지 확인
           if git diff --staged --quiet; then
             echo "ℹ️ 변경사항이 없습니다. (이미 동기화됨)"
@@ -111,10 +112,39 @@ jobs:
             echo "📤 변경사항 커밋 중..."
             REPO_NAME=$(basename "${{ github.repository }}")
             COMMIT_MSG="$REPO_NAME 버전 정보 관리: chore: 버전 ${{ steps.version.outputs.new_version }} [skip ci]"
-          
+
             if git commit -m "$COMMIT_MSG"; then
-              git push
-              echo "✅ 버전 업데이트 커밋 완료"
+              # Race Condition 방지: pull-rebase 후 push (최대 3회 재시도)
+              MAX_RETRIES=3
+              RETRY_COUNT=0
+              PUSH_SUCCESS=false
+
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "🔄 Push 시도 $RETRY_COUNT/$MAX_RETRIES..."
+
+                if git push; then
+                  PUSH_SUCCESS=true
+                  echo "✅ 버전 업데이트 커밋 완료"
+                  break
+                else
+                  echo "⚠️ Push 실패, remote 변경사항 동기화 중..."
+
+                  # remote에서 최신 변경사항 가져와서 rebase
+                  if git pull --rebase origin ${{ github.event.repository.default_branch || 'main' }}; then
+                    echo "✅ Rebase 성공, 다시 push 시도..."
+                  else
+                    echo "❌ Rebase 실패, 충돌 해결 필요"
+                    git rebase --abort 2>/dev/null || true
+                    exit 1
+                  fi
+                fi
+              done
+
+              if [ "$PUSH_SUCCESS" = false ]; then
+                echo "❌ $MAX_RETRIES회 시도 후에도 push 실패"
+                exit 1
+              fi
             else
               echo "❌ 커밋 실패"
               exit 1

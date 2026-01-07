@@ -371,7 +371,13 @@ cleanup_template_files() {
         rm -f CONTRIBUTING.md
         echo "  ✓ CONTRIBUTING.md 삭제"
     fi
-    
+
+    # CLAUDE.md 파일 삭제 (템플릿 전용 문서)
+    if [ -f "CLAUDE.md" ]; then
+        rm -f CLAUDE.md
+        echo "  ✓ CLAUDE.md 삭제"
+    fi
+
     # 테스트 폴더들 삭제
     if [ -d ".github/scripts/test" ]; then
         rm -rf .github/scripts/test

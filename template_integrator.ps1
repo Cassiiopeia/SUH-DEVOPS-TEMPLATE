@@ -716,7 +716,8 @@ function Download-Template {
     Print-Info "템플릿 내부 문서 제외 중..."
     $docsToRemove = @(
         "ARCHITECTURE.md",
-        "CONTRIBUTING.md"
+        "CONTRIBUTING.md",
+        "CLAUDE.md"
     )
     
     foreach ($doc in $docsToRemove) {

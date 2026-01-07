@@ -199,6 +199,47 @@ python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output rel
 ./template_initializer.sh -v 0.0.0 -t flutter
 ```
 
+**GitHub 템플릿으로 새 저장소 생성 시** `PROJECT-TEMPLATE-INITIALIZER` 워크플로우가 자동 실행됩니다.
+
+**초기화 시 삭제되는 템플릿 전용 파일**:
+```
+CHANGELOG.md
+CHANGELOG.json
+template_integrator.sh
+template_integrator.ps1
+LICENSE
+CONTRIBUTING.md
+CLAUDE.md
+.github/scripts/test/
+.github/workflows/test/
+```
+
+### template_integrator.sh / template_integrator.ps1
+
+기존 프로젝트에 SUH-DEVOPS-TEMPLATE 기능을 추가하는 원격 실행 스크립트
+
+```bash
+# Linux/macOS (원격 실행)
+bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)
+
+# Windows PowerShell (원격 실행)
+irm https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1 | iex
+```
+
+**통합 시 복사되지 않는 템플릿 전용 문서**:
+```
+ARCHITECTURE.md
+CONTRIBUTING.md
+CLAUDE.md
+```
+
+**통합 모드 옵션**:
+| 모드 | 설명 |
+|------|------|
+| 신규 통합 | 기존 프로젝트에 템플릿 추가 |
+| 업데이트 | 최신 템플릿 버전으로 업그레이드 |
+| 되돌리기 | 이전 백업으로 복원 |
+
 ---
 
 ## Flutter 마법사 도구

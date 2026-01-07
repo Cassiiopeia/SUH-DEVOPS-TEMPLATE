@@ -829,6 +829,7 @@ download_template() {
     local docs_to_remove=(
         "ARCHITECTURE.md"
         "CONTRIBUTING.md"
+        "CLAUDE.md"
     )
     
     for doc in "${docs_to_remove[@]}"; do

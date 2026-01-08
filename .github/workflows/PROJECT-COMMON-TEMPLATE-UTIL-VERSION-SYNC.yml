@@ -1,0 +1,167 @@
+# ===================================================================
+# 템플릿 Util 모듈 버전 동기화 워크플로우
+# ===================================================================
+#
+# 이 워크플로우는 SUH-DEVOPS-TEMPLATE 전용으로,
+# .github/util/ 하위의 version.json 파일이 변경될 때 자동으로
+# 해당 디렉토리의 version-sync.sh 스크립트를 실행하여
+# HTML 파일의 버전 정보를 동기화합니다.
+#
+# 트리거 조건:
+# - .github/util/**/version.json 파일 변경 시
+# - 수동 실행 (workflow_dispatch)
+#
+# 동작 방식:
+# 1. .github/util/ 하위의 모든 version-sync.sh 스크립트를 탐색
+# 2. 각 스크립트 실행 (version.json → HTML 동기화)
+# 3. 변경사항이 있으면 자동 커밋 & 푸시
+#
+# 주의사항:
+# - VERSION-CONTROL 워크플로우와 충돌 방지를 위해 concurrency 설정
+# - [skip ci] 커밋 메시지로 무한 루프 방지
+#
+# ===================================================================
+
+name: TEMPLATE-UTIL-VERSION-SYNC
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/util/**/version.json'
+  workflow_dispatch:
+
+# VERSION-CONTROL 워크플로우와 충돌 방지
+concurrency:
+  group: version-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  version-sync:
+    name: Sync Version JSON to HTML
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Find and Execute All version-sync.sh Scripts
+      run: |
+        echo "🔍 .github/util/ 하위의 version-sync.sh 스크립트 탐색 중..."
+
+        # version-sync.sh 스크립트 목록 찾기
+        SYNC_SCRIPTS=$(find .github/util -name "version-sync.sh" -type f 2>/dev/null || true)
+
+        if [ -z "$SYNC_SCRIPTS" ]; then
+          echo "⚠️ version-sync.sh 스크립트를 찾을 수 없습니다."
+          exit 0
+        fi
+
+        echo "📋 발견된 스크립트:"
+        echo "$SYNC_SCRIPTS"
+        echo ""
+
+        # 각 스크립트 실행
+        SCRIPT_COUNT=0
+        SUCCESS_COUNT=0
+
+        for SCRIPT in $SYNC_SCRIPTS; do
+          SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
+          SCRIPT_DIR=$(dirname "$SCRIPT")
+          SCRIPT_NAME=$(basename "$SCRIPT_DIR")
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 [$SCRIPT_COUNT] $SCRIPT_NAME 동기화 실행"
+          echo "   경로: $SCRIPT"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # 스크립트에 실행 권한 부여
+          chmod +x "$SCRIPT"
+
+          # 스크립트 실행
+          if bash "$SCRIPT"; then
+            echo "✅ $SCRIPT_NAME 동기화 성공"
+            SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+          else
+            echo "❌ $SCRIPT_NAME 동기화 실패 (계속 진행)"
+          fi
+
+          echo ""
+        done
+
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📊 실행 결과: $SUCCESS_COUNT / $SCRIPT_COUNT 성공"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    - name: Check for Changes
+      id: changes
+      run: |
+        git diff --quiet || echo "has_changes=true" >> $GITHUB_OUTPUT
+
+    - name: Commit and Push Changes
+      if: steps.changes.outputs.has_changes == 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add .
+        git commit -m "chore: github workflow util module version sync [skip ci]"
+
+        # Race Condition 방지: pull-rebase 후 push (최대 3회 재시도)
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        PUSH_SUCCESS=false
+
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          echo "🔄 Push 시도 $RETRY_COUNT/$MAX_RETRIES..."
+
+          if git push; then
+            PUSH_SUCCESS=true
+            echo "✅ 변경사항이 커밋되었습니다."
+            break
+          else
+            echo "⚠️ Push 실패, remote 변경사항 동기화 중..."
+
+            if git pull --rebase origin ${{ github.ref_name }}; then
+              echo "✅ Rebase 성공, 다시 push 시도..."
+            else
+              echo "❌ Rebase 실패, 충돌 해결 필요"
+              git rebase --abort 2>/dev/null || true
+              exit 1
+            fi
+          fi
+        done
+
+        if [ "$PUSH_SUCCESS" = false ]; then
+          echo "❌ $MAX_RETRIES회 시도 후에도 push 실패"
+          exit 1
+        fi
+
+    - name: No Changes
+      if: steps.changes.outputs.has_changes != 'true'
+      run: |
+        echo "ℹ️ 동기화할 변경사항이 없습니다. (이미 동기화됨)"
+
+    - name: Summary
+      if: always()
+      run: |
+        echo ""
+        echo "🎉 버전 동기화 워크플로우 완료!"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 트리거: ${{ github.event_name }}"
+        echo "🌿 브랜치: ${{ github.ref_name }}"
+        echo "📌 커밋: ${{ github.sha }}"
+        echo "🕐 시간: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

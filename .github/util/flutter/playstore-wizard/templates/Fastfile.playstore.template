@@ -33,6 +33,13 @@ platform :android do
     end
 
     # Upload to Play Store
+    # ⚠️ release_status 설정 가이드:
+    #   - "draft": 앱이 Play Console에서 아직 한 번도 출시되지 않은 경우 (신규 앱)
+    #   - "completed": 앱이 이미 Play Console에서 검토 완료되어 활성화된 경우
+    #
+    # 신규 앱은 반드시 "draft"로 시작해야 합니다.
+    # Play Console에서 첫 번째 릴리즈를 수동으로 검토 제출 후 승인되면
+    # "completed"로 변경하여 자동 배포가 가능합니다.
     upload_to_play_store(
       package_name: "{{APPLICATION_ID}}",
       track: "internal",
@@ -41,7 +48,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      release_status: "completed"
+      release_status: "draft"  # 신규 앱: "draft" → 승인 후: "completed"로 변경
     )
 
     puts ""

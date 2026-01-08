@@ -28,7 +28,8 @@ function detectOS() {
 
 const state = {
     currentStep: 1,
-    totalSteps: 6, // Step 1~6 (시작하기, Keystore, Service Account, Play Console, 설정 적용, 완료)
+    maxReachedStep: 1, // 도달한 최대 단계 (이전 단계로 돌아가도 유지)
+    totalSteps: 7, // Step 1~7 (프로젝트, Keystore, AAB 빌드, 앱 생성, AAB 업로드, Service Account, 완료)
     projectPath: '',
     detectedOS: 'mac', // OS 감지 결과
     // Project Info
@@ -85,6 +86,14 @@ function loadState() {
             // currentStep이 totalSteps를 초과하면 보정
             if (state.currentStep > state.totalSteps) {
                 state.currentStep = state.totalSteps;
+            }
+
+            // maxReachedStep이 없거나 잘못된 경우 보정 (이전 버전 호환)
+            if (!state.maxReachedStep || state.maxReachedStep < state.currentStep) {
+                state.maxReachedStep = state.currentStep;
+            }
+            if (state.maxReachedStep > state.totalSteps) {
+                state.maxReachedStep = state.totalSteps;
             }
 
             restoreUIFromState();
@@ -183,12 +192,6 @@ function restoreUIFromState() {
             const p = upload.querySelector('p');
             if (p) p.textContent = '✅ Service Account 파일 로드됨';
         }
-        const result = document.getElementById('serviceAccountBase64Result');
-        if (result) {
-            result.classList.remove('hidden');
-            const pre = document.getElementById('serviceAccountBase64');
-            if (pre) pre.textContent = state.serviceAccountBase64;
-        }
     }
 
     // Project Info 복원
@@ -284,7 +287,6 @@ async function handleKeystoreUpload(input) {
     try {
         state.keystoreBase64 = await fileToBase64(file);
 
-        document.getElementById('keystoreBase64').textContent = state.keystoreBase64;
         document.getElementById('keystoreBase64Result').classList.remove('hidden');
         document.getElementById('keystoreUpload').classList.add('has-file');
         document.getElementById('keystoreUpload').querySelector('p').textContent = `✅ ${file.name} (${(file.size/1024).toFixed(1)}KB)`;
@@ -311,8 +313,6 @@ async function handleServiceAccountUpload(input) {
         reader.onload = function(e) {
             state.serviceAccountBase64 = btoa(e.target.result);
 
-            document.getElementById('serviceAccountBase64').textContent = state.serviceAccountBase64;
-            document.getElementById('serviceAccountBase64Result').classList.remove('hidden');
             document.getElementById('serviceAccountUpload').classList.add('has-file');
             document.getElementById('serviceAccountUpload').querySelector('p').textContent = `✅ ${file.name}`;
 
@@ -322,6 +322,42 @@ async function handleServiceAccountUpload(input) {
         reader.readAsText(file);
     } catch (error) {
         showToast('❌ 파일 읽기 실패: ' + error.message);
+    }
+}
+
+// 서비스 계정 이메일 복사
+function copyServiceAccountEmail() {
+    const emailInput = document.getElementById('serviceAccountEmail');
+    const email = emailInput ? emailInput.value : '';
+
+    if (email) {
+        navigator.clipboard.writeText(email).then(() => {
+            showToast('📋 이메일이 복사되었습니다!');
+        }).catch(() => {
+            // Fallback for older browsers
+            emailInput.select();
+            document.execCommand('copy');
+            showToast('📋 이메일이 복사되었습니다!');
+        });
+    } else {
+        showToast('⚠️ 이메일을 먼저 입력하세요');
+    }
+}
+
+// Step 3 이메일 입력 → Step 6 확인 팝업에 자동 반영
+function updateStep6Email() {
+    const emailInput = document.getElementById('serviceAccountEmail');
+    const step6Display = document.getElementById('step6EmailDisplay');
+
+    if (emailInput && step6Display) {
+        const email = emailInput.value;
+        if (email && email.length > 0) {
+            // 이메일이 너무 길면 축약
+            const displayEmail = email.length > 25 ? email.substring(0, 22) + '...' : email;
+            step6Display.textContent = displayEmail;
+        } else {
+            step6Display.textContent = 'your-bot@project.iam...';
+        }
     }
 }
 
@@ -503,7 +539,18 @@ function updateCommandsForOS() {
         if (windowsCommandEl) {
             windowsCommandEl.textContent = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter\\playstore-wizard\\playstore-wizard-setup.ps1`;
         }
+        
+        // Windows 사용자에게 관리자 권한 안내 표시
+        const adminWarningEl = document.getElementById('adminWarningWindows');
+        if (adminWarningEl) {
+            adminWarningEl.classList.remove('hidden');
+        }
     } else {
+        // Mac/Linux에서는 관리자 권한 안내 숨김
+        const adminWarningEl = document.getElementById('adminWarningWindows');
+        if (adminWarningEl) {
+            adminWarningEl.classList.add('hidden');
+        }
         // Mac/Linux 표시
         if (macSection) macSection.style.display = 'block';
         if (windowsSection) windowsSection.style.display = 'none';
@@ -633,22 +680,26 @@ function updateProgress() {
         const circle = indicator.querySelector('.step-circle');
         const label = indicator.querySelector('span:last-child');
 
-        if (stepNum < state.currentStep) {
-            // 완료된 스텝
-            circle.className = 'step-circle w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-xs z-10 shadow-lg';
-            circle.innerHTML = '✓';
-            if (label) label.className = 'text-[9px] mt-1 text-green-400 text-center hidden md:block';
-        } else if (stepNum === state.currentStep) {
-            // 현재 스텝 - 파랑-보라 그라데이션
+        if (stepNum === state.currentStep) {
+            // 현재 보고 있는 스텝 - 파랑-보라 그라데이션
             circle.className = 'step-circle w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white flex items-center justify-center font-bold text-xs z-10 shadow-lg shadow-blue-500/30';
             circle.innerHTML = stepNum;
             if (label) label.className = 'text-[9px] mt-1 text-blue-400 text-center hidden md:block';
+        } else if (stepNum <= state.maxReachedStep) {
+            // 방문한 적 있는 스텝 - 초록 체크
+            circle.className = 'step-circle w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-xs z-10 shadow-lg';
+            circle.innerHTML = '✓';
+            if (label) label.className = 'text-[9px] mt-1 text-green-400 text-center hidden md:block';
         } else {
-            // 아직 안 한 스텝
+            // 아직 방문 안한 스텝 - 회색
             circle.className = 'step-circle w-8 h-8 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center font-bold text-xs z-10';
             circle.innerHTML = stepNum;
             if (label) label.className = 'text-[9px] mt-1 text-slate-500 text-center hidden md:block';
         }
+
+        // 클릭하여 해당 스텝으로 이동 가능
+        indicator.style.cursor = 'pointer';
+        indicator.onclick = () => goToStep(stepNum);
     });
 }
 
@@ -670,14 +721,14 @@ function showStep(stepNumber) {
 function initializeStep(stepNumber) {
     switch (stepNumber) {
         case 1:
-            // Step 1: 시작하기
+            // Step 1: 프로젝트 설정 (경로 + Application ID)
             // 프로젝트 경로 검증 UI 업데이트
             if (state.projectPath) {
                 updatePathValidation(state.projectPath);
                 // 프로젝트 경로가 있으면 자동으로 Application ID 감지 명령어 생성
                 autoDetectApplicationIdOnPathInput();
             }
-            
+
             // Application ID 복원
             if (state.applicationId) {
                 const detectedContainer = document.getElementById('detectedApplicationIdContainer');
@@ -694,7 +745,7 @@ function initializeStep(stepNumber) {
             }
             break;
         case 2:
-            // Keystore 생성
+            // Step 2: Keystore 생성
             restoreInputValues();
             // Application ID 기반으로 Key Alias 자동 생성
             if (state.applicationId && !state.keyAlias) {
@@ -720,15 +771,66 @@ function initializeStep(stepNumber) {
             }, 100);
             break;
         case 3:
-            // Service Account
-            restoreInputValues();
+            // Step 3: AAB 빌드
+            // Windows 사용자에게 파일 잠금 안내 표시
+            if (state.detectedOS === 'windows') {
+                const fileLockErrorEl = document.getElementById('fileLockErrorWindows');
+                if (fileLockErrorEl) {
+                    fileLockErrorEl.classList.remove('hidden');
+                }
+            } else {
+                const fileLockErrorEl = document.getElementById('fileLockErrorWindows');
+                if (fileLockErrorEl) {
+                    fileLockErrorEl.classList.add('hidden');
+                }
+            }
+            
+            // 프로젝트 경로 기반 AAB 빌드 명령어 생성
+            if (state.projectPath) {
+                const aabBuildCommand = document.getElementById('aabBuildCommandStep3');
+                const aabOutputPath = document.getElementById('aabOutputPathStep3');
+                const aabCheckCommand = document.getElementById('aabCheckCommand');
+                const projectPath = state.projectPath;
+                const os = state.detectedOS || 'mac';
+
+                if (aabBuildCommand) {
+                    if (os === 'windows') {
+                        const winPath = projectPath.replace(/\//g, '\\');
+                        // 각 명령어를 개별 라인으로 분리하여 순차 실행
+                        // PowerShell에서 여러 줄 선택 후 실행 가능 (Shift+Enter 또는 선택 후 Enter)
+                        // 각 명령어 전에 cd로 디렉토리 재설정하여 작업 디렉토리 보장
+                        aabBuildCommand.textContent = `cd "${winPath}"
+cd "${winPath}"; flutter clean
+cd "${winPath}"; flutter pub get
+cd "${winPath}"; flutter build appbundle --release`;
+                    } else {
+                        aabBuildCommand.textContent = `cd "${projectPath}" && flutter clean && flutter pub get && flutter build appbundle --release`;
+                    }
+                }
+                if (aabOutputPath) {
+                    if (os === 'windows') {
+                        const winPath = projectPath.replace(/\//g, '\\');
+                        aabOutputPath.textContent = `${winPath}\\build\\app\\outputs\\bundle\\release\\app-release.aab`;
+                    } else {
+                        aabOutputPath.textContent = `${projectPath}/build/app/outputs/bundle/release/app-release.aab`;
+                    }
+                }
+                if (aabCheckCommand) {
+                    if (os === 'windows') {
+                        const winPath = projectPath.replace(/\//g, '\\');
+                        aabCheckCommand.textContent = `dir "${winPath}\\build\\app\\outputs\\bundle\\release\\"`;
+                    } else {
+                        aabCheckCommand.textContent = `ls -lah "${projectPath}/build/app/outputs/bundle/release/"`;
+                    }
+                }
+            }
             break;
         case 4:
-            // Play Console 앱 생성 & 첫 AAB 업로드
+            // Step 4: Play Console 앱 생성
             // Application ID에서 앱 이름 추출하여 표시
             if (state.applicationId) {
                 const appName = state.applicationId.split('.').pop() || state.applicationId;
-                // camelCase/snake_case를 읽기 좋게 변환 (ear_loc_alert -> EarLocAlert)
+                // camelCase/snake_case를 읽기 좋게 변환 (suh_devops_template -> SuhDevopsTemplate)
                 const formattedName = appName
                     .split(/[_-]/)
                     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -738,38 +840,30 @@ function initializeStep(stepNumber) {
                     appNameDisplay.textContent = formattedName;
                 }
             }
-            // 프로젝트 경로 기반 AAB 빌드 명령어 생성
+            break;
+        case 5:
+            // Step 5: AAB 수동 업로드
+            // AAB 파일 경로 표시
             if (state.projectPath) {
-                const aabBuildCommand = document.getElementById('aabBuildCommand');
-                const aabOutputPath = document.getElementById('aabOutputPath');
+                const aabUploadPath = document.getElementById('aabUploadPath');
                 const projectPath = state.projectPath;
-
-                if (aabBuildCommand) {
+                if (aabUploadPath) {
                     const os = state.detectedOS || 'mac';
                     if (os === 'windows') {
                         const winPath = projectPath.replace(/\//g, '\\');
-                        aabBuildCommand.textContent = `cd "${winPath}" && flutter build appbundle --release`;
+                        aabUploadPath.textContent = `${winPath}\\build\\app\\outputs\\bundle\\release\\app-release.aab`;
                     } else {
-                        aabBuildCommand.textContent = `cd "${projectPath}" && flutter build appbundle --release`;
-                    }
-                }
-                if (aabOutputPath) {
-                    const os = state.detectedOS || 'mac';
-                    if (os === 'windows') {
-                        const winPath = projectPath.replace(/\//g, '\\');
-                        aabOutputPath.textContent = `${winPath}\\build\\app\\outputs\\bundle\\release\\app-release.aab`;
-                    } else {
-                        aabOutputPath.textContent = `${projectPath}/build/app/outputs/bundle/release/app-release.aab`;
+                        aabUploadPath.textContent = `${projectPath}/build/app/outputs/bundle/release/app-release.aab`;
                     }
                 }
             }
             break;
-        case 5:
-            // 설정 적용
-            generateSetupCommand();
-            break;
         case 6:
-            // 완료
+            // Step 6: Service Account
+            restoreInputValues();
+            break;
+        case 7:
+            // Step 7: 완료
             generateFinalResult();
             break;
     }
@@ -838,6 +932,10 @@ function nextStep() {
 
     if (state.currentStep < state.totalSteps) {
         state.currentStep++;
+        // 최대 도달 단계 갱신
+        if (state.currentStep > state.maxReachedStep) {
+            state.maxReachedStep = state.currentStep;
+        }
         showStep(state.currentStep);
         updateProgress();
         saveState();
@@ -856,12 +954,28 @@ function prevStep() {
     }
 }
 
+function goToStep(stepNumber) {
+    // 현재 단계와 같으면 무시
+    if (stepNumber === state.currentStep) return;
+
+    // 유효 범위 체크
+    if (stepNumber >= 1 && stepNumber <= state.totalSteps) {
+        saveCurrentStepData();
+        state.currentStep = stepNumber;
+        showStep(state.currentStep);
+        updateProgress();
+        saveState();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
 function resetWizard() {
     if (confirm('모든 데이터를 초기화하시겠습니까?\n\n모든 입력값과 localStorage가 완전히 삭제됩니다.')) {
         // State 초기화
         Object.keys(state).forEach(key => {
             if (key === 'currentStep') state[key] = 1;
-            else if (key === 'totalSteps') state[key] = 9;
+            else if (key === 'maxReachedStep') state[key] = 1;
+            else if (key === 'totalSteps') state[key] = 7;
             else if (key === 'certC') state[key] = 'KR';
             else if (key === 'gradleType') state[key] = 'kts';
             else if (key === 'validityDays') state[key] = '99999'; // 무제한 기본값
@@ -899,7 +1013,7 @@ function resetWizard() {
         // Application ID 입력 필드 placeholder 복원
         const applicationIdInput = document.getElementById('applicationId');
         if (applicationIdInput) {
-            applicationIdInput.placeholder = '예: com.example.app 또는 kr.suhsaechan.ear_loc_alert';
+            applicationIdInput.placeholder = '예: com.example.app 또는 kr.suhsaechan.suh_devops_template';
         }
         
         // 유효기간 초기화
@@ -1473,7 +1587,7 @@ end`;
 }
 
 // ============================================
-// Step 7: Final Result Generation
+// Step 7: 완료 및 GitHub Secrets 목록 생성
 // ============================================
 
 function generateFinalResult() {
@@ -1569,6 +1683,48 @@ function copySecretValue(key) {
 
     navigator.clipboard.writeText(value).then(() => {
         showToast(`✅ ${key} 복사 완료!`);
+    });
+}
+
+// ============================================
+// Copy All Secrets to Clipboard
+// ============================================
+
+function copyAllSecrets() {
+    const secrets = [
+        { key: 'RELEASE_KEYSTORE_BASE64', value: state.keystoreBase64 },
+        { key: 'RELEASE_KEYSTORE_PASSWORD', value: state.storePassword },
+        { key: 'RELEASE_KEY_ALIAS', value: state.keyAlias },
+        { key: 'RELEASE_KEY_PASSWORD', value: state.keyPassword },
+        { key: 'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64', value: state.serviceAccountBase64 },
+        { key: 'GOOGLE_SERVICES_JSON', value: state.googleServicesJson },
+        { key: 'ENV_FILE', value: state.envFileContent }
+    ];
+
+    // 설정된 값만 필터링
+    const configuredSecrets = secrets.filter(s => s.value);
+
+    if (configuredSecrets.length === 0) {
+        showToast('⚠️ 복사할 설정값이 없습니다');
+        return;
+    }
+
+    const lines = [
+        '===== GitHub Secrets for Play Store =====',
+        `생성일: ${new Date().toLocaleString('ko-KR')}`,
+        `Application ID: ${state.applicationId || '(미설정)'}`,
+        '',
+        ...configuredSecrets.map(s => `${s.key}=${s.value}`),
+        '',
+        '========================================='
+    ];
+
+    const text = lines.join('\n');
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast(`✅ ${configuredSecrets.length}개 Secret 전체 복사 완료!`);
+    }).catch(() => {
+        showToast('❌ 클립보드 복사 실패');
     });
 }
 
@@ -1670,6 +1826,226 @@ function downloadConfig() {
     a.click();
     URL.revokeObjectURL(url);
     showToast('✅ 설정 JSON 다운로드 완료!');
+}
+
+// ============================================
+// ZIP Export Functions
+// ============================================
+
+function getDateString() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function generateReadme() {
+    return `# Play Store 배포 설정 백업
+
+생성일: ${new Date().toLocaleString('ko-KR')}
+Application ID: ${state.applicationId || '(미설정)'}
+
+## 📁 파일 구조
+
+\`\`\`
+├── release-key.jks          # Android 서명 키스토어 (Base64 디코딩됨)
+├── service-account.json     # Google Play Service Account (Base64 디코딩됨)
+├── github-secrets/          # GitHub Secrets용 값들
+│   ├── RELEASE_KEYSTORE_BASE64.txt
+│   ├── RELEASE_KEYSTORE_PASSWORD.txt
+│   ├── RELEASE_KEY_ALIAS.txt
+│   ├── RELEASE_KEY_PASSWORD.txt
+│   └── GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64.txt
+└── README.md
+\`\`\`
+
+## 🔐 GitHub Secrets 등록 방법
+
+1. GitHub 저장소 → Settings → Secrets and variables → Actions
+2. \`github-secrets/\` 폴더 내 각 파일의 내용을 Secret으로 등록
+3. Secret 이름은 파일명에서 .txt를 제외한 이름 사용
+
+## ⚠️ 주의사항
+
+- 이 파일들에는 민감한 정보가 포함되어 있습니다
+- 안전한 장소에 보관하고, Git에 커밋하지 마세요
+- 필요한 경우 암호화하여 보관하세요
+`;
+}
+
+async function downloadAsZip() {
+    // JSZip 로드 확인
+    if (typeof JSZip === 'undefined') {
+        showToast('❌ ZIP 라이브러리 로드 실패. 페이지를 새로고침해주세요.');
+        return;
+    }
+
+    const zip = new JSZip();
+
+    // 1. 실제 파일들 (Base64 디코딩)
+    if (state.keystoreBase64) {
+        try {
+            const binaryString = atob(state.keystoreBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            zip.file("release-key.jks", bytes);
+        } catch (e) {
+            console.error('Keystore 디코딩 실패:', e);
+        }
+    }
+
+    if (state.serviceAccountBase64) {
+        try {
+            const jsonContent = atob(state.serviceAccountBase64);
+            zip.file("service-account.json", jsonContent);
+        } catch (e) {
+            console.error('Service Account 디코딩 실패:', e);
+        }
+    }
+
+    // 2. 개별 Secret TXT 파일들 (github-secrets 폴더에)
+    const secrets = [
+        { name: 'RELEASE_KEYSTORE_BASE64.txt', value: state.keystoreBase64 },
+        { name: 'RELEASE_KEYSTORE_PASSWORD.txt', value: state.storePassword },
+        { name: 'RELEASE_KEY_ALIAS.txt', value: state.keyAlias },
+        { name: 'RELEASE_KEY_PASSWORD.txt', value: state.keyPassword },
+        { name: 'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64.txt', value: state.serviceAccountBase64 },
+        { name: 'GOOGLE_SERVICES_JSON.txt', value: state.googleServicesJson },
+        { name: 'ENV_FILE.txt', value: state.envFileContent }
+    ];
+
+    const secretsFolder = zip.folder("github-secrets");
+    let fileCount = 0;
+    secrets.forEach(s => {
+        if (s.value) {
+            secretsFolder.file(s.name, s.value);
+            fileCount++;
+        }
+    });
+
+    // 파일이 하나도 없으면 경고
+    if (fileCount === 0) {
+        showToast('⚠️ 내보낼 설정값이 없습니다');
+        return;
+    }
+
+    // 3. README.md 생성
+    const readme = generateReadme();
+    zip.file("README.md", readme);
+
+    // 4. ZIP 다운로드
+    try {
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        const appId = state.applicationId ? state.applicationId.replace(/\./g, '-') : 'app';
+        a.download = `playstore-secrets-${appId}-${getDateString()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`✅ ZIP 파일 다운로드 완료! (${fileCount}개 설정 포함)`);
+    } catch (e) {
+        console.error('ZIP 생성 실패:', e);
+        showToast('❌ ZIP 파일 생성 실패');
+    }
+}
+
+// ============================================
+// Import from JSON
+// ============================================
+
+function importFromJson(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 파일 확장자 확인
+    if (!file.name.endsWith('.json')) {
+        showToast('❌ JSON 파일만 업로드 가능합니다');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            // 유효성 검사 - 적어도 하나의 알려진 키가 있어야 함
+            const knownKeys = [
+                'RELEASE_KEYSTORE_BASE64',
+                'RELEASE_KEYSTORE_PASSWORD',
+                'RELEASE_KEY_ALIAS',
+                'RELEASE_KEY_PASSWORD',
+                'GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64',
+                'GOOGLE_SERVICES_JSON',
+                'ENV_FILE'
+            ];
+
+            const hasValidKey = knownKeys.some(key => key in data);
+            if (!hasValidKey) {
+                showToast('❌ 올바른 PlayStore Secrets JSON 파일이 아닙니다');
+                event.target.value = '';
+                return;
+            }
+
+            // State에 값 매핑
+            let importedCount = 0;
+
+            if (data.RELEASE_KEYSTORE_BASE64) {
+                state.keystoreBase64 = data.RELEASE_KEYSTORE_BASE64;
+                importedCount++;
+            }
+            if (data.RELEASE_KEYSTORE_PASSWORD) {
+                state.storePassword = data.RELEASE_KEYSTORE_PASSWORD;
+                importedCount++;
+            }
+            if (data.RELEASE_KEY_ALIAS) {
+                state.keyAlias = data.RELEASE_KEY_ALIAS;
+                importedCount++;
+            }
+            if (data.RELEASE_KEY_PASSWORD) {
+                state.keyPassword = data.RELEASE_KEY_PASSWORD;
+                importedCount++;
+            }
+            if (data.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64) {
+                state.serviceAccountBase64 = data.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64;
+                importedCount++;
+            }
+            if (data.GOOGLE_SERVICES_JSON) {
+                state.googleServicesJson = data.GOOGLE_SERVICES_JSON;
+                importedCount++;
+            }
+            if (data.ENV_FILE) {
+                state.envFileContent = data.ENV_FILE;
+                importedCount++;
+            }
+
+            // LocalStorage에 저장
+            saveState();
+
+            // 테이블 갱신
+            generateFinalResult();
+
+            showToast(`✅ ${importedCount}개 설정값 가져오기 완료!`);
+
+        } catch (error) {
+            console.error('JSON 파싱 오류:', error);
+            showToast('❌ JSON 파일 읽기 실패: 형식이 올바르지 않습니다');
+        }
+
+        // 파일 입력 초기화 (같은 파일 다시 선택 가능하도록)
+        event.target.value = '';
+    };
+
+    reader.onerror = function() {
+        showToast('❌ 파일 읽기 오류');
+        event.target.value = '';
+    };
+
+    reader.readAsText(file);
 }
 
 // ============================================

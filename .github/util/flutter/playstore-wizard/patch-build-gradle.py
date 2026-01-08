@@ -65,7 +65,7 @@ if (keystorePropertiesFile.exists()) {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String? ?: ""
             keyPassword = keystoreProperties["keyPassword"] as String? ?: ""
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storeFile = keystoreProperties["storeFile"]?.let { rootProject.file(it) }
             storePassword = keystoreProperties["storePassword"] as String? ?: ""
         }
     }
@@ -77,6 +77,13 @@ if (keystorePropertiesFile.exists()) {
         print("✅ signingConfigs 블록 추가")
     else:
         print("ℹ️  signingConfigs 블록 이미 존재")
+        # 기존 storeFile 경로 수정 (file(it) → rootProject.file(it))
+        if 'storeFile = keystoreProperties["storeFile"]?.let { file(it) }' in content:
+            content = content.replace(
+                'storeFile = keystoreProperties["storeFile"]?.let { file(it) }',
+                'storeFile = keystoreProperties["storeFile"]?.let { rootProject.file(it) }'
+            )
+            print("✅ 기존 storeFile 경로 수정 (file(it) → rootProject.file(it))")
 
     # 4. buildTypes.release에 signingConfig 설정
     # 기존 debug signingConfig 제거
@@ -101,7 +108,35 @@ if (keystorePropertiesFile.exists()) {
     else:
         print("ℹ️  release buildType에 signingConfig 이미 존재")
 
-    # 5. 파일 저장 (변경사항이 있는 경우에만)
+    # 5. flutter.source 설정 추가/수정
+    if 'flutter {' in content or 'flutter{' in content:
+        # source = "../.." 확인
+        if not re.search(r'flutter\s*\{[^}]*source\s*=\s*"\.\.\/\.\."', content, re.DOTALL):
+            # source = "." → "../.." 변경
+            if re.search(r'flutter\s*\{[^}]*source\s*=\s*"\."', content, re.DOTALL):
+                content = re.sub(
+                    r'(flutter\s*\{[^}]*source\s*=\s*)"\."',
+                    r'\1"../.."',
+                    content,
+                    count=1,
+                    flags=re.DOTALL
+                )
+                print("✅ flutter.source updated to '../..' (project root)")
+            # flutter 블록은 있지만 source가 없는 경우
+            elif re.search(r'flutter\s*\{', content):
+                content = re.sub(
+                    r'(flutter\s*\{)',
+                    r'\1\n    source = "../.."',
+                    content,
+                    count=1
+                )
+                print("✅ flutter.source added as '../..' (project root)")
+        else:
+            print("ℹ️  flutter.source already set to '../..'")
+    else:
+        print("ℹ️  flutter 블록이 없습니다 (추가 필요 시 수동으로 추가하세요)")
+
+    # 6. 파일 저장 (변경사항이 있는 경우에만)
     if content != original_content:
         try:
             with open(gradle_file_path, 'w', encoding='utf-8') as f:

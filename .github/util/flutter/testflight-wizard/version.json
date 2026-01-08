@@ -1,15 +1,18 @@
 {
   "name": "iOS TestFlight Setup Wizard",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2024-12-22",
+  "lastUpdated": "2025-01-08",
   "changelog": [
     {
-      "version": "1.0.1",
-      "date": "2024-12-22",
+      "version": "1.1.0",
+      "date": "2025-01-08",
       "changes": [
-        "상단 Step Indicator 클릭으로 스텝 이동 기능 추가",
-        "Step hover 효과 추가"
+        "내보내기/가져오기 기능 추가 (ZIP, JSON, TXT 포맷 지원)",
+        "모든 Secret 일괄 복사 기능 추가",
+        "스텝 인디케이터 클릭 네비게이션 추가",
+        "JSZip 라이브러리 통합",
+        "Play Store Wizard와 기능 동일화"
       ]
     },
     {

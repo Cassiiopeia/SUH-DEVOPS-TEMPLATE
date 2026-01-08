@@ -8,16 +8,19 @@
     <script type="application/json" id="versionJson">
 {
   "name": "iOS TestFlight Setup Wizard",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2024-12-22",
+  "lastUpdated": "2025-01-08",
   "changelog": [
     {
-      "version": "1.0.1",
-      "date": "2024-12-22",
+      "version": "1.1.0",
+      "date": "2025-01-08",
       "changes": [
-        "상단 Step Indicator 클릭으로 스텝 이동 기능 추가",
-        "Step hover 효과 추가"
+        "내보내기/가져오기 기능 추가 (ZIP, JSON, TXT 포맷 지원)",
+        "모든 Secret 일괄 복사 기능 추가",
+        "스텝 인디케이터 클릭 네비게이션 추가",
+        "JSZip 라이브러리 통합",
+        "Play Store Wizard와 기능 동일화"
       ]
     },
     {
@@ -40,6 +43,8 @@
 }
 
     </script>
+    <!-- JSZip for ZIP export -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <!-- Pretendard 폰트 -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -248,18 +253,6 @@
             padding: 24px;
         }
 
-        /* Step Indicator 클릭 가능 */
-        .step-indicator {
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-        .step-indicator:hover {
-            transform: translateY(-2px);
-        }
-        .step-indicator:hover .step-circle {
-            box-shadow: 0 4px 12px rgba(96, 165, 250, 0.4);
-        }
-
         /* Skip Button */
         .skip-btn {
             color: #94a3b8;
@@ -375,7 +368,7 @@
                 <span class="text-slate-600">|</span>
                 <button onclick="openChangelogModal()" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border border-blue-500/30 rounded-full text-sm text-blue-400 hover:text-blue-300 transition cursor-pointer">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                    <span id="versionBadge">v1.0.0</span>
+                    <span id="versionBadge">v1.1.0</span>
                 </button>
             </p>
         </header>
@@ -1456,21 +1449,79 @@
             <h3 class="text-lg font-semibold mb-4 text-slate-200">등록할 Secrets 목록</h3>
             <div id="results-container"></div>
 
-            <div class="mt-6 p-4 bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-700 rounded-lg">
-                <p class="text-center text-slate-300 mb-4">💾 Secrets 정보를 파일로 저장하세요</p>
-                <div class="flex justify-center gap-4">
-                    <button class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-lg font-medium transition flex items-center gap-2" onclick="downloadAsJson()">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- 내보내기 / 가져오기 섹션 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-semibold text-slate-300 mb-4">📦 설정 내보내기 / 가져오기</p>
+
+                <!-- 내보내기 버튼들 -->
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <button onclick="copyAllSecrets()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                        </svg>
+                        전체 복사
+                    </button>
+                    <button onclick="downloadAsJson()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                         </svg>
-                        JSON 다운로드
+                        JSON 내보내기
                     </button>
-                    <button class="px-6 py-3 bg-slate-600 hover:bg-slate-500 rounded-lg font-medium transition flex items-center gap-2" onclick="downloadAsTxt()">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    <button onclick="downloadAsTxt()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
-                        TXT 다운로드
+                        TXT 내보내기
                     </button>
+                    <button onclick="downloadAsZip()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                        </svg>
+                        ZIP 내보내기
+                    </button>
+                </div>
+
+                <!-- 가져오기 -->
+                <div class="border-t border-slate-600 pt-4">
+                    <p class="text-xs text-slate-400 mb-3">이전에 내보낸 JSON 파일로 설정을 복원할 수 있습니다.</p>
+                    <label class="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/20 hover:bg-purple-600/30 border-2 border-dashed border-purple-500 rounded-lg cursor-pointer transition">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                        <span class="text-purple-300 text-sm font-medium">JSON 파일로 설정 가져오기</span>
+                        <input type="file" accept=".json" onchange="importFromJson(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <!-- 필수 Secrets 설명 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm font-semibold text-yellow-300 mb-3">📝 각 Secret 설명</p>
+                <div class="space-y-3 text-xs text-slate-300">
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APPLE_CERTIFICATE_BASE64</code>
+                        <p class="text-slate-400 mt-1">배포 인증서 (.p12)를 Base64로 인코딩한 값</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APPLE_CERTIFICATE_PASSWORD</code>
+                        <p class="text-slate-400 mt-1">.p12 파일 내보내기 시 설정한 비밀번호</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APPLE_PROVISIONING_PROFILE_BASE64</code>
+                        <p class="text-slate-400 mt-1">프로비저닝 프로파일 (.mobileprovision)을 Base64로 인코딩한 값</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APP_STORE_CONNECT_API_KEY_BASE64</code>
+                        <p class="text-slate-400 mt-1">App Store Connect API Key (.p8)를 Base64로 인코딩한 값</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APP_STORE_CONNECT_API_KEY_ID</code>
+                        <p class="text-slate-400 mt-1">API Key ID (10자리)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APP_STORE_CONNECT_ISSUER_ID</code>
+                        <p class="text-slate-400 mt-1">App Store Connect Issuer ID (UUID 형식)</p>
+                    </div>
                 </div>
             </div>
 

@@ -715,8 +715,8 @@ function Download-Template {
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
     Print-Info "템플릿 내부 문서 제외 중..."
     $docsToRemove = @(
-        "ARCHITECTURE.md",
-        "CONTRIBUTING.md"
+        "CONTRIBUTING.md",
+        "CLAUDE.md"
     )
     
     foreach ($doc in $docsToRemove) {
@@ -900,22 +900,24 @@ metadata:
 function Copy-Workflows {
     Print-Step "프로젝트 타입별 워크플로우 다운로드 중..."
     Print-Info "프로젝트 타입: $($script:ProjectType)"
-    
+
     if (-not (Test-Path $WORKFLOWS_DIR)) {
         New-Item -Path $WORKFLOWS_DIR -ItemType Directory -Force | Out-Null
     }
-    
+
     $copied = 0
+    $skipped = 0
+    $templateAdded = 0
     $projectTypesDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR"
-    
+
     # project-types 폴더 존재 확인
     if (-not (Test-Path $projectTypesDir)) {
         Print-Error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
         Print-Error "project-types 폴더를 찾을 수 없습니다."
         exit 1
     }
-    
-    # 1. Common 워크플로우 다운로드 (필수)
+
+    # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
     Print-Info "공통 워크플로우 다운로드 중..."
     $commonDir = Join-Path $projectTypesDir "common"
     if (Test-Path $commonDir) {
@@ -930,11 +932,9 @@ function Copy-Workflows {
             $filename = $workflow.Name
             $destPath = Join-Path $WORKFLOWS_DIR $filename
 
+            # COMMON은 항상 덮어쓰기 (핵심 기능)
             if (Test-Path $destPath) {
-                # PowerShell 5.1 호환성: 명시적 문자열 연결
-                $backupPath = [string]$destPath + ".bak"
-                Print-Warning "$filename 이미 존재 → ${filename}.bak으로 백업"
-                Move-Item -Path $destPath -Destination $backupPath -Force
+                Print-Info "$filename 업데이트"
             }
 
             Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
@@ -944,13 +944,15 @@ function Copy-Workflows {
     } else {
         Print-Warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
     }
-    
-    # 2. 타입별 워크플로우 다운로드
+
+    # 2. 타입별 워크플로우 처리 (선택적 업데이트)
     $typeDir = Join-Path $projectTypesDir $script:ProjectType
     if (Test-Path $typeDir) {
-        Print-Info "$($script:ProjectType) 전용 워크플로우 다운로드 중..."
+        # 먼저 이미 존재하는 파일 목록 수집
+        $existingFiles = @()
+        $newFiles = @()
 
-        # PowerShell 5.1 호환성: 배열 초기화 후 추가 (null += 방지)
+        # PowerShell 5.1 호환성: 배열 초기화 후 추가
         $workflows = @()
         $yamlFiles = Get-ChildItem -Path $typeDir -Filter "*.yaml" -ErrorAction SilentlyContinue
         $ymlFiles = Get-ChildItem -Path $typeDir -Filter "*.yml" -ErrorAction SilentlyContinue
@@ -962,25 +964,118 @@ function Copy-Workflows {
             $destPath = Join-Path $WORKFLOWS_DIR $filename
 
             if (Test-Path $destPath) {
-                # PowerShell 5.1 호환성: 명시적 문자열 연결
-                $backupPath = [string]$destPath + ".bak"
-                Print-Warning "$filename 이미 존재 → ${filename}.bak으로 백업"
-                Move-Item -Path $destPath -Destination $backupPath -Force
+                $existingFiles += $workflow
+            } else {
+                $newFiles += $workflow
             }
+        }
 
-            Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-            Write-Host "  ✓ $filename"
-            $copied++
+        # 신규 파일은 바로 복사
+        if ($newFiles.Count -gt 0) {
+            Print-Info "$($script:ProjectType) 신규 워크플로우 다운로드 중..."
+            foreach ($workflow in $newFiles) {
+                Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                Write-Host "  ✓ $($workflow.Name) (신규)"
+                $copied++
+            }
+        }
+
+        # 이미 존재하는 파일 처리
+        if ($existingFiles.Count -gt 0) {
+            Write-Host ""
+            Print-Warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            Print-Warning "⚠️  이미 존재하는 타입별 워크플로우: $($existingFiles.Count)개"
+            Print-Warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            foreach ($workflow in $existingFiles) {
+                Write-Host "   • $($workflow.Name)"
+            }
+            Write-Host ""
+            Print-Info "처리 방법을 선택하세요:"
+            Write-Host ""
+            Write-Host "  (T) .template.yaml로 추가"
+            Write-Host "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
+            Write-Host "      → 예: PROJECT-FLUTTER-*.yaml.template.yaml"
+            Write-Host ""
+            Write-Host "  (S) 건너뛰기"
+            Write-Host "      → 기존 파일만 유지, 아무것도 추가 안 함"
+            Write-Host ""
+            Write-Host "  (O) 덮어쓰기 (기존 방식)"
+            Write-Host "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
+            Write-Host ""
+
+            $choice = Read-SingleKey "선택 [T/S/O]: "
+            Write-Host ""
+
+            switch ($choice.ToUpper()) {
+                "T" {
+                    # .template.yaml로 추가
+                    Print-Info "새 버전을 .template.yaml로 추가합니다..."
+                    foreach ($workflow in $existingFiles) {
+                        $filename = $workflow.Name
+                        $templateName = $filename -replace '\.yaml$', '.template.yaml'
+                        $templatePath = Join-Path $WORKFLOWS_DIR $templateName
+                        # 기존 .template.yaml이 있으면 삭제
+                        if (Test-Path $templatePath) {
+                            Remove-Item -Path $templatePath -Force
+                        }
+                        Copy-Item -Path $workflow.FullName -Destination $templatePath -Force
+                        Write-Host "  ✓ $templateName (참고용 추가)"
+                        $templateAdded++
+                    }
+                    Print-Info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
+                    Print-Info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
+                }
+                "S" {
+                    # 건너뛰기
+                    Print-Info "기존 파일을 유지합니다..."
+                    foreach ($workflow in $existingFiles) {
+                        Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
+                        $skipped++
+                    }
+                }
+                "O" {
+                    # 기존 방식 (덮어쓰기)
+                    Print-Info "기존 파일을 백업 후 덮어씁니다..."
+                    foreach ($workflow in $existingFiles) {
+                        $filename = $workflow.Name
+                        $destPath = Join-Path $WORKFLOWS_DIR $filename
+                        $backupPath = [string]$destPath + ".bak"
+                        Move-Item -Path $destPath -Destination $backupPath -Force
+                        Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                        Write-Host "  ✓ $filename (백업: ${filename}.bak)"
+                        $copied++
+                    }
+                }
+                default {
+                    # 기본값: 건너뛰기
+                    Print-Warning "잘못된 선택. 기존 파일을 유지합니다."
+                    foreach ($workflow in $existingFiles) {
+                        Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
+                        $skipped++
+                    }
+                }
+            }
+        } else {
+            Print-Info "$($script:ProjectType) 타입의 기존 워크플로우가 없습니다."
         }
     } else {
         Print-Info "$($script:ProjectType) 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     }
-    
-    Print-Success "$copied 개 워크플로우 다운로드 완료 (타입: $($script:ProjectType))"
-    
+
+    # 결과 요약
+    Write-Host ""
+    Print-Success "워크플로우 처리 완료 (타입: $($script:ProjectType))"
+    Write-Host "   📥 복사됨: $copied 개"
+    if ($templateAdded -gt 0) {
+        Write-Host "   📄 참고용 추가 (.template.yaml): $templateAdded 개"
+    }
+    if ($skipped -gt 0) {
+        Write-Host "   ⏭ 건너뜀: $skipped 개"
+    }
+
     # 복사된 워크플로우 수를 전역 변수로 저장
     $script:WorkflowsCopied = $copied
-    
+
     # CI/CD 워크플로우 안내
     if ($script:ProjectType -eq "spring") {
         Write-Host ""

@@ -1,9 +1,21 @@
 {
   "name": "Android Play Store Setup Wizard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Flutter Android 앱을 Play Store에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2024-12-01",
+  "lastUpdated": "2026-01-08",
   "changelog": [
+    {
+      "version": "1.1.0",
+      "date": "2026-01-08",
+      "changes": [
+        "Step 인디케이터 클릭하여 단계 이동 기능 추가",
+        "진행 상태 추적 개선 (maxReachedStep) - 이전 단계로 이동해도 완료 표시 유지",
+        "Step 2에 Keystore 파일 업로드 UI 추가",
+        "Step 6 불필요한 Base64 복사 UI 제거",
+        "안내 문구 수정 (7번 단계 참고 → 체크리스트 참고)",
+        "Keystore 업로드 에러 수정"
+      ]
+    },
     {
       "version": "1.0.0",
       "date": "2024-12-01",

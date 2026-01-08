@@ -63,6 +63,60 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+# 파일을 사용 중인 프로세스 찾기 및 종료
+stop_processes_using_file() {
+    local file_path="$1"
+    
+    if [ ! -f "$file_path" ]; then
+        return 1
+    fi
+    
+    print_info "파일을 사용 중인 프로세스 찾는 중: $file_path"
+    
+    local processes_killed=0
+    
+    # lsof 명령어 사용 (Linux/macOS)
+    if command -v lsof >/dev/null 2>&1; then
+        local pids
+        pids=$(lsof -t "$file_path" 2>/dev/null)
+        if [ -n "$pids" ]; then
+            for pid in $pids; do
+                if kill -0 "$pid" 2>/dev/null; then
+                    local proc_name
+                    proc_name=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+                    print_warning "프로세스 종료 중: $proc_name (PID: $pid)"
+                    kill -9 "$pid" 2>/dev/null && processes_killed=1
+                    sleep 0.5
+                fi
+            done
+        fi
+    fi
+    
+    # 모든 Java/Gradle 프로세스 종료 (파일이 잠겨있을 때)
+    if [ $processes_killed -eq 0 ]; then
+        print_warning "파일을 사용하는 프로세스를 찾지 못했습니다. 모든 Java/Gradle 프로세스 종료 시도 중..."
+        for proc_name in java javaw gradle gradlew; do
+            local pids
+            pids=$(pgrep -f "$proc_name" 2>/dev/null || true)
+            if [ -n "$pids" ]; then
+                for pid in $pids; do
+                    print_warning "프로세스 종료 중: $proc_name (PID: $pid)"
+                    kill -9 "$pid" 2>/dev/null && processes_killed=1
+                    sleep 0.5
+                done
+            fi
+        done
+    fi
+    
+    if [ $processes_killed -eq 1 ]; then
+        print_info "프로세스 종료 완료. 파일 핸들이 해제될 때까지 5초 대기 중..."
+        sleep 5
+        return 0
+    fi
+    
+    return 1
+}
+
 # 도움말
 show_help() {
     cat << EOF
@@ -331,6 +385,9 @@ commit_gitignore() {
     fi
 }
 
+# keystore 생성 스킵 여부
+KEYSTORE_SKIPPED=0
+
 # Keystore 생성
 create_keystore() {
     print_step "Keystore 생성 중..."
@@ -343,16 +400,44 @@ create_keystore() {
 
     # 기존 keystore 확인
     if [ -f "$keystore_path" ]; then
-        print_warning "기존 keystore가 존재합니다: $keystore_path"
-        read -p "덮어쓰시겠습니까? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Keystore 생성 스킵"
-            return 0
+        print_info "기존 keystore가 존재합니다: $keystore_path"
+        print_info "기존 keystore 덮어쓰기 중..."
+        
+        # 기존 keystore에서 alias 삭제 시도 (파일 삭제 전에)
+        print_info "기존 keystore에서 alias 삭제 시도 중..."
+        if keytool -delete -alias "$KEY_ALIAS" -keystore "$keystore_path" -storepass "$STORE_PASSWORD" 2>/dev/null; then
+            print_info "기존 alias가 keystore에서 삭제되었습니다"
+        else
+            print_warning "keystore에서 alias 삭제 실패 (존재하지 않거나 비밀번호가 다를 수 있음)"
+            print_warning "파일 삭제/교체를 시도합니다..."
         fi
-        # 백업 (mv로 원본 제거하여 alias 충돌 방지)
-        mv "$keystore_path" "${keystore_path}.bak"
-        print_info "기존 keystore 백업: ${keystore_path}.bak"
+        
+        # 백업 파일이 있으면 삭제
+        if [ -f "${keystore_path}.bak" ]; then
+            rm -f "${keystore_path}.bak"
+        fi
+        
+        # 파일 백업 시도
+        if mv "$keystore_path" "${keystore_path}.bak" 2>/dev/null; then
+            print_info "기존 keystore 백업: ${keystore_path}.bak"
+        else
+            # 파일이 잠겨있으면 프로세스 종료 후 재시도
+            print_warning "keystore 파일 이동 실패. 파일을 사용 중인 프로세스 종료 시도 중..."
+            
+            if stop_processes_using_file "$keystore_path"; then
+                if rm -f "$keystore_path" 2>/dev/null; then
+                    print_info "기존 keystore 삭제됨 (프로세스 종료 후)"
+                else
+                    print_error "프로세스 종료 후에도 keystore 파일 삭제 실패: $keystore_path"
+                    print_error "파일을 수동으로 삭제하거나 파일을 사용하는 프로그램을 닫으세요."
+                    exit 1
+                fi
+            else
+                print_error "keystore 파일 삭제 실패: $keystore_path"
+                print_error "파일을 수동으로 삭제하거나 파일을 사용하는 프로그램을 닫으세요."
+                exit 1
+            fi
+        fi
     fi
 
     # keytool 명령어 생성
@@ -389,24 +474,101 @@ create_keystore() {
 create_key_properties() {
     print_step "key.properties 생성 중..."
 
-    local key_properties_path="$PROJECT_PATH/android/key.properties"
-
-    # 기존 파일 백업
-    if [ -f "$key_properties_path" ]; then
-        print_warning "기존 key.properties 백업: ${key_properties_path}.bak"
-        cp "$key_properties_path" "${key_properties_path}.bak"
+    # keystore 생성이 스킵되었으면 key.properties도 스킵
+    if [ "$KEYSTORE_SKIPPED" = "1" ]; then
+        print_warning "key.properties 생성 스킵 (keystore가 덮어쓰기되지 않음)"
+        print_warning "⚠️ 기존 keystore를 사용하므로 key.properties의 비밀번호를 수동으로 확인하세요!"
+        print_warning "   기존 keystore의 비밀번호를 android/key.properties에 입력해야 합니다."
+        print_warning "   또는 Step 2로 돌아가서 keystore를 덮어쓰기(y)로 다시 생성하세요."
+        return 0
     fi
 
-    cat > "$key_properties_path" << EOF
+    local key_properties_path="$PROJECT_PATH/android/key.properties"
+
+    # 기존 파일 백업 및 삭제
+    if [ -f "$key_properties_path" ]; then
+        print_info "기존 key.properties 발견. 덮어쓰기 중..."
+        backup_path="${key_properties_path}.bak"
+        
+        # 백업 파일이 있으면 삭제
+        if [ -f "$backup_path" ]; then
+            rm -f "$backup_path"
+        fi
+        
+        # 파일 백업 시도
+        if cp "$key_properties_path" "$backup_path" 2>/dev/null && rm -f "$key_properties_path" 2>/dev/null; then
+            print_info "기존 key.properties 백업: $backup_path"
+        else
+            # 파일이 잠겨있으면 프로세스 종료 후 재시도
+            print_warning "key.properties 파일 백업/삭제 실패. 파일을 사용 중인 프로세스 종료 시도 중..."
+            
+            if stop_processes_using_file "$key_properties_path"; then
+                if rm -f "$key_properties_path" 2>/dev/null; then
+                    print_info "기존 key.properties 삭제됨 (프로세스 종료 후)"
+                else
+                    print_error "프로세스 종료 후에도 key.properties 파일 삭제 실패: $key_properties_path"
+                    print_error "파일을 수동으로 삭제하거나 파일을 사용하는 프로그램을 닫으세요."
+                    exit 1
+                fi
+            else
+                print_error "key.properties 파일 삭제 실패: $key_properties_path"
+                print_error "파일을 수동으로 삭제하거나 파일을 사용하는 프로그램을 닫으세요."
+                exit 1
+            fi
+        fi
+    fi
+
+    # 파일 쓰기 시도
+    if ! cat > "$key_properties_path" << EOF
 # Release Keystore Configuration
 # WARNING: Do not commit this file to version control!
 # This file is automatically generated by Play Store Wizard
 
-storeFile=keystore/key.jks
+storeFile=app/keystore/key.jks
 storePassword=$STORE_PASSWORD
 keyAlias=$KEY_ALIAS
 keyPassword=$KEY_PASSWORD
 EOF
+    then
+        # 파일이 잠겨있으면 프로세스 종료 후 재시도
+        print_warning "key.properties 파일 쓰기 실패. 파일을 사용 중인 프로세스 종료 시도 중..."
+        
+        if stop_processes_using_file "$key_properties_path"; then
+            if ! cat > "$key_properties_path" << EOF
+# Release Keystore Configuration
+# WARNING: Do not commit this file to version control!
+# This file is automatically generated by Play Store Wizard
+
+storeFile=app/keystore/key.jks
+storePassword=$STORE_PASSWORD
+keyAlias=$KEY_ALIAS
+keyPassword=$KEY_PASSWORD
+EOF
+            then
+                print_error "프로세스 종료 후에도 key.properties 파일 쓰기 실패"
+                print_error "파일이 여전히 잠겨있을 수 있습니다. 파일을 사용하는 프로그램을 수동으로 닫고 다시 시도하세요."
+                exit 1
+            else
+                print_info "프로세스 종료 후 key.properties 쓰기 성공"
+            fi
+        else
+            print_error "key.properties 파일 쓰기 실패"
+            print_error "파일이 다른 프로세스에서 사용 중일 수 있습니다. 파일을 사용하는 프로그램을 닫고 다시 시도하세요."
+            exit 1
+        fi
+    fi
+    
+    # 파일이 제대로 생성되었는지 확인
+    if [ ! -f "$key_properties_path" ]; then
+        print_error "key.properties 파일이 생성되지 않았습니다: $key_properties_path"
+        exit 1
+    fi
+    
+    # 파일 내용 확인
+    if ! grep -q "storePassword" "$key_properties_path" 2>/dev/null; then
+        print_error "key.properties 파일이 존재하지만 내용이 유효하지 않습니다: $key_properties_path"
+        exit 1
+    fi
 
     print_success "key.properties 생성 완료: $key_properties_path"
     print_info "  • Store Password: $STORE_PASSWORD"
@@ -505,6 +667,10 @@ platform :android do
     end
 
     # Upload to Play Store
+    # ⚠️ release_status 설정 가이드:
+    #   - "draft": 앱이 Play Console에서 아직 한 번도 출시되지 않은 경우 (신규 앱)
+    #   - "completed": 앱이 이미 Play Console에서 검토 완료되어 활성화된 경우
+    # 신규 앱은 반드시 "draft"로 시작해야 합니다.
     upload_to_play_store(
       package_name: "$APPLICATION_ID",
       track: "internal",
@@ -513,7 +679,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      release_status: "completed"
+      release_status: "draft"  # 신규 앱: "draft" → 승인 후: "completed"로 변경
     )
 
     puts ""

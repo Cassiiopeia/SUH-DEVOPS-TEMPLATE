@@ -827,8 +827,8 @@ download_template() {
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
     print_info "템플릿 내부 문서 제외 중..."
     local docs_to_remove=(
-        "ARCHITECTURE.md"
         "CONTRIBUTING.md"
+        "CLAUDE.md"
     )
     
     for doc in "${docs_to_remove[@]}"; do
@@ -983,35 +983,37 @@ EOF
     print_success "version.yml 생성 완료"
 }
 
-# 워크플로우 다운로드 (폴더 기반, 단순화)
+# 워크플로우 다운로드 (폴더 기반, 선택적 업데이트)
 copy_workflows() {
     print_step "프로젝트 타입별 워크플로우 다운로드 중..."
     print_info "프로젝트 타입: $PROJECT_TYPE"
-    
+
     mkdir -p "$WORKFLOWS_DIR"
-    
+
     local copied=0
+    local skipped=0
+    local template_added=0
     local project_types_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"
-    
+
     # project-types 폴더 존재 확인
     if [ ! -d "$project_types_dir" ]; then
         print_error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
         print_error "project-types 폴더를 찾을 수 없습니다."
         exit 1
     fi
-    
-    # 1. Common 워크플로우 다운로드 (필수)
+
+    # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
     print_info "공통 워크플로우 다운로드 중..."
     if [ -d "$project_types_dir/common" ]; then
         for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
             local filename=$(basename "$workflow")
-            
+
+            # COMMON은 항상 덮어쓰기 (핵심 기능)
             if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                print_warning "$filename 이미 존재 → ${filename}.bak으로 백업"
-                mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                print_info "$filename 업데이트"
             fi
-            
+
             cp "$workflow" "$WORKFLOWS_DIR/"
             echo "  ✓ $filename"
             copied=$((copied + 1))
@@ -1019,35 +1021,125 @@ copy_workflows() {
     else
         print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
     fi
-    
-    # 2. 타입별 워크플로우 다운로드 (optional 구분 없이 전체 다운로드)
+
+    # 2. 타입별 워크플로우 처리 (선택적 업데이트)
     local type_dir="$project_types_dir/$PROJECT_TYPE"
     if [ -d "$type_dir" ]; then
-        print_info "$PROJECT_TYPE 전용 워크플로우 다운로드 중..."
-        
+        # 먼저 이미 존재하는 파일 목록 수집
+        local existing_files=()
+        local new_files=()
+
         for workflow in "$type_dir"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
-            
             local filename=$(basename "$workflow")
-            
+
             if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                print_warning "$filename 이미 존재 → ${filename}.bak으로 백업"
-                mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                existing_files+=("$filename")
+            else
+                new_files+=("$filename")
             fi
-            
-            cp "$workflow" "$WORKFLOWS_DIR/"
-            echo "  ✓ $filename"
-            copied=$((copied + 1))
         done
+
+        # 신규 파일은 바로 복사
+        if [ ${#new_files[@]} -gt 0 ]; then
+            print_info "$PROJECT_TYPE 신규 워크플로우 다운로드 중..."
+            for filename in "${new_files[@]}"; do
+                cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
+                echo "  ✓ $filename (신규)"
+                copied=$((copied + 1))
+            done
+        fi
+
+        # 이미 존재하는 파일 처리
+        if [ ${#existing_files[@]} -gt 0 ]; then
+            echo ""
+            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            print_warning "⚠️  이미 존재하는 타입별 워크플로우: ${#existing_files[@]}개"
+            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            for f in "${existing_files[@]}"; do
+                echo "   • $f"
+            done
+            echo ""
+            print_info "처리 방법을 선택하세요:"
+            echo ""
+            echo "  (T) .template.yaml로 추가"
+            echo "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
+            echo "      → 예: PROJECT-FLUTTER-*.yaml.template.yaml"
+            echo ""
+            echo "  (S) 건너뛰기"
+            echo "      → 기존 파일만 유지, 아무것도 추가 안 함"
+            echo ""
+            echo "  (O) 덮어쓰기 (기존 방식)"
+            echo "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
+            echo ""
+
+            local choice
+            safe_read "선택 [T/S/O]: " choice "-n 1"
+            echo ""
+
+            case "${choice^^}" in
+                T)
+                    # .template.yaml로 추가
+                    print_info "새 버전을 .template.yaml로 추가합니다..."
+                    for filename in "${existing_files[@]}"; do
+                        local template_name="${filename%.yaml}.template.yaml"
+                        # 기존 .template.yaml이 있으면 삭제
+                        rm -f "$WORKFLOWS_DIR/$template_name"
+                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/$template_name"
+                        echo "  ✓ $template_name (참고용 추가)"
+                        template_added=$((template_added + 1))
+                    done
+                    print_info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
+                    print_info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
+                    ;;
+                S)
+                    # 건너뛰기
+                    print_info "기존 파일을 유지합니다..."
+                    for filename in "${existing_files[@]}"; do
+                        echo "  ⏭ $filename (건너뜀)"
+                        skipped=$((skipped + 1))
+                    done
+                    ;;
+                O)
+                    # 기존 방식 (덮어쓰기)
+                    print_info "기존 파일을 백업 후 덮어씁니다..."
+                    for filename in "${existing_files[@]}"; do
+                        mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
+                        echo "  ✓ $filename (백업: ${filename}.bak)"
+                        copied=$((copied + 1))
+                    done
+                    ;;
+                *)
+                    # 기본값: 건너뛰기
+                    print_warning "잘못된 선택. 기존 파일을 유지합니다."
+                    for filename in "${existing_files[@]}"; do
+                        echo "  ⏭ $filename (건너뜀)"
+                        skipped=$((skipped + 1))
+                    done
+                    ;;
+            esac
+        else
+            print_info "$PROJECT_TYPE 타입의 기존 워크플로우가 없습니다."
+        fi
     else
         print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     fi
-    
-    print_success "$copied 개 워크플로우 다운로드 완료 (타입: $PROJECT_TYPE)"
-    
+
+    # 결과 요약
+    echo ""
+    print_success "워크플로우 처리 완료 (타입: $PROJECT_TYPE)"
+    echo "   📥 복사됨: $copied 개"
+    if [ $template_added -gt 0 ]; then
+        echo "   📄 참고용 추가 (.template.yaml): $template_added 개"
+    fi
+    if [ $skipped -gt 0 ]; then
+        echo "   ⏭ 건너뜀: $skipped 개"
+    fi
+
     # 복사된 워크플로우 수를 전역 변수로 저장 (최종 요약에서 사용)
     WORKFLOWS_COPIED=$copied
-    
+
     # CI/CD 워크플로우 안내
     if [ "$PROJECT_TYPE" = "spring" ]; then
         echo ""

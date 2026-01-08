@@ -1,11 +1,45 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-07T06:52:30Z",
-    "currentVersion": "2.4.4",
+    "lastUpdated": "2026-01-08T05:46:05Z",
+    "currentVersion": "2.5.0",
     "projectType": "basic",
-    "totalReleases": 47
+    "totalReleases": 48
   },
   "releases": [
+    {
+      "version": "2.5.0",
+      "project_type": "basic",
+      "date": "2026-01-08",
+      "pr_number": 140,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리스 노트\n\n* **New Features**\n  * Play Store 및 TestFlight 마법사가 v1.1.0으로 업그레이드\n  * ZIP, JSON, TXT 형식으로 설정 내보내기/가져오기 기능 추가\n  * 모든 시크릿 일괄 복사 기능 추가\n  * 단계 표시기 클릭을 통한 직접 네비게이션 기능 추가\n\n* **Bug Fixes**\n  * 키스토어 처리 및 파일 잠금 상황 개선\n  * Android SDK 검색 및 자동 설정 플로우 개선\n  * Gradle 서명 설정 경로 해석 개선\n\n* **Chores**\n  * 템플릿 통합 로직 및 워크플로우 최적화\n  * 버전 2.5.0으로 업그레이드",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "Play Store 및 TestFlight 마법사가 v1.1.0으로 업그레이드",
+            "ZIP, JSON, TXT 형식으로 설정 내보내기/가져오기 기능 추가",
+            "모든 시크릿 일괄 복사 기능 추가",
+            "단계 표시기 클릭을 통한 직접 네비게이션 기능 추가"
+          ]
+        },
+        "bug_fixes": {
+          "title": "Bug Fixes",
+          "items": [
+            "키스토어 처리 및 파일 잠금 상황 개선",
+            "Android SDK 검색 및 자동 설정 플로우 개선",
+            "Gradle 서명 설정 경로 해석 개선"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "템플릿 통합 로직 및 워크플로우 최적화",
+            "버전 2.5.0으로 업그레이드"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.4.4",
       "project_type": "basic",

@@ -24,7 +24,7 @@
 # - basic: version.yml만 사용
 # ===================================================================
 
-version: "2.4.8"
+version: "2.5.0"
 version_code: 99 # app build number
 project_type: "basic" # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
 metadata:

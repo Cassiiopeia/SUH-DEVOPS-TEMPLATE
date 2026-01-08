@@ -859,8 +859,8 @@ add_version_section_to_readme() {
     fi
     
     # 이미 버전 섹션이 있는지 확인 (다중 패턴 체크로 강화)
-    # 1. 주석 체크 (가장 확실한 방법)
-    if grep -qiE "(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION)" README.md; then
+    # 1. 주석 체크 (가장 확실한 방법 - 신/구 형식 모두 감지)
+    if grep -qiE "(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION|<!-- 자동 동기화 버전 정보|수정하지마세요 자동으로 동기화)" README.md; then
         print_info "이미 버전 관리 섹션이 있습니다. (주석 감지)"
         return
     fi

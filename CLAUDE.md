@@ -369,13 +369,31 @@ metadata:
    ```
 
 2. **배치 위치**
-   - 공통 기능: 루트 또는 `project-types/common/`
-   - 타입별 기능: `project-types/[type]/`
+   - **공통 기능 (필수 2곳 - 반드시 동일하게 유지)**:
+     1. `project-types/common/` - **원본 (Source of Truth)**
+     2. `.github/workflows/` 루트 - **템플릿 저장소용 복사본**
+   - 타입별 기능: `project-types/[type]/`만 (루트 복사 불필요)
 
 3. **필수 요소**
    - `workflow_dispatch` 수동 트리거 포함
    - `concurrency` 설정으로 중복 실행 방지
    - `[skip ci]` 커밋 메시지로 무한 루프 방지
+
+4. **공통 워크플로우 동기화 규칙**
+
+   공통(COMMON) 워크플로우는 두 위치에 **동일하게** 유지해야 합니다:
+
+   | 위치 | 용도 | 필수 |
+   |------|------|------|
+   | `project-types/common/` | `template_integrator`가 복사하는 원본 | ✅ |
+   | `.github/workflows/` (루트) | 템플릿 저장소에서 직접 실행 | ✅ |
+
+   **워크플로우 추가/수정 순서**:
+   1. `project-types/common/`에 먼저 작성 (원본)
+   2. 동일한 파일을 루트 `.github/workflows/`에 복사
+   3. 두 파일의 버전/내용이 동일한지 확인
+
+   > **참고**: 타입별 워크플로우 (flutter, spring 등)는 `project-types/[type]/`에만 존재하면 됨. `template_initializer`와 `template_integrator`가 프로젝트 타입에 따라 해당 폴더에서 복사함.
 
 ### 새 스크립트 추가
 

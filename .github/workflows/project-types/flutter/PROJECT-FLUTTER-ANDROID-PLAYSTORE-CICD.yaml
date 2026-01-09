@@ -199,7 +199,9 @@ jobs:
       # Google-services.json 생성
       - name: Create Google-services.json
         run: |
-          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+          cat << 'EOF' > android/app/google-services.json
+          ${{ secrets.GOOGLE_SERVICES_JSON }}
+          EOF
           echo "✅ Google-services.json 생성 완료"
 
       - name: Set up Flutter

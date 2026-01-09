@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-08T05:46:05Z",
-    "currentVersion": "2.5.0",
+    "lastUpdated": "2026-01-09T07:30:13Z",
+    "currentVersion": "2.5.3",
     "projectType": "basic",
-    "totalReleases": 48
+    "totalReleases": 49
   },
   "releases": [
+    {
+      "version": "2.5.3",
+      "project_type": "basic",
+      "date": "2026-01-09",
+      "pr_number": 143,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * Synology NAS 배포 지원 추가\n  * 포괄적인 Synology 배포 가이드 문서 추가 (Docker, SSH, SMB 구성 포함)\n\n* **개선사항**\n  * 워크플로우의 Google 서비스 파일 처리 안정성 향상\n\n* **문서**\n  * 민감 정보 마스킹 예시 수정\n  * 버전 2.5.3으로 업데이트",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Synology NAS 배포 지원 추가",
+            "포괄적인 Synology 배포 가이드 문서 추가 (Docker, SSH, SMB 구성 포함)"
+          ]
+        },
+        "개선사항": {
+          "title": "개선사항",
+          "items": [
+            "워크플로우의 Google 서비스 파일 처리 안정성 향상"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "민감 정보 마스킹 예시 수정",
+            "버전 2.5.3으로 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.5.0",
       "project_type": "basic",

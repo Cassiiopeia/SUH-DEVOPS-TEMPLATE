@@ -58,19 +58,25 @@
 param(
     [Parameter(Mandatory=$false)]
     [string]$Mode = "interactive",
-    
+
     [Parameter(Mandatory=$false)]
     [string]$Version = "",
-    
+
     [Parameter(Mandatory=$false)]
     [string]$Type = "",
-    
+
     [Parameter(Mandatory=$false)]
     [switch]$NoBackup,
-    
+
     [Parameter(Mandatory=$false)]
     [switch]$Force,
-    
+
+    [Parameter(Mandatory=$false)]
+    [switch]$Synology,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NoSynology,
+
     [Parameter(Mandatory=$false)]
     [switch]$Help
 )
@@ -115,6 +121,7 @@ $script:IsInteractiveMode = $false
 $script:WorkflowsCopied = 0
 $script:UtilModulesCopied = 0
 $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
+$script:IncludeSynology = $null  # Synology 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
 
 # ===================================================================
 # 출력 함수 (색상 지원)
@@ -312,6 +319,8 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Type <TYPE>          프로젝트 타입 (미지정 시 자동 감지)
   -NoBackup             백업 생성 안 함
   -Force                확인 없이 즉시 실행
+  -Synology             Synology 워크플로우 포함 (기본: 제외)
+  -NoSynology           Synology 워크플로우 제외
   -Help                 이 도움말 표시
 
 지원 프로젝트 타입:
@@ -752,9 +761,9 @@ function Add-VersionSectionToReadme {
     
     # 이미 버전 섹션이 있는지 확인 (다중 패턴 체크로 강화)
     $readmeContent = Get-Content "README.md" -Raw
-    
-    # 1. 주석 체크 (가장 확실한 방법)
-    if ($readmeContent -match "(?i)(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION)") {
+
+    # 1. 주석 체크 (가장 확실한 방법 - 신/구 형식 모두 감지)
+    if ($readmeContent -match "(?i)(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION|<!-- 자동 동기화 버전 정보|수정하지마세요 자동으로 동기화)") {
         Print-Info "이미 버전 관리 섹션이 있습니다. (주석 감지)"
         return
     }
@@ -889,8 +898,186 @@ metadata:
 "@
     
     Set-Content -Path "version.yml" -Value $versionYmlContent -Encoding UTF8
-    
+
     Print-Success "version.yml 생성 완료"
+}
+
+# ===================================================================
+# Synology 옵션 관리 함수
+# ===================================================================
+
+function Read-TemplateOptions {
+    $versionFile = "version.yml"
+
+    if (-not (Test-Path $versionFile)) {
+        return
+    }
+
+    $content = Get-Content -Path $versionFile -Raw -ErrorAction SilentlyContinue
+    if (-not $content) {
+        return
+    }
+
+    # template.options.synology 값 찾기
+    $inTemplate = $false
+    $inOptions = $false
+
+    foreach ($line in (Get-Content -Path $versionFile)) {
+        # template: 섹션 시작 확인
+        if ($line -match "^\s*template:") {
+            $inTemplate = $true
+            continue
+        }
+
+        # template 섹션 내부에서 options: 확인
+        if ($inTemplate -and $line -match "^\s+options:") {
+            $inOptions = $true
+            continue
+        }
+
+        # options 섹션 내부에서 synology 값 확인
+        if ($inTemplate -and $inOptions) {
+            if ($line -match "^\s+synology:\s*(.+)") {
+                $synologyVal = $matches[1].Trim().Trim('"').Trim("'")
+
+                if ($synologyVal -eq "true" -or $synologyVal -eq "True") {
+                    $script:IncludeSynology = $true
+                    Print-Info "이전 설정에서 Synology 옵션 감지: 포함"
+                }
+                elseif ($synologyVal -eq "false" -or $synologyVal -eq "False") {
+                    $script:IncludeSynology = $false
+                    Print-Info "이전 설정에서 Synology 옵션 감지: 제외"
+                }
+                return
+            }
+
+            # 다른 최상위 키 만나면 options 섹션 종료
+            if ($line -match "^\s{0,4}[a-z_]+:") {
+                $inOptions = $false
+                $inTemplate = $false
+            }
+        }
+
+        # template 섹션 종료 확인
+        if ($inTemplate -and $line -match "^[a-z_]+:") {
+            $inTemplate = $false
+            $inOptions = $false
+        }
+    }
+}
+
+function Save-TemplateOptions {
+    param([string]$TemplateVersion = "unknown")
+
+    $versionFile = "version.yml"
+    $today = (Get-Date).ToString("yyyy-MM-dd")
+
+    if (-not (Test-Path $versionFile)) {
+        return
+    }
+
+    $content = Get-Content -Path $versionFile -Raw
+
+    # 기존에 template 섹션이 있는지 확인
+    if ($content -match "template:") {
+        # synology 값 업데이트 또는 추가
+        if ($content -match "synology:") {
+            $content = $content -replace "synology:.*$", "synology: $($script:IncludeSynology.ToString().ToLower())"
+        }
+        elseif ($content -match "options:") {
+            # options 다음 줄에 synology 추가
+            $content = $content -replace "(options:)", "`$1`n      synology: $($script:IncludeSynology.ToString().ToLower())"
+        }
+
+        # last_update_date 업데이트
+        if ($content -match "last_update_date:") {
+            $content = $content -replace 'last_update_date:.*$', "last_update_date: `"$today`""
+        }
+
+        Set-Content -Path $versionFile -Value $content -Encoding UTF8
+    }
+    else {
+        # template 섹션 새로 추가
+        $templateSection = @"
+  template:
+    source: "SUH-DEVOPS-TEMPLATE"
+    version: "$TemplateVersion"
+    integrated_date: "$today"
+    last_update_date: "$today"
+    options:
+      synology: $($script:IncludeSynology.ToString().ToLower())
+"@
+        Add-Content -Path $versionFile -Value $templateSection -Encoding UTF8
+        Print-Info "version.yml에 템플릿 설정 저장됨"
+    }
+}
+
+function Ask-SynologyOption {
+    param([string]$TypeDir)
+
+    $synologyDir = Join-Path $TypeDir "synology"
+
+    # synology 폴더가 없으면 건너뛰기
+    if (-not (Test-Path $synologyDir)) {
+        return
+    }
+
+    # CLI 파라미터로 이미 지정된 경우
+    if ($Synology) {
+        $script:IncludeSynology = $true
+        return
+    }
+    if ($NoSynology) {
+        $script:IncludeSynology = $false
+        return
+    }
+
+    # 이미 설정되어 있으면 건너뛰기
+    if ($null -ne $script:IncludeSynology) {
+        return
+    }
+
+    # 기존 version.yml에서 설정 읽기 시도
+    Read-TemplateOptions
+
+    # 이전 설정이 있으면 건너뛰기
+    if ($null -ne $script:IncludeSynology) {
+        return
+    }
+
+    # synology 폴더 내 파일 개수 확인
+    $synologyFiles = @()
+    $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+    $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+    if ($yamlFiles) { $synologyFiles += $yamlFiles }
+    if ($ymlFiles) { $synologyFiles += $ymlFiles }
+
+    if ($synologyFiles.Count -eq 0) {
+        return
+    }
+
+    Print-SeparatorLine
+    Write-Host ""
+    Write-Host "🗄️ Synology 워크플로우가 발견되었습니다. ($($synologyFiles.Count)개 파일)"
+    Write-Host "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
+    Write-Host ""
+    Write-Host "   포함되는 워크플로우:"
+    foreach ($f in $synologyFiles) {
+        Write-Host "     • $($f.Name)"
+    }
+    Write-Host ""
+    Write-Host "  Y/y - 예, 포함"
+    Write-Host "  N/n - 아니오, 제외 (기본)"
+    Write-Host ""
+
+    if (Ask-YesNo "선택" "N") {
+        $script:IncludeSynology = $true
+        Print-Info "Synology 워크플로우를 포함합니다"
+    }
+    else {
+        $script:IncludeSynology = $false
+        Print-Info "Synology 워크플로우를 제외합니다"
+    }
 }
 
 # ===================================================================
@@ -1062,10 +1249,59 @@ function Copy-Workflows {
         Print-Info "$($script:ProjectType) 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     }
 
+    # 3. Synology 하위폴더 처리 (선택적)
+    $synologyCopied = 0
+    $synologyDir = Join-Path $projectTypesDir "$($script:ProjectType)\synology"
+
+    if (Test-Path $synologyDir) {
+        if ($script:IncludeSynology -eq $true) {
+            Print-Info "Synology 워크플로우 다운로드 중..."
+
+            $synologyWorkflows = @()
+            $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $synologyWorkflows += $yamlFiles }
+            if ($ymlFiles) { $synologyWorkflows += $ymlFiles }
+
+            foreach ($workflow in $synologyWorkflows) {
+                $filename = $workflow.Name
+                $destPath = Join-Path $WORKFLOWS_DIR $filename
+
+                # 이미 존재하는 경우 처리
+                if (Test-Path $destPath) {
+                    # 기존 파일 백업 후 덮어쓰기
+                    $backupPath = [string]$destPath + ".bak"
+                    Move-Item -Path $destPath -Destination $backupPath -Force
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $filename (Synology, 백업: ${filename}.bak)"
+                } else {
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $filename (Synology)"
+                }
+                $synologyCopied++
+                $copied++
+            }
+        } else {
+            # Synology 제외됨 - 사용자에게 알림
+            $synologyFiles = @()
+            $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $synologyFiles += $yamlFiles }
+            if ($ymlFiles) { $synologyFiles += $ymlFiles }
+
+            if ($synologyFiles.Count -gt 0) {
+                Print-Info "Synology 워크플로우 $($synologyFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
+            }
+        }
+    }
+
     # 결과 요약
     Write-Host ""
     Print-Success "워크플로우 처리 완료 (타입: $($script:ProjectType))"
     Write-Host "   📥 복사됨: $copied 개"
+    if ($synologyCopied -gt 0) {
+        Write-Host "   🗄️ Synology: $synologyCopied 개"
+    }
     if ($templateAdded -gt 0) {
         Write-Host "   📄 참고용 추가 (.template.yaml): $templateAdded 개"
     }
@@ -1734,7 +1970,14 @@ function Start-InteractiveMode {
     
     # 프로젝트 감지 및 확인
     Detect-AndConfirmProject
-    
+
+    # 템플릿 다운로드 (Synology 폴더 확인을 위해 미리 다운로드)
+    Download-Template
+
+    # Synology 옵션 질문 (해당 타입에 synology 폴더 있을 때만)
+    $typeDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$($script:ProjectType)"
+    Ask-SynologyOption $typeDir
+
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
 
     Write-Host "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
@@ -1813,10 +2056,18 @@ function Start-Integration {
     }
     
     Write-Host ""
-    
-    # 1. 템플릿 다운로드
-    Download-Template
-    
+
+    # 1. 템플릿 다운로드 (CLI 모드에서만, interactive 모드는 이미 다운로드됨)
+    if (-not $script:IsInteractiveMode) {
+        Download-Template
+
+        # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
+        if ($Mode -eq "full" -or $Mode -eq "workflows") {
+            $typeDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$($script:ProjectType)"
+            Ask-SynologyOption $typeDir
+        }
+    }
+
     # 2. 모드별 통합
     switch ($Mode) {
         "full" {
@@ -1853,6 +2104,14 @@ function Start-Integration {
         "commands" {
             Show-CustomCommandMenu
             return  # commands 모드는 자체적으로 정리하고 종료
+        }
+    }
+
+    # 2.1 템플릿 옵션 저장 (Synology 설정 등)
+    if ($Mode -eq "full" -or $Mode -eq "workflows") {
+        # IncludeSynology가 설정되어 있으면 저장
+        if ($null -ne $script:IncludeSynology) {
+            Save-TemplateOptions $script:ProjectVersion
         }
     }
 

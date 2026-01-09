@@ -570,3 +570,4 @@ SYNOLOGY_PASSWORD
 | FLUTTER-TESTFLIGHT-WIZARD.md | docs/ | iOS 배포 설정 |
 | FLUTTER-PLAYSTORE-WIZARD.md | docs/ | Android 배포 설정 |
 | FLUTTER-TEST-BUILD-TRIGGER.md | docs/ | 테스트 빌드 트리거 |
+| SYNOLOGY-DEPLOYMENT-GUIDE.md | docs/ | Synology NAS 배포 가이드 |

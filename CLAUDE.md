@@ -33,10 +33,12 @@ suh-github-template/
 │   │   ├── PROJECT-COMMON-*.yaml           # 공통 워크플로우
 │   │   └── project-types/
 │   │       ├── common/                     # 공통 (복사본)
-│   │       ├── flutter/                    # Flutter 전용 (6개)
-│   │       ├── spring/                     # Spring 전용 (3개)
-│   │       ├── react/                      # React 전용 (2개)
-│   │       └── next/                       # Next.js 전용 (2개)
+│   │       ├── flutter/                    # Flutter 전용
+│   │       │   └── synology/               # Synology 배포 (선택적)
+│   │       ├── spring/                     # Spring 전용
+│   │       │   └── synology/               # Synology/Nexus 배포 (선택적)
+│   │       ├── react/                      # React 전용
+│   │       └── next/                       # Next.js 전용
 │   │
 │   ├── scripts/
 │   │   ├── version_manager.sh              # 버전 관리 (v3.0)
@@ -128,22 +130,26 @@ snake_case.sh / snake_case.py
 
 ### 타입별 워크플로우
 
-#### Flutter (6개)
-| 파일명 | 용도 |
-|--------|------|
-| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 |
-| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Synology NAS APK 배포 |
-| `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 |
-| `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 |
-| `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 |
-| `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 |
+#### Flutter
+| 파일명 | 용도 | 위치 |
+|--------|------|------|
+| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 | 기본 |
+| `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 | 기본 |
+| `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
+| `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 | 기본 |
+| `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
+| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Synology NAS APK 배포 | synology/ |
 
-#### Spring (3개)
-| 파일명 | 용도 |
-|--------|------|
-| `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Synology Docker 배포 |
-| `PROJECT-SPRING-NEXUS-CI` | Nexus CI (빌드/테스트) |
-| `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 |
+#### Spring
+| 파일명 | 용도 | 위치 |
+|--------|------|------|
+| `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Synology Docker 배포 | synology/ |
+| `PROJECT-SPRING-SYNOLOGY-NONSTOP-CICD` | Synology 무중단 배포 | synology/ |
+| `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW` | PR 프리뷰 배포 | synology/ |
+| `PROJECT-SPRING-NEXUS-CI` | Nexus CI (빌드/테스트) | synology/ |
+| `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | synology/ |
+
+> **참고**: `synology/` 위치의 워크플로우는 `--synology` 옵션으로만 포함됩니다.
 
 #### React / Next (각 2개)
 | 파일명 | 용도 |
@@ -238,6 +244,16 @@ CLAUDE.md
 | 신규 통합 | 기존 프로젝트에 템플릿 추가 |
 | 업데이트 | 최신 템플릿 버전으로 업그레이드 |
 | 되돌리기 | 이전 백업으로 복원 |
+
+**Synology 옵션**:
+| 옵션 | 설명 |
+|------|------|
+| `--synology` / `-Synology` | Synology 워크플로우 포함 |
+| `--no-synology` / `-NoSynology` | Synology 워크플로우 제외 (기본값) |
+
+Synology 워크플로우는 `project-types/{type}/synology/` 폴더에 위치하며, 기본적으로 제외됩니다.
+대화형 모드에서는 해당 폴더가 있을 때만 Y/N 질문이 표시됩니다.
+선택한 옵션은 `version.yml`의 `metadata.template.options.synology`에 저장되어 재통합 시 기억됩니다.
 
 ---
 

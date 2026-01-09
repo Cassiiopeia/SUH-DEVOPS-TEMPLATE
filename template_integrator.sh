@@ -327,6 +327,8 @@ ${BLUE}옵션:${NC}
   -t, --type TYPE          프로젝트 타입 (미지정 시 자동 감지)
   --no-backup              백업 생성 안 함
   --force                  확인 없이 즉시 실행
+  --synology               Synology 워크플로우 포함 (기본: 제외)
+  --no-synology            Synology 워크플로우 제외
   -h, --help               이 도움말 표시
 
 ${BLUE}지원 프로젝트 타입:${NC}
@@ -397,6 +399,7 @@ VERSION=""
 PROJECT_TYPE=""
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
+INCLUDE_SYNOLOGY=""  # Synology 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
 
 # 지원하는 프로젝트 타입
 VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
@@ -418,6 +421,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --force)
             FORCE_MODE=true
+            shift
+            ;;
+        --synology|--include-synology)
+            INCLUDE_SYNOLOGY=true
+            shift
+            ;;
+        --no-synology)
+            INCLUDE_SYNOLOGY=false
             shift
             ;;
         -h|--help)
@@ -813,8 +824,14 @@ handle_project_edit_menu() {
 
 # 템플릿 다운로드
 download_template() {
+    # 이미 다운로드되었으면 건너뛰기 (중복 호출 방지)
+    if [ -d "$TEMP_DIR" ] && [ -d "$TEMP_DIR/.github" ]; then
+        print_info "템플릿이 이미 다운로드되어 있습니다. 건너뜁니다."
+        return
+    fi
+
     print_step "템플릿 다운로드 중..."
-    
+
     if [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
     fi
@@ -979,8 +996,182 @@ metadata:
   integrated_from: "SUH-DEVOPS-TEMPLATE"
   integration_date: "$(date -u +"%Y-%m-%d")"
 EOF
-    
+
     print_success "version.yml 생성 완료"
+}
+
+# ===================================================================
+# Synology 옵션 관리 함수
+# ===================================================================
+
+# version.yml에서 템플릿 옵션 읽기
+read_template_options() {
+    local version_file="version.yml"
+
+    if [ ! -f "$version_file" ]; then
+        return
+    fi
+
+    # synology 옵션 읽기 (metadata.template.options.synology)
+    # YAML 파싱: template 섹션 내의 synology 값 찾기
+    local in_template=false
+    local in_options=false
+
+    while IFS= read -r line; do
+        # template: 섹션 시작 확인
+        if [[ "$line" =~ ^[[:space:]]*template: ]]; then
+            in_template=true
+            continue
+        fi
+
+        # template 섹션 내부에서 options: 확인
+        if [ "$in_template" = true ] && [[ "$line" =~ ^[[:space:]]+options: ]]; then
+            in_options=true
+            continue
+        fi
+
+        # options 섹션 내부에서 synology 값 확인
+        if [ "$in_template" = true ] && [ "$in_options" = true ]; then
+            if [[ "$line" =~ ^[[:space:]]+synology:[[:space:]]*(.+) ]]; then
+                local synology_val="${BASH_REMATCH[1]}"
+                # 따옴표 제거 및 trim
+                synology_val=$(echo "$synology_val" | tr -d '"' | tr -d "'" | xargs)
+
+                if [ "$synology_val" = "true" ]; then
+                    INCLUDE_SYNOLOGY=true
+                    print_info "이전 설정에서 Synology 옵션 감지: 포함"
+                elif [ "$synology_val" = "false" ]; then
+                    INCLUDE_SYNOLOGY=false
+                    print_info "이전 설정에서 Synology 옵션 감지: 제외"
+                fi
+                return
+            fi
+
+            # 다른 최상위 키 만나면 options 섹션 종료
+            if [[ "$line" =~ ^[[:space:]]{0,4}[a-z_]+: ]]; then
+                in_options=false
+                in_template=false
+            fi
+        fi
+
+        # template 섹션 종료 확인 (들여쓰기가 줄어들면)
+        if [ "$in_template" = true ] && [[ "$line" =~ ^[a-z_]+: ]]; then
+            in_template=false
+            in_options=false
+        fi
+    done < "$version_file"
+}
+
+# version.yml에 템플릿 옵션 저장
+save_template_options() {
+    local version_file="version.yml"
+    local template_version="${1:-unknown}"
+    local today=$(date -u +"%Y-%m-%d")
+
+    if [ ! -f "$version_file" ]; then
+        return
+    fi
+
+    # 기존에 template 섹션이 있는지 확인
+    if grep -q "^[[:space:]]*template:" "$version_file"; then
+        # 기존 template 섹션 업데이트
+        # macOS/Linux 호환을 위해 임시 파일 방식 사용
+
+        # options.synology 값 업데이트 또는 추가
+        if grep -q "synology:" "$version_file"; then
+            # synology 값 업데이트
+            sed "s/synology:.*$/synology: $INCLUDE_SYNOLOGY/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        else
+            # synology 값이 없으면 options 섹션에 추가
+            if grep -q "options:" "$version_file"; then
+                # options 다음 줄에 synology 추가 (macOS 호환)
+                sed "/options:/a\\
+      synology: $INCLUDE_SYNOLOGY" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+            fi
+        fi
+
+        # last_update_date 업데이트
+        if grep -q "last_update_date:" "$version_file"; then
+            sed "s/last_update_date:.*$/last_update_date: \"$today\"/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        fi
+    else
+        # template 섹션 새로 추가 (metadata 섹션 끝에)
+        # 파일 끝에 추가
+        cat >> "$version_file" << EOF
+  template:
+    source: "SUH-DEVOPS-TEMPLATE"
+    version: "$template_version"
+    integrated_date: "$today"
+    last_update_date: "$today"
+    options:
+      synology: $INCLUDE_SYNOLOGY
+EOF
+        print_info "version.yml에 템플릿 설정 저장됨"
+    fi
+}
+
+# Synology 워크플로우 포함 여부 질문
+ask_synology_option() {
+    local type_dir="$1"
+    local synology_dir="$type_dir/synology"
+
+    # synology 폴더가 없으면 건너뛰기
+    if [ ! -d "$synology_dir" ]; then
+        return
+    fi
+
+    # 이미 CLI로 지정된 경우 건너뛰기
+    if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
+        return
+    fi
+
+    # 기존 version.yml에서 설정 읽기 시도
+    read_template_options
+
+    # 이전 설정이 있으면 건너뛰기
+    if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
+        return
+    fi
+
+    # TTY 없으면 건너뛰기 (기본값: 제외)
+    if [ "$TTY_AVAILABLE" = false ]; then
+        INCLUDE_SYNOLOGY=false
+        return
+    fi
+
+    # synology 폴더 내 파일 개수 확인
+    local synology_files=0
+    for f in "$synology_dir"/*.{yaml,yml}; do
+        [ -e "$f" ] && synology_files=$((synology_files + 1))
+    done
+
+    if [ $synology_files -eq 0 ]; then
+        return
+    fi
+
+    print_separator_line
+    print_to_user ""
+    print_to_user "🗄️ Synology 워크플로우가 발견되었습니다. ($synology_files개 파일)"
+    print_to_user "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
+    print_to_user ""
+    print_to_user "   포함되는 워크플로우:"
+    for f in "$synology_dir"/*.{yaml,yml}; do
+        [ -e "$f" ] || continue
+        local fname=$(basename "$f")
+        print_to_user "     • $fname"
+    done
+    print_to_user ""
+    print_to_user "  Y/y - 예, 포함"
+    print_to_user "  N/n - 아니오, 제외 (기본)"
+    print_to_user ""
+
+    if ask_yes_no "선택: " "N"; then
+        INCLUDE_SYNOLOGY=true
+        print_info "Synology 워크플로우를 포함합니다"
+    else
+        INCLUDE_SYNOLOGY=false
+        print_info "Synology 워크플로우를 제외합니다"
+    fi
 }
 
 # 워크플로우 다운로드 (폴더 기반, 선택적 업데이트)
@@ -1126,10 +1317,49 @@ copy_workflows() {
         print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     fi
 
+    # 3. Synology 하위폴더 처리 (선택적)
+    local synology_copied=0
+    local synology_dir="$project_types_dir/$PROJECT_TYPE/synology"
+
+    if [ -d "$synology_dir" ]; then
+        if [ "$INCLUDE_SYNOLOGY" = true ]; then
+            print_info "Synology 워크플로우 다운로드 중..."
+            for workflow in "$synology_dir"/*.{yaml,yml}; do
+                [ -e "$workflow" ] || continue
+                local filename=$(basename "$workflow")
+
+                # 이미 존재하는 경우 처리
+                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                    # 기존 파일 백업 후 덮어쓰기
+                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (Synology, 백업: ${filename}.bak)"
+                else
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (Synology)"
+                fi
+                synology_copied=$((synology_copied + 1))
+                copied=$((copied + 1))
+            done
+        else
+            # Synology 제외됨 - 사용자에게 알림
+            local synology_count=0
+            for f in "$synology_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && synology_count=$((synology_count + 1))
+            done
+            if [ $synology_count -gt 0 ]; then
+                print_info "Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
+            fi
+        fi
+    fi
+
     # 결과 요약
     echo ""
     print_success "워크플로우 처리 완료 (타입: $PROJECT_TYPE)"
     echo "   📥 복사됨: $copied 개"
+    if [ $synology_copied -gt 0 ]; then
+        echo "   🗄️ Synology: $synology_copied 개"
+    fi
     if [ $template_added -gt 0 ]; then
         echo "   📄 참고용 추가 (.template.yaml): $template_added 개"
     fi
@@ -1789,7 +2019,14 @@ interactive_mode() {
     
     # 프로젝트 감지 및 확인
     detect_and_confirm_project
-    
+
+    # 템플릿 다운로드 (Synology 폴더 확인을 위해 미리 다운로드)
+    download_template
+
+    # Synology 옵션 질문 (해당 타입에 synology 폴더 있을 때만)
+    local type_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$PROJECT_TYPE"
+    ask_synology_option "$type_dir"
+
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
 
     print_to_user "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
@@ -1885,10 +2122,18 @@ execute_integration() {
     fi
     
     echo "" >&2
-    
-    # 1. 템플릿 다운로드
-    download_template
-    
+
+    # 1. 템플릿 다운로드 (CLI 모드에서만, interactive 모드는 이미 다운로드됨)
+    if [ "$IS_INTERACTIVE_MODE" = false ]; then
+        download_template
+
+        # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
+        if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
+            local type_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$PROJECT_TYPE"
+            ask_synology_option "$type_dir"
+        fi
+    fi
+
     # 2. 모드별 통합
     case $MODE in
         full)
@@ -1927,6 +2172,15 @@ execute_integration() {
             return  # commands 모드는 자체적으로 정리하고 종료
             ;;
     esac
+
+    # 2.1 템플릿 옵션 저장 (Synology 설정 등)
+    if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
+        # INCLUDE_SYNOLOGY가 설정되어 있으면 저장
+        if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
+            # 템플릿 버전 전달 (DEFAULT_VERSION 사용)
+            save_template_options "$DEFAULT_VERSION"
+        fi
+    fi
 
     # 3. 임시 파일 정리
     rm -rf "$TEMP_DIR"

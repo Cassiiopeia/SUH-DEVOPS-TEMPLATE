@@ -214,7 +214,7 @@ TestFlight 앱에서 최신 빌드를 확인하세요.
 **Android 빌드용:**
 - `ANDROID_KEYSTORE_BASE64` (선택)
 - `DEBUG_KEYSTORE` (선택)
-- `ENV` 또는 `ENV_FILE` (선택)
+- `ENV_FILE` 또는 `ENV` (선택)
 
 **iOS 빌드용:**
 - `IOS_CERTIFICATE_BASE64`
@@ -224,7 +224,7 @@ TestFlight 앱에서 최신 빌드를 확인하세요.
 - `APP_STORE_CONNECT_API_KEY_ID`
 - `APP_STORE_CONNECT_API_ISSUER_ID`
 - `APP_STORE_CONNECT_API_KEY_CONTENT`
-- `ENV` (선택)
+- `ENV_FILE` 또는 `ENV` (선택)
 
 ### Repository 권한
 

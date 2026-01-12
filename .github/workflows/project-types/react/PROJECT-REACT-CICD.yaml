@@ -12,7 +12,7 @@ name: PROJECT-REACT-CICD
 # ┌─────────────────────────────┬────────────────────────────────────┐
 # │ Secret 이름                 │ 설명                               │
 # ├─────────────────────────────┼────────────────────────────────────┤
-# │ ENV                         │ React/Next.js 환경변수 파일 내용  │
+# │ ENV_FILE (또는 ENV)         │ React/Next.js 환경변수 파일 내용  │
 # │ DOCKERHUB_USERNAME          │ DockerHub 사용자명                 │
 # │ DOCKERHUB_TOKEN             │ DockerHub 액세스 토큰              │
 # │ SERVER_HOST                 │ 배포 대상 서버 IP/도메인           │
@@ -60,7 +60,7 @@ jobs:
       - name: 환경변수 파일 생성 (${{ env.ENV_FILE_NAME }})
         run: |
           cat << 'EOF' > ./${{ env.ENV_FILE_NAME }}
-          ${{ secrets.ENV }}
+          ${{ secrets.ENV_FILE || secrets.ENV }}
           EOF
           echo "✅ ${{ env.ENV_FILE_NAME }} 파일 생성 완료"
 

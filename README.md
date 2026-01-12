@@ -1,6 +1,6 @@
 <div align="center">
 
-# SUH-DEVOPS-TEMPLATE
+# 🚀 SUH-DEVOPS-TEMPLATE
 
 **완전 자동화된 GitHub 프로젝트 관리 템플릿**
 

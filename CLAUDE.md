@@ -216,6 +216,7 @@ template_integrator.ps1
 LICENSE
 CONTRIBUTING.md
 CLAUDE.md
+docs/
 .github/scripts/test/
 .github/workflows/test/
 ```

@@ -388,7 +388,13 @@ cleanup_template_files() {
         rm -rf .github/workflows/test
         echo "  ✓ .github/workflows/test 폴더 삭제"
     fi
-    
+
+    # docs 폴더 삭제 (템플릿 전용 문서)
+    if [ -d "docs" ]; then
+        rm -rf docs
+        echo "  ✓ docs 폴더 삭제"
+    fi
+
     print_success "템플릿 관련 파일 삭제 완료"
 }
 

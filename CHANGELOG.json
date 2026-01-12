@@ -1,11 +1,42 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-09T07:30:13Z",
-    "currentVersion": "2.5.3",
+    "lastUpdated": "2026-01-12T04:36:10Z",
+    "currentVersion": "2.6.0",
     "projectType": "basic",
-    "totalReleases": 49
+    "totalReleases": 50
   },
   "releases": [
+    {
+      "version": "2.6.0",
+      "project_type": "basic",
+      "date": "2026-01-12",
+      "pr_number": 148,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트 v2.6.0\n\n* **새로운 기능**\n  * Python 프로젝트를 위한 CI/CD 워크플로우 추가\n  * Synology 배포 환경에서 PR/이슈 기반 프리뷰 환경 생성 기능 추가\n  * Spring 프로젝트 프리뷰 워크플로우를 PR 및 이슈 모두 지원하도록 확장\n\n* **개선 사항**\n  * 환경 변수 설정의 유연성 향상 (ENV_FILE 또는 ENV 선택 지원)\n  * 상태 확인 및 배포 모니터링 기능 강화\n\n* **문서**\n  * Flutter 테스트 빌드 트리거 가이드 업데이트",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Python 프로젝트를 위한 CI/CD 워크플로우 추가",
+            "Synology 배포 환경에서 PR/이슈 기반 프리뷰 환경 생성 기능 추가",
+            "Spring 프로젝트 프리뷰 워크플로우를 PR 및 이슈 모두 지원하도록 확장"
+          ]
+        },
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "환경 변수 설정의 유연성 향상 (ENV_FILE 또는 ENV 선택 지원)",
+            "상태 확인 및 배포 모니터링 기능 강화"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "Flutter 테스트 빌드 트리거 가이드 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.5.3",
       "project_type": "basic",

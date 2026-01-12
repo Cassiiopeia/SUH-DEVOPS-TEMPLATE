@@ -39,7 +39,7 @@
 #   - APP_STORE_CONNECT_API_KEY_BASE64: AuthKey_XXXXXX.p8 파일 (base64 인코딩)
 #
 # 📝 환경 설정 (선택):
-#   - ENV                             : .env 파일 내용 (앱에서 사용하는 환경변수)
+#   - ENV_FILE (또는 ENV)             : .env 파일 내용 (앱에서 사용하는 환경변수)
 #   - SECRETS_XCCONFIG                : ios/Flutter/Secrets.xcconfig 내용 (선택)
 #
 # ===================================================================
@@ -91,7 +91,7 @@ jobs:
       - name: Create .env file
         run: |
           cat << 'EOF' > ${{ env.ENV_FILE_PATH }}
-          ${{ secrets.ENV }}
+          ${{ secrets.ENV_FILE || secrets.ENV }}
           EOF
           echo "✅ ${{ env.ENV_FILE_PATH }} file created"
 
@@ -266,7 +266,7 @@ jobs:
         run: |
           if [ ! -f "${{ env.ENV_FILE_PATH }}" ]; then
             cat << 'EOF' > ${{ env.ENV_FILE_PATH }}
-          ${{ secrets.ENV }}
+          ${{ secrets.ENV_FILE || secrets.ENV }}
           EOF
             echo "✅ ${{ env.ENV_FILE_PATH }} file created (fallback)"
           fi

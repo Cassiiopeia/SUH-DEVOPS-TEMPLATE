@@ -1,5 +1,5 @@
 # ===================================================================
-# Spring Boot + Synology PR/Issue Preview 시스템
+# Python/FastAPI + Synology PR/Issue Preview 시스템
 # ===================================================================
 #
 # PR 또는 Issue 코멘트 명령어를 통해 Preview 환경을 자동으로 관리합니다.
@@ -20,18 +20,12 @@
 # 🔑 GitHub Secrets:
 #
 #   [필수] 모든 프로젝트 공통:
-#   - APPLICATION_PROD_YML: Spring application-prod.yml 전체 내용
+#   - ENV_FILE: .env 파일 전체 내용 (환경변수)
 #   - DOCKERHUB_USERNAME: Docker Hub 사용자명
 #   - DOCKERHUB_TOKEN: Docker Hub 액세스 토큰
 #   - SERVER_HOST: 시놀로지 서버 호스트 (예: suh-project.synology.me)
 #   - SERVER_USER: SSH 사용자명
 #   - SERVER_PASSWORD: SSH 비밀번호
-#
-#   [선택] 프로젝트별 추가 (필요 없으면 해당 step 삭제):
-#   - VERTEX_SA_KEY: Vertex AI 서비스 계정 키
-#   - FIREBASE_KEY_JSON: Firebase Admin SDK 키
-#   - FIREBASE_MESSAGING_SW_JS: Firebase Messaging Service Worker
-#   - 기타 프로젝트별 Secret...
 #
 # 📋 사전 요구사항:
 #   - Traefik 컨테이너 실행 중 (traefik-network)
@@ -39,7 +33,7 @@
 #   - 서버에 프로젝트 디렉토리 존재
 #
 #   ※ Health Check 방식:
-#     - HEALTH_CHECK_PATH로 HTTP 엔드포인트 확인 (기본값: /actuator/health)
+#     - HEALTH_CHECK_PATH로 HTTP 엔드포인트 확인 (기본값: /docs)
 #     - 폴백: HEALTH_CHECK_LOG_PATTERN으로 로그 패턴 매칭
 #
 # 🌐 Traefik 대시보드:
@@ -53,7 +47,7 @@
 #   - Providers: Docker 프로바이더 상태
 #
 #   배포 후 대시보드에서 새로운 Router/Service가 추가되었는지 확인할 수 있습니다.
-#   예: Router "suh-project-utility-pr-123" → Service "suh-project-utility-pr-123"
+#   예: Router "mapsee-ai-pr-123" → Service "mapsee-ai-pr-123"
 #
 # 📊 리소스 네이밍 규칙:
 #   - 컨테이너: {PROJECT_NAME}-pr-{PR번호}
@@ -63,28 +57,22 @@
 #
 # ===================================================================
 
-name: PROJECT-SPRING-SYNOLOGY-PR-PREVIEW
+name: PROJECT-PYTHON-SYNOLOGY-PR-PREVIEW
 
 # ===================================================================
 # ⚠️ [영역 1] 프로젝트별 설정 - 다른 프로젝트에서 사용 시 이 섹션만 수정하세요
 # ===================================================================
 env:
-  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용) (프로젝트별 수정 필요)
-  PROJECT_NAME: suh-project-utility
+  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)
+  PROJECT_NAME: 프로젝트명-ai
 
-  # Spring Boot 빌드 설정 (프로젝트별 수정 필요)
-  JAVA_VERSION: '17'
-  GRADLE_BUILD_CMD: './gradlew clean build -x test -Dspring.profiles.active=prod'
-  JAR_PATH: 'Suh-Web/build/libs/*.jar'
-  APPLICATION_YML_PATH: 'Suh-Web/src/main/resources/application-prod.yml'
-
-  # Docker 설정 (프로젝트별 수정 필요)
+  # Docker 설정
   DOCKERFILE_PATH: './Dockerfile'
-  INTERNAL_PORT: '8080'
+  INTERNAL_PORT: '8000'
 
   # 🗂️ 볼륨 마운트 설정 (프로젝트별 수정 필요, 빈값이면 마운트 안함)
-  PROJECT_TARGET_DIR: ""  # 서버의 데이터 디렉토리 (예: /volume1/projects/myapp/data)
-  PROJECT_MNT_DIR: ""     # 컨테이너 내부 마운트 경로 (예: /mnt/myapp)
+  PROJECT_TARGET_DIR: "/volume1/projects/프로젝트명/ai"  # 서버의 데이터 디렉토리
+  PROJECT_MNT_DIR: "/mnt/프로젝트명"                     # 컨테이너 내부 마운트 경로
 
   # Traefik & Preview 도메인 설정 (환경 구축 후 수정 금지)
   TRAEFIK_NETWORK: traefik-network
@@ -103,13 +91,13 @@ env:
   # - HEALTH_CHECK_LOG_PATTERN: 로그 패턴 매칭 (HTTP 실패 시 폴백)
   # - API_DOCS_PATH: API 문서 URL (빈값이면 배포 코멘트에 미표시)
   #
-  # Spring Boot 기본값:
-  #   HEALTH_CHECK_PATH: '/actuator/health'
-  #   HEALTH_CHECK_LOG_PATTERN: 'Started .* in [0-9.]+ seconds'
-  #   API_DOCS_PATH: '/swagger-ui.html' 또는 '/swagger-ui/index.html'
-  HEALTH_CHECK_PATH: '/actuator/health'
-  HEALTH_CHECK_LOG_PATTERN: 'Started .* in [0-9.]+ seconds'
-  API_DOCS_PATH: '/docs/swagger'
+  # 프레임워크별 기본값 예시:
+  #   FastAPI: '/docs', 'Uvicorn running on|Application startup complete'
+  #   Spring Boot: '/actuator/health', 'Started.*Application|Tomcat started on port'
+  #   Express: '/health', 'Server listening on port'
+  HEALTH_CHECK_PATH: '/docs'
+  HEALTH_CHECK_LOG_PATTERN: 'Uvicorn running on|Application startup complete'
+  API_DOCS_PATH: '/docs'
 
 # ===================================================================
 # 트리거 설정
@@ -231,8 +219,7 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              '| 🔨 프로젝트 빌드 | ⏳ 진행 중... | - |',
-              '| 🐳 Docker 이미지 생성 | ⏸️ 대기 | - |',
+              '| 🐳 Docker 이미지 빌드 & Push | ⏳ 진행 중... | - |',
               '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -250,106 +237,24 @@ jobs:
 
             core.setOutput('comment_id', comment.id);
             core.setOutput('start_time', startTime);
+            core.setOutput('docker_start', startTime);
 
       - name: 코드 체크아웃
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.pr.outputs.ref }}
 
-      - name: JDK 설정
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
-
-      - name: Gradle 권한 설정
-        run: chmod +x gradlew
-
       # =================================================================
-      # ⚠️ [영역 2] 프로젝트별 Secret 파일 생성
+      # ⚠️ [영역 2] 환경변수 파일 생성
       # =================================================================
-      #
-      # 📋 필수 (모든 Spring Boot 프로젝트):
-      #   - application-prod.yml
-      #
-      # 📋 선택 (프로젝트에 따라 추가/제거):
-      #   - Firebase: firebase-admin-sdk.json, firebase-messaging-sw.js
-      #   - Vertex AI: gen-lang-client-xxx.json
-      #   - 기타 설정 파일: admin.yml, prompt.yml 등
-      #
-      # ⚠️ 다른 프로젝트에서 사용 시:
-      #   1. 필요 없는 step은 삭제하세요
-      #   2. 필요한 step을 추가하세요
-      #   3. 파일 경로를 프로젝트에 맞게 수정하세요
-      # =================================================================
-
-      # [필수] Spring Boot 설정 파일
-      - name: "[필수] application-prod.yml 생성"
+      - name: "[필수] .env 파일 생성"
         run: |
-          mkdir -p $(dirname ${{ env.APPLICATION_YML_PATH }})
-          cat << 'EOF' > ${{ env.APPLICATION_YML_PATH }}
-          ${{ secrets.APPLICATION_PROD_YML }}
+          cat << 'EOF' > .env
+          ${{ secrets.ENV_FILE }}
           EOF
-
-      # [선택] 아래는 예시입니다. 필요 없으면 삭제하세요.
-      # - name: "[선택] Vertex AI Service Account Key 생성"
-      #   env:
-      #     VERTEX_SA_KEY: ${{ secrets.VERTEX_SA_KEY }}
-      #   run: |
-      #     echo "$VERTEX_SA_KEY" | sed 's/\\n/\n/g' > ./Suh-Web/src/main/resources/vertex-ai-key.json
-
-      # - name: "[선택] Firebase Admin SDK 생성"
-      #   env:
-      #     FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
-      #   run: |
-      #     echo "$FIREBASE_KEY_JSON" | sed 's/\\n/\n/g' > ./Suh-Web/src/main/resources/firebase-admin-sdk.json
-
       # =================================================================
-      # ⚠️ [영역 2 끝] 프로젝트별 Secret 파일 생성 끝
+      # ⚠️ [영역 2 끝] 환경변수 파일 생성 끝
       # =================================================================
-
-      - name: Gradle 빌드
-        run: ${{ env.GRADLE_BUILD_CMD }}
-
-      - name: 진행 상황 - 빌드 완료
-        id: build_progress
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const commentId = ${{ steps.progress.outputs.comment_id }};
-            const startTime = ${{ steps.progress.outputs.start_time }};
-            const now = Date.now();
-            const elapsed = now - startTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            const buildDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
-            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-
-            const body = [
-              '## 🚀 PR Preview 빌드 중...',
-              '',
-              '| 단계 | 상태 | 소요 시간 |',
-              '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
-              '| 🐳 Docker 이미지 생성 | ⏳ 진행 중... | - |',
-              '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
-              '',
-              `**[📋 실시간 로그 보기](${runUrl})**`,
-              '',
-              '---',
-              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
-            ].join('\n');
-
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: commentId,
-              body: body
-            });
-
-            core.setOutput('build_duration', buildDuration);
-            core.setOutput('docker_start', now);
 
       - name: Docker 로그인
         uses: docker/login-action@v3
@@ -376,8 +281,7 @@ jobs:
         with:
           script: |
             const commentId = ${{ steps.progress.outputs.comment_id }};
-            const buildDuration = '${{ steps.build_progress.outputs.build_duration }}';
-            const dockerStart = ${{ steps.build_progress.outputs.docker_start }};
+            const dockerStart = ${{ steps.progress.outputs.docker_start }};
             const now = Date.now();
             const dockerElapsed = now - dockerStart;
             const minutes = Math.floor(dockerElapsed / 60000);
@@ -390,8 +294,7 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
-              `| 🐳 Docker 이미지 생성 | ✅ 완료 | ${dockerDuration} |`,
+              `| 🐳 Docker 이미지 빌드 & Push | ✅ 완료 | ${dockerDuration} |`,
               '| 🚀 서버 배포 & Health Check | ⏳ 진행 중... | - |',
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -407,7 +310,6 @@ jobs:
               body: body
             });
 
-            core.setOutput('build_duration', buildDuration);
             core.setOutput('docker_duration', dockerDuration);
             core.setOutput('deploy_start', now);
 
@@ -467,7 +369,7 @@ jobs:
               --label "traefik.http.routers.${CONTAINER_NAME}.entrypoints=web" \
               --label "traefik.http.services.${CONTAINER_NAME}.loadbalancer.server.port=${INTERNAL_PORT}" \
               -e TZ=Asia/Seoul \
-              -e SPRING_PROFILES_ACTIVE=prod \
+              -e ENVIRONMENT=prod \
               $VOLUME_OPTS \
               "${IMAGE}"
 
@@ -505,10 +407,9 @@ jobs:
               if [ "$STATUS" = "running" ]; then
                 # 2. HTTP Health Check 시도 (HEALTH_CHECK_PATH가 설정된 경우에만)
                 if [ -n "$HEALTH_PATH" ]; then
-                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" wget -qO- "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
+                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
 
-                  # Spring Actuator 응답 확인 ({"status":"UP"}) 또는 일반 HTTP 응답
-                  if echo "$HEALTH" | grep -q '"status":"UP"' || [ -n "$HEALTH" ]; then
+                  if [ -n "$HEALTH" ]; then
                     echo "✅ 정상 기동 확인! (HTTP 응답: ${HEALTH_PATH})"
                     HEALTH_CHECK_PASSED=true
                     HEALTH_CHECK_METHOD="HTTP"
@@ -553,7 +454,6 @@ jobs:
         with:
           script: |
             const commentId = ${{ steps.progress.outputs.comment_id }};
-            const buildDuration = '${{ steps.docker_progress.outputs.build_duration }}';
             const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
             const deployStart = ${{ steps.docker_progress.outputs.deploy_start }};
             const now = Date.now();
@@ -586,8 +486,7 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
-              `| 🐳 Docker 이미지 생성 | ✅ 완료 | ${dockerDuration} |`,
+              `| 🐳 Docker 이미지 빌드 & Push | ✅ 완료 | ${dockerDuration} |`,
               `| 🚀 서버 배포 & Health Check | ✅ 완료 | ${deployDuration} |`,
               '',
               '### 🌐 Preview 환경',
@@ -624,35 +523,24 @@ jobs:
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
             // 진행 상황에 따라 어디서 실패했는지 표시
-            const buildDuration = '${{ steps.build_progress.outputs.build_duration }}';
             const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
 
             // 실패 지점 판단 - 초기 단계 실패도 구분
-            let buildStatus, dockerStatus, deployStatus;
-            let buildTime = '-', dockerTime = '-';
+            let dockerStatus, deployStatus;
+            let dockerTime = '-';
 
             if (!commentId) {
               // 진행 상황 댓글 생성 전 실패 (초기화 단계)
-              buildStatus = '⚠️ 초기화 실패';
-              dockerStatus = '-';
+              dockerStatus = '⚠️ 초기화 실패';
               deployStatus = '-';
-            } else if (!buildDuration || buildDuration === '') {
-              // 빌드 단계에서 실패
-              buildStatus = '❌ 실패';
-              dockerStatus = '⏸️ 대기';
-              deployStatus = '⏸️ 대기';
             } else if (!dockerDuration || dockerDuration === '') {
-              // Docker 단계에서 실패
-              buildStatus = '✅ 완료';
+              // Docker 빌드 단계에서 실패
               dockerStatus = '❌ 실패';
               deployStatus = '⏸️ 대기';
-              buildTime = buildDuration;
             } else {
               // 배포 단계에서 실패
-              buildStatus = '✅ 완료';
               dockerStatus = '✅ 완료';
               deployStatus = '❌ 실패';
-              buildTime = buildDuration;
               dockerTime = dockerDuration;
             }
 
@@ -661,17 +549,16 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ${buildStatus} | ${buildTime} |`,
-              `| 🐳 Docker 이미지 생성 | ${dockerStatus} | ${dockerTime} |`,
+              `| 🐳 Docker 이미지 빌드 & Push | ${dockerStatus} | ${dockerTime} |`,
               `| 🚀 서버 배포 & Health Check | ${deployStatus} | - |`,
               '',
               `**[📋 빌드/배포 로그 확인](${runUrl})**`,
               '',
               '### 🔍 가능한 원인',
-              '- Gradle 빌드 실패',
-              '- Docker 이미지 빌드 실패',
-              '- 컨테이너 시작 실패 (Spring Boot 기동 오류)',
+              '- Docker 이미지 빌드 실패 (Python 의존성 문제)',
+              '- 컨테이너 시작 실패 (FastAPI/Uvicorn 기동 오류)',
               '- Health Check 타임아웃 (120초 내 기동 완료 안됨)',
+              '- 환경변수 누락 (.env 파일 설정 확인)',
               '',
               '### 💡 다음 단계',
               '1. 위 링크에서 빌드/배포 로그를 확인하세요',
@@ -888,8 +775,7 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              '| 🔨 프로젝트 빌드 | ⏳ 진행 중... | - |',
-              '| 🐳 Docker 이미지 생성 | ⏸️ 대기 | - |',
+              '| 🐳 Docker 이미지 빌드 & Push | ⏳ 진행 중... | - |',
               '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -907,6 +793,7 @@ jobs:
 
             core.setOutput('comment_id', comment.id);
             core.setOutput('start_time', startTime);
+            core.setOutput('docker_start', startTime);
 
       - name: 코드 체크아웃
         if: steps.check_branch.outputs.exists == 'true'
@@ -914,78 +801,18 @@ jobs:
         with:
           ref: ${{ needs.get-branch-from-issue.outputs.branch_name }}
 
-      - name: JDK 설정
-        if: steps.check_branch.outputs.exists == 'true'
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
-
-      - name: Gradle 권한 설정
-        if: steps.check_branch.outputs.exists == 'true'
-        run: chmod +x gradlew
-
       # =================================================================
-      # ⚠️ [영역 2] 프로젝트별 Secret 파일 생성
+      # ⚠️ [영역 2] 환경변수 파일 생성
       # =================================================================
-      - name: "[필수] application-prod.yml 생성"
+      - name: "[필수] .env 파일 생성"
         if: steps.check_branch.outputs.exists == 'true'
         run: |
-          mkdir -p $(dirname ${{ env.APPLICATION_YML_PATH }})
-          cat << 'EOF' > ${{ env.APPLICATION_YML_PATH }}
-          ${{ secrets.APPLICATION_PROD_YML }}
+          cat << 'EOF' > .env
+          ${{ secrets.ENV_FILE }}
           EOF
       # =================================================================
-      # ⚠️ [영역 2 끝] 프로젝트별 Secret 파일 생성 끝
+      # ⚠️ [영역 2 끝] 환경변수 파일 생성 끝
       # =================================================================
-
-      - name: Gradle 빌드
-        if: steps.check_branch.outputs.exists == 'true'
-        run: ${{ env.GRADLE_BUILD_CMD }}
-
-      - name: 진행 상황 - 빌드 완료
-        if: steps.check_branch.outputs.exists == 'true'
-        id: build_progress
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const commentId = ${{ steps.progress.outputs.comment_id }};
-            const branchName = '${{ needs.get-branch-from-issue.outputs.branch_name }}';
-            const startTime = ${{ steps.progress.outputs.start_time }};
-            const now = Date.now();
-            const elapsed = now - startTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            const buildDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
-            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-
-            const body = [
-              '## 🚀 Issue Preview 빌드 중...',
-              '',
-              `**브랜치**: \`${branchName}\``,
-              '',
-              '| 단계 | 상태 | 소요 시간 |',
-              '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
-              '| 🐳 Docker 이미지 생성 | ⏳ 진행 중... | - |',
-              '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
-              '',
-              `**[📋 실시간 로그 보기](${runUrl})**`,
-              '',
-              '---',
-              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
-            ].join('\n');
-
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: commentId,
-              body: body
-            });
-
-            core.setOutput('build_duration', buildDuration);
-            core.setOutput('docker_start', now);
 
       - name: Docker 로그인
         if: steps.check_branch.outputs.exists == 'true'
@@ -1017,8 +844,7 @@ jobs:
           script: |
             const commentId = ${{ steps.progress.outputs.comment_id }};
             const branchName = '${{ needs.get-branch-from-issue.outputs.branch_name }}';
-            const buildDuration = '${{ steps.build_progress.outputs.build_duration }}';
-            const dockerStart = ${{ steps.build_progress.outputs.docker_start }};
+            const dockerStart = ${{ steps.progress.outputs.docker_start }};
             const now = Date.now();
             const dockerElapsed = now - dockerStart;
             const minutes = Math.floor(dockerElapsed / 60000);
@@ -1033,8 +859,7 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
-              `| 🐳 Docker 이미지 생성 | ✅ 완료 | ${dockerDuration} |`,
+              `| 🐳 Docker 이미지 빌드 & Push | ✅ 완료 | ${dockerDuration} |`,
               '| 🚀 서버 배포 & Health Check | ⏳ 진행 중... | - |',
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -1050,7 +875,6 @@ jobs:
               body: body
             });
 
-            core.setOutput('build_duration', buildDuration);
             core.setOutput('docker_duration', dockerDuration);
             core.setOutput('deploy_start', now);
 
@@ -1111,7 +935,7 @@ jobs:
               --label "traefik.http.routers.${CONTAINER_NAME}.entrypoints=web" \
               --label "traefik.http.services.${CONTAINER_NAME}.loadbalancer.server.port=${INTERNAL_PORT}" \
               -e TZ=Asia/Seoul \
-              -e SPRING_PROFILES_ACTIVE=prod \
+              -e ENVIRONMENT=prod \
               $VOLUME_OPTS \
               "${IMAGE}"
 
@@ -1149,10 +973,9 @@ jobs:
               if [ "$STATUS" = "running" ]; then
                 # 2. HTTP Health Check 시도 (HEALTH_CHECK_PATH가 설정된 경우에만)
                 if [ -n "$HEALTH_PATH" ]; then
-                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" wget -qO- "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
+                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
 
-                  # Spring Actuator 응답 확인 ({"status":"UP"}) 또는 일반 HTTP 응답
-                  if echo "$HEALTH" | grep -q '"status":"UP"' || [ -n "$HEALTH" ]; then
+                  if [ -n "$HEALTH" ]; then
                     echo "✅ 정상 기동 확인! (HTTP 응답: ${HEALTH_PATH})"
                     HEALTH_CHECK_PASSED=true
                     HEALTH_CHECK_METHOD="HTTP"
@@ -1199,7 +1022,6 @@ jobs:
           script: |
             const commentId = ${{ steps.progress.outputs.comment_id }};
             const branchName = '${{ needs.get-branch-from-issue.outputs.branch_name }}';
-            const buildDuration = '${{ steps.docker_progress.outputs.build_duration }}';
             const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
             const deployStart = ${{ steps.docker_progress.outputs.deploy_start }};
             const now = Date.now();
@@ -1235,8 +1057,7 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ✅ 완료 | ${buildDuration} |`,
-              `| 🐳 Docker 이미지 생성 | ✅ 완료 | ${dockerDuration} |`,
+              `| 🐳 Docker 이미지 빌드 & Push | ✅ 완료 | ${dockerDuration} |`,
               `| 🚀 서버 배포 & Health Check | ✅ 완료 | ${deployDuration} |`,
               '',
               '### 🌐 Preview 환경',
@@ -1273,30 +1094,20 @@ jobs:
             const branchName = '${{ needs.get-branch-from-issue.outputs.branch_name }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
-            const buildDuration = '${{ steps.build_progress.outputs.build_duration }}';
             const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
 
-            let buildStatus, dockerStatus, deployStatus;
-            let buildTime = '-', dockerTime = '-';
+            let dockerStatus, deployStatus;
+            let dockerTime = '-';
 
             if (!commentId) {
-              buildStatus = '⚠️ 초기화 실패';
-              dockerStatus = '-';
+              dockerStatus = '⚠️ 초기화 실패';
               deployStatus = '-';
-            } else if (!buildDuration || buildDuration === '') {
-              buildStatus = '❌ 실패';
-              dockerStatus = '⏸️ 대기';
-              deployStatus = '⏸️ 대기';
             } else if (!dockerDuration || dockerDuration === '') {
-              buildStatus = '✅ 완료';
               dockerStatus = '❌ 실패';
               deployStatus = '⏸️ 대기';
-              buildTime = buildDuration;
             } else {
-              buildStatus = '✅ 완료';
               dockerStatus = '✅ 완료';
               deployStatus = '❌ 실패';
-              buildTime = buildDuration;
               dockerTime = dockerDuration;
             }
 
@@ -1307,17 +1118,16 @@ jobs:
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔨 프로젝트 빌드 | ${buildStatus} | ${buildTime} |`,
-              `| 🐳 Docker 이미지 생성 | ${dockerStatus} | ${dockerTime} |`,
+              `| 🐳 Docker 이미지 빌드 & Push | ${dockerStatus} | ${dockerTime} |`,
               `| 🚀 서버 배포 & Health Check | ${deployStatus} | - |`,
               '',
               `**[📋 빌드/배포 로그 확인](${runUrl})**`,
               '',
               '### 🔍 가능한 원인',
-              '- Gradle 빌드 실패',
-              '- Docker 이미지 빌드 실패',
-              '- 컨테이너 시작 실패 (Spring Boot 기동 오류)',
+              '- Docker 이미지 빌드 실패 (Python 의존성 문제)',
+              '- 컨테이너 시작 실패 (FastAPI/Uvicorn 기동 오류)',
               '- Health Check 타임아웃 (120초 내 기동 완료 안됨)',
+              '- 환경변수 누락 (.env 파일 설정 확인)',
               '',
               '### 💡 다음 단계',
               '1. 위 링크에서 빌드/배포 로그를 확인하세요',
@@ -1387,10 +1197,10 @@ jobs:
             IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:pr-${PR_NUMBER}"
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "🗑️ Preview 삭제"
+            echo "🗑️ PR Preview 삭제"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "📦 프로젝트: ${PROJECT_NAME}"
-            echo "🔢 번호: #${PR_NUMBER}"
+            echo "🔢 PR 번호: #${PR_NUMBER}"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
             # 컨테이너 삭제

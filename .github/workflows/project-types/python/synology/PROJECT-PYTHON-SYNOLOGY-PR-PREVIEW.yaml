@@ -1037,6 +1037,7 @@ jobs:
             const issueNumber = ${{ needs.get-branch-from-issue.outputs.issue_number }};
             const domain = `${projectName}-pr-${issueNumber}.${domainSuffix}`;
             const previewUrl = `http://${domain}:${previewPort}`;
+            const sha = '${{ steps.issue.outputs.sha }}';
 
             // Preview 환경 테이블 구성 (API_DOCS_PATH가 있을 때만 API Docs 행 추가)
             const envRows = [
@@ -1047,6 +1048,7 @@ jobs:
             }
             envRows.push(`| **컨테이너** | \`${projectName}-pr-${issueNumber}\` |`);
             envRows.push(`| **브랜치** | \`${branchName}\` |`);
+            envRows.push(`| **커밋** | \`${sha}\` |`);
 
             const body = [
               '## ✅ Issue Preview 배포 완료!',

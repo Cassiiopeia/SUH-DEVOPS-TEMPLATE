@@ -563,12 +563,90 @@ SYNOLOGY_PASSWORD
 
 | 문서 | 위치 | 설명 |
 |------|------|------|
-| README.md | 루트 | 메인 문서 |
+| README.md | 루트 | 메인 문서 (간결하게 유지, ~150줄) |
 | CONTRIBUTING.md | 루트 | 기여 가이드 |
 | CHANGELOG.md | 루트 | 변경 이력 (자동생성) |
+| VERSION-CONTROL.md | docs/ | 버전 관리 시스템 |
+| CHANGELOG-AUTOMATION.md | docs/ | 체인지로그 자동화 |
+| PR-PREVIEW.md | docs/ | PR Preview 시스템 |
+| ISSUE-AUTOMATION.md | docs/ | 이슈 자동화 (Issue Helper, QA 봇) |
 | TEMPLATE-INTEGRATOR.md | docs/ | 통합 스크립트 가이드 |
 | FLUTTER-CICD-OVERVIEW.md | docs/ | Flutter CI/CD 전체 가이드 |
 | FLUTTER-TESTFLIGHT-WIZARD.md | docs/ | iOS 배포 설정 |
 | FLUTTER-PLAYSTORE-WIZARD.md | docs/ | Android 배포 설정 |
 | FLUTTER-TEST-BUILD-TRIGGER.md | docs/ | 테스트 빌드 트리거 |
 | SYNOLOGY-DEPLOYMENT-GUIDE.md | docs/ | Synology NAS 배포 가이드 |
+| TROUBLESHOOTING.md | docs/ | 문제 해결 가이드 |
+
+---
+
+## 문서 관리 규칙
+
+### README.md 유지 원칙
+
+README.md는 **150줄 이하**로 간결하게 유지합니다.
+
+```
+README.md 구조:
+├── 헤더 (중앙 정렬, 배지)
+├── "왜 이 템플릿인가?" (비교 테이블)
+├── 빠른 시작 (간략)
+├── 주요 기능 (테이블 + docs 링크)
+├── 지원 프로젝트 타입
+├── 댓글 명령어 (@suh-lab)
+├── 설정 (간략)
+├── 문서 링크
+└── 지원/라이선스
+```
+
+**상세 내용은 모두 `docs/` 폴더로 분리**합니다.
+
+### @suh-lab 명령어 문서화 규칙
+
+`@suh-lab` 댓글 명령어는 두 곳에 기록합니다:
+
+| 위치 | 내용 |
+|------|------|
+| `README.md` | 명령어 요약 테이블 (한눈에 보기) |
+| `docs/[기능].md` | 상세 사용법 및 트러블슈팅 |
+
+**명령어 추가 시 업데이트 순서**:
+1. 해당 기능의 `docs/[기능].md`에 상세 내용 추가
+2. `README.md`의 "댓글 명령어" 테이블에 요약 추가
+3. `CLAUDE.md`의 "트리거 키워드" 섹션 업데이트
+
+### 워크플로우 변경 시 문서 업데이트
+
+워크플로우 파일을 수정하면 다음을 확인합니다:
+
+| 변경 유형 | 업데이트 필요 문서 |
+|----------|-------------------|
+| 새 워크플로우 추가 | CLAUDE.md (핵심 워크플로우), 해당 docs/ |
+| 트리거 조건 변경 | 해당 docs/, CLAUDE.md (트리거 키워드) |
+| 환경변수 추가 | 해당 docs/ |
+| 새 댓글 명령어 | README.md, CLAUDE.md, 해당 docs/ |
+
+### 신규 기능 문서화 체크리스트
+
+```markdown
+새 기능 추가 시:
+- [ ] 해당 기능의 docs/ 문서 생성/업데이트
+- [ ] README.md "주요 기능" 테이블 업데이트 (필요시)
+- [ ] README.md "댓글 명령어" 테이블 업데이트 (필요시)
+- [ ] README.md "문서" 테이블에 링크 추가
+- [ ] CLAUDE.md 관련 섹션 업데이트
+- [ ] 모든 링크 유효성 확인
+```
+
+### docs/ 폴더 네이밍 규칙
+
+```
+docs/
+├── [기능명].md              # 단일 기능 문서
+├── [타입]-[기능].md         # 타입별 기능 (예: FLUTTER-CICD-OVERVIEW.md)
+└── [타입]-[상세]-[기능].md  # 세부 기능 (예: FLUTTER-TESTFLIGHT-WIZARD.md)
+```
+
+**파일명 규칙**:
+- 대문자 + 하이픈 (UPPER-KEBAB-CASE)
+- 예: `PR-PREVIEW.md`, `VERSION-CONTROL.md`

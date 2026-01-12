@@ -24,7 +24,7 @@
 # - 대소문자 구분 없음
 # - 콜론(:) 앞뒤 공백 자유롭게 허용
 # - "version", "버전", "최신", "current", "recent" 등의 키워드 포함 시 자동 인식
-# - 주석 <!-- 수정하지마세요 자동으로 동기화 됩니다 -->는 자동으로 추가됩니다.
+# - 주석 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->가 자동으로 추가됩니다.
 #
 # ❌ 지원되지 않는 형식 (에러 발생):
 # - ## 최신 버전: v1.0.0** (마크다운 볼드 문자 사용 금지)
@@ -170,10 +170,10 @@ jobs:
             # 파일 맨 앞에 제목이 있는지 확인 후 그 다음에 추가
             if grep -q "^# " README.md; then
               # 첫 번째 제목 다음에 추가
-              sed -i '/^# /a\\n<!-- 수정하지마세요 자동으로 동기화 됩니다 -->\n## 최신 버전 : '"$VERSION_TEXT" README.md
+              sed -i '/^# /a\\n<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->\n## 최신 버전 : '"$VERSION_TEXT" README.md
             else
               # 파일 맨 앞에 추가
-              sed -i '1i\<!-- 수정하지마세요 자동으로 동기화 됩니다 -->\n## 최신 버전 : '"$VERSION_TEXT"'\n' README.md
+              sed -i '1i\<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->\n## 최신 버전 : '"$VERSION_TEXT"'\n' README.md
             fi
             echo "✅ 기본 버전 정보 추가 완료: $VERSION_TEXT"
           else
@@ -196,16 +196,16 @@ jobs:
 
             if [ $PREV_LINE_NUMBER -gt 0 ]; then
               PREV_LINE=$(sed -n "${PREV_LINE_NUMBER}p" README.md)
-              if [[ "$PREV_LINE" != *"수정하지마세요 자동으로 동기화 됩니다"* ]]; then
+              if [[ "$PREV_LINE" != *"AUTO-VERSION-SECTION"* ]]; then
                 # 주석이 없으면 버전 라인 위에 추가
-                sed -i "${PREV_LINE_NUMBER}a\\<!-- 수정하지마세요 자동으로 동기화 됩니다 -->" README.md
+                sed -i "${PREV_LINE_NUMBER}a\\<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->" README.md
                 echo "✅ 자동 업데이트 주석 추가 완료"
                 # 주석 추가로 라인 번호가 변경됨
                 LINE_NUMBER=$((LINE_NUMBER + 1))
               fi
             else
               # 첫 번째 라인이면 그 위에 추가
-              sed -i '1i\<!-- 수정하지마세요 자동으로 동기화 됩니다 -->' README.md
+              sed -i '1i\<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->' README.md
               echo "✅ 자동 업데이트 주석 추가 완료"
               # 주석 추가로 라인 번호가 변경됨
               LINE_NUMBER=$((LINE_NUMBER + 1))

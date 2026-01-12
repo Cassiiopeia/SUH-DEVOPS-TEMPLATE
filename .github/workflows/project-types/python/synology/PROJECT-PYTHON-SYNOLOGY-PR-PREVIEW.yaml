@@ -64,15 +64,15 @@ name: PROJECT-PYTHON-SYNOLOGY-PR-PREVIEW
 # ===================================================================
 env:
   # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)
-  PROJECT_NAME: mapsee-ai
+  PROJECT_NAME: 프로젝트명-ai
 
   # Docker 설정
   DOCKERFILE_PATH: './Dockerfile'
   INTERNAL_PORT: '8000'
 
   # 🗂️ 볼륨 마운트 설정 (프로젝트별 수정 필요, 빈값이면 마운트 안함)
-  PROJECT_TARGET_DIR: "/volume1/projects/mapsee/ai"  # 서버의 데이터 디렉토리
-  PROJECT_MNT_DIR: "/mnt/mapsee"                     # 컨테이너 내부 마운트 경로
+  PROJECT_TARGET_DIR: "/volume1/projects/프로젝트명/ai"  # 서버의 데이터 디렉토리
+  PROJECT_MNT_DIR: "/mnt/프로젝트명"                     # 컨테이너 내부 마운트 경로
 
   # Traefik & Preview 도메인 설정 (환경 구축 후 수정 금지)
   TRAEFIK_NETWORK: traefik-network

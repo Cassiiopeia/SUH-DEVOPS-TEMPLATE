@@ -44,16 +44,17 @@ on:
 # 환경 변수 설정
 # ===================================================================
 env:
-  # 🔧 프로젝트 설정
-  PROJECT_NAME: "mapsee-ai"
+  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)
+  PROJECT_NAME: "프로젝트명-ai"
+  # 프로젝트 배포 포트
   PROJECT_MAIN_PORT: "8092"
 
   # 🐍 Python 설정
   PYTHON_VERSION: "3.13"
 
   # 🗂️ 볼륨 마운트 설정 (프로젝트별 수정 필요, 빈값이면 마운트 안함)
-  PROJECT_TARGET_DIR: "/volume1/projects/mapsee/ai"  # 서버의 데이터 디렉토리
-  PROJECT_MNT_DIR: "/mnt/mapsee"                     # 컨테이너 내부 마운트 경로
+  PROJECT_TARGET_DIR: "/volume1/projects/프로젝트명/ai"  # 서버의 데이터 디렉토리
+  PROJECT_MNT_DIR: "/mnt/프로젝트명"                     # 컨테이너 내부 마운트 경로
 
 jobs:
   # ===================================================================

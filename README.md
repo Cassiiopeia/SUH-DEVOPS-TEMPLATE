@@ -39,11 +39,12 @@ GitHub에서 **"Use this template"** 클릭 → 1분 내 자동 초기화 완료
 
 ### 기존 프로젝트
 
+##### macOS / Linux
 ```bash
-# macOS / Linux
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
-
-# Windows PowerShell
+```
+##### Windows PowerShell
+```bash
 iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
 ```
 

@@ -539,7 +539,9 @@ metadata:
 | 키워드 | 워크플로우 | 기능 |
 |--------|-----------|------|
 | `@suh-lab create qa` | QA-ISSUE-CREATION-BOT | QA 이슈 자동 생성 |
-| `@suh-lab build app` | SUH-LAB-APP-BUILD-TRIGGER | Android APK + iOS 빌드 |
+| `@suh-lab build app` | SUH-LAB-APP-BUILD-TRIGGER | Android + iOS 빌드 |
+| `@suh-lab apk build` | SUH-LAB-APP-BUILD-TRIGGER | Android만 빌드 |
+| `@suh-lab ios build` | SUH-LAB-APP-BUILD-TRIGGER | iOS만 빌드 |
 
 ### 브랜치 기반 트리거
 

@@ -227,5 +227,5 @@ on:
 ## 관련 문서
 
 - [PR Preview](PR-PREVIEW.md) - `@suh-lab server` 명령어
-- [Flutter 빌드 트리거](FLUTTER-TEST-BUILD-TRIGGER.md) - `@suh-lab build app` 명령어
+- [Flutter 빌드 트리거](FLUTTER-TEST-BUILD-TRIGGER.md) - `@suh-lab build app/apk build/ios build` 명령어
 - [트러블슈팅](TROUBLESHOOTING.md)

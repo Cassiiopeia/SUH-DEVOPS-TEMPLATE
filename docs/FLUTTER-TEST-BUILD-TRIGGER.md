@@ -18,13 +18,13 @@
 
 ## 개요
 
-테스트 빌드 트리거는 PR 또는 이슈에 `@suh-lab build app` 댓글을 작성하면 자동으로 Android APK와 iOS TestFlight 빌드를 실행하는 기능입니다.
+테스트 빌드 트리거는 PR 또는 이슈에 빌드 명령어 댓글을 작성하면 자동으로 Android APK와 iOS TestFlight 빌드를 실행하는 기능입니다.
 
 **주요 특징:**
 - PR과 이슈 모두 지원
-- Android APK + iOS TestFlight 동시 빌드
+- **3가지 빌드 옵션**: 전체 빌드 / Android만 / iOS만
 - 테스트 버전 `0.0.0` 고정 (운영 버전과 분리)
-- 고유한 빌드 번호 자동 생성
+- **플랫폼별 독립 빌드 카운트** (빌드 번호 중복 방지)
 - 빌드 결과 자동 댓글 작성
 
 ---
@@ -33,10 +33,18 @@
 
 ### PR에서 빌드 트리거
 
-PR에 다음 댓글을 작성합니다:
+PR에 다음 댓글 중 하나를 작성합니다:
+
+| 명령어 | 빌드 대상 |
+|--------|----------|
+| `@suh-lab build app` | Android + iOS 모두 |
+| `@suh-lab apk build` | Android만 |
+| `@suh-lab ios build` | iOS만 |
 
 ```
-@suh-lab build app
+@suh-lab build app    # 양쪽 모두 빌드
+@suh-lab apk build    # Android만 빌드
+@suh-lab ios build    # iOS만 빌드
 ```
 
 ### 이슈에서 빌드 트리거
@@ -53,20 +61,24 @@ feature/20240101_#123_기능명
 ```
 ```
 
-3. 위 조건이 충족된 이슈에 `@suh-lab build app` 댓글 작성
+3. 위 조건이 충족된 이슈에 빌드 명령어 댓글 작성
 
 ### 지원하는 키워드
 
-다음 세 단어가 모두 포함되어 있으면 트리거됩니다:
-- `@suh-lab`
-- `build`
-- `app`
+다음 패턴 중 하나가 포함되어 있으면 트리거됩니다:
+
+| 패턴 | 필요한 키워드 | 빌드 대상 |
+|------|--------------|----------|
+| 전체 빌드 | `@suh-lab` + `build` + `app` | Android + iOS |
+| APK만 | `@suh-lab` + `apk` + `build` | Android |
+| iOS만 | `@suh-lab` + `ios` + `build` | iOS |
 
 **예시:**
 ```
-@suh-lab build app
-@suh-lab 으로 build 해서 app 테스트 부탁드려요
-@suh-lab please build the app
+@suh-lab build app                      # Android + iOS 빌드
+@suh-lab apk build                      # Android만 빌드
+@suh-lab ios build                      # iOS만 빌드
+@suh-lab 으로 build 해서 app 테스트해주세요  # Android + iOS 빌드
 ```
 
 ---
@@ -80,13 +92,29 @@ feature/20240101_#123_기능명
 {PR/이슈번호}{빌드횟수(2자리)}
 ```
 
-### 예시
-| PR/이슈 | 빌드 횟수 | 빌드 번호 |
-|---------|----------|-----------|
-| #387 | 1번째 | `38700` |
-| #387 | 2번째 | `38701` |
-| #387 | 10번째 | `38709` |
-| #123 | 1번째 | `12300` |
+### 플랫폼별 독립 카운트
+
+**중요**: 각 빌드 타입은 **독립적인 카운트**를 가집니다.
+
+| 빌드 타입 | 카운트 기준 댓글 |
+|-----------|-----------------|
+| `build app` | "앱 빌드 트리거 완료" |
+| `apk build` | "APK 빌드 트리거 완료" |
+| `ios build` | "iOS 빌드 트리거 완료" |
+
+이를 통해 `apk build`와 `ios build`를 혼용해도 빌드 번호가 중복되지 않습니다.
+
+### 예시: 플랫폼별 독립 카운트
+
+| 실행 순서 | 명령어 | 카운트 기준 | 빌드 번호 |
+|-----------|--------|-------------|-----------|
+| 1 | `@suh-lab apk build` | APK 카운트: 0 | `38700` |
+| 2 | `@suh-lab ios build` | iOS 카운트: 0 | `38700` |
+| 3 | `@suh-lab apk build` | APK 카운트: 1 | `38701` |
+| 4 | `@suh-lab ios build` | iOS 카운트: 1 | `38701` |
+| 5 | `@suh-lab build app` | 앱 카운트: 0 | `38700` |
+
+> **Note**: Android와 iOS가 같은 빌드 번호를 가질 수 있지만, 각 플랫폼 내에서는 고유합니다.
 
 ### 앱 버전 형식
 ```
@@ -100,18 +128,21 @@ feature/20240101_#123_기능명
 ## 워크플로우 동작 흐름
 
 ```
-1. PR/이슈에 "@suh-lab build app" 댓글 작성
+1. PR/이슈에 빌드 명령어 댓글 작성
+   (@suh-lab build app / apk build / ios build)
        ↓
 2. BUILD-TRIGGER 워크플로우 실행
    - 👀 리액션 추가
+   - 빌드 타입 판별 (app/apk/ios)
    - PR/이슈 정보 추출
-   - 빌드 번호 생성
+   - 빌드 번호 생성 (플랫폼별 독립 카운트)
        ↓
-3. repository_dispatch 이벤트 발생
-   - event_type: build-android-app
-   - event_type: build-ios-app
+3. repository_dispatch 이벤트 발생 (빌드 타입에 따라)
+   - build app: Android + iOS 모두 트리거
+   - apk build: Android만 트리거
+   - ios build: iOS만 트리거
        ↓
-4. 동시에 두 워크플로우 실행
+4. 선택된 워크플로우 실행
    ┌─────────────────────────────────┐
    │ ANDROID-TEST-APK               │
    │ - Flutter 빌드                  │
@@ -136,13 +167,42 @@ feature/20240101_#123_기능명
 
 ### 트리거 완료 댓글
 
+빌드 타입에 따라 다른 완료 메시지가 작성됩니다.
+
+**전체 빌드 (`@suh-lab build app`):**
 ```markdown
 🚀 **앱 빌드 트리거 완료**
 
 Android와 iOS 빌드 워크플로우를 시작했습니다.
 
 - 앱 버전: `0.0.0(38700)`
-- PR/ISSUE: **#387** (0번째 빌드)
+- PR/ISSUE: **#387** (app 0번째 빌드)
+- 브랜치: `feature/20240101_#123_기능명`
+
+⏳ 빌드가 완료되면 자동으로 결과 댓글이 작성됩니다.
+```
+
+**Android만 (`@suh-lab apk build`):**
+```markdown
+🚀 **APK 빌드 트리거 완료**
+
+Android 빌드 워크플로우를 시작했습니다.
+
+- 앱 버전: `0.0.0(38700)`
+- PR/ISSUE: **#387** (apk 0번째 빌드)
+- 브랜치: `feature/20240101_#123_기능명`
+
+⏳ 빌드가 완료되면 자동으로 결과 댓글이 작성됩니다.
+```
+
+**iOS만 (`@suh-lab ios build`):**
+```markdown
+🚀 **iOS 빌드 트리거 완료**
+
+iOS 빌드 워크플로우를 시작했습니다.
+
+- 앱 버전: `0.0.0(38700)`
+- PR/ISSUE: **#387** (ios 0번째 빌드)
 - 브랜치: `feature/20240101_#123_기능명`
 
 ⏳ 빌드가 완료되면 자동으로 결과 댓글이 작성됩니다.
@@ -299,7 +359,7 @@ permissions:
 ```yaml
 env:
   FLUTTER_VERSION: "3.24.5"      # Flutter 버전
-  XCODE_VERSION: "16.0"          # Xcode 버전 (iOS만)
+  XCODE_VERSION: "16.4"          # Xcode 버전 (iOS만)
   ENV_FILE_PATH: ".env"          # 환경 파일 경로
 ```
 

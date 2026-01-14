@@ -759,33 +759,29 @@ function Add-VersionSectionToReadme {
         return
     }
     
-    # 이미 버전 섹션이 있는지 확인 (다중 패턴 체크로 강화)
+    # 이미 버전 섹션이 있는지 확인 (영어 마커만 체크 - 파싱 호환성)
     $readmeContent = Get-Content "README.md" -Raw
 
-    # 1. 주석 체크 (가장 확실한 방법 - 신/구 형식 모두 감지)
-    if ($readmeContent -match "(?i)(<!-- AUTO-VERSION-SECTION|<!-- END-AUTO-VERSION-SECTION|<!-- 자동 동기화 버전 정보|수정하지마세요 자동으로 동기화)") {
-        Print-Info "이미 버전 관리 섹션이 있습니다. (주석 감지)"
+    if ($readmeContent -match "<!-- AUTO-VERSION-SECTION") {
+        Print-Info "이미 버전 관리 섹션이 있습니다. (마커 감지)"
         return
     }
-    
-    # 2. 버전 라인 체크 (버전 번호 포함 필수 - False Positive 방지)
-    # 버전 번호 패턴(v1.0.0 형식)이 포함된 경우만 버전 섹션으로 인식
+
+    # 버전 라인 체크 (버전 번호 패턴 감지)
     if ($readmeContent -match "(?i)##\s*(최신\s*버전|최신버전|Version|버전)\s*:\s*v\d+\.\d+\.\d+") {
         Print-Info "이미 버전 관리 섹션이 있습니다. (버전 라인 감지)"
         return
     }
-    
+
     # README.md 끝에 버전 섹션 추가
     $versionSection = @"
 
 ---
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-<!-- 이 섹션은 .github/workflows/PROJECT-README-VERSION-UPDATE.yaml에 의해 자동으로 업데이트됩니다 -->
 ## 최신 버전 : v$Version
 
 [전체 버전 기록 보기](CHANGELOG.md)
-<!-- END-AUTO-VERSION-SECTION -->
 "@
     
     Add-Content -Path "README.md" -Value $versionSection -Encoding UTF8

@@ -56,7 +56,7 @@ on:
 # ============================================
 env:
   FLUTTER_VERSION: "3.35.5"
-  XCODE_VERSION: "16.3"
+  XCODE_VERSION: "16.4"
   PROJECT_TYPE: "flutter"
   ENV_FILE_PATH: ".env"
 
@@ -74,8 +74,113 @@ jobs:
       branch_name: ${{ steps.issue_info.outputs.branch_name }}
       pr_number: ${{ steps.test_version.outputs.pr_number }}
       commit_hash: ${{ steps.release_notes.outputs.commit_hash }}
+      progress_comment_id: ${{ steps.progress.outputs.comment_id }}
+      prepare_start: ${{ steps.progress.outputs.start_time }}
 
     steps:
+      - name: 브랜치 존재 여부 사전 확인
+        id: verify_branch
+        if: github.event_name == 'repository_dispatch'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const prNumber = '${{ github.event.client_payload.pr_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            console.log(`🔍 브랜치 존재 여부 확인: ${branchName}`);
+
+            try {
+              await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: branchName
+              });
+              console.log(`✅ 브랜치 존재 확인됨: ${branchName}`);
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ 브랜치를 찾을 수 없음: ${branchName}`);
+
+                // 에러 댓글 작성
+                const body = [
+                  '🍎 ❌ **iOS TestFlight 빌드 실패 - 브랜치를 찾을 수 없습니다**',
+                  '',
+                  '| 항목 | 값 |',
+                  '|------|-----|',
+                  `| **요청된 브랜치** | \`${branchName}\` |`,
+                  `| **이슈/PR** | #${prNumber} |`,
+                  '',
+                  '### 💡 확인 사항',
+                  '1. 브랜치가 원격 저장소에 push되었는지 확인하세요',
+                  '2. "Guide by SUH-LAB" 댓글의 브랜치명이 올바른지 확인하세요',
+                  '3. 브랜치명에 오타가 없는지 확인하세요',
+                  '',
+                  `🔗 [워크플로우 로그](${runUrl})`
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(prNumber),
+                  body: body
+                });
+
+                core.setFailed(`브랜치를 찾을 수 없습니다: ${branchName}`);
+              } else {
+                core.setFailed(`브랜치 확인 중 오류: ${error.message}`);
+              }
+            }
+
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # 진행 상황 댓글 시스템
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      - name: 진행 상황 댓글 생성
+        id: progress
+        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = parseInt('${{ github.event.client_payload.pr_number }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const startTime = Date.now();
+
+            const body = [
+              '## 🍎 iOS TestFlight 빌드 진행 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              '| 🔧 준비 | ⏳ 진행 중... | - |',
+              '| 🔨 IPA 빌드 | ⏸️ 대기 | - |',
+              '| 📤 TestFlight 배포 | ⏸️ 대기 | - |',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
+
+            console.log(`✅ 진행 상황 댓글 생성 완료: #${comment.id}`);
+            core.setOutput('comment_id', comment.id);
+            core.setOutput('start_time', startTime);
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -235,6 +340,55 @@ jobs:
             assets/
           retention-days: 1
 
+      # 진행 상황 업데이트 - 준비 완료
+      - name: 진행 상황 업데이트 - 준비 완료
+        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && steps.progress.outputs.comment_id != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentId = parseInt('${{ steps.progress.outputs.comment_id }}');
+            const startTime = parseInt('${{ steps.progress.outputs.start_time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            const duration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+            const body = [
+              '## 🍎 iOS TestFlight 빌드 진행 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ✅ 완료 | ${duration} |`,
+              '| 🔨 IPA 빌드 | ⏳ 진행 중... | - |',
+              '| 📤 TestFlight 배포 | ⏸️ 대기 | - |',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            console.log(`✅ 진행 상황 업데이트 완료: 준비 완료 (${duration})`);
+
   # ============================================
   # iOS 빌드 (xcodebuild 직접 사용)
   # ============================================
@@ -243,7 +397,18 @@ jobs:
     runs-on: macos-15
     needs: prepare-test-build
 
+    outputs:
+      build_start: ${{ steps.build_start.outputs.time }}
+
     steps:
+      # 빌드 시작 시간 기록 (JavaScript로 밀리초 단위 기록)
+      - name: 빌드 시작 시간 기록
+        id: build_start
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput('time', Date.now().toString());
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -372,6 +537,123 @@ jobs:
             build-metadata.json
           retention-days: 1
 
+      # 진행 상황 업데이트 - IPA 빌드 완료
+      - name: 진행 상황 업데이트 - IPA 빌드 완료
+        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
+            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const buildStart = parseInt('${{ steps.build_start.outputs.time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const now = Date.now();
+
+            // 준비 단계 소요 시간
+            const prepareElapsed = buildStart - prepareStart;
+            const prepareMin = Math.floor(prepareElapsed / 60000);
+            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
+            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
+
+            // 빌드 단계 소요 시간
+            const buildElapsed = now - buildStart;
+            const buildMin = Math.floor(buildElapsed / 60000);
+            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
+            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
+
+            const body = [
+              '## 🍎 iOS TestFlight 빌드 진행 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
+              `| 🔨 IPA 빌드 | ✅ 완료 | ${buildDuration} |`,
+              '| 📤 TestFlight 배포 | ⏳ 진행 중... | - |',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            console.log(`✅ 진행 상황 업데이트 완료: IPA 빌드 완료 (${buildDuration})`);
+
+      # 빌드 실패 시 progress 댓글 업데이트
+      - name: 빌드 실패 시 progress 댓글 업데이트
+        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
+            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const buildStart = parseInt('${{ steps.build_start.outputs.time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const now = Date.now();
+
+            // 준비 단계 소요 시간
+            const prepareElapsed = buildStart - prepareStart;
+            const prepareMin = Math.floor(prepareElapsed / 60000);
+            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
+            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
+
+            // 빌드 단계 소요 시간
+            const buildElapsed = now - buildStart;
+            const buildMin = Math.floor(buildElapsed / 60000);
+            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
+            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
+
+            const body = [
+              '## 🍎 ❌ iOS TestFlight 빌드 실패',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
+              `| 🔨 IPA 빌드 | ❌ 실패 | ${buildDuration} |`,
+              '| 📤 TestFlight 배포 | ⏸️ 취소됨 | - |',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              `| **커밋** | \`${commitHash}\` |`,
+              '',
+              '❌ **IPA 빌드 중 오류가 발생했습니다.**',
+              '',
+              `🔗 [워크플로우 실행 로그 확인](${runUrl})`
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            console.log(`❌ 진행 상황 업데이트 완료: IPA 빌드 실패`);
+
   # ============================================
   # TestFlight 배포 (마법사 생성 Fastfile 사용)
   # ============================================
@@ -381,6 +663,14 @@ jobs:
     needs: [prepare-test-build, build-ios-test]
 
     steps:
+      # 배포 시작 시간 기록
+      - name: 배포 시작 시간 기록
+        id: deploy_start
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput('time', Date.now().toString());
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -476,114 +766,142 @@ jobs:
           echo "❌ TestFlight 테스트 빌드 업로드 실패!"
           echo "로그를 확인해주세요."
 
-      # PR/ISSUE에 빌드 완료 댓글 작성 (repository_dispatch로 트리거된 경우)
-      - name: 빌드 성공 댓글 작성
-        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
+      # 진행 상황 최종 업데이트 - 성공
+      - name: 진행 상황 최종 업데이트 - 성공
+        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const sourceType = '${{ github.event.client_payload.source_type }}' || 'PR';
-            const prNumber = parseInt('${{ github.event.client_payload.pr_number }}');
-            const issueNumber = '${{ needs.prepare-test-build.outputs.issue_number }}';
-            const buildNumber = '${{ needs.prepare-test-build.outputs.build_number }}';
+            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
+            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const buildStart = parseInt('${{ needs.build-ios-test.outputs.build_start }}');
+            const deployStart = parseInt('${{ steps.deploy_start.outputs.time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
-            const branchName = '${{ needs.prepare-test-build.outputs.branch_name }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-            const body = `🍎 ✅ **iOS TestFlight 빌드 완료**
+            const now = Date.now();
 
-            - 앱 버전: \`0.0.0(${buildNumber})\`
-            - 브랜치: \`${branchName}\`
-            - 커밋: \`${commitHash}\`
+            // 준비 단계 소요 시간
+            const prepareElapsed = buildStart - prepareStart;
+            const prepareMin = Math.floor(prepareElapsed / 60000);
+            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
+            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
 
-            📱 **TestFlight에서 테스트 앱을 다운로드할 수 있습니다.**
+            // 빌드 단계 소요 시간
+            const buildElapsed = deployStart - buildStart;
+            const buildMin = Math.floor(buildElapsed / 60000);
+            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
+            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
 
-            🔗 [워크플로우 실행 로그](${runUrl})`;
+            // 배포 단계 소요 시간
+            const deployElapsed = now - deployStart;
+            const deployMin = Math.floor(deployElapsed / 60000);
+            const deploySec = Math.floor((deployElapsed % 60000) / 1000);
+            const deployDuration = deployMin > 0 ? `${deployMin}분 ${deploySec}초` : `${deploySec}초`;
 
-            if (sourceType === 'PR') {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: body
-              });
-              console.log(`✅ PR #${prNumber}에 빌드 성공 댓글 작성 완료`);
+            // 전체 소요 시간
+            const totalElapsed = now - prepareStart;
+            const totalMin = Math.floor(totalElapsed / 60000);
+            const totalSec = Math.floor((totalElapsed % 60000) / 1000);
+            const totalDuration = totalMin > 0 ? `${totalMin}분 ${totalSec}초` : `${totalSec}초`;
 
-              if (issueNumber && issueNumber !== '' && parseInt(issueNumber) !== prNumber) {
-                const issueBody = `🍎 ✅ **iOS TestFlight 빌드 완료**
+            const body = [
+              '## 🍎 ✅ iOS TestFlight 빌드 완료',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
+              `| 🔨 IPA 빌드 | ✅ 완료 | ${buildDuration} |`,
+              `| 📤 TestFlight 배포 | ✅ 완료 | ${deployDuration} |`,
+              '',
+              `**총 소요 시간: ${totalDuration}**`,
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              `| **커밋** | \`${commitHash}\` |`,
+              '',
+              '📱 **TestFlight에서 테스트 앱을 다운로드할 수 있습니다.**',
+              '',
+              `🔗 [워크플로우 실행 로그](${runUrl})`
+            ].join('\n');
 
-            - 앱 버전: \`0.0.0(${buildNumber})\`
-            - 커밋: \`${commitHash}\`
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
 
-            📱 **TestFlight에서 테스트 앱을 다운로드할 수 있습니다.**`;
+            console.log(`✅ 진행 상황 최종 업데이트 완료: 전체 성공 (${totalDuration})`);
 
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: parseInt(issueNumber),
-                  body: issueBody
-                });
-                console.log(`✅ 이슈 #${issueNumber}에도 빌드 성공 댓글 작성 완료`);
-              }
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: body
-              });
-              console.log(`✅ ${sourceType} #${prNumber}에 빌드 성공 댓글 작성 완료`);
-            }
-
-      - name: 빌드 실패 댓글 작성
-        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
+      # 진행 상황 최종 업데이트 - 실패
+      - name: 진행 상황 최종 업데이트 - 실패
+        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const sourceType = '${{ github.event.client_payload.source_type }}' || 'PR';
-            const prNumber = parseInt('${{ github.event.client_payload.pr_number }}');
-            const issueNumber = '${{ needs.prepare-test-build.outputs.issue_number }}';
-            const buildNumber = '${{ needs.prepare-test-build.outputs.build_number }}';
-            const branchName = '${{ needs.prepare-test-build.outputs.branch_name }}';
+            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
+            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const buildStart = parseInt('${{ needs.build-ios-test.outputs.build_start }}');
+            const deployStart = parseInt('${{ steps.deploy_start.outputs.time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-            const body = `🍎 ❌ **iOS TestFlight 빌드 실패**
+            const now = Date.now();
 
-            - 앱 버전: \`0.0.0(${buildNumber})\`
-            - 브랜치: \`${branchName}\`
+            // 준비 단계 소요 시간
+            const prepareElapsed = buildStart - prepareStart;
+            const prepareMin = Math.floor(prepareElapsed / 60000);
+            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
+            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
 
-            ❌ 빌드 중 오류가 발생했습니다.
+            // 빌드 단계 소요 시간
+            const buildElapsed = deployStart - buildStart;
+            const buildMin = Math.floor(buildElapsed / 60000);
+            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
+            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
 
-            🔗 [워크플로우 실행 로그 확인](${runUrl})`;
+            // 배포 단계 소요 시간
+            const deployElapsed = now - deployStart;
+            const deployMin = Math.floor(deployElapsed / 60000);
+            const deploySec = Math.floor((deployElapsed % 60000) / 1000);
+            const deployDuration = deployMin > 0 ? `${deployMin}분 ${deploySec}초` : `${deploySec}초`;
 
-            if (sourceType === 'PR') {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: body
-              });
-              console.log(`✅ PR #${prNumber}에 빌드 실패 댓글 작성 완료`);
+            const body = [
+              '## 🍎 ❌ iOS TestFlight 빌드 실패',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
+              `| 🔨 IPA 빌드 | ✅ 완료 | ${buildDuration} |`,
+              `| 📤 TestFlight 배포 | ❌ 실패 | ${deployDuration} |`,
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              `| **커밋** | \`${commitHash}\` |`,
+              '',
+              '❌ **TestFlight 배포 중 오류가 발생했습니다.**',
+              '',
+              `🔗 [워크플로우 실행 로그 확인](${runUrl})`
+            ].join('\n');
 
-              if (issueNumber && issueNumber !== '' && parseInt(issueNumber) !== prNumber) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: parseInt(issueNumber),
-                  body: body
-                });
-                console.log(`✅ 이슈 #${issueNumber}에도 빌드 실패 댓글 작성 완료`);
-              }
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: body
-              });
-              console.log(`✅ ${sourceType} #${prNumber}에 빌드 실패 댓글 작성 완료`);
-            }
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            console.log(`❌ 진행 상황 최종 업데이트 완료: TestFlight 배포 실패`);

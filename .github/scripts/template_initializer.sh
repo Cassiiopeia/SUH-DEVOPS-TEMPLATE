@@ -488,14 +488,14 @@ initialize_readme() {
     cat > README.md << EOF
 # $project_name
 
-<!-- 수정하지마세요 자동으로 동기화 됩니다 -->
+<!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
 ## 최신 버전 : v$version
 
 [전체 버전 기록 보기](CHANGELOG.md)
 
 </br>
 
-<!-- 템플릿 초기화 완료: $(TZ=Asia/Seoul date +"%Y-%m-%d %H:%M:%S KST") -->
+<!-- Template initialized: $(TZ=Asia/Seoul date +"%Y-%m-%d %H:%M:%S KST") -->
 EOF
     
     print_success "README.md 파일이 초기화되었습니다."

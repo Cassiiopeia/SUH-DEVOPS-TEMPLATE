@@ -412,6 +412,39 @@ metadata:
 
    > **참고**: 타입별 워크플로우 (flutter, spring 등)는 `project-types/[type]/`에만 존재하면 됨. `template_initializer`와 `template_integrator`가 프로젝트 타입에 따라 해당 폴더에서 복사함.
 
+5. **GitHub 댓글에서 마크다운 표 작성 규칙**
+
+   `actions/github-script`에서 이슈/PR에 댓글을 작성할 때 **마크다운 표(table)**가 포함되면 반드시 `array.join('\n')` 패턴을 사용해야 합니다.
+
+   **✅ 올바른 방법 (array.join 패턴)**:
+   ```javascript
+   const body = [
+     '## 🤖 빌드 완료!',
+     '',
+     '| 항목 | 값 |',
+     '|------|-----|',
+     `| **버전** | \`${version}\` |`,
+     `| **브랜치** | \`${branchName}\` |`,
+     '',
+     '📦 **다운로드 가능합니다.**'
+   ].join('\n');
+   ```
+
+   **❌ 잘못된 방법 (template literal + 들여쓰기)**:
+   ```javascript
+   // 들여쓰기가 마크다운에 포함되어 표가 깨질 수 있음
+   const body = `## 🤖 빌드 완료!
+
+               | 항목 | 값 |
+               |------|-----|
+               | **버전** | \`${version}\` |`;
+   ```
+
+   **이유**:
+   - Template literal 내부의 들여쓰기(공백)가 그대로 마크다운에 포함됨
+   - GitHub 마크다운 렌더러가 표를 올바르게 인식하지 못할 수 있음
+   - `array.join('\n')`은 각 줄을 깔끔하게 연결하여 들여쓰기 문제 방지
+
 ### 새 스크립트 추가
 
 1. **위치**: `.github/scripts/`

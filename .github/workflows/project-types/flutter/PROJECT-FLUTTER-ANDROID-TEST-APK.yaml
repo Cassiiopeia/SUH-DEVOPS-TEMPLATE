@@ -62,6 +62,61 @@ jobs:
       build_number: ${{ steps.build_info.outputs.build_number }}
 
     steps:
+      - name: 브랜치 존재 여부 사전 확인
+        id: verify_branch
+        if: github.event_name == 'repository_dispatch'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const prNumber = '${{ github.event.client_payload.pr_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            console.log(`🔍 브랜치 존재 여부 확인: ${branchName}`);
+
+            try {
+              await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: branchName
+              });
+              console.log(`✅ 브랜치 존재 확인됨: ${branchName}`);
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ 브랜치를 찾을 수 없음: ${branchName}`);
+
+                // 에러 댓글 작성
+                const body = [
+                  '🤖 ❌ **Android 테스트 APK 빌드 실패 - 브랜치를 찾을 수 없습니다**',
+                  '',
+                  '| 항목 | 값 |',
+                  '|------|-----|',
+                  `| **요청된 브랜치** | \`${branchName}\` |`,
+                  `| **이슈/PR** | #${prNumber} |`,
+                  '',
+                  '### 💡 확인 사항',
+                  '1. 브랜치가 원격 저장소에 push되었는지 확인하세요',
+                  '2. "Guide by SUH-LAB" 댓글의 브랜치명이 올바른지 확인하세요',
+                  '3. 브랜치명에 오타가 없는지 확인하세요',
+                  '',
+                  `🔗 [워크플로우 로그](${runUrl})`
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(prNumber),
+                  body: body
+                });
+
+                core.setFailed(`브랜치를 찾을 수 없습니다: ${branchName}`);
+              } else {
+                core.setFailed(`브랜치 확인 중 오류: ${error.message}`);
+              }
+            }
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -465,15 +520,30 @@ jobs:
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
             const artifactUrl = `${runUrl}#artifacts`;
 
-            const body = `🤖 ✅ **Android 테스트 APK 빌드 완료**
+            const body = [
+              '🤖 ✅ **Android 테스트 APK 빌드 완료**',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              `| **커밋** | \`${commitHash}\` |`,
+              '',
+              `📦 **[아티팩트 다운로드](${artifactUrl})**`,
+              '',
+              `🔗 [워크플로우 실행 로그](${runUrl})`
+            ].join('\n');
 
-            - 앱 버전: \`0.0.0(${buildNumber})\`
-            - 브랜치: \`${branchName}\`
-            - 커밋: \`${commitHash}\`
-
-            📦 **[아티팩트 다운로드](${artifactUrl})**
-
-            🔗 [워크플로우 실행 로그](${runUrl})`;
+            const issueBody = [
+              '🤖 ✅ **Android 테스트 APK 빌드 완료**',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **커밋** | \`${commitHash}\` |`,
+              '',
+              `📦 **[아티팩트 다운로드](${artifactUrl})**`
+            ].join('\n');
 
             if (sourceType === 'PR') {
               await github.rest.issues.createComment({
@@ -485,13 +555,6 @@ jobs:
               console.log(`✅ PR #${prNumber}에 빌드 성공 댓글 작성 완료`);
 
               if (issueNumber && issueNumber !== '' && parseInt(issueNumber) !== prNumber) {
-                const issueBody = `🤖 ✅ **Android 테스트 APK 빌드 완료**
-
-            - 앱 버전: \`0.0.0(${buildNumber})\`
-            - 커밋: \`${commitHash}\`
-
-            📦 **[아티팩트 다운로드](${artifactUrl})**`;
-
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -524,14 +587,19 @@ jobs:
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-            const body = `🤖 ❌ **Android 테스트 APK 빌드 실패**
-
-            - 앱 버전: \`0.0.0(${buildNumber})\`
-            - 브랜치: \`${branchName}\`
-
-            ❌ 빌드 중 오류가 발생했습니다.
-
-            🔗 [워크플로우 실행 로그 확인](${runUrl})`;
+            const body = [
+              '🤖 ❌ **Android 테스트 APK 빌드 실패**',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              `| **실패 단계** | APK 빌드 |`,
+              '',
+              '❌ APK 빌드 중 오류가 발생했습니다.',
+              '',
+              `🔗 [워크플로우 실행 로그 확인](${runUrl})`
+            ].join('\n');
 
             if (sourceType === 'PR') {
               await github.rest.issues.createComment({
@@ -540,7 +608,7 @@ jobs:
                 issue_number: prNumber,
                 body: body
               });
-              console.log(`✅ PR #${prNumber}에 빌드 실패 댓글 작성 완료`);
+              console.log(`❌ PR #${prNumber}에 빌드 실패 댓글 작성 완료`);
 
               if (issueNumber && issueNumber !== '' && parseInt(issueNumber) !== prNumber) {
                 await github.rest.issues.createComment({
@@ -549,7 +617,7 @@ jobs:
                   issue_number: parseInt(issueNumber),
                   body: body
                 });
-                console.log(`✅ 이슈 #${issueNumber}에도 빌드 실패 댓글 작성 완료`);
+                console.log(`❌ 이슈 #${issueNumber}에도 빌드 실패 댓글 작성 완료`);
               }
             } else {
               await github.rest.issues.createComment({
@@ -558,5 +626,5 @@ jobs:
                 issue_number: prNumber,
                 body: body
               });
-              console.log(`✅ ${sourceType} #${prNumber}에 빌드 실패 댓글 작성 완료`);
+              console.log(`❌ ${sourceType} #${prNumber}에 빌드 실패 댓글 작성 완료`);
             }

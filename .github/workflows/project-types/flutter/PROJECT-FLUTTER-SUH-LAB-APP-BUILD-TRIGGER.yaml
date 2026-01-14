@@ -185,9 +185,78 @@ jobs:
 
             core.setFailed(errorMessage);
 
+      - name: 브랜치 존재 여부 확인
+        id: check_branch
+        if: steps.source_info.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branchName = '${{ steps.source_info.outputs.branchName }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            console.log(`🔍 브랜치 존재 여부 확인: ${branchName}`);
+
+            try {
+              await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: branchName
+              });
+              console.log(`✅ 브랜치 존재 확인됨: ${branchName}`);
+              core.setOutput('exists', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ 브랜치를 찾을 수 없음: ${branchName}`);
+                core.setOutput('exists', 'false');
+                core.setOutput('errorMessage', `브랜치 \`${branchName}\`를 찾을 수 없습니다.`);
+              } else {
+                console.log(`❌ 브랜치 확인 중 오류: ${error.message}`);
+                core.setOutput('exists', 'false');
+                core.setOutput('errorMessage', `브랜치 확인 중 오류가 발생했습니다: ${error.message}`);
+              }
+            }
+
+      - name: 브랜치가 존재하지 않는 경우 에러 댓글 작성
+        if: steps.source_info.outputs.found == 'true' && steps.check_branch.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = context.payload.issue.number;
+            const branchName = '${{ steps.source_info.outputs.branchName }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const body = [
+              '❌ **앱 빌드 트리거 실패 - 브랜치를 찾을 수 없습니다**',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **요청된 브랜치** | \`${branchName}\` |`,
+              `| **이슈/PR** | #${issueNumber} |`,
+              '',
+              '### 💡 확인 사항',
+              '1. 브랜치가 원격 저장소에 push되었는지 확인하세요',
+              '2. "Guide by SUH-LAB" 댓글의 브랜치명이 올바른지 확인하세요',
+              '3. 브랜치명에 오타가 없는지 확인하세요',
+              '',
+              `🔗 [워크플로우 로그](${runUrl})`
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: body
+            });
+
+            core.setFailed(`브랜치를 찾을 수 없습니다: ${branchName}`);
+
       - name: 빌드 횟수 조회 및 빌드 번호 생성
         id: build_number_calc
-        if: steps.source_info.outputs.found == 'true'
+        if: steps.source_info.outputs.found == 'true' && steps.check_branch.outputs.exists == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -220,7 +289,7 @@ jobs:
             core.setOutput('buildNumber', buildNumber);
 
       - name: Android 빌드 워크플로우 트리거
-        if: steps.source_info.outputs.found == 'true'
+        if: steps.source_info.outputs.found == 'true' && steps.check_branch.outputs.exists == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -255,7 +324,7 @@ jobs:
             console.log('✅ Android 빌드 워크플로우 트리거 완료');
 
       - name: iOS 빌드 워크플로우 트리거
-        if: steps.source_info.outputs.found == 'true'
+        if: steps.source_info.outputs.found == 'true' && steps.check_branch.outputs.exists == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -290,7 +359,7 @@ jobs:
             console.log('✅ iOS 빌드 워크플로우 트리거 완료');
 
       - name: 트리거 완료 댓글 작성
-        if: steps.source_info.outputs.found == 'true'
+        if: steps.source_info.outputs.found == 'true' && steps.check_branch.outputs.exists == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

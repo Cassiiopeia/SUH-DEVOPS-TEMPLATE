@@ -321,7 +321,10 @@ jobs:
       # 빌드 시작 시간 기록
       - name: 빌드 시작 시간 기록
         id: build_start
-        run: echo "time=$(date +%s%3N)" >> $GITHUB_OUTPUT
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput('time', Date.now().toString());
 
       - name: Checkout repository
         uses: actions/checkout@v4

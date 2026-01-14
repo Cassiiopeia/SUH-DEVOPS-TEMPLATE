@@ -5,7 +5,7 @@
 **완전 자동화된 GitHub 프로젝트 관리 템플릿**
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v2.6.0 (2026-01-12)
+## 최신 버전 : v2.6.6 (2026-01-14)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 

@@ -359,7 +359,7 @@ permissions:
 ```yaml
 env:
   FLUTTER_VERSION: "3.24.5"      # Flutter 버전
-  XCODE_VERSION: "16.0"          # Xcode 버전 (iOS만)
+  XCODE_VERSION: "16.4"          # Xcode 버전 (iOS만)
   ENV_FILE_PATH: ".env"          # 환경 파일 경로
 ```
 

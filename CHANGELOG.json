@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-19T06:15:02Z",
-    "currentVersion": "2.6.8",
+    "lastUpdated": "2026-01-19T12:47:28Z",
+    "currentVersion": "2.6.9",
     "projectType": "basic",
-    "totalReleases": 52
+    "totalReleases": 53
   },
   "releases": [
+    {
+      "version": "2.6.9",
+      "project_type": "basic",
+      "date": "2026-01-19",
+      "pr_number": 161,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 버전이 2.6.9로 업데이트되었습니다.\n  * 빌드 및 배포 구성이 개선되었습니다.",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전이 2.6.9로 업데이트되었습니다.",
+            "빌드 및 배포 구성이 개선되었습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.6.8",
       "project_type": "basic",

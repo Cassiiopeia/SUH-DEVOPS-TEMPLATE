@@ -163,7 +163,7 @@ if (-not (Test-Path $keyPropertiesPath)) {
 # WARNING: Do not commit this file to version control!
 # Add 'android/key.properties' to your .gitignore
 
-storeFile=keystore/key.jks
+storeFile=app/keystore/key.jks
 storePassword=YOUR_STORE_PASSWORD
 keyAlias=YOUR_KEY_ALIAS
 keyPassword=YOUR_KEY_PASSWORD

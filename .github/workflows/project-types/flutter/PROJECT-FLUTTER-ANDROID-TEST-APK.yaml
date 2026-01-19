@@ -362,7 +362,7 @@ jobs:
           if [ -n "${{ secrets.DEBUG_KEYSTORE }}" ]; then
             echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > android/app/keystore/key.jks
             echo "✅ Keystore created from DEBUG_KEYSTORE"
-            echo "storeFile=keystore/key.jks" > android/key.properties
+            echo "storeFile=app/keystore/key.jks" > android/key.properties
             echo "storePassword=android" >> android/key.properties
             echo "keyAlias=androiddebugkey" >> android/key.properties
             echo "keyPassword=android" >> android/key.properties

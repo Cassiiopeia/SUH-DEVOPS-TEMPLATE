@@ -23,10 +23,49 @@ name: PROJECT-PYTHON-SYNOLOGY-CICD
 # │ ENV_FILE                    │ .env 파일 전체 내용                │
 # └─────────────────────────────┴────────────────────────────────────┘
 #
-# 🧪 선택적 Secrets (test 브랜치 사용시에만):
-# ┌─────────────────────────────┬────────────────────────────────────┐
-# │ PYTHON_TEST_PORT            │ test 브랜치 배포 포트 (기본: 8001) │
-# └─────────────────────────────┴────────────────────────────────────┘
+# 🌐 포트 및 컨테이너 설정 (워크플로우 env 섹션에서 설정):
+# ┌──────────────────────────────┬────────────────────────────────────┐
+# │ CONTAINER_INTERNAL_PORT      │ FastAPI 내부 포트 (기본: 8000)     │
+# │ DEPLOY_PORT                  │ deploy/main 브랜치 배포 포트       │
+# │ CONTAINER_NAME               │ Docker 컨테이너 이름               │
+# │                              │ (기본값: PROJECT_NAME)             │
+# ├──────────────────────────────┼────────────────────────────────────┤
+# │ ENABLE_VOLUME_MOUNT          │ 볼륨 마운트 활성화 (true/false)    │
+# │ VOLUME_HOST_PATH             │ 호스트 볼륨 풀 경로                │
+# │ VOLUME_CONTAINER_PATH        │ 컨테이너 내부 마운트 경로          │
+# ├──────────────────────────────┼────────────────────────────────────┤
+# │ SSH_PORT                     │ SSH 포트 (기본: 2022)              │
+# │ SSH_COMMAND_TIMEOUT          │ SSH 명령 타임아웃 (기본: 600s)     │
+# │ SSH_CONNECTION_TIMEOUT       │ SSH 연결 타임아웃 (기본: 60s)      │
+# └──────────────────────────────┴────────────────────────────────────┘
+#
+# ⏱️ 헬스체크 설정 (워크플로우 env 섹션에서 설정):
+# ┌────────────────────────────┬────────────────────────────────────┐
+# │ HEALTHCHECK_WAIT_SECONDS   │ 초기화 대기 시간 (기본: 10초)      │
+# │ HEALTHCHECK_PATH           │ HTTP 엔드포인트 경로               │
+# │                            │ (비어있으면 로그 패턴만 사용)      │
+# │ HEALTHCHECK_MAX_RETRIES    │ HTTP 재시도 횟수 (기본: 5회)       │
+# │ HEALTHCHECK_RETRY_INTERVAL │ 재시도 간격 (기본: 3초)            │
+# │ HEALTHCHECK_LOG_PATTERN    │ Fallback 로그 검색 패턴            │
+# └────────────────────────────┴────────────────────────────────────┘
+#
+# 💡 HEALTHCHECK_PATH 설정 예시:
+#   FastAPI (기본):                    "/docs"
+#   FastAPI (커스텀 헬스체크):         "/health"
+#   커스텀 엔드포인트:                 "/api/v1/health"
+#
+# 💡 HEALTHCHECK_LOG_PATTERN 설정 예시:
+#   FastAPI:      "Uvicorn running on"
+#   Django:       "Django version"
+#   커스텀:       "Application started successfully"
+#
+# 💡 환경변수 설정 예시 (env 섹션에서 변경):
+#   PROJECT_NAME: "프로젝트명-ai"
+#   DEPLOY_PORT: "8092"
+#   CONTAINER_INTERNAL_PORT: "8000"
+#   ENABLE_VOLUME_MOUNT: "false"
+#   VOLUME_HOST_PATH: "/volume1/projects/프로젝트명/ai"
+#   SSH_PORT: "2022"
 #
 # ===================================================================
 
@@ -36,25 +75,44 @@ name: PROJECT-PYTHON-SYNOLOGY-CICD
 on:
   push:
     branches:
-      - deploy  # 프로덕션 배포 (필수)
-      - test    # 테스트 환경 배포 (선택사항)
+      - deploy  # 프로덕션 배포
   workflow_dispatch:  # 수동 실행 허용
 
 # ===================================================================
 # 환경 변수 설정
 # ===================================================================
 env:
-  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)
+  # 프로젝트 고유 식별자
   PROJECT_NAME: "프로젝트명-ai"
-  # 프로젝트 배포 포트
-  PROJECT_MAIN_PORT: "8092"
+
+  # 🌐 포트 설정
+  DEPLOY_PORT: "8092"
 
   # 🐍 Python 설정
   PYTHON_VERSION: "3.13"
 
-  # 🗂️ 볼륨 마운트 설정 (프로젝트별 수정 필요, 빈값이면 마운트 안함)
-  PROJECT_TARGET_DIR: "/volume1/projects/프로젝트명/ai"  # 서버의 데이터 디렉토리
-  PROJECT_MNT_DIR: "/mnt/프로젝트명"                     # 컨테이너 내부 마운트 경로
+  # 🐳 컨테이너 이름 설정 (비워두면 PROJECT_NAME 사용)
+  CONTAINER_NAME: ""
+
+  # 🗂️ 볼륨 마운트 설정 (빈값이면 마운트 안함)
+  ENABLE_VOLUME_MOUNT: "false"
+  VOLUME_HOST_PATH: "/volume1/projects/프로젝트명/ai"
+  VOLUME_CONTAINER_PATH: "/mnt/프로젝트명"
+
+  # 🔌 SSH 연결 설정
+  SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)
+  SSH_COMMAND_TIMEOUT: "600s"  # SSH 명령 실행 타임아웃
+  SSH_CONNECTION_TIMEOUT: "60s"  # SSH 연결 타임아웃
+
+  # 🌐 컨테이너 포트 설정
+  CONTAINER_INTERNAL_PORT: "8000"  # FastAPI 내부 포트
+
+  # ⏱️ 헬스체크 설정
+  HEALTHCHECK_WAIT_SECONDS: "10"  # 컨테이너 초기화 대기 시간 (초)
+  HEALTHCHECK_PATH: "/docs"  # HTTP 엔드포인트 경로 (비어있으면 로그 패턴만 사용)
+  HEALTHCHECK_MAX_RETRIES: "5"  # HTTP 재시도 횟수
+  HEALTHCHECK_RETRY_INTERVAL: "3"  # 재시도 간격 (초)
+  HEALTHCHECK_LOG_PATTERN: "Uvicorn running on"  # Fallback 로그 검색 패턴
 
 jobs:
   # ===================================================================
@@ -143,9 +201,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          port: 2022
-          command_timeout: 600s  # 명령 실행 타임아웃 10분
-          timeout: 60s           # SSH 연결 타임아웃 60초
+          port: ${{ env.SSH_PORT }}
+          command_timeout: ${{ env.SSH_COMMAND_TIMEOUT }}
+          timeout: ${{ env.SSH_CONNECTION_TIMEOUT }}
           script: |
             set -e
 
@@ -163,30 +221,20 @@ jobs:
             PROJECT_NAME="${{ env.PROJECT_NAME }}"
 
             # ============================================================
-            # 브랜치별 포트 및 컨테이너명 설정
+            # 포트 및 컨테이너명 설정
             # ============================================================
-            # 기본값 설정
-            PORT=8000
-            CONTAINER_NAME="${PROJECT_NAME}"
+            PORT=${{ env.DEPLOY_PORT }}
 
-            # 브랜치에 따른 환경별 설정
-            if [ "$BRANCH" == "main" ] || [ "$BRANCH" == "deploy" ]; then
-              # 🏭 프로덕션 환경 (main/deploy 브랜치)
-              PORT=${{ env.PROJECT_MAIN_PORT }}
+            # 컨테이너 이름 설정
+            if [ -z "${{ env.CONTAINER_NAME }}" ]; then
               CONTAINER_NAME="${PROJECT_NAME}"
-              echo "🏭 프로덕션 환경으로 배포합니다"
-
-            elif [ "$BRANCH" == "test" ]; then
-              # 🧪 테스트 환경 (test 브랜치)
-              PORT=${{ secrets.PYTHON_TEST_PORT}}
-              CONTAINER_NAME="${PROJECT_NAME}-test"
-              echo "🧪 테스트 환경으로 배포합니다"
-
+              echo "ℹ️ CONTAINER_NAME이 설정되지 않아 PROJECT_NAME을 사용합니다: $CONTAINER_NAME"
             else
-              # ⚠️ 기타 브랜치
-              echo "⚠️ 지원하지 않는 브랜치입니다: $BRANCH"
-              exit 1
+              CONTAINER_NAME="${{ env.CONTAINER_NAME }}"
+              echo "ℹ️ 사용자 지정 CONTAINER_NAME 사용: $CONTAINER_NAME"
             fi
+
+            echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"
 
             # 설정 정보 출력
             echo "📋 배포 설정 정보:"
@@ -222,19 +270,27 @@ jobs:
             echo "🚀 새로운 컨테이너 $CONTAINER_NAME 실행 중..."
 
             # Docker 컨테이너 실행
-            # - 포트 매핑: ${PORT}:8000 (외부포트:내부포트)
+            # - 포트 매핑: ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }} (외부:내부)
             # - 시간대: Asia/Seoul
             # - 볼륨 마운트: 로컬 시간 동기화 및 프로젝트 데이터
             # ⚠️ .env 파일은 이미 Docker 이미지에 포함되어 있습니다
 
             # 볼륨 마운트 옵션 구성
             VOLUME_OPTS="-v /etc/localtime:/etc/localtime:ro"
-            if [ -n "${{ env.PROJECT_TARGET_DIR }}" ] && [ -n "${{ env.PROJECT_MNT_DIR }}" ]; then
-              VOLUME_OPTS="$VOLUME_OPTS -v ${{ env.PROJECT_TARGET_DIR }}:${{ env.PROJECT_MNT_DIR }}"
+            if [ "${{ env.ENABLE_VOLUME_MOUNT }}" == "true" ]; then
+              # 디렉토리가 없으면 생성
+              if [ ! -d "${{ env.VOLUME_HOST_PATH }}" ]; then
+                echo "📁 볼륨 마운트 디렉토리 생성: ${{ env.VOLUME_HOST_PATH }}"
+                echo $PW | sudo -S mkdir -p "${{ env.VOLUME_HOST_PATH }}"
+              fi
+              VOLUME_OPTS="$VOLUME_OPTS -v ${{ env.VOLUME_HOST_PATH }}:${{ env.VOLUME_CONTAINER_PATH }}"
+              echo "📦 볼륨 마운트 활성화: $VOLUME_OPTS"
+            else
+              echo "ℹ️ 볼륨 마운트 비활성화됨"
             fi
 
             echo $PW | sudo -S docker run -d \
-              -p ${PORT}:8000 \
+              -p ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }} \
               --name $CONTAINER_NAME \
               -e TZ=Asia/Seoul \
               $VOLUME_OPTS \
@@ -243,17 +299,75 @@ jobs:
             # ============================================================
             # 컨테이너 헬스체크
             # ============================================================
-            echo "⏳ 컨테이너 초기화 대기 중... (10초)"
-            sleep 10
+            echo "⏳ 컨테이너 초기화 대기 중... (${{ env.HEALTHCHECK_WAIT_SECONDS }}초)"
+            sleep ${{ env.HEALTHCHECK_WAIT_SECONDS }}
 
+            # 1단계: 컨테이너 프로세스 확인
             echo "🏥 컨테이너 헬스체크 중..."
-            if echo $PW | sudo -S docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
-              echo "✅ 컨테이너 $CONTAINER_NAME 이(가) 정상적으로 실행 중입니다"
-            else
-              echo "❌ 컨테이너 $CONTAINER_NAME 실행 실패"
-              echo "📋 컨테이너 로그:"
-              echo $PW | sudo -S docker logs $CONTAINER_NAME || true
+            if ! echo $PW | sudo -S docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+              echo "❌ 컨테이너 $CONTAINER_NAME 프로세스가 실행되지 않았습니다"
+              echo $PW | sudo -S docker logs --tail 50 $CONTAINER_NAME || true
               exit 1
+            fi
+            echo "✅ 컨테이너 프로세스 실행 확인 완료"
+
+            # 2단계: HTTP 엔드포인트 체크 (설정된 경우)
+            HEALTHCHECK_SUCCESS=false
+            if [ -n "${{ env.HEALTHCHECK_PATH }}" ]; then
+              echo "🌐 HTTP 헬스체크 시작: http://localhost:${PORT}${{ env.HEALTHCHECK_PATH }}"
+
+              for i in $(seq 1 ${{ env.HEALTHCHECK_MAX_RETRIES }}); do
+                echo "  시도 $i/${{ env.HEALTHCHECK_MAX_RETRIES }}..."
+
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${PORT}${{ env.HEALTHCHECK_PATH }} || echo "000")
+
+                if [ "$HTTP_CODE" = "200" ]; then
+                  echo "✅ HTTP 헬스체크 성공 (응답 코드: $HTTP_CODE)"
+                  HEALTHCHECK_SUCCESS=true
+                  break
+                else
+                  echo "⚠️ HTTP 헬스체크 실패 (응답 코드: $HTTP_CODE)"
+                  if [ $i -lt ${{ env.HEALTHCHECK_MAX_RETRIES }} ]; then
+                    echo "  ${{ env.HEALTHCHECK_RETRY_INTERVAL }}초 후 재시도..."
+                    sleep ${{ env.HEALTHCHECK_RETRY_INTERVAL }}
+                  fi
+                fi
+              done
+
+              # HTTP 체크 실패 시 fallback으로 로그 패턴 매칭
+              if [ "$HEALTHCHECK_SUCCESS" = "false" ]; then
+                echo "⚠️ HTTP 헬스체크 최종 실패, 로그 패턴 매칭으로 fallback..."
+              fi
+            else
+              echo "ℹ️ HEALTHCHECK_PATH가 설정되지 않아 로그 패턴 매칭만 사용합니다"
+            fi
+
+            # 3단계: 로그 패턴 매칭 (HTTP 실패 시 또는 HTTP 체크 비활성화 시)
+            if [ "$HEALTHCHECK_SUCCESS" = "false" ]; then
+              echo "📋 로그 패턴 매칭 시작: '${{ env.HEALTHCHECK_LOG_PATTERN }}'"
+
+              if echo $PW | sudo -S docker logs $CONTAINER_NAME 2>&1 | grep -q "${{ env.HEALTHCHECK_LOG_PATTERN }}"; then
+                echo "✅ 로그 패턴 매칭 성공: 애플리케이션이 정상적으로 시작되었습니다"
+                HEALTHCHECK_SUCCESS=true
+              else
+                echo "❌ 로그 패턴 매칭 실패: 애플리케이션 시작 로그를 찾을 수 없습니다"
+                echo ""
+                echo "📋 디버깅 정보:"
+                echo "  - 검색 패턴: ${{ env.HEALTHCHECK_LOG_PATTERN }}"
+                echo "  - 컨테이너: $CONTAINER_NAME"
+                echo "  - 이미지: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}"
+                echo "  - 포트: ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }}"
+                echo "  - 볼륨: $VOLUME_OPTS"
+                echo ""
+                echo "📋 컨테이너 로그 (최근 50줄):"
+                echo $PW | sudo -S docker logs --tail 50 $CONTAINER_NAME || true
+                exit 1
+              fi
+            fi
+
+            # 최종 성공 메시지
+            if [ "$HEALTHCHECK_SUCCESS" = "true" ]; then
+              echo "✅ 헬스체크 완료: 컨테이너 $CONTAINER_NAME 이(가) 정상적으로 실행 중입니다"
             fi
 
             # ============================================================

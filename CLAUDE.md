@@ -144,7 +144,6 @@ snake_case.sh / snake_case.py
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
 | `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Synology Docker 배포 | synology/ |
-| `PROJECT-SPRING-SYNOLOGY-NONSTOP-CICD` | Synology 무중단 배포 | synology/ |
 | `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW` | PR 프리뷰 배포 | synology/ |
 | `PROJECT-SPRING-NEXUS-CI` | Nexus CI (빌드/테스트) | synology/ |
 | `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | synology/ |

@@ -331,13 +331,16 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   • basic             - 기타 프로젝트
 
 자동 감지 기능:
-  • package.json 발견 → Node.js 프로젝트로 감지
-  • "next" 의존성 → Next.js
-  • "react" 의존성 → React
-  • @react-native 의존성 → React Native
-  • build.gradle → Spring Boot
-  • pubspec.yaml → Flutter
-  • pyproject.toml → Python
+  우선순위 1 (명확한 프레임워크 마커):
+    • pubspec.yaml → Flutter
+    • build.gradle/pom.xml → Spring Boot
+    • pyproject.toml → Python
+  우선순위 2 (Node.js 에코시스템 세부 분류):
+    • package.json 내용 분석
+      - @react-native → React Native
+      - "next" → Next.js
+      - "react" → React
+      - 기타 → Node.js
 
 사용 예시:
   # 로컬 실행 - 대화형 모드 (추천)
@@ -377,11 +380,39 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
 
 function Detect-ProjectType {
     Print-Step "프로젝트 타입 자동 감지 중..."
-    
-    # Node.js / React / React Native
+
+    # ===================================================
+    # 우선순위 1: 명확한 프레임워크 마커 파일 체크
+    # Flutter, Spring, Python은 고유한 마커 파일을 가지므로 우선 체크
+    # ===================================================
+
+    # Flutter
+    if (Test-Path "pubspec.yaml") {
+        Print-Info "감지됨: Flutter"
+        return "flutter"
+    }
+
+    # Spring Boot
+    if ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts") -or (Test-Path "pom.xml")) {
+        Print-Info "감지됨: Spring Boot"
+        return "spring"
+    }
+
+    # Python
+    if ((Test-Path "pyproject.toml") -or (Test-Path "setup.py") -or (Test-Path "requirements.txt")) {
+        Print-Info "감지됨: Python"
+        return "python"
+    }
+
+    # ===================================================
+    # 우선순위 2: Node.js 에코시스템 세부 분류
+    # package.json은 여러 프로젝트 타입에서 보조 도구로 사용될 수 있으므로 나중에 체크
+    # ===================================================
+
+    # Node.js / React / React Native / Next.js
     if (Test-Path "package.json") {
         $packageJson = Get-Content "package.json" -Raw
-        
+
         # React Native 체크
         if ($packageJson -match "@react-native|react-native") {
             # Expo 체크
@@ -393,7 +424,7 @@ function Detect-ProjectType {
                 return "react-native"
             }
         }
-        
+
         # Next.js 체크 (React보다 먼저 체크해야 함)
         if ($packageJson -match '"next"') {
             Print-Info "감지됨: Next.js"
@@ -410,26 +441,10 @@ function Detect-ProjectType {
         Print-Info "감지됨: Node.js"
         return "node"
     }
-    
-    # Spring Boot
-    if ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts") -or (Test-Path "pom.xml")) {
-        Print-Info "감지됨: Spring Boot"
-        return "spring"
-    }
-    
-    # Flutter
-    if (Test-Path "pubspec.yaml") {
-        Print-Info "감지됨: Flutter"
-        return "flutter"
-    }
-    
-    # Python
-    if ((Test-Path "pyproject.toml") -or (Test-Path "setup.py") -or (Test-Path "requirements.txt")) {
-        Print-Info "감지됨: Python"
-        return "python"
-    }
-    
+
+    # ===================================================
     # 감지 실패
+    # ===================================================
     Print-Warning "프로젝트 타입을 감지하지 못했습니다. 기본(basic) 타입으로 설정합니다."
     return "basic"
 }

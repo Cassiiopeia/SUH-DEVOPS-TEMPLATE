@@ -6,13 +6,12 @@ Synology NAS에 애플리케이션을 자동 배포하는 워크플로우 사용
 
 ## 개요
 
-SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 4종의 워크플로우를 제공합니다.
+SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 3종의 워크플로우를 제공합니다.
 
 | 워크플로우 | 프로젝트 타입 | 용도 |
 |-----------|-------------|------|
 | `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Flutter | APK 빌드 후 SMB로 NAS 업로드 |
-| `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Spring Boot | Docker 이미지 빌드 및 단순 배포 |
-| `PROJECT-SPRING-SYNOLOGY-NONSTOP-CICD` | Spring Boot | Blue/Green 무중단 배포 |
+| `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Spring Boot | Docker 이미지 빌드 및 배포 |
 | `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW` | Spring Boot | PR별 Preview 환경 자동 생성 |
 
 > **참고**: Synology 워크플로우는 template_integrator 실행 시 `--synology` 옵션으로 포함할 수 있습니다.
@@ -155,78 +154,6 @@ env:
 4. Docker 이미지 Pull
 5. 기존 컨테이너 제거 후 새 컨테이너 실행
 ```
-
----
-
-## Spring Boot 무중단 배포 (Blue/Green)
-
-### 워크플로우
-
-**파일**: `PROJECT-SPRING-SYNOLOGY-NONSTOP-CICD.yaml`
-
-**트리거**:
-- `main` 브랜치 푸시 (Blue/Green 무중단 배포)
-- `test` 브랜치 푸시 (단순 배포)
-
-### 필수 GitHub Secrets
-
-단순 배포와 동일 (APPLICATION_PROD_YML, DOCKERHUB_*, SERVER_*)
-
-### 환경변수 설정 (워크플로우 파일 내 수정)
-
-```yaml
-env:
-  PROJECT_NAME: "project"
-  DOMAIN_NAME: "api.example.com"    # 도메인명
-  BLUE_PORT: "8080"                 # Blue 환경 포트
-  GREEN_PORT: "8081"                # Green 환경 포트
-  TEST_PORT: "8082"                 # 테스트 환경 포트
-  NGINX_RP_CONF: "/etc/nginx/sites-enabled/server.ReverseProxy.conf"
-  NGINX_BACKUP_DIR: "/volume1/projects/backups/nginx"
-```
-
-### 동작 원리
-
-```
-main 브랜치 배포 시:
-1. 현재 활성 포트 감지 (Nginx 설정에서 파싱)
-2. 비활성 포트에 새 버전 배포
-   - Blue(8080) 활성 → Green(8081)에 배포
-   - Green(8081) 활성 → Blue(8080)에 배포
-3. 헬스체크 (최대 60초, 1초 간격)
-4. 성공 시 Nginx 설정 토글 및 reload
-5. 이전 컨테이너 정리
-```
-
-### 헬스체크 엔드포인트
-
-다음 중 하나가 응답하면 성공:
-- `/actuator/health`
-- `/healthz`
-- `/`
-- `/docs/swagger-ui/index.html`
-
-### Nginx 설정 예시
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name api.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;  # Blue/Green 자동 토글
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-### 롤백
-
-헬스체크 실패 시:
-1. Nginx 설정 자동 복구 (백업 파일에서)
-2. 신규 컨테이너 삭제
-3. 워크플로우 실패 처리
 
 ---
 
@@ -379,15 +306,6 @@ Error: Health check timeout after 60 seconds
 1. 애플리케이션 기동 시간 확인 (60초 이상 필요 시 MAX_RETRIES 증가)
 2. 헬스체크 엔드포인트 확인 (`/actuator/health` 또는 `/`)
 3. 컨테이너 로그 확인: `docker logs {container_name}`
-
-#### Nginx 설정 오류 (무중단 배포)
-```
-Error: nginx configuration test failed
-```
-**해결**:
-1. Nginx 설정 파일 문법 확인
-2. 백업 파일에서 자동 복구됨
-3. 수동 복구: `/volume1/projects/backups/nginx/` 에서 최신 백업 사용
 
 #### Traefik 라우팅 실패 (PR Preview)
 ```

@@ -339,11 +339,16 @@ ${BLUE}지원 프로젝트 타입:${NC}
   • ${GREEN}basic${NC}             - 기타 프로젝트
 
 ${BLUE}자동 감지 기능:${NC}
-  • package.json 발견 → Node.js 프로젝트로 감지
-  • @react-native 의존성 → React Native
-  • build.gradle → Spring Boot
-  • pubspec.yaml → Flutter
-  • pyproject.toml → Python
+  우선순위 1 (명확한 프레임워크 마커):
+    • pubspec.yaml → Flutter
+    • build.gradle/pom.xml → Spring Boot
+    • pyproject.toml → Python
+  우선순위 2 (Node.js 에코시스템 세부 분류):
+    • package.json 내용 분석
+      - @react-native → React Native
+      - "next" → Next.js
+      - "react" → React
+      - 기타 → Node.js
 
 ${BLUE}사용 예시:${NC}
   # 로컬 실행 - 대화형 모드 (추천)
@@ -447,8 +452,39 @@ done
 # 프로젝트 타입 자동 감지
 detect_project_type() {
     print_step "프로젝트 타입 자동 감지 중..."
-    
-    # Node.js / React / React Native
+
+    # ===================================================
+    # 우선순위 1: 명확한 프레임워크 마커 파일 체크
+    # Flutter, Spring, Python은 고유한 마커 파일을 가지므로 우선 체크
+    # ===================================================
+
+    # Flutter
+    if [ -f "pubspec.yaml" ]; then
+        print_info "감지됨: Flutter"
+        echo "flutter"
+        return
+    fi
+
+    # Spring Boot
+    if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] || [ -f "pom.xml" ]; then
+        print_info "감지됨: Spring Boot"
+        echo "spring"
+        return
+    fi
+
+    # Python
+    if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
+        print_info "감지됨: Python"
+        echo "python"
+        return
+    fi
+
+    # ===================================================
+    # 우선순위 2: Node.js 에코시스템 세부 분류
+    # package.json은 여러 프로젝트 타입에서 보조 도구로 사용될 수 있으므로 나중에 체크
+    # ===================================================
+
+    # Node.js / React / React Native / Next.js
     if [ -f "package.json" ]; then
         # React Native 체크
         if grep -q "@react-native" package.json || grep -q "react-native" package.json; then
@@ -463,42 +499,30 @@ detect_project_type() {
                 return
             fi
         fi
-        
+
+        # Next.js 체크 (React보다 먼저 체크해야 함)
+        if grep -q "\"next\"" package.json; then
+            print_info "감지됨: Next.js"
+            echo "next"
+            return
+        fi
+
         # React 체크
         if grep -q "\"react\"" package.json; then
             print_info "감지됨: React"
             echo "react"
             return
         fi
-        
+
         # 기본 Node.js
         print_info "감지됨: Node.js"
         echo "node"
         return
     fi
-    
-    # Spring Boot
-    if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] || [ -f "pom.xml" ]; then
-        print_info "감지됨: Spring Boot"
-        echo "spring"
-        return
-    fi
-    
-    # Flutter
-    if [ -f "pubspec.yaml" ]; then
-        print_info "감지됨: Flutter"
-        echo "flutter"
-        return
-    fi
-    
-    # Python
-    if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
-        print_info "감지됨: Python"
-        echo "python"
-        return
-    fi
-    
+
+    # ===================================================
     # 감지 실패
+    # ===================================================
     print_warning "프로젝트 타입을 감지하지 못했습니다. 기본(basic) 타입으로 설정합니다."
     echo "basic"
 }

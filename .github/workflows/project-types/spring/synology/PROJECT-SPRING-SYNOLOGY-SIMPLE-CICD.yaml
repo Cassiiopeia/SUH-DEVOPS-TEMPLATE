@@ -23,14 +23,48 @@ name: PROJECT-SPRING-SYNOLOGY-CICD
 # │ SERVER_PASSWORD             │ 서버 SSH 접속 비밀번호             │
 # └─────────────────────────────┴────────────────────────────────────┘
 #
-# 🧪 선택적 Secrets (포트 커스터마이징시):
-# ┌─────────────────────────────┬────────────────────────────────────┐
-# │ PROJECT_DEPLOY_PORT         │ deploy 브랜치 배포 포트 (기본: 8081) │
-# └─────────────────────────────┴────────────────────────────────────┘
+# 🌐 포트 및 컨테이너 설정 (워크플로우 env 섹션에서 설정):
+# ┌──────────────────────────────┬────────────────────────────────────┐
+# │ CONTAINER_INTERNAL_PORT      │ Spring Boot 내부 포트 (기본: 8080) │
+# │ DEPLOY_PORT                  │ deploy/main 브랜치 배포 포트       │
+# │ CONTAINER_NAME               │ Docker 컨테이너 이름               │
+# │                              │ (기본값: PROJECT_NAME)             │
+# ├──────────────────────────────┼────────────────────────────────────┤
+# │ ENABLE_VOLUME_MOUNT          │ 볼륨 마운트 활성화 (true/false)    │
+# │ VOLUME_HOST_PATH             │ 호스트 볼륨 풀 경로                │
+# │ VOLUME_CONTAINER_PATH        │ 컨테이너 내부 마운트 경로          │
+# ├──────────────────────────────┼────────────────────────────────────┤
+# │ SSH_PORT                     │ SSH 포트 (기본: 2022)              │
+# │ SSH_COMMAND_TIMEOUT          │ SSH 명령 타임아웃 (기본: 600s)     │
+# │ SSH_CONNECTION_TIMEOUT       │ SSH 연결 타임아웃 (기본: 60s)      │
+# └──────────────────────────────┴────────────────────────────────────┘
 #
-# 💡 포트 설정 예시:
-# - PROJECT_DEPLOY_PORT: 8080  (배포 서비스 포트)
-# - PROJECT_TEST_PORT: 8081    (테스트 서비스 포트)
+# ⏱️ 헬스체크 설정 (워크플로우 env 섹션에서 설정):
+# ┌────────────────────────────┬────────────────────────────────────┐
+# │ HEALTHCHECK_WAIT_SECONDS   │ 초기화 대기 시간 (기본: 10초)      │
+# │ HEALTHCHECK_PATH           │ HTTP 엔드포인트 경로               │
+# │                            │ (비어있으면 로그 패턴만 사용)      │
+# │ HEALTHCHECK_MAX_RETRIES    │ HTTP 재시도 횟수 (기본: 5회)       │
+# │ HEALTHCHECK_RETRY_INTERVAL │ 재시도 간격 (기본: 3초)            │
+# │ HEALTHCHECK_LOG_PATTERN    │ Fallback 로그 검색 패턴            │
+# └────────────────────────────┴────────────────────────────────────┘
+#
+# 💡 HEALTHCHECK_PATH 설정 예시:
+#   Spring Boot (Actuator 설치됨):     "/actuator/health"
+#   Spring Boot (Actuator 없음):       ""  (로그 패턴만 사용)
+#   커스텀 헬스체크 엔드포인트:        "/api/v1/health"
+#
+# 💡 HEALTHCHECK_LOG_PATTERN 설정 예시:
+#   Spring Boot:  "Tomcat started on port"
+#   커스텀:       "Application started successfully"
+#
+# 💡 환경변수 설정 예시 (env 섹션에서 변경):
+#   PROJECT_NAME: "mapsy-back"
+#   DEPLOY_PORT: "8096"
+#   CONTAINER_INTERNAL_PORT: "8080"
+#   ENABLE_VOLUME_MOUNT: "false"
+#   VOLUME_HOST_PATH: "/volume1/projects/mapsy-back"
+#   SSH_PORT: "2022"
 #
 # ⚠️ 주의사항:
 # 1. 포트는 서버에서 사용하지 않는 포트를 선택하세요
@@ -57,28 +91,25 @@ name: PROJECT-SPRING-SYNOLOGY-CICD
 # - 포트 충돌 방지를 위한 환경변수 기반 포트 설정
 #
 # 🌿 브랜치별 배포 전략:
-# - deploy 브랜치: 배포 환경 (PROJECT_DEPLOY_PORT 사용, 기본: 8080)
-# - main 브랜치: 배포 환경 (수동 실행시, PROJECT_DEPLOY_PORT 사용, 기본: 8080)
-# - test 브랜치: 테스트 환경 (PROJECT_TEST_PORT 사용, 기본: 8081)
+# - deploy 브랜치: 배포 환경 (DEPLOY_PORT 사용)
+# - main 브랜치: 배포 환경 (수동 실행시, DEPLOY_PORT 사용)
 #
 # 📝 사용 방법:
 # 1. 위의 GitHub Secrets 설정
-# 2. 아래 PROJECT_NAME을 실제 프로젝트명으로 변경
-# 3. deploy와 test 브랜치에 push하면 자동으로 CI/CD 실행 (main 브랜치는 수동 실행만 가능)
-# 4. GitHub Secrets에서 포트 설정 (기본값: deploy=8080, test=8081)
+# 2. 아래 env 섹션에서 PROJECT_NAME, DEPLOY_PORT 등 설정
+# 3. deploy 브랜치에 push하면 자동으로 CI/CD 실행 (main 브랜치는 수동 실행만 가능)
 #
 # ===================================================================
 
 # ===================================================================
 # 트리거 설정
 # ===================================================================
-# deploy와 test 브랜치에 push할 때 자동으로 CI/CD가 실행됩니다.
+# deploy 브랜치에 push할 때 자동으로 CI/CD가 실행됩니다.
 # main 브랜치는 workflow_dispatch로 수동 실행만 가능합니다.
 on:
   push:
     branches:
-      - deploy  # 배포 환경 (8080 포트)
-      - test    # 테스트 환경 (8081 포트)
+      - deploy  # 배포 환경 (DEPLOY_PORT 사용)
   workflow_dispatch:  # 수동 실행 허용
 
 # ===================================================================
@@ -86,15 +117,44 @@ on:
 # ===================================================================
 env:
   # 🔧 프로젝트 설정 - 실제 프로젝트명으로 변경하세요
-  PROJECT_NAME: "project"  # 기본값: project (프로젝트명에 맞게 수정 필요)
-
-  # 🐳 Docker 설정
-  DOCKER_IMAGE_PREFIX: "back-container"
+  PROJECT_NAME: "mapsy-back"  # 기본값: project (프로젝트명에 맞게 수정 필요)
 
   # ☁️ Spring Boot 설정
   SPRING_PROFILE: "prod"
-  JAVA_VERSION: "17"
+  JAVA_VERSION: "21"
   GRADLE_OPTS: "-Dspring.profiles.active=prod"
+
+  # 📁 경로 설정
+  APPLICATION_YML_DIR: "MS-Web/src/main/resources"
+  DOCKERFILE_PATH: "./Dockerfile"
+
+  # 🌐 포트 설정
+  CONTAINER_INTERNAL_PORT: "8080"  # Spring Boot 내부 포트
+  DEPLOY_PORT: "8096"  # deploy/main 브랜치 배포 포트
+
+  # 🐳 컨테이너 이름 설정
+  # 비워두면 PROJECT_NAME을 기본값으로 사용 (예: mapsy-back)
+  # 커스텀 이름을 원하면 직접 입력 (예: "my-custom-container")
+  CONTAINER_NAME: ""
+
+  # 📦 볼륨 마운트 설정
+  # true: 볼륨 마운트 활성화 (디렉토리 없으면 자동 생성)
+  # false: 볼륨 마운트 비활성화 (기본값)
+  ENABLE_VOLUME_MOUNT: "false"
+  VOLUME_HOST_PATH: "/volume1/projects/mapsy-back"  # 호스트 풀 경로 (예: /volume1/projects/프로젝트명)
+  VOLUME_CONTAINER_PATH: "/mnt/mapsy-back"  # 컨테이너 내부 경로
+
+  # 🔌 SSH 연결 설정
+  SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)
+  SSH_COMMAND_TIMEOUT: "600s"  # SSH 명령 실행 타임아웃
+  SSH_CONNECTION_TIMEOUT: "60s"  # SSH 연결 타임아웃
+
+  # ⏱️ 헬스체크 설정
+  HEALTHCHECK_WAIT_SECONDS: "10"  # 컨테이너 초기화 대기 시간 (초)
+  HEALTHCHECK_PATH: "/actuator/health"  # HTTP 엔드포인트 경로 (비어있으면 로그 패턴만 사용)
+  HEALTHCHECK_MAX_RETRIES: "5"  # HTTP 재시도 횟수
+  HEALTHCHECK_RETRY_INTERVAL: "3"  # 재시도 간격 (초)
+  HEALTHCHECK_LOG_PATTERN: "Tomcat started on port"  # Fallback 로그 검색 패턴
 
 jobs:
   # ===================================================================
@@ -123,18 +183,18 @@ jobs:
 
       # 4. Spring Boot 운영 환경 설정 파일 생성
       # GitHub Secrets에서 APPLICATION_PROD_YML 값을 읽어와서
-      # src/main/resources/application-prod.yml 파일로 생성
+      # 리소스 디렉토리에 파일로 생성
       - name: application-prod.yml 생성
         run: |
-          # 리소스 디렉토리 생성 (프로젝트 구조에 따라 경로 조정 필요)
-          mkdir -p src/main/resources
+          # 리소스 디렉토리 생성 (환경변수 사용)
+          mkdir -p ${{ env.APPLICATION_YML_DIR }}
 
           # GitHub Secrets의 APPLICATION_PROD_YML 내용을 파일로 저장
-          cat << 'EOF' > ./src/main/resources/application-prod.yml
+          cat << 'EOF' > ./${{ env.APPLICATION_YML_DIR }}/application-prod.yml
           ${{ secrets.APPLICATION_PROD_YML }}
           EOF
 
-          echo "✅ application-prod.yml 파일 생성 완료"
+          echo "✅ application-prod.yml 파일 생성 완료 (${{ env.APPLICATION_YML_DIR }})"
 
       # 5. Gradle 빌드 실행
       # 테스트는 제외하고 운영 프로파일로 빌드
@@ -163,14 +223,14 @@ jobs:
             ${{ runner.os }}-buildx-
 
       # 9. Docker 이미지 빌드 및 푸시
-      # 브랜치명을 태그로 사용하여 main/test 환경별로 이미지 관리
+      # 브랜치명을 태그로 사용하여 환경별로 이미지 관리
       - name: Docker 이미지 빌드 및 푸시
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ${{ env.DOCKERFILE_PATH }}
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}-${{ env.DOCKER_IMAGE_PREFIX }}:${{ github.ref_name }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:${{ github.ref_name }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
@@ -196,7 +256,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          port: 2022
+          port: ${{ env.SSH_PORT }}
           script: |
             set -e
 
@@ -214,36 +274,20 @@ jobs:
             PROJECT_NAME="${{ env.PROJECT_NAME }}"
 
             # ============================================================
-            # 브랜치별 포트 및 컨테이너명 설정
+            # 포트 및 컨테이너명 설정
             # ============================================================
-            # 기본값 설정
-            PORT=8080
-            CONTAINER_NAME="${PROJECT_NAME}-back"
+            PORT=${{ env.DEPLOY_PORT }}
 
-            # 브랜치에 따른 환경별 설정
-            if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
-              # 🚀 배포 환경 (deploy 브랜치 또는 main 브랜치)
-              # GitHub Secrets의 PROJECT_DEPLOY_PORT 환경변수 사용
-              # 설정되어 있지 않으면 기본값 8080 사용
-              PORT=${{ secrets.PROJECT_DEPLOY_PORT || '8080' }}
-              CONTAINER_NAME="${PROJECT_NAME}-back-deploy"
-              echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"
-
-            elif [ "$BRANCH" == "test" ]; then
-              # 🧪 테스트 환경 (test 브랜치)
-              # GitHub Secrets의 PROJECT_TEST_PORT 환경변수 사용
-              # 설정되어 있지 않으면 기본값 8081 사용
-              PORT=${{ secrets.PROJECT_TEST_PORT || '8081' }}
-              CONTAINER_NAME="${PROJECT_NAME}-back-test"
-              echo "🧪 테스트 환경으로 배포합니다"
-
+            # 컨테이너 이름 설정 (환경변수가 비어있으면 PROJECT_NAME을 기본값으로 사용)
+            if [ -z "${{ env.CONTAINER_NAME }}" ]; then
+              CONTAINER_NAME="${PROJECT_NAME}"
+              echo "ℹ️ CONTAINER_NAME이 설정되지 않아 PROJECT_NAME을 사용합니다: $CONTAINER_NAME"
             else
-              # ⚠️ 기타 브랜치 (예상치 못한 브랜치)
-              echo "⚠️ 지원하지 않는 브랜치입니다: $BRANCH"
-              echo "이 워크플로우는 deploy 브랜치와 test 브랜치만 지원합니다."
-              echo "on.push.branches에서 지원할 브랜치를 설정하세요."
-              exit 1
+              CONTAINER_NAME="${{ env.CONTAINER_NAME }}"
+              echo "ℹ️ 사용자 지정 CONTAINER_NAME 사용: $CONTAINER_NAME"
             fi
+
+            echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"
 
             # 설정 정보 출력
             echo "📋 배포 설정 정보:"
@@ -251,13 +295,13 @@ jobs:
             echo "  - 프로젝트: $PROJECT_NAME"
             echo "  - 컨테이너 이름: $CONTAINER_NAME"
             echo "  - 포트: $PORT"
-            echo "  - Docker 이미지: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}"
+            echo "  - Docker 이미지: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}"
 
             # ============================================================
             # Docker 이미지 풀 (Pull)
             # ============================================================
-            echo "⬇️ Docker 이미지 풀: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}"
-            echo $PW | sudo -S docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}
+            echo "⬇️ Docker 이미지 풀: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}"
+            echo $PW | sudo -S docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}
 
             # ============================================================
             # 기존 컨테이너 정리
@@ -278,19 +322,108 @@ jobs:
             # ============================================================
             echo "🚀 새로운 컨테이너 $CONTAINER_NAME 실행 중..."
 
+            # 볼륨 마운트 옵션 설정
+            VOLUME_MOUNT_OPTION=""
+            if [ "${{ env.ENABLE_VOLUME_MOUNT }}" == "true" ]; then
+              # 디렉토리가 없으면 생성
+              if [ ! -d "${{ env.VOLUME_HOST_PATH }}" ]; then
+                echo "📁 볼륨 마운트 디렉토리 생성: ${{ env.VOLUME_HOST_PATH }}"
+                echo $PW | sudo -S mkdir -p "${{ env.VOLUME_HOST_PATH }}"
+              fi
+              VOLUME_MOUNT_OPTION="-v ${{ env.VOLUME_HOST_PATH }}:${{ env.VOLUME_CONTAINER_PATH }}"
+              echo "📦 볼륨 마운트 활성화: $VOLUME_MOUNT_OPTION"
+            else
+              echo "ℹ️ 볼륨 마운트 비활성화됨"
+            fi
+
             # Docker 컨테이너 실행
-            # - 포트 매핑: ${PORT}:8080 (외부포트:내부포트)
+            # - 포트 매핑: ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }} (외부:내부)
             # - 시간대: Asia/Seoul
-            # - Spring 프로파일: prod
-            # - 볼륨 마운트: 로컬 시간 동기화 및 프로젝트 데이터
+            # - Spring 프로파일: ${{ env.SPRING_PROFILE }}
+            # - 볼륨 마운트: ENABLE_VOLUME_MOUNT=true일 때만 활성화
             echo $PW | sudo -S docker run -d \
-              -p ${PORT}:8080 \
+              -p ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }} \
               --name $CONTAINER_NAME \
               -e TZ=Asia/Seoul \
               -e "SPRING_PROFILES_ACTIVE=${{ env.SPRING_PROFILE }}" \
               -v /etc/localtime:/etc/localtime:ro \
-              -v /volume1/projects/${PROJECT_NAME}:/mnt/${PROJECT_NAME} \
-              ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}
+              $VOLUME_MOUNT_OPTION \
+              ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}
+
+            # ============================================================
+            # 컨테이너 헬스체크
+            # ============================================================
+            echo "⏳ 컨테이너 초기화 대기 중... (${{ env.HEALTHCHECK_WAIT_SECONDS }}초)"
+            sleep ${{ env.HEALTHCHECK_WAIT_SECONDS }}
+
+            # 1단계: 컨테이너 프로세스 확인
+            echo "🏥 컨테이너 헬스체크 중..."
+            if ! echo $PW | sudo -S docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+              echo "❌ 컨테이너 $CONTAINER_NAME 프로세스가 실행되지 않았습니다"
+              echo $PW | sudo -S docker logs --tail 50 $CONTAINER_NAME || true
+              exit 1
+            fi
+            echo "✅ 컨테이너 프로세스 실행 확인 완료"
+
+            # 2단계: HTTP 엔드포인트 체크 (설정된 경우)
+            HEALTHCHECK_SUCCESS=false
+            if [ -n "${{ env.HEALTHCHECK_PATH }}" ]; then
+              echo "🌐 HTTP 헬스체크 시작: http://localhost:${PORT}${{ env.HEALTHCHECK_PATH }}"
+
+              for i in $(seq 1 ${{ env.HEALTHCHECK_MAX_RETRIES }}); do
+                echo "  시도 $i/${{ env.HEALTHCHECK_MAX_RETRIES }}..."
+
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${PORT}${{ env.HEALTHCHECK_PATH }} || echo "000")
+
+                if [ "$HTTP_CODE" = "200" ]; then
+                  echo "✅ HTTP 헬스체크 성공 (응답 코드: $HTTP_CODE)"
+                  HEALTHCHECK_SUCCESS=true
+                  break
+                else
+                  echo "⚠️ HTTP 헬스체크 실패 (응답 코드: $HTTP_CODE)"
+                  if [ $i -lt ${{ env.HEALTHCHECK_MAX_RETRIES }} ]; then
+                    echo "  ${{ env.HEALTHCHECK_RETRY_INTERVAL }}초 후 재시도..."
+                    sleep ${{ env.HEALTHCHECK_RETRY_INTERVAL }}
+                  fi
+                fi
+              done
+
+              # HTTP 체크 실패 시 fallback으로 로그 패턴 매칭
+              if [ "$HEALTHCHECK_SUCCESS" = "false" ]; then
+                echo "⚠️ HTTP 헬스체크 최종 실패, 로그 패턴 매칭으로 fallback..."
+              fi
+            else
+              echo "ℹ️ HEALTHCHECK_PATH가 설정되지 않아 로그 패턴 매칭만 사용합니다"
+            fi
+
+            # 3단계: 로그 패턴 매칭 (HTTP 실패 시 또는 HTTP 체크 비활성화 시)
+            if [ "$HEALTHCHECK_SUCCESS" = "false" ]; then
+              echo "📋 로그 패턴 매칭 시작: '${{ env.HEALTHCHECK_LOG_PATTERN }}'"
+
+              if echo $PW | sudo -S docker logs $CONTAINER_NAME 2>&1 | grep -q "${{ env.HEALTHCHECK_LOG_PATTERN }}"; then
+                echo "✅ 로그 패턴 매칭 성공: 애플리케이션이 정상적으로 시작되었습니다"
+                HEALTHCHECK_SUCCESS=true
+              else
+                echo "❌ 로그 패턴 매칭 실패: 애플리케이션 시작 로그를 찾을 수 없습니다"
+                echo ""
+                echo "📋 디버깅 정보:"
+                echo "  - 검색 패턴: ${{ env.HEALTHCHECK_LOG_PATTERN }}"
+                echo "  - 컨테이너: $CONTAINER_NAME"
+                echo "  - 이미지: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}"
+                echo "  - 포트: ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }}"
+                echo "  - 볼륨: $VOLUME_MOUNT_OPTION"
+                echo "  - 프로파일: ${{ env.SPRING_PROFILE }}"
+                echo ""
+                echo "📋 컨테이너 로그 (최근 50줄):"
+                echo $PW | sudo -S docker logs --tail 50 $CONTAINER_NAME || true
+                exit 1
+              fi
+            fi
+
+            # 최종 성공 메시지
+            if [ "$HEALTHCHECK_SUCCESS" = "true" ]; then
+              echo "✅ 헬스체크 완료: 컨테이너 $CONTAINER_NAME 이(가) 정상적으로 실행 중입니다"
+            fi
 
             # ============================================================
             # 배포 완료 확인
@@ -307,20 +440,25 @@ jobs:
             echo "🔗 접속 URL: http://${{ secrets.SERVER_HOST }}:${PORT}"
 
 # ===================================================================
-# 사용 예시 - deploy와 test 브랜치 사용
+# 사용 예시
 # ===================================================================
 #
-# 현재 설정: deploy와 test 브랜치에 push할 때 자동 배포
+# 현재 설정: deploy 브랜치에 push할 때 자동 배포
 # main 브랜치는 수동 실행(workflow_dispatch)만 가능
 #
-# 브랜치별 포트:
-# - deploy: 8080 (PROJECT_DEPLOY_PORT secret으로 변경 가능)
-# - main: 8080 (수동 실행시, PROJECT_DEPLOY_PORT secret으로 변경 가능)
-# - test: 8081 (PROJECT_TEST_PORT secret으로 변경 가능)
-#
-# 필요한 Secrets:
+# 필요한 GitHub Secrets:
 # - APPLICATION_PROD_YML, DOCKERHUB_*, SERVER_* (필수)
-# - PROJECT_DEPLOY_PORT (선택, 기본값: 8080)
-# - PROJECT_TEST_PORT (선택, 기본값: 8081)
+#
+# env 섹션에서 설정하는 주요 값들:
+# - PROJECT_NAME: "프로젝트명" (필수)
+# - DEPLOY_PORT: "8096" (배포 포트)
+# - CONTAINER_INTERNAL_PORT: "8080" (Spring Boot 내부 포트)
+# - CONTAINER_NAME: "" (비워두면 PROJECT_NAME 사용)
+# - ENABLE_VOLUME_MOUNT: "false" (볼륨 마운트 활성화 여부)
+# - VOLUME_HOST_PATH: "/volume1/projects/프로젝트명" (호스트 경로)
+# - SSH_PORT: "2022" (Synology SSH 포트)
+#
+# 배포된 서비스 접속:
+# - http://SERVER_HOST:DEPLOY_PORT
 #
 # ===================================================================

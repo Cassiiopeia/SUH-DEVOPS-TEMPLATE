@@ -1,11 +1,52 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-14T13:39:32Z",
-    "currentVersion": "2.6.6",
+    "lastUpdated": "2026-01-19T06:15:02Z",
+    "currentVersion": "2.6.8",
     "projectType": "basic",
-    "totalReleases": 51
+    "totalReleases": 52
   },
   "releases": [
+    {
+      "version": "2.6.8",
+      "project_type": "basic",
+      "date": "2026-01-19",
+      "pr_number": 158,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리스 노트\n\n* **개선 사항**\n  * 배포 환경 설정을 통합하여 포트 및 컨테이너 관리 단순화\n  * 헬스 체크 로직 강화 및 배포 구성 유연성 증대\n\n* **제거된 기능**\n  * Spring Boot Synology 무중단(Blue/Green) 배포 워크플로우 삭제\n\n* **개선**\n  * 프로젝트 유형 자동 감지 알고리즘 최적화\n\n* **문서**\n  * 배포 가이드 및 워크플로우 문서 업데이트\n\n* **기타**\n  * 버전 2.6.6 → 2.6.8 업데이트",
+      "parsed_changes": {
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "배포 환경 설정을 통합하여 포트 및 컨테이너 관리 단순화",
+            "헬스 체크 로직 강화 및 배포 구성 유연성 증대"
+          ]
+        },
+        "제거된_기능": {
+          "title": "제거된 기능",
+          "items": [
+            "Spring Boot Synology 무중단(Blue/Green) 배포 워크플로우 삭제"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "프로젝트 유형 자동 감지 알고리즘 최적화"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "배포 가이드 및 워크플로우 문서 업데이트"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전 2.6.6 → 2.6.8 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.6.6",
       "project_type": "basic",

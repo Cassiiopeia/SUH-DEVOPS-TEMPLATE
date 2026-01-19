@@ -63,7 +63,7 @@ jobs:
           echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > android/app/keystore/key.jks || echo "Base64 decoding failed"
           echo "Keystore created from DEBUG_KEYSTORE"
           ls -la android/app/keystore
-          echo "storeFile=keystore/key.jks" > android/key.properties
+          echo "storeFile=app/keystore/key.jks" > android/key.properties
           echo "storePassword=android" >> android/key.properties
           echo "keyAlias=androiddebugkey" >> android/key.properties
           echo "keyPassword=android" >> android/key.properties

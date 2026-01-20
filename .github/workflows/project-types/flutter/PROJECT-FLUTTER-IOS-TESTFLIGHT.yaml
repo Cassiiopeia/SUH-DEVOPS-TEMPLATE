@@ -71,7 +71,7 @@ on:
 # ============================================
 env:
   FLUTTER_VERSION: "3.35.5"
-  XCODE_VERSION: "16.4"
+  XCODE_VERSION: "26.0"
   PROJECT_TYPE: "flutter"
 
   # ============================================

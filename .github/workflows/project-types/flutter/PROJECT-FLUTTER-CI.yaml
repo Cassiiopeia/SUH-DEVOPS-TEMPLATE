@@ -1,17 +1,18 @@
 # ===================================================================
-# Flutter CI (빌드 검증) 워크플로우
+# Flutter CI (코드 분석 및 빌드 검증) 워크플로우
 # ===================================================================
 #
 # 이 워크플로우는 PR 생성 또는 main 브랜치 푸시 시
-# Android와 iOS 앱 빌드가 정상적으로 되는지 검증합니다.
+# 코드 정적 분석(flutter analyze)과 Android/iOS 앱 빌드를 검증합니다.
 #
 # 주요 특징:
 # - PR 생성/업데이트 시 자동 실행
 # - main 브랜치 푸시 시 자동 실행
+# - flutter analyze로 코드 품질 검사
 # - Android/iOS 빌드 개별 활성화/비활성화 가능
 # - PR인 경우 진행 상황을 댓글로 실시간 업데이트
 # - 빌드 실패 시 상세 에러 정보 제공
-# - Android와 iOS 빌드 병렬 실행으로 시간 단축
+# - Analyze와 빌드 병렬 실행으로 시간 단축
 #
 # 사용 방법:
 # 1. 프로젝트에 맞게 상단 env 섹션의 값들을 수정하세요
@@ -45,7 +46,7 @@ name: PROJECT-Flutter-CI
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     types: [opened, synchronize, reopened]
   push:
     branches: [main]
@@ -160,12 +161,13 @@ jobs:
             const iosStatus = enableIos ? '⏳ 진행 중...' : '⏸️ 비활성화';
 
             const body = [
-              '## 🔨 Flutter CI 빌드 진행 중...',
+              '## 🔨 Flutter CI 진행 중...',
               '',
-              '| 플랫폼 | 상태 | 소요 시간 |',
-              '|--------|------|----------|',
-              `| 🤖 Android | ${androidStatus} | - |`,
-              `| 🍎 iOS | ${iosStatus} | - |`,
+              '| 검사 항목 | 상태 | 소요 시간 |',
+              '|----------|------|----------|',
+              '| 🔍 Analyze | ⏳ 진행 중... | - |',
+              `| 🤖 Android 빌드 | ${androidStatus} | - |`,
+              `| 🍎 iOS 빌드 | ${iosStatus} | - |`,
               '',
               '| 항목 | 값 |',
               '|------|-----|',
@@ -190,7 +192,92 @@ jobs:
             core.setOutput('start_time', startTime);
 
   # ============================================
-  # Job 2: Android 빌드 (조건부, 병렬)
+  # Job 2: 코드 분석 (병렬)
+  # ============================================
+  analyze:
+    name: 코드 분석
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      duration: ${{ steps.result.outputs.duration }}
+
+    steps:
+      - name: 분석 시작 시간 기록
+        id: analyze_start
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput('time', Date.now().toString());
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # .env 파일 생성
+      - name: Create .env file
+        run: |
+          cat << 'EOF' > ${{ env.ENV_FILE_PATH }}
+          ${{ secrets.ENV_FILE || secrets.ENV }}
+          EOF
+          echo "✅ ${{ env.ENV_FILE_PATH }} file created"
+
+      # Flutter 설정
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Verify Flutter version
+        run: |
+          echo "✅ Flutter setup completed"
+          flutter --version
+
+      # Flutter 캐시
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-flutter-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-flutter-pub-
+
+      # 프로젝트 의존성 설치
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          echo "✅ Dependencies installed"
+
+      # Flutter Analyze 실행
+      - name: Run Flutter Analyze
+        id: analyze
+        run: |
+          echo "🔍 Flutter 코드 분석 시작..."
+          flutter analyze --no-fatal-infos
+          echo "✅ 코드 분석 완료"
+
+      # 분석 결과 기록
+      - name: 분석 결과 기록
+        id: result
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const analyzeStart = parseInt('${{ steps.analyze_start.outputs.time }}');
+            const now = Date.now();
+            const elapsed = now - analyzeStart;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            const duration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+            const status = '${{ steps.analyze.outcome }}' === 'success' ? 'success' : 'failure';
+
+            core.setOutput('status', status);
+            core.setOutput('duration', duration);
+            console.log(`📋 코드 분석 결과: ${status} (${duration})`);
+
+  # ============================================
+  # Job 3: Android 빌드 (조건부, 병렬)
   # ============================================
   build-android:
     name: Android 빌드
@@ -307,7 +394,7 @@ jobs:
             console.log(`📋 Android 빌드 결과: ${status} (${duration})`);
 
   # ============================================
-  # Job 3: iOS 빌드 (조건부, 병렬)
+  # Job 4: iOS 빌드 (조건부, 병렬)
   # ============================================
   build-ios:
     name: iOS 빌드
@@ -409,13 +496,13 @@ jobs:
             console.log(`📋 iOS 빌드 결과: ${status} (${duration})`);
 
   # ============================================
-  # Job 4: 결과 보고
+  # Job 5: 결과 보고
   # ============================================
   report:
     name: 결과 보고
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    needs: [prepare, build-android, build-ios]
+    needs: [prepare, analyze, build-android, build-ios]
 
     steps:
       - name: 최종 결과 댓글 업데이트
@@ -432,7 +519,9 @@ jobs:
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-            // 빌드 결과 수집
+            // 결과 수집
+            const analyzeStatus = '${{ needs.analyze.outputs.status }}';
+            const analyzeDuration = '${{ needs.analyze.outputs.duration }}' || '-';
             const androidStatus = '${{ needs.build-android.outputs.status }}';
             const androidDuration = '${{ needs.build-android.outputs.duration }}' || '-';
             const iosStatus = '${{ needs.build-ios.outputs.status }}';
@@ -447,8 +536,17 @@ jobs:
 
             // 상태 결정
             let overallSuccess = true;
-            let androidDisplay, iosDisplay;
+            let analyzeDisplay, androidDisplay, iosDisplay;
 
+            // Analyze 상태
+            if (analyzeStatus === 'success') {
+              analyzeDisplay = '✅ 성공';
+            } else {
+              analyzeDisplay = '❌ 실패';
+              overallSuccess = false;
+            }
+
+            // Android 상태
             if (!enableAndroid) {
               androidDisplay = '⏸️ 비활성화';
             } else if (androidStatus === 'success') {
@@ -458,6 +556,7 @@ jobs:
               overallSuccess = false;
             }
 
+            // iOS 상태
             if (!enableIos) {
               iosDisplay = '⏸️ 비활성화';
             } else if (iosStatus === 'success') {
@@ -469,17 +568,18 @@ jobs:
 
             // 헤더 결정
             const header = overallSuccess
-              ? '## ✅ Flutter CI 빌드 성공!'
-              : '## ❌ Flutter CI 빌드 실패';
+              ? '## ✅ Flutter CI 성공!'
+              : '## ❌ Flutter CI 실패';
 
             // 댓글 본문 생성
             const bodyParts = [
               header,
               '',
-              '| 플랫폼 | 상태 | 소요 시간 |',
-              '|--------|------|----------|',
-              `| 🤖 Android | ${androidDisplay} | ${enableAndroid ? androidDuration : '-'} |`,
-              `| 🍎 iOS | ${iosDisplay} | ${enableIos ? iosDuration : '-'} |`,
+              '| 검사 항목 | 상태 | 소요 시간 |',
+              '|----------|------|----------|',
+              `| 🔍 Analyze | ${analyzeDisplay} | ${analyzeDuration} |`,
+              `| 🤖 Android 빌드 | ${androidDisplay} | ${enableAndroid ? androidDuration : '-'} |`,
+              `| 🍎 iOS 빌드 | ${iosDisplay} | ${enableIos ? iosDuration : '-'} |`,
               '',
               '| 항목 | 값 |',
               '|------|-----|',
@@ -493,11 +593,29 @@ jobs:
             if (!overallSuccess) {
               bodyParts.push(
                 '### 💡 확인 사항',
-                '1. 빌드 로그에서 에러 메시지를 확인하세요',
-                '2. 의존성 설치가 올바른지 확인하세요',
-                '3. Flutter 버전 호환성을 확인하세요',
                 ''
               );
+
+              if (analyzeStatus !== 'success') {
+                bodyParts.push('**Analyze 실패 시:**');
+                bodyParts.push('- `flutter analyze` 로컬에서 실행하여 lint 오류 확인');
+                bodyParts.push('- 코드 스타일 및 타입 오류 수정');
+                bodyParts.push('');
+              }
+
+              if (enableAndroid && androidStatus !== 'success') {
+                bodyParts.push('**Android 빌드 실패 시:**');
+                bodyParts.push('- Gradle 빌드 로그에서 에러 확인');
+                bodyParts.push('- 의존성 버전 호환성 확인');
+                bodyParts.push('');
+              }
+
+              if (enableIos && iosStatus !== 'success') {
+                bodyParts.push('**iOS 빌드 실패 시:**');
+                bodyParts.push('- Xcode 빌드 로그에서 에러 확인');
+                bodyParts.push('- CocoaPods 의존성 확인');
+                bodyParts.push('');
+              }
             }
 
             bodyParts.push(`**[📋 워크플로우 로그](${runUrl})**`);

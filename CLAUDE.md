@@ -133,6 +133,7 @@ snake_case.sh / snake_case.py
 #### Flutter
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
+| `PROJECT-FLUTTER-CI` | 코드 분석 + 빌드 검증 (PR/main) | 기본 |
 | `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 | 기본 |
 | `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 | 기본 |
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
@@ -546,7 +547,8 @@ metadata:
 
 | 브랜치 | 트리거 | 워크플로우 |
 |--------|--------|-----------|
-| `main` | push | VERSION-CONTROL |
+| `main` | push | VERSION-CONTROL, FLUTTER-CI |
+| `main` | PR | FLUTTER-CI (코드 분석 + 빌드 검증) |
 | `deploy` | PR | CHANGELOG-CONTROL |
 | `deploy` | push | README-UPDATE, CICD |
 | `test` | push | 테스트 환경 배포 |
@@ -558,9 +560,16 @@ metadata:
 ### 공통
 ```
 _GITHUB_PAT_TOKEN    # PR 자동 머지용 (repo, workflow 권한)
+ENV_FILE (또는 ENV) # .env 파일 내용 (앱 환경변수)
 ```
 
-### Flutter Android
+### Flutter CI (코드 분석 + 빌드 검증)
+```
+ENV_FILE (또는 ENV) # .env 파일 내용 (선택)
+# ※ CI는 빌드 검증 목적이므로 서명/배포 관련 Secrets 불필요
+```
+
+### Flutter Android (CD - Play Store 배포)
 ```
 RELEASE_KEYSTORE_BASE64
 RELEASE_KEYSTORE_PASSWORD
@@ -569,11 +578,12 @@ RELEASE_KEY_PASSWORD
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64
 ```
 
-### Flutter iOS
+### Flutter iOS (CD - TestFlight 배포)
 ```
 APPLE_CERTIFICATE_BASE64
 APPLE_CERTIFICATE_PASSWORD
 APPLE_PROVISIONING_PROFILE_BASE64
+IOS_PROVISIONING_PROFILE_NAME
 APP_STORE_CONNECT_API_KEY_BASE64
 APP_STORE_CONNECT_API_KEY_ID
 APP_STORE_CONNECT_ISSUER_ID

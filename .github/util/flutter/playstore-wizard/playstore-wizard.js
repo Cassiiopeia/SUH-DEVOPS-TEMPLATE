@@ -52,7 +52,16 @@ const state = {
     serviceAccountBase64: '',
     // Optional
     googleServicesJson: '',
-    envFileContent: ''
+    envFileContent: '',
+    // Custom Secrets (사용자 추가)
+    customSecrets: []
+    // [{
+    //   key: 'SECRET_NAME',
+    //   value: '...',
+    //   fileName: 'file.json',
+    //   type: 'text' | 'binary',
+    //   hint: '사용법 힌트'
+    // }]
 };
 
 // ============================================
@@ -203,6 +212,12 @@ function restoreUIFromState() {
         setElementText('detectedVersionCode', state.versionCode);
         setElementText('detectedGradleType', state.gradleType);
     }
+
+    // 커스텀 Secrets 복원 (배열이 아닌 경우 초기화)
+    if (!Array.isArray(state.customSecrets)) {
+        state.customSecrets = [];
+    }
+    renderCustomSecrets();
 }
 
 // ============================================
@@ -1701,6 +1716,12 @@ function copyAllSecrets() {
         { key: 'ENV_FILE', value: state.envFileContent }
     ];
 
+    // 커스텀 Secrets 추가
+    const customSecrets = getCustomSecretsForExport();
+    customSecrets.forEach(cs => {
+        secrets.push({ key: cs.key, value: cs.value });
+    });
+
     // 설정된 값만 필터링
     const configuredSecrets = secrets.filter(s => s.value);
 
@@ -1743,6 +1764,12 @@ function downloadAsJson() {
         ENV_FILE: state.envFileContent
     };
 
+    // 커스텀 Secrets 추가
+    const customSecrets = getCustomSecretsForExport();
+    customSecrets.forEach(cs => {
+        secrets[cs.key] = cs.value;
+    });
+
     const jsonStr = JSON.stringify(secrets, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1783,9 +1810,23 @@ function downloadAsTxt() {
         '',
         'ENV_FILE:',
         state.envFileContent || '(미입력)',
-        '',
-        '====================================='
+        ''
     ];
+
+    // 커스텀 Secrets 추가
+    const customSecrets = getCustomSecretsForExport();
+    if (customSecrets.length > 0) {
+        lines.push('===== 사용자 추가 Secrets =====');
+        lines.push('');
+        customSecrets.forEach(cs => {
+            const typeLabel = cs.type === 'text' ? '[텍스트]' : '[Base64]';
+            lines.push(`${cs.key}: ${typeLabel}`);
+            lines.push(cs.value.substring(0, 100) + (cs.value.length > 100 ? '...' : ''));
+            lines.push('');
+        });
+    }
+
+    lines.push('=====================================');
 
     const txtStr = lines.join('\n');
     const blob = new Blob([txtStr], { type: 'text/plain' });
@@ -1913,6 +1954,31 @@ async function downloadAsZip() {
         { name: 'GOOGLE_SERVICES_JSON.txt', value: state.googleServicesJson },
         { name: 'ENV_FILE.txt', value: state.envFileContent }
     ];
+
+    // 커스텀 Secrets 추가
+    const customSecrets = getCustomSecretsForExport();
+    customSecrets.forEach(cs => {
+        secrets.push({ name: `${cs.key}.txt`, value: cs.value });
+
+        // 바이너리 파일은 실제 파일로도 복원
+        if (cs.type === 'binary') {
+            try {
+                const binaryString = atob(cs.value);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                // 파일명에서 확장자 추출
+                const ext = cs.fileName.split('.').pop() || 'bin';
+                zip.file(`custom-files/${cs.fileName}`, bytes);
+            } catch (e) {
+                console.error(`커스텀 파일 디코딩 실패 (${cs.key}):`, e);
+            }
+        } else {
+            // 텍스트 파일은 그대로 저장
+            zip.file(`custom-files/${cs.fileName}`, cs.value);
+        }
+    });
 
     const secretsFolder = zip.folder("github-secrets");
     let fileCount = 0;
@@ -2289,3 +2355,254 @@ window.addEventListener('beforeunload', (e) => {
         e.returnValue = '입력한 데이터가 사라질 수 있습니다. 정말 나가시겠습니까?';
     }
 });
+
+// ============================================
+// Custom Secrets Functions (파일 타입별 자동 처리)
+// ============================================
+
+// 텍스트 파일 확장자 (원본 그대로 저장 - cat <<EOF 로 사용)
+const TEXT_EXTENSIONS = ['.json', '.yml', '.yaml', '.env', '.txt', '.xml', '.plist', '.properties', '.toml', '.ini', '.cfg', '.conf'];
+
+// 바이너리 파일 확장자 (Base64 인코딩 - echo $SECRET | base64 -d 로 사용)
+const BINARY_EXTENSIONS = ['.jks', '.keystore', '.p12', '.mobileprovision', '.p8', '.cer', '.pfx', '.pem', '.der', '.key', '.crt'];
+
+/**
+ * 파일 확장자로 파일 타입 결정
+ * @param {string} fileName 파일명
+ * @returns {'text' | 'binary'} 파일 타입
+ */
+function getFileType(fileName) {
+    const lowerName = fileName.toLowerCase();
+    // .env로 시작하는 파일은 텍스트로 처리 (.env.production, .env.local 등)
+    if (lowerName === '.env' || lowerName.startsWith('.env.')) return 'text';
+
+    const ext = '.' + fileName.split('.').pop().toLowerCase();
+    if (TEXT_EXTENSIONS.includes(ext)) return 'text';
+    if (BINARY_EXTENSIONS.includes(ext)) return 'binary';
+    // 알 수 없는 확장자는 바이너리로 처리 (안전)
+    return 'binary';
+}
+
+/**
+ * 파일명으로 키 이름 자동 생성
+ * @param {string} fileName 파일명
+ * @param {'text' | 'binary'} fileType 파일 타입
+ * @returns {string} GitHub Secrets 키 이름
+ */
+function generateKeyName(fileName, fileType) {
+    // 파일명에서 확장자 제거 후 대문자+언더스코어로 변환
+    const baseName = fileName
+        .replace(/\.[^/.]+$/, '')  // 확장자 제거
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');  // 앞뒤 언더스코어 제거
+
+    // 바이너리 파일만 _BASE64 접미사 추가
+    if (fileType === 'binary') {
+        return baseName + '_BASE64';
+    }
+    return baseName;
+}
+
+/**
+ * 파일을 타입에 따라 처리
+ * @param {File} file 파일 객체
+ * @returns {Promise<{value: string, type: 'text' | 'binary', hint: string}>}
+ */
+async function processFile(file) {
+    const fileType = getFileType(file.name);
+
+    if (fileType === 'text') {
+        // 텍스트 파일: 원본 내용 그대로
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({
+                value: reader.result,
+                type: 'text',
+                hint: 'cat <<EOF > file 로 사용'
+            });
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    } else {
+        // 바이너리 파일: Base64 인코딩
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({
+                value: reader.result.split(',')[1],  // data URL에서 base64만 추출
+                type: 'binary',
+                hint: 'echo $SECRET | base64 -d > file 로 사용'
+            });
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+}
+
+/**
+ * 새 커스텀 Secret 슬롯 추가
+ */
+function addCustomSecret() {
+    state.customSecrets.push({
+        key: '',
+        value: '',
+        fileName: '',
+        type: null,
+        hint: ''
+    });
+    renderCustomSecrets();
+    saveState();
+}
+
+/**
+ * 커스텀 Secret 삭제
+ * @param {number} index 인덱스
+ */
+function removeCustomSecret(index) {
+    state.customSecrets.splice(index, 1);
+    renderCustomSecrets();
+    saveState();
+}
+
+/**
+ * 커스텀 Secret 키 이름 업데이트
+ * @param {number} index 인덱스
+ * @param {string} key 새 키 이름
+ */
+function updateCustomSecretKey(index, key) {
+    if (state.customSecrets[index]) {
+        state.customSecrets[index].key = key.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+        saveState();
+    }
+}
+
+/**
+ * 커스텀 Secret 파일 업로드 처리
+ * @param {number} index 인덱스
+ * @param {File} file 파일 객체
+ */
+async function handleCustomFileUpload(index, file) {
+    if (!file) return;
+
+    try {
+        const result = await processFile(file);
+        const suggestedKey = generateKeyName(file.name, result.type);
+
+        state.customSecrets[index] = {
+            key: state.customSecrets[index]?.key || suggestedKey,
+            value: result.value,
+            fileName: file.name,
+            type: result.type,
+            hint: result.hint
+        };
+
+        // 키가 비어있으면 자동 생성된 키 사용
+        if (!state.customSecrets[index].key) {
+            state.customSecrets[index].key = suggestedKey;
+        }
+
+        renderCustomSecrets();
+        saveState();
+        showToast(`✅ ${file.name} 업로드 완료 (${result.type === 'text' ? '텍스트' : 'Base64'})`);
+    } catch (error) {
+        showToast('❌ 파일 읽기 실패: ' + error.message);
+    }
+}
+
+/**
+ * 커스텀 Secret 값 복사
+ * @param {number} index 인덱스
+ */
+function copyCustomSecretValue(index) {
+    const secret = state.customSecrets[index];
+    if (secret && secret.value) {
+        navigator.clipboard.writeText(secret.value).then(() => {
+            showToast(`✅ ${secret.key} 값 복사됨`);
+        }).catch(() => {
+            showToast('❌ 클립보드 복사 실패');
+        });
+    }
+}
+
+/**
+ * HTML 이스케이프 (XSS 방지)
+ * @param {string} text 이스케이프할 텍스트
+ * @returns {string} 이스케이프된 텍스트
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * 커스텀 Secrets 목록 렌더링
+ */
+function renderCustomSecrets() {
+    const container = document.getElementById('customSecretsList');
+    if (!container) return;
+
+    if (state.customSecrets.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = state.customSecrets.map((secret, index) => {
+        const hasFile = secret.value && secret.fileName;
+        const typeIcon = secret.type === 'text' ? '📄' : '🔐';
+        const typeBadge = secret.type === 'text' ? 'Raw Text' : 'Base64';
+        const typeClass = secret.type === 'text' ? 'text' : 'binary';
+
+        return `
+            <div class="custom-secret-item">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    ${hasFile ? `<span class="type-badge ${typeClass}">${typeIcon} ${typeBadge}</span>` : '<span></span>'}
+                    <button class="remove-secret-btn" onclick="removeCustomSecret(${index})">✕ 삭제</button>
+                </div>
+
+                <div class="mb-3">
+                    <label class="block text-xs text-slate-400 mb-1">Secret 이름</label>
+                    <input type="text"
+                           class="secret-key-input"
+                           placeholder="SECRET_NAME"
+                           value="${secret.key || ''}"
+                           onchange="updateCustomSecretKey(${index}, this.value)"
+                           oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_')">
+                </div>
+
+                <div class="custom-file-upload ${hasFile ? 'has-file' : ''}"
+                     onclick="document.getElementById('customFile${index}').click()">
+                    <input type="file" id="customFile${index}" onchange="handleCustomFileUpload(${index}, this.files[0])">
+                    ${hasFile
+                        ? `<div class="text-green-400 text-sm">✅ ${escapeHtml(secret.fileName)}</div>`
+                        : `<div class="text-slate-400 text-sm">📁 파일 선택 또는 클릭</div>`
+                    }
+                </div>
+
+                ${hasFile ? `
+                    <div class="usage-hint">💡 ${escapeHtml(secret.hint)}</div>
+                    <div class="flex justify-end mt-2">
+                        <button class="copy-btn-small" onclick="copyCustomSecretValue(${index})">값 복사</button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * 커스텀 Secrets를 기존 Secrets와 통합하여 반환
+ * @returns {Array} 통합된 Secrets 배열
+ */
+function getCustomSecretsForExport() {
+    return state.customSecrets
+        .filter(cs => cs.key && cs.value)
+        .map(cs => ({
+            key: cs.key,
+            value: cs.value,
+            desc: `사용자 추가 (${cs.fileName})`,
+            type: cs.type,
+            hint: cs.hint
+        }));
+}

@@ -1,9 +1,21 @@
 {
   "name": "Android Play Store Setup Wizard",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Flutter Android 앱을 Play Store에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2026-01-08",
+  "lastUpdated": "2026-01-20",
   "changelog": [
+    {
+      "version": "1.2.0",
+      "date": "2026-01-20",
+      "changes": [
+        "Step 7에 '추가 Secrets' 섹션 추가 - 사용자 정의 Secret 동적 추가 가능",
+        "파일 타입별 스마트 변환 (텍스트 파일 → 원본, 바이너리 파일 → Base64)",
+        "커스텀 Secret 키 이름 자동 생성 (바이너리 파일은 _BASE64 접미사 자동 추가)",
+        "Drag & Drop 파일 업로드 지원",
+        "커스텀 Secrets를 JSON/TXT/ZIP 내보내기에 통합",
+        "localStorage에 커스텀 Secrets 상태 저장"
+      ]
+    },
     {
       "version": "1.1.0",
       "date": "2026-01-08",

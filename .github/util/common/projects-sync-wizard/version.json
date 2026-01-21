@@ -1,9 +1,22 @@
 {
   "name": "GitHub Projects Sync Wizard",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "GitHub Projects Status와 Issue Label 간 양방향 동기화를 위한 Cloudflare Worker 설정 마법사",
   "lastUpdated": "2026-01-22",
   "changelog": [
+    {
+      "version": "2.3.0",
+      "date": "2026-01-22",
+      "changes": [
+        "wrangler.toml STATUS_LABELS 멀티라인 JSON 에러 수정 (jq -sc 옵션)",
+        "스크립트 파일명 변경: projects-sync-wizard-setup.sh/ps1 (unique name)",
+        "기존 불필요 스크립트 제거 (setup.sh, projects-sync-worker-setup.sh/ps1)",
+        "Node.js 18+ 사전 요구사항 가이드 추가",
+        "설치 명령어 생성 버튼 제거 → 입력 즉시 자동 업데이트",
+        "Mac/Linux + Windows 명령어 동시 표시 (OS 선택 탭 제거)",
+        "OS별 복사 버튼 개선"
+      ]
+    },
     {
       "version": "2.2.0",
       "date": "2026-01-22",

@@ -1,9 +1,14 @@
 #!/bin/bash
 # ============================================
-# GitHub Projects Sync Worker 원클릭 설치 스크립트
+# GitHub Projects Sync Wizard - 원클릭 설치 스크립트
+#
+# ⚠️ 사전 요구사항:
+#   - Node.js 18.0.0 이상 (node -v로 확인)
+#   - npm (Node.js와 함께 설치됨)
+#   - Cloudflare 계정
 #
 # 사용법 (마법사에서 생성된 명령어):
-# curl -fsSL https://raw.githubusercontent.com/.../setup.sh | bash -s -- \
+# curl -fsSL https://raw.githubusercontent.com/.../projects-sync-wizard-setup.sh | bash -s -- \
 #   --type "org" \
 #   --owner "ORG_NAME" \
 #   --project "1" \
@@ -91,6 +96,45 @@ if [ "$PROJECT_TYPE" = "user" ] && ([ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ])
     echo "  --repo-owner와 --repo-name 옵션을 추가하세요."
 fi
 
+# Node.js 버전 확인
+echo ""
+echo -e "${CYAN}🔍 사전 요구사항 확인 중...${NC}"
+
+if ! command -v node &> /dev/null; then
+    echo -e "${RED}❌ Node.js가 설치되어 있지 않습니다.${NC}"
+    echo -e "   https://nodejs.org 에서 Node.js 18 이상을 설치해주세요."
+    exit 1
+fi
+
+NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+    echo -e "${RED}❌ Node.js 18 이상이 필요합니다. 현재 버전: $(node -v)${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Node.js $(node -v)${NC}"
+
+if ! command -v npm &> /dev/null; then
+    echo -e "${RED}❌ npm이 설치되어 있지 않습니다.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ npm $(npm -v)${NC}"
+
+if ! command -v jq &> /dev/null; then
+    echo -e "${YELLOW}⚠️  jq가 설치되어 있지 않습니다. 설치 중...${NC}"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install jq 2>/dev/null || {
+            echo -e "${RED}❌ jq 설치 실패. brew install jq 로 수동 설치해주세요.${NC}"
+            exit 1
+        }
+    else
+        sudo apt-get install -y jq 2>/dev/null || sudo yum install -y jq 2>/dev/null || {
+            echo -e "${RED}❌ jq 설치 실패. 수동으로 설치해주세요.${NC}"
+            exit 1
+        }
+    fi
+fi
+echo -e "${GREEN}✅ jq $(jq --version)${NC}"
+
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}   🔄 GitHub Projects Sync Worker 원클릭 설치${NC}"
@@ -111,9 +155,9 @@ WORK_DIR=$(mktemp -d)
 cd "$WORK_DIR"
 echo -e "${YELLOW}[1/5]${NC} 📁 작업 디렉토리: $WORK_DIR"
 
-# Labels를 JSON 배열로 변환
+# Labels를 JSON 배열로 변환 (compact - 한 줄 출력)
 IFS=',' read -ra LABEL_ARRAY <<< "$STATUS_LABELS"
-LABELS_JSON=$(printf '%s\n' "${LABEL_ARRAY[@]}" | jq -R . | jq -s .)
+LABELS_JSON=$(printf '%s\n' "${LABEL_ARRAY[@]}" | jq -R . | jq -sc .)
 
 # wrangler.toml 생성
 echo -e "${YELLOW}[2/5]${NC} 📝 설정 파일 생성 중..."

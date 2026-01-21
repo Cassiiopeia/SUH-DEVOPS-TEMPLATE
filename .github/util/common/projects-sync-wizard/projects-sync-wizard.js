@@ -74,6 +74,21 @@ document.addEventListener('DOMContentLoaded', () => {
         updateWebhookPayloadUrl();
         saveState();
     });
+
+    // Worker 이름 입력 이벤트 - 명령어 자동 업데이트
+    document.getElementById('workerName').addEventListener('input', (e) => {
+        state.workerName = e.target.value.trim() || 'github-projects-sync-worker';
+        saveState();
+        scheduleCommandUpdate();
+    });
+
+    // Webhook Secret 변경 이벤트 - 명령어 자동 업데이트
+    document.getElementById('webhookSecret').addEventListener('input', () => {
+        scheduleCommandUpdate();
+    });
+
+    // 초기 명령어 표시
+    updateInstallCommands();
 });
 
 // ============================================
@@ -343,6 +358,7 @@ function parseProjectUrl() {
         state.projectNumber = orgMatch[2];
         updateUIForProjectType();
         saveState();
+        scheduleCommandUpdate();
         return;
     }
 
@@ -357,6 +373,7 @@ function parseProjectUrl() {
         state.projectNumber = userMatch[2];
         updateUIForProjectType();
         saveState();
+        scheduleCommandUpdate();
         return;
     }
 
@@ -367,6 +384,7 @@ function parseProjectUrl() {
     state.projectNumber = '';
     updateUIForProjectType();
     saveState();
+    scheduleCommandUpdate();
 }
 
 // 프로젝트 타입에 따른 UI 업데이트
@@ -469,6 +487,7 @@ function parseRepositoryUrl() {
     // 정규화된 URL 저장
     state.repositoryUrl = normalizeRepoUrl(rawUrl);
     saveState();
+    scheduleCommandUpdate();
 }
 
 // ============================================
@@ -495,11 +514,13 @@ function addLabel() {
     state.statusLabels.push('새 Label');
     renderLabels();
     saveState();
+    scheduleCommandUpdate();
 }
 
 function updateLabel(index, value) {
     state.statusLabels[index] = value;
     saveState();
+    scheduleCommandUpdate();
 }
 
 function removeLabel(index) {
@@ -507,6 +528,7 @@ function removeLabel(index) {
         state.statusLabels.splice(index, 1);
         renderLabels();
         saveState();
+        scheduleCommandUpdate();
     } else {
         showToast('최소 1개의 Label이 필요합니다.', 'error');
     }
@@ -516,6 +538,7 @@ function resetLabels() {
     state.statusLabels = [...DEFAULT_STATUS_LABELS];
     renderLabels();
     saveState();
+    scheduleCommandUpdate();
     showToast('기본값으로 복원되었습니다.');
 }
 
@@ -529,6 +552,7 @@ function generateWebhookSecret() {
     state.webhookSecret = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
     document.getElementById('webhookSecret').value = state.webhookSecret;
     saveState();
+    scheduleCommandUpdate();
 }
 
 // ============================================
@@ -1341,52 +1365,59 @@ function showToast(message, type = 'success') {
 }
 
 // ============================================
-// 설치 명령어 생성
+// 설치 명령어 자동 생성 (OS별)
 // ============================================
 
-function generateInstallCommand() {
-    // 유효성 검사
-    const ownerName = state.ownerName || document.getElementById('ownerName')?.value.trim() || '';
-    const projectNumber = state.projectNumber || document.getElementById('projectNumber')?.value.trim() || '';
+// 명령어 자동 업데이트 (debounce 적용)
+let commandUpdateTimer = null;
 
-    if (!ownerName || !projectNumber) {
-        showToast('Projects URL을 입력하거나 Owner Name과 Project Number를 입력하세요.', 'error');
-        return;
+function scheduleCommandUpdate() {
+    if (commandUpdateTimer) {
+        clearTimeout(commandUpdateTimer);
     }
-
-    // User 타입인데 저장소 URL이 없는 경우 경고
-    if (state.projectType === 'user' && !state.repositoryUrl) {
-        showToast('User Projects의 경우 Webhook 설정을 위해 저장소 URL이 필요합니다.', 'error');
-        return;
-    }
-
-    // 상태 업데이트
-    state.ownerName = ownerName;
-    state.orgName = ownerName;
-    state.projectNumber = projectNumber;
-    state.workerName = document.getElementById('workerName').value.trim() || 'github-projects-sync-worker';
-    saveState();
-
-    // 명령어 표시
-    updateInstallCommandDisplay();
-    showToast('설치 명령어가 생성되었습니다. 복사하여 터미널에서 실행하세요.');
+    commandUpdateTimer = setTimeout(() => {
+        updateInstallCommands();
+    }, 300);
 }
 
-function updateInstallCommandDisplay() {
+function updateInstallCommands() {
     const commandSection = document.getElementById('installCommandSection');
-    const commandCode = document.getElementById('installCommandCode');
+    const waitingMessage = document.getElementById('commandWaitingMessage');
+    const bashCommandCode = document.getElementById('bashCommandCode');
+    const powershellCommandCode = document.getElementById('powershellCommandCode');
 
-    if (!commandSection || !commandCode) return;
-    if (!state.ownerName || !state.projectNumber) return;
+    if (!commandSection || !waitingMessage) return;
 
-    const command = buildInstallCommand();
-    commandCode.textContent = command;
+    // 필수 필드 확인
+    const ownerName = state.ownerName || '';
+    const projectNumber = state.projectNumber || '';
+    const webhookSecret = state.webhookSecret || '';
+
+    // User 타입인데 저장소 URL이 없으면 명령어 생성 안함
+    const needsRepoUrl = state.projectType === 'user' && !state.repositoryUrl;
+
+    if (!ownerName || !projectNumber || !webhookSecret || needsRepoUrl) {
+        // 입력 대기 메시지 표시
+        waitingMessage.classList.remove('hidden');
+        commandSection.classList.add('hidden');
+        return;
+    }
+
+    // 명령어 생성 및 표시
+    waitingMessage.classList.add('hidden');
     commandSection.classList.remove('hidden');
+
+    if (bashCommandCode) {
+        bashCommandCode.textContent = buildBashCommand();
+    }
+    if (powershellCommandCode) {
+        powershellCommandCode.textContent = buildPowerShellCommand();
+    }
 }
 
-function buildInstallCommand() {
-    // 기본 스크립트 URL
-    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/setup.sh';
+function buildBashCommand() {
+    // Mac/Linux bash 스크립트 URL
+    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.sh';
 
     // 인자 구성
     const args = [];
@@ -1413,7 +1444,40 @@ function buildInstallCommand() {
   ${args.join(' \\\n  ')}`;
 }
 
-function copyInstallCommand() {
-    const command = buildInstallCommand();
+function buildPowerShellCommand() {
+    // 환경변수 설정
+    const envVars = [];
+    envVars.push(`$env:WIZARD_TYPE='${state.projectType || 'org'}'`);
+    envVars.push(`$env:WIZARD_OWNER='${state.ownerName}'`);
+    envVars.push(`$env:WIZARD_PROJECT='${state.projectNumber}'`);
+    envVars.push(`$env:WIZARD_WORKER_NAME='${state.workerName}'`);
+    envVars.push(`$env:WIZARD_WEBHOOK_SECRET='${state.webhookSecret}'`);
+    envVars.push(`$env:WIZARD_LABELS='${state.statusLabels.join(',')}'`);
+
+    // User 타입인 경우 저장소 정보 추가
+    if (state.projectType === 'user' && state.repositoryUrl) {
+        const repoMatch = state.repositoryUrl.match(/github\.com\/([^\/]+)\/([^\/\?\#]+)/);
+        if (repoMatch) {
+            const repoOwner = repoMatch[1];
+            const repoName = repoMatch[2].replace(/\.git$/, '');
+            envVars.push(`$env:WIZARD_REPO_OWNER='${repoOwner}'`);
+            envVars.push(`$env:WIZARD_REPO_NAME='${repoName}'`);
+        }
+    }
+
+    // PowerShell 스크립트 URL
+    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.ps1';
+
+    // PowerShell 명령어 생성
+    return `${envVars.join('; ')}; irm '${scriptUrl}' | iex`;
+}
+
+function copyCommand(type) {
+    let command = '';
+    if (type === 'bash') {
+        command = buildBashCommand();
+    } else if (type === 'powershell') {
+        command = buildPowerShellCommand();
+    }
     copyToClipboard(command);
 }

@@ -1,70 +1,466 @@
 /**
- * GitHub Projects Sync Wizard - Client Logic
+ * GitHub Projects Sync Wizard v2.0.0
  *
- * 7단계 마법사 UI를 관리하고 Cloudflare Worker 파일을 생성합니다.
+ * 4단계 간소화 버전:
+ * 1. 프로젝트 정보 입력 (URL, Worker 이름, Labels, Webhook Secret) → ZIP 다운로드
+ * 2. Worker 배포 (스크립트 실행)
+ * 3. GitHub Webhook 설정
+ * 4. 완료
  */
 
 // ============================================
-// 상수 정의
+// 상태 관리
 // ============================================
 
-const STORAGE_KEY = 'github-projects-sync-wizard';
-const DEFAULT_LABELS = ['작업 전', '작업 중', '확인 대기', '피드백', '작업 완료', '취소'];
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 4;
 
-// Worker 템플릿 (빌드 시 포함됨)
-const TEMPLATES = {
-    'wrangler.toml': `name = "github-projects-sync-worker"
+// issue-label.yml 기본 Status Labels
+const DEFAULT_STATUS_LABELS = [
+    '작업 전',
+    '작업 중',
+    '확인 대기',
+    '피드백',
+    '작업 완료',
+    '취소'
+];
+
+let state = {
+    currentStep: 1,
+    projectUrl: '',
+    orgName: '',
+    projectNumber: '',
+    workerName: 'github-projects-sync-worker',
+    statusLabels: [...DEFAULT_STATUS_LABELS],
+    webhookSecret: '',
+    workerUrl: ''
+};
+
+// ============================================
+// 초기화
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 버전 정보 표시
+    displayVersion();
+
+    // 다크 모드 초기화
+    initDarkMode();
+
+    // 저장된 상태 복원
+    loadState();
+
+    // Webhook Secret 자동 생성 (없는 경우)
+    if (!state.webhookSecret) {
+        generateWebhookSecret();
+    }
+
+    // Step Indicator 생성
+    renderStepIndicators();
+
+    // Labels 렌더링
+    renderLabels();
+
+    // UI 초기화
+    showStep(state.currentStep);
+    updateNavigationButtons();
+
+    // Worker URL 입력 이벤트
+    document.getElementById('workerUrl').addEventListener('input', (e) => {
+        state.workerUrl = e.target.value;
+        updateWebhookPayloadUrl();
+        saveState();
+    });
+});
+
+// ============================================
+// 버전 정보
+// ============================================
+
+function displayVersion() {
+    try {
+        const versionJson = JSON.parse(document.getElementById('versionJson').textContent);
+        document.getElementById('versionDisplay').textContent = `v${versionJson.version}`;
+    } catch (e) {
+        console.error('버전 정보 로드 실패:', e);
+    }
+}
+
+// ============================================
+// 다크 모드
+// ============================================
+
+function initDarkMode() {
+    if (localStorage.getItem('darkMode') === 'true' ||
+        (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+}
+
+function toggleDarkMode() {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+}
+
+// ============================================
+// 상태 저장/복원
+// ============================================
+
+function saveState() {
+    localStorage.setItem('projectsSyncWizardState', JSON.stringify(state));
+}
+
+function loadState() {
+    try {
+        const saved = localStorage.getItem('projectsSyncWizardState');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            state = { ...state, ...parsed };
+
+            // UI에 상태 반영
+            document.getElementById('projectUrl').value = state.projectUrl || '';
+            document.getElementById('orgName').value = state.orgName || '';
+            document.getElementById('projectNumber').value = state.projectNumber || '';
+            document.getElementById('workerName').value = state.workerName || 'github-projects-sync-worker';
+            document.getElementById('webhookSecret').value = state.webhookSecret || '';
+            document.getElementById('workerUrl').value = state.workerUrl || '';
+        }
+    } catch (e) {
+        console.error('상태 복원 실패:', e);
+    }
+}
+
+function resetWizard() {
+    if (confirm('모든 설정을 초기화하시겠습니까?')) {
+        localStorage.removeItem('projectsSyncWizardState');
+        state = {
+            currentStep: 1,
+            projectUrl: '',
+            orgName: '',
+            projectNumber: '',
+            workerName: 'github-projects-sync-worker',
+            statusLabels: [...DEFAULT_STATUS_LABELS],
+            webhookSecret: '',
+            workerUrl: ''
+        };
+        generateWebhookSecret();
+        renderLabels();
+        showStep(1);
+        updateNavigationButtons();
+
+        // 입력 필드 초기화
+        document.getElementById('projectUrl').value = '';
+        document.getElementById('orgName').value = '';
+        document.getElementById('projectNumber').value = '';
+        document.getElementById('workerName').value = 'github-projects-sync-worker';
+        document.getElementById('workerUrl').value = '';
+
+        showToast('설정이 초기화되었습니다.');
+    }
+}
+
+// ============================================
+// Step Indicator
+// ============================================
+
+function renderStepIndicators() {
+    const container = document.getElementById('stepIndicators');
+    const steps = [
+        { num: 1, title: '정보 입력' },
+        { num: 2, title: 'Worker 배포' },
+        { num: 3, title: 'Webhook 설정' },
+        { num: 4, title: '완료' }
+    ];
+
+    container.innerHTML = steps.map((step, index) => `
+        <div class="flex items-center">
+            <div class="step-indicator flex items-center cursor-pointer" onclick="goToStep(${step.num})">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors
+                    ${state.currentStep === step.num
+                        ? 'bg-blue-500 text-white'
+                        : state.currentStep > step.num
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    }">
+                    ${state.currentStep > step.num
+                        ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                        : step.num
+                    }
+                </div>
+                <span class="ml-2 text-sm font-medium ${state.currentStep === step.num ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}">${step.title}</span>
+            </div>
+            ${index < steps.length - 1 ? '<div class="flex-1 h-0.5 mx-4 bg-gray-200 dark:bg-gray-700"></div>' : ''}
+        </div>
+    `).join('');
+}
+
+// ============================================
+// Step 네비게이션
+// ============================================
+
+function showStep(stepNum) {
+    // 모든 step 숨기기
+    document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+
+    // 현재 step 표시
+    const currentSection = document.getElementById(`step${stepNum}`);
+    if (currentSection) {
+        currentSection.classList.remove('hidden');
+    }
+
+    state.currentStep = stepNum;
+    saveState();
+    renderStepIndicators();
+
+    // Step별 추가 처리
+    if (stepNum === 3) {
+        updateWebhookDisplay();
+    } else if (stepNum === 4) {
+        updateSummary();
+    }
+}
+
+function goToStep(stepNum) {
+    if (stepNum >= 1 && stepNum <= TOTAL_STEPS) {
+        showStep(stepNum);
+        updateNavigationButtons();
+    }
+}
+
+function nextStep() {
+    if (state.currentStep < TOTAL_STEPS) {
+        // Step 1 유효성 검사
+        if (state.currentStep === 1) {
+            const orgName = document.getElementById('orgName').value.trim();
+            const projectNumber = document.getElementById('projectNumber').value.trim();
+
+            if (!orgName || !projectNumber) {
+                showToast('Organization Name과 Project Number를 입력하세요.', 'error');
+                return;
+            }
+
+            state.orgName = orgName;
+            state.projectNumber = projectNumber;
+            state.workerName = document.getElementById('workerName').value.trim() || 'github-projects-sync-worker';
+            saveState();
+        }
+
+        showStep(state.currentStep + 1);
+        updateNavigationButtons();
+    }
+}
+
+function prevStep() {
+    if (state.currentStep > 1) {
+        showStep(state.currentStep - 1);
+        updateNavigationButtons();
+    }
+}
+
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    // 이전 버튼
+    prevBtn.classList.toggle('hidden', state.currentStep === 1);
+
+    // 다음 버튼
+    if (state.currentStep === TOTAL_STEPS) {
+        nextBtn.classList.add('hidden');
+    } else {
+        nextBtn.classList.remove('hidden');
+        nextBtn.textContent = '다음';
+    }
+}
+
+// ============================================
+// Project URL 파싱
+// ============================================
+
+function parseProjectUrl() {
+    const url = document.getElementById('projectUrl').value.trim();
+    state.projectUrl = url;
+
+    // Organization Projects URL 파싱
+    // https://github.com/orgs/ORG-NAME/projects/NUMBER
+    const orgMatch = url.match(/github\.com\/orgs\/([^\/]+)\/projects\/(\d+)/);
+
+    if (orgMatch) {
+        state.orgName = orgMatch[1];
+        state.projectNumber = orgMatch[2];
+        document.getElementById('orgName').value = state.orgName;
+        document.getElementById('projectNumber').value = state.projectNumber;
+    }
+
+    saveState();
+}
+
+// ============================================
+// Labels 관리
+// ============================================
+
+function renderLabels() {
+    const container = document.getElementById('labelsContainer');
+    container.innerHTML = state.statusLabels.map((label, index) => `
+        <div class="label-item flex items-center gap-2">
+            <input type="text" value="${escapeHtml(label)}"
+                class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                onchange="updateLabel(${index}, this.value)">
+            <button onclick="removeLabel(${index})" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    `).join('');
+}
+
+function addLabel() {
+    state.statusLabels.push('새 Label');
+    renderLabels();
+    saveState();
+}
+
+function updateLabel(index, value) {
+    state.statusLabels[index] = value;
+    saveState();
+}
+
+function removeLabel(index) {
+    if (state.statusLabels.length > 1) {
+        state.statusLabels.splice(index, 1);
+        renderLabels();
+        saveState();
+    } else {
+        showToast('최소 1개의 Label이 필요합니다.', 'error');
+    }
+}
+
+function resetLabels() {
+    state.statusLabels = [...DEFAULT_STATUS_LABELS];
+    renderLabels();
+    saveState();
+    showToast('기본값으로 복원되었습니다.');
+}
+
+// ============================================
+// Webhook Secret 생성
+// ============================================
+
+function generateWebhookSecret() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    state.webhookSecret = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    document.getElementById('webhookSecret').value = state.webhookSecret;
+    saveState();
+}
+
+// ============================================
+// Webhook 정보 업데이트
+// ============================================
+
+function updateWebhookDisplay() {
+    // Organization 이름 업데이트
+    const webhookOrgName = document.getElementById('webhookOrgName');
+    if (webhookOrgName) {
+        webhookOrgName.textContent = state.orgName || 'YOUR-ORG';
+    }
+
+    // Webhook 설정 링크 업데이트
+    const webhookSettingsLink = document.getElementById('webhookSettingsLink');
+    if (webhookSettingsLink && state.orgName) {
+        webhookSettingsLink.href = `https://github.com/organizations/${state.orgName}/settings/hooks`;
+    }
+
+    // Webhook Secret 표시
+    const webhookSecretDisplay = document.getElementById('webhookSecretDisplay');
+    if (webhookSecretDisplay) {
+        webhookSecretDisplay.textContent = state.webhookSecret || '-';
+    }
+
+    // Payload URL 표시
+    updateWebhookPayloadUrl();
+}
+
+function updateWebhookPayloadUrl() {
+    const webhookPayloadUrl = document.getElementById('webhookPayloadUrl');
+    if (webhookPayloadUrl) {
+        webhookPayloadUrl.textContent = state.workerUrl || 'Worker URL을 Step 2에서 입력하세요';
+    }
+}
+
+// ============================================
+// Summary 업데이트
+// ============================================
+
+function updateSummary() {
+    document.getElementById('summaryOrg').textContent = state.orgName || '-';
+    document.getElementById('summaryProject').textContent = state.projectNumber || '-';
+    document.getElementById('summaryWorker').textContent = state.workerName || '-';
+    document.getElementById('summaryLabels').textContent = state.statusLabels.join(', ') || '-';
+}
+
+// ============================================
+// 파일 생성 템플릿
+// ============================================
+
+function generateWranglerToml() {
+    return `# ============================================
+# Cloudflare Worker 설정
+# GitHub Projects Sync Worker
+# ============================================
+
+name = "${state.workerName}"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
 [vars]
-PROJECT_NUMBER = "{{PROJECT_NUMBER}}"
+PROJECT_NUMBER = "${state.projectNumber}"
 STATUS_FIELD = "Status"
-STATUS_LABELS = '{{STATUS_LABELS}}'
-ORG_NAME = "{{ORG_NAME}}"
-`,
-
-    'package.json': `{
-  "name": "github-projects-sync-worker",
-  "version": "1.0.0",
-  "description": "GitHub Projects Status를 Issue Label로 실시간 동기화하는 Cloudflare Worker",
-  "main": "src/index.ts",
-  "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241218.0",
-    "typescript": "^5.3.3",
-    "wrangler": "^3.99.0"
-  }
+STATUS_LABELS = '${JSON.stringify(state.statusLabels)}'
+ORG_NAME = "${state.orgName}"
+`;
 }
-`,
 
-    'tsconfig.json': `{
-  "compilerOptions": {
-    "target": "ES2021",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "lib": ["ES2021"],
-    "types": ["@cloudflare/workers-types"],
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+function generatePackageJson() {
+    return JSON.stringify({
+        name: state.workerName,
+        version: "1.0.0",
+        private: true,
+        scripts: {
+            deploy: "wrangler deploy",
+            dev: "wrangler dev",
+            tail: "wrangler tail"
+        },
+        devDependencies: {
+            "@cloudflare/workers-types": "^4.20240117.0",
+            "typescript": "^5.3.3",
+            "wrangler": "^3.22.1"
+        }
+    }, null, 2);
 }
-`,
 
-    'src/index.ts': `/**
+function generateTsconfig() {
+    return JSON.stringify({
+        compilerOptions: {
+            target: "ES2021",
+            module: "ESNext",
+            moduleResolution: "node",
+            lib: ["ES2021"],
+            types: ["@cloudflare/workers-types"],
+            strict: true,
+            noEmit: true,
+            skipLibCheck: true
+        },
+        include: ["src/**/*"]
+    }, null, 2);
+}
+
+function generateWorkerCode() {
+    return `/**
  * GitHub Projects Sync Worker
+ * Projects Status → Issue Label 동기화
  *
- * GitHub Projects의 Status가 변경되면 Issue Label을 자동으로 동기화합니다.
+ * Generated by GitHub Projects Sync Wizard
  */
 
 export interface Env {
@@ -76,12 +472,11 @@ export interface Env {
   ORG_NAME: string;
 }
 
-interface WebhookPayload {
+interface GitHubWebhookPayload {
   action: string;
   projects_v2_item?: {
     id: number;
     node_id: string;
-    project_node_id: string;
     content_node_id: string;
     content_type: string;
   };
@@ -94,149 +489,96 @@ interface WebhookPayload {
   organization?: {
     login: string;
   };
-  sender?: {
-    login: string;
-  };
-}
-
-interface ProjectItemResponse {
-  data?: {
-    node?: {
-      content?: {
-        number: number;
-        title: string;
-        labels: {
-          nodes: Array<{ name: string }>;
-        };
-        repository: {
-          name: string;
-          owner: {
-            login: string;
-          };
-        };
-      };
-      fieldValueByName?: {
-        name?: string;
-      };
-    };
-  };
-  errors?: Array<{ message: string }>;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Health check
+    if (request.method === 'GET') {
+      return new Response(JSON.stringify({
+        status: 'ok',
+        message: 'GitHub Projects Sync Worker is running',
+        org: env.ORG_NAME,
+        project: env.PROJECT_NUMBER
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // POST만 처리
     if (request.method !== 'POST') {
       return new Response('Method Not Allowed', { status: 405 });
     }
 
-    const signature = request.headers.get('X-Hub-Signature-256');
-    if (!signature) {
-      console.log('❌ Missing signature header');
-      return new Response('Missing signature', { status: 401 });
-    }
-
-    const body = await request.text();
-    const isValid = await verifySignature(body, signature, env.WEBHOOK_SECRET);
-    if (!isValid) {
-      console.log('❌ Invalid signature');
-      return new Response('Invalid signature', { status: 401 });
-    }
-
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔄 GitHub Projects Sync Worker');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('✅ Webhook signature verified');
-
-    const event = request.headers.get('X-GitHub-Event');
-    console.log(\`📌 Event type: \${event}\`);
-
-    if (event !== 'projects_v2_item') {
-      console.log('⏭️ Skipping non-projects_v2_item event');
-      return new Response('OK - Event ignored', { status: 200 });
-    }
-
-    const payload: WebhookPayload = JSON.parse(body);
-    console.log(\`📌 Action: \${payload.action}\`);
-
-    if (payload.action !== 'edited') {
-      console.log('⏭️ Skipping non-edited action');
-      return new Response('OK - Action ignored', { status: 200 });
-    }
-
-    if (!payload.changes?.field_value) {
-      console.log('⏭️ No field value change detected');
-      return new Response('OK - No field change', { status: 200 });
-    }
-
-    const itemNodeId = payload.projects_v2_item?.node_id;
-    if (!itemNodeId) {
-      console.log('❌ No item node ID found');
-      return new Response('OK - No item ID', { status: 200 });
-    }
-
-    console.log(\`📌 Processing item: \${itemNodeId}\`);
-
     try {
-      const itemInfo = await getProjectItemInfo(itemNodeId, env);
+      // Webhook 서명 검증
+      const signature = request.headers.get('X-Hub-Signature-256');
+      const body = await request.text();
 
-      if (!itemInfo?.data?.node?.content) {
-        console.log('❌ Could not get item content');
-        return new Response('OK - No content', { status: 200 });
+      if (!await verifySignature(body, signature, env.WEBHOOK_SECRET)) {
+        console.log('Invalid signature');
+        return new Response('Unauthorized', { status: 401 });
       }
 
-      const content = itemInfo.data.node.content;
-      const currentStatus = itemInfo.data.node.fieldValueByName?.name;
-      const issueNumber = content.number;
-      const repoName = content.repository.name;
-      const repoOwner = content.repository.owner.login;
-      const currentLabels = content.labels.nodes.map(l => l.name);
+      const payload: GitHubWebhookPayload = JSON.parse(body);
 
-      console.log(\`📌 Issue: \${repoOwner}/\${repoName}#\${issueNumber}\`);
-      console.log(\`📌 Current Labels: \${currentLabels.join(', ')}\`);
-      console.log(\`📌 New Status: "\${currentStatus}"\`);
-
-      if (!currentStatus) {
-        console.log('⏭️ No status value');
-        return new Response('OK - No status', { status: 200 });
+      // projects_v2_item + edited 이벤트만 처리
+      if (payload.action !== 'edited' || !payload.projects_v2_item) {
+        return new Response('Ignored', { status: 200 });
       }
 
+      // Issue/PR만 처리 (Draft 제외)
+      if (payload.projects_v2_item.content_type !== 'Issue' &&
+          payload.projects_v2_item.content_type !== 'PullRequest') {
+        return new Response('Not an Issue or PR', { status: 200 });
+      }
+
+      const contentNodeId = payload.projects_v2_item.content_node_id;
       const statusLabels: string[] = JSON.parse(env.STATUS_LABELS);
 
-      const labelsToRemove = currentLabels.filter(label =>
-        statusLabels.includes(label) && label !== currentStatus
+      // GraphQL로 현재 Status 조회
+      const status = await getCurrentStatus(
+        contentNodeId,
+        parseInt(env.PROJECT_NUMBER),
+        env.STATUS_FIELD,
+        env.GITHUB_TOKEN
       );
 
-      console.log(\`🗑️ Labels to remove: \${labelsToRemove.join(', ') || 'none'}\`);
-
-      if (currentLabels.includes(currentStatus) && labelsToRemove.length === 0) {
-        console.log('⏭️ Label already synced, skipping');
-        return new Response('OK - Already synced', { status: 200 });
+      if (!status) {
+        console.log('Status not found');
+        return new Response('Status not found', { status: 200 });
       }
 
-      for (const label of labelsToRemove) {
-        await removeLabel(repoOwner, repoName, issueNumber, label, env);
-        console.log(\`  ✅ Label "\${label}" 제거됨\`);
+      console.log(\`Current status: \${status}\`);
+
+      // Status가 Label 목록에 있는지 확인
+      if (!statusLabels.includes(status)) {
+        console.log(\`Status "\${status}" not in label list\`);
+        return new Response('Status not in label list', { status: 200 });
       }
 
-      if (statusLabels.includes(currentStatus) && !currentLabels.includes(currentStatus)) {
-        console.log(\`➕ Adding label: "\${currentStatus}"\`);
-        await addLabel(repoOwner, repoName, issueNumber, currentStatus, env);
-        console.log(\`  ✅ Label "\${currentStatus}" 추가됨\`);
-      }
+      // Issue/PR 정보 조회 및 Label 동기화
+      await syncLabel(contentNodeId, status, statusLabels, env.GITHUB_TOKEN);
 
-      console.log('🎉 Label sync completed!');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      return new Response('OK - Synced', { status: 200 });
-
+      return new Response('OK', { status: 200 });
     } catch (error) {
-      console.error('❌ Error:', error);
-      return new Response('Internal Server Error', { status: 500 });
+      console.error('Error:', error);
+      return new Response(\`Error: \${error}\`, { status: 500 });
     }
   }
 };
 
-async function verifySignature(payload: string, signature: string, secret: string): Promise<boolean> {
+// ============================================
+// Webhook 서명 검증
+// ============================================
+
+async function verifySignature(
+  payload: string,
+  signature: string | null,
+  secret: string
+): Promise<boolean> {
+  if (!signature) return false;
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -246,67 +588,57 @@ async function verifySignature(payload: string, signature: string, secret: strin
     ['sign']
   );
 
-  const signatureBytes = await crypto.subtle.sign(
+  const signatureBuffer = await crypto.subtle.sign(
     'HMAC',
     key,
     encoder.encode(payload)
   );
 
-  const expectedSignature = 'sha256=' + Array.from(new Uint8Array(signatureBytes))
+  const expectedSignature = 'sha256=' + Array.from(new Uint8Array(signatureBuffer))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 
-  if (signature.length !== expectedSignature.length) {
-    return false;
-  }
-
-  let result = 0;
-  for (let i = 0; i < signature.length; i++) {
-    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
-  }
-  return result === 0;
+  return signature === expectedSignature;
 }
 
-async function getProjectItemInfo(nodeId: string, env: Env): Promise<ProjectItemResponse> {
+// ============================================
+// GraphQL: 현재 Status 조회
+// ============================================
+
+async function getCurrentStatus(
+  contentNodeId: string,
+  projectNumber: number,
+  statusField: string,
+  token: string
+): Promise<string | null> {
   const query = \`
-    query($nodeId: ID!, $statusField: String!) {
+    query($nodeId: ID!) {
       node(id: $nodeId) {
-        ... on ProjectV2Item {
-          content {
-            ... on Issue {
-              number
-              title
-              labels(first: 20) {
-                nodes {
+        ... on Issue {
+          projectItems(first: 10) {
+            nodes {
+              project {
+                number
+              }
+              fieldValueByName(name: "\${statusField}") {
+                ... on ProjectV2ItemFieldSingleSelectValue {
                   name
-                }
-              }
-              repository {
-                name
-                owner {
-                  login
-                }
-              }
-            }
-            ... on PullRequest {
-              number
-              title
-              labels(first: 20) {
-                nodes {
-                  name
-                }
-              }
-              repository {
-                name
-                owner {
-                  login
                 }
               }
             }
           }
-          fieldValueByName(name: $statusField) {
-            ... on ProjectV2ItemFieldSingleSelectValue {
-              name
+        }
+        ... on PullRequest {
+          projectItems(first: 10) {
+            nodes {
+              project {
+                number
+              }
+              fieldValueByName(name: "\${statusField}") {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                }
+              }
             }
           }
         }
@@ -317,660 +649,423 @@ async function getProjectItemInfo(nodeId: string, env: Env): Promise<ProjectItem
   const response = await fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': \`Bearer \${env.GITHUB_TOKEN}\`,
+      'Authorization': \`Bearer \${token}\`,
       'Content-Type': 'application/json',
       'User-Agent': 'GitHub-Projects-Sync-Worker'
     },
-    body: JSON.stringify({
-      query,
-      variables: {
-        nodeId,
-        statusField: env.STATUS_FIELD || 'Status'
-      }
-    })
+    body: JSON.stringify({ query, variables: { nodeId: contentNodeId } })
   });
 
-  return response.json();
+  const data = await response.json() as any;
+
+  const items = data.data?.node?.projectItems?.nodes || [];
+  const targetItem = items.find((item: any) => item.project?.number === projectNumber);
+
+  return targetItem?.fieldValueByName?.name || null;
 }
 
-async function addLabel(owner: string, repo: string, issueNumber: number, label: string, env: Env): Promise<void> {
-  const response = await fetch(
-    \`https://api.github.com/repos/\${owner}/\${repo}/issues/\${issueNumber}/labels\`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${env.GITHUB_TOKEN}\`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'GitHub-Projects-Sync-Worker'
-      },
-      body: JSON.stringify({ labels: [label] })
-    }
-  );
+// ============================================
+// Label 동기화
+// ============================================
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error(\`Failed to add label: \${error}\`);
-  }
-}
-
-async function removeLabel(owner: string, repo: string, issueNumber: number, label: string, env: Env): Promise<void> {
-  const encodedLabel = encodeURIComponent(label);
-  const response = await fetch(
-    \`https://api.github.com/repos/\${owner}/\${repo}/issues/\${issueNumber}/labels/\${encodedLabel}\`,
-    {
-      method: 'DELETE',
-      headers: {
-        'Authorization': \`Bearer \${env.GITHUB_TOKEN}\`,
-        'User-Agent': 'GitHub-Projects-Sync-Worker'
+async function syncLabel(
+  contentNodeId: string,
+  newStatus: string,
+  statusLabels: string[],
+  token: string
+): Promise<void> {
+  // Issue/PR 정보 조회
+  const infoQuery = \`
+    query($nodeId: ID!) {
+      node(id: $nodeId) {
+        ... on Issue {
+          number
+          repository {
+            owner { login }
+            name
+          }
+          labels(first: 100) {
+            nodes { name }
+          }
+        }
+        ... on PullRequest {
+          number
+          repository {
+            owner { login }
+            name
+          }
+          labels(first: 100) {
+            nodes { name }
+          }
+        }
       }
     }
-  );
+  \`;
 
-  if (!response.ok && response.status !== 404) {
-    const error = await response.text();
-    console.error(\`Failed to remove label: \${error}\`);
+  const infoResponse = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${token}\`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'GitHub-Projects-Sync-Worker'
+    },
+    body: JSON.stringify({ query: infoQuery, variables: { nodeId: contentNodeId } })
+  });
+
+  const infoData = await infoResponse.json() as any;
+  const node = infoData.data?.node;
+
+  if (!node) {
+    console.log('Node not found');
+    return;
   }
+
+  const owner = node.repository.owner.login;
+  const repo = node.repository.name;
+  const issueNumber = node.number;
+  const currentLabels = node.labels.nodes.map((l: any) => l.name);
+
+  console.log(\`Issue: \${owner}/\${repo}#\${issueNumber}\`);
+  console.log(\`Current labels: \${currentLabels.join(', ')}\`);
+
+  // 현재 Status Label 확인
+  const currentStatusLabel = currentLabels.find((l: string) => statusLabels.includes(l));
+
+  // 이미 동일한 Label이면 스킵 (무한 루프 방지)
+  if (currentStatusLabel === newStatus) {
+    console.log(\`Label already set to "\${newStatus}", skipping\`);
+    return;
+  }
+
+  // 기존 Status Label 제거
+  if (currentStatusLabel) {
+    await removeLabel(owner, repo, issueNumber, currentStatusLabel, token);
+  }
+
+  // 새 Status Label 추가
+  await addLabel(owner, repo, issueNumber, newStatus, token);
+
+  console.log(\`Label updated to "\${newStatus}"\`);
 }
-`
-};
 
-// ============================================
-// 상태 관리
-// ============================================
+async function removeLabel(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  label: string,
+  token: string
+): Promise<void> {
+  const url = \`https://api.github.com/repos/\${owner}/\${repo}/issues/\${issueNumber}/labels/\${encodeURIComponent(label)}\`;
 
-let state = {
-    currentStep: 1,
-    maxReachedStep: 1,
-    projectUrl: '',
-    orgName: '',
-    projectNumber: '',
-    subdomain: '',
-    labels: [...DEFAULT_LABELS],
-    workerUrl: '',
-    webhookSecret: '',
-    githubToken: ''
-};
-
-// ============================================
-// 초기화
-// ============================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadState();
-    initDarkMode();
-    renderStepIndicators();
-    renderLabels();
-    showStep(state.currentStep);
-    updateNavigationButtons();
-
-    // 버전 표시
-    try {
-        const versionJson = JSON.parse(document.getElementById('versionJson').textContent);
-        document.getElementById('versionDisplay').textContent = `v${versionJson.version}`;
-    } catch (e) {
-        console.error('Failed to parse version info:', e);
+  await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': \`Bearer \${token}\`,
+      'User-Agent': 'GitHub-Projects-Sync-Worker'
     }
-
-    // 입력 필드 이벤트
-    document.getElementById('projectUrl').value = state.projectUrl;
-    document.getElementById('orgName').value = state.orgName;
-    document.getElementById('projectNumber').value = state.projectNumber;
-    document.getElementById('subdomain').value = state.subdomain;
-    document.getElementById('workerUrl').value = state.workerUrl;
-    document.getElementById('webhookSecret').value = state.webhookSecret;
-});
-
-// ============================================
-// 상태 저장/불러오기
-// ============================================
-
-function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  });
 }
 
-function loadState() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            state = { ...state, ...parsed };
-        }
-    } catch (e) {
-        console.error('Failed to load state:', e);
-    }
+async function addLabel(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  label: string,
+  token: string
+): Promise<void> {
+  const url = \`https://api.github.com/repos/\${owner}/\${repo}/issues/\${issueNumber}/labels\`;
+
+  await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${token}\`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'GitHub-Projects-Sync-Worker'
+    },
+    body: JSON.stringify({ labels: [label] })
+  });
+}
+`;
 }
 
-// ============================================
-// 다크 모드
-// ============================================
-
-function initDarkMode() {
-    const isDark = localStorage.getItem('darkMode') === 'true' ||
-        (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-    if (isDark) {
-        document.documentElement.classList.add('dark');
-    }
+function generateConfigJson() {
+    return JSON.stringify({
+        orgName: state.orgName,
+        projectNumber: state.projectNumber,
+        workerName: state.workerName,
+        webhookSecret: state.webhookSecret,
+        statusLabels: state.statusLabels
+    }, null, 2);
 }
 
-function toggleDarkMode() {
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-}
+function generateReadme() {
+    return `# GitHub Projects Sync Worker
 
-// ============================================
-// Step Indicator
-// ============================================
-
-function renderStepIndicators() {
-    const container = document.getElementById('stepIndicators');
-    const steps = [
-        '프로젝트 설정',
-        'Status Labels',
-        'Cloudflare 설정',
-        '파일 생성',
-        'Worker 배포',
-        'Webhook 설정',
-        '완료'
-    ];
-
-    container.innerHTML = steps.map((title, index) => {
-        const stepNum = index + 1;
-        return `
-            <div class="step-indicator flex flex-col items-center cursor-pointer" onclick="goToStep(${stepNum})">
-                <div id="stepCircle${stepNum}" class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${getStepClass(stepNum)}">
-                    ${stepNum <= state.maxReachedStep && stepNum < state.currentStep ?
-                        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' :
-                        stepNum}
-                </div>
-                <span class="text-xs mt-1 text-gray-500 dark:text-gray-400 hidden md:block">${title}</span>
-            </div>
-            ${index < steps.length - 1 ? '<div class="flex-1 h-0.5 bg-gray-200 dark:bg-gray-700 mx-2 hidden md:block"></div>' : ''}
-        `;
-    }).join('');
-}
-
-function getStepClass(stepNum) {
-    if (stepNum < state.currentStep && stepNum <= state.maxReachedStep) {
-        return 'bg-green-500 text-white';
-    } else if (stepNum === state.currentStep) {
-        return 'bg-gradient-to-r from-blue-500 to-purple-600 text-white';
-    } else if (stepNum <= state.maxReachedStep) {
-        return 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300';
-    } else {
-        return 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500';
-    }
-}
-
-function goToStep(step) {
-    if (step <= state.maxReachedStep) {
-        state.currentStep = step;
-        showStep(step);
-        renderStepIndicators();
-        updateNavigationButtons();
-        saveState();
-    }
-}
-
-// ============================================
-// Step 관리
-// ============================================
-
-function showStep(step) {
-    // 모든 step 숨기기
-    document.querySelectorAll('.step-content').forEach(el => {
-        el.classList.add('hidden');
-    });
-
-    // 현재 step 표시
-    const currentStepEl = document.getElementById(`step${step}`);
-    if (currentStepEl) {
-        currentStepEl.classList.remove('hidden');
-    }
-
-    // Step별 초기화
-    if (step === 4) {
-        updateSummary();
-    } else if (step === 6) {
-        updateWebhookInfo();
-    } else if (step === 7) {
-        renderSecretsList();
-    }
-}
-
-function nextStep() {
-    // 유효성 검사
-    if (!validateCurrentStep()) {
-        return;
-    }
-
-    // 상태 저장
-    saveCurrentStepData();
-
-    if (state.currentStep < TOTAL_STEPS) {
-        state.currentStep++;
-        state.maxReachedStep = Math.max(state.maxReachedStep, state.currentStep);
-        showStep(state.currentStep);
-        renderStepIndicators();
-        updateNavigationButtons();
-        saveState();
-
-        // 스크롤 상단으로
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-}
-
-function prevStep() {
-    if (state.currentStep > 1) {
-        state.currentStep--;
-        showStep(state.currentStep);
-        renderStepIndicators();
-        updateNavigationButtons();
-        saveState();
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-}
-
-function updateNavigationButtons() {
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-
-    if (state.currentStep === 1) {
-        prevBtn.classList.add('hidden');
-    } else {
-        prevBtn.classList.remove('hidden');
-    }
-
-    if (state.currentStep === TOTAL_STEPS) {
-        nextBtn.classList.add('hidden');
-    } else {
-        nextBtn.classList.remove('hidden');
-        nextBtn.textContent = '다음';
-    }
-}
-
-function validateCurrentStep() {
-    switch (state.currentStep) {
-        case 1:
-            const orgName = document.getElementById('orgName').value.trim();
-            const projectNumber = document.getElementById('projectNumber').value.trim();
-            if (!orgName || !projectNumber) {
-                showToast('Organization Name과 Project Number를 입력하세요.');
-                return false;
-            }
-            return true;
-        case 2:
-            if (state.labels.length === 0) {
-                showToast('최소 하나의 Label이 필요합니다.');
-                return false;
-            }
-            return true;
-        case 5:
-            // Worker URL은 선택사항 (나중에 입력 가능)
-            return true;
-        case 6:
-            if (!state.webhookSecret) {
-                generateWebhookSecret();
-            }
-            return true;
-        default:
-            return true;
-    }
-}
-
-function saveCurrentStepData() {
-    switch (state.currentStep) {
-        case 1:
-            state.projectUrl = document.getElementById('projectUrl').value.trim();
-            state.orgName = document.getElementById('orgName').value.trim();
-            state.projectNumber = document.getElementById('projectNumber').value.trim();
-            break;
-        case 3:
-            state.subdomain = document.getElementById('subdomain').value.trim();
-            break;
-        case 5:
-            state.workerUrl = document.getElementById('workerUrl').value.trim();
-            break;
-        case 6:
-            state.webhookSecret = document.getElementById('webhookSecret').value.trim();
-            break;
-    }
-}
-
-// ============================================
-// Step 1: Project URL 파싱
-// ============================================
-
-function parseProjectUrl() {
-    const url = document.getElementById('projectUrl').value.trim();
-
-    // URL 형식: https://github.com/orgs/ORG-NAME/projects/NUMBER
-    const match = url.match(/github\.com\/orgs\/([^\/]+)\/projects\/(\d+)/);
-
-    if (match) {
-        document.getElementById('orgName').value = match[1];
-        document.getElementById('projectNumber').value = match[2];
-        state.orgName = match[1];
-        state.projectNumber = match[2];
-    }
-}
-
-// ============================================
-// Step 2: Labels 관리
-// ============================================
-
-function renderLabels() {
-    const container = document.getElementById('labelsContainer');
-    container.innerHTML = state.labels.map((label, index) => `
-        <div class="label-item flex items-center gap-2">
-            <input type="text" value="${escapeHtml(label)}"
-                onchange="updateLabel(${index}, this.value)"
-                class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <button onclick="removeLabel(${index})" class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-            </button>
-        </div>
-    `).join('');
-}
-
-function addLabel() {
-    state.labels.push('새 Label');
-    renderLabels();
-    saveState();
-}
-
-function updateLabel(index, value) {
-    state.labels[index] = value.trim();
-    saveState();
-}
-
-function removeLabel(index) {
-    state.labels.splice(index, 1);
-    renderLabels();
-    saveState();
-}
-
-function resetLabels() {
-    state.labels = [...DEFAULT_LABELS];
-    renderLabels();
-    saveState();
-    showToast('기본 Label로 복원되었습니다.');
-}
-
-// ============================================
-// Step 4: 파일 생성
-// ============================================
-
-function updateSummary() {
-    document.getElementById('summaryOrg').textContent = state.orgName || '-';
-    document.getElementById('summaryProject').textContent = state.projectNumber || '-';
-    document.getElementById('summaryLabels').textContent = state.labels.length > 0 ?
-        state.labels.join(', ') : '-';
-}
-
-function generateFileContent(filename) {
-    let content = TEMPLATES[filename] || '';
-
-    if (filename === 'wrangler.toml') {
-        content = content
-            .replace('{{PROJECT_NUMBER}}', state.projectNumber)
-            .replace('{{STATUS_LABELS}}', JSON.stringify(state.labels))
-            .replace('{{ORG_NAME}}', state.orgName);
-    }
-
-    return content;
-}
-
-function downloadFile(filename) {
-    const content = generateFileContent(filename);
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename.includes('/') ? filename.split('/').pop() : filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showToast(`${filename} 다운로드 완료`);
-}
-
-async function downloadAllAsZip() {
-    const zip = new JSZip();
-
-    // 파일 추가
-    zip.file('wrangler.toml', generateFileContent('wrangler.toml'));
-    zip.file('package.json', generateFileContent('package.json'));
-    zip.file('tsconfig.json', generateFileContent('tsconfig.json'));
-    zip.folder('src').file('index.ts', generateFileContent('src/index.ts'));
-
-    // README 추가
-    const readme = `# GitHub Projects Sync Worker
-
-이 Worker는 GitHub Projects의 Status 변경을 감지하여 Issue Label을 자동으로 동기화합니다.
+GitHub Projects Status → Issue Label 자동 동기화 Worker
 
 ## 설정 정보
 
-- Organization: ${state.orgName}
-- Project Number: ${state.projectNumber}
-- Status Labels: ${state.labels.join(', ')}
+- **Organization:** ${state.orgName}
+- **Project Number:** ${state.projectNumber}
+- **Worker Name:** ${state.workerName}
 
-## 배포 방법
+## 설치 방법
 
-1. 의존성 설치
-   \`\`\`bash
-   npm install
-   \`\`\`
+### 1. 스크립트 실행 (권장)
 
+\`\`\`bash
+# Mac/Linux
+./projects-sync-worker-setup.sh
+
+# Windows PowerShell
+.\\projects-sync-worker-setup.ps1
+\`\`\`
+
+스크립트가 자동으로:
+1. npm 의존성 설치
 2. Cloudflare 로그인
-   \`\`\`bash
-   npx wrangler login
-   \`\`\`
-
 3. Worker 배포
-   \`\`\`bash
-   npx wrangler deploy
-   \`\`\`
-
 4. Secrets 설정
-   \`\`\`bash
-   npx wrangler secret put GITHUB_TOKEN
-   npx wrangler secret put WEBHOOK_SECRET
-   \`\`\`
 
-## 생성일
+### 2. 수동 설치
 
-${new Date().toLocaleString('ko-KR')}
-`;
-    zip.file('README.md', readme);
+\`\`\`bash
+# 의존성 설치
+npm config set strict-ssl false
+npm install
+npm config set strict-ssl true
 
-    // ZIP 생성 및 다운로드
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
+# Cloudflare 로그인
+export NODE_TLS_REJECT_UNAUTHORIZED=0  # Mac/Linux
+# $env:NODE_TLS_REJECT_UNAUTHORIZED=0  # Windows PowerShell
+npx wrangler login
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'github-projects-sync-worker.zip';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+# Worker 배포
+npx wrangler deploy
 
-    showToast('ZIP 파일 다운로드 완료');
-}
-
-// ============================================
-// Step 6: Webhook 설정
-// ============================================
-
-function updateWebhookInfo() {
-    // Organization 이름 업데이트
-    const orgNameEl = document.getElementById('webhookOrgName');
-    const linkEl = document.getElementById('webhookSettingsLink');
-
-    if (state.orgName) {
-        orgNameEl.textContent = state.orgName;
-        linkEl.href = `https://github.com/organizations/${state.orgName}/settings/hooks`;
-    }
-
-    // Worker URL 업데이트
-    const payloadUrlEl = document.getElementById('webhookPayloadUrl');
-    payloadUrlEl.textContent = state.workerUrl || '(Step 5에서 Worker URL을 입력하세요)';
-
-    // Webhook Secret 업데이트
-    const secretDisplayEl = document.getElementById('webhookSecretDisplay');
-    secretDisplayEl.textContent = state.webhookSecret || '(자동 생성 버튼 클릭)';
-}
-
-function generateWebhookSecret() {
-    // crypto.randomUUID() 사용
-    const secret = crypto.randomUUID().replace(/-/g, '');
-    state.webhookSecret = secret;
-    document.getElementById('webhookSecret').value = secret;
-    document.getElementById('webhookSecretDisplay').textContent = secret;
-    saveState();
-    showToast('Webhook Secret이 생성되었습니다.');
-}
-
-function updateWebhookSecret() {
-    state.webhookSecret = document.getElementById('webhookSecret').value.trim();
-    document.getElementById('webhookSecretDisplay').textContent = state.webhookSecret || '-';
-    saveState();
-}
-
-// ============================================
-// Step 7: 완료 및 내보내기
-// ============================================
-
-function renderSecretsList() {
-    const container = document.getElementById('secretsList');
-
-    const secrets = [
-        {
-            name: 'GITHUB_TOKEN',
-            description: 'GitHub Personal Access Token (repo, project 권한)',
-            value: state.githubToken || '(GitHub에서 생성 필요)',
-            editable: true
-        },
-        {
-            name: 'WEBHOOK_SECRET',
-            description: 'Webhook 검증용 비밀키',
-            value: state.webhookSecret || '(Step 6에서 생성)',
-            editable: false
-        }
-    ];
-
-    container.innerHTML = secrets.map(secret => `
-        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div class="flex-1">
-                <div class="flex items-center gap-2">
-                    <code class="font-medium text-gray-900 dark:text-white">${secret.name}</code>
-                    ${secret.editable ? `
-                        <button onclick="editSecret('${secret.name}')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">편집</button>
-                    ` : ''}
-                </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${secret.description}</p>
-                <code class="text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded mt-2 block break-all">${escapeHtml(secret.value)}</code>
-            </div>
-            <button onclick="copyToClipboard('${escapeHtml(secret.name === 'GITHUB_TOKEN' ? (state.githubToken || '') : state.webhookSecret)}')"
-                class="ml-4 p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                </svg>
-            </button>
-        </div>
-    `).join('');
-}
-
-function editSecret(name) {
-    const newValue = prompt(`${name}을(를) 입력하세요:`);
-    if (newValue !== null) {
-        if (name === 'GITHUB_TOKEN') {
-            state.githubToken = newValue;
-        } else if (name === 'WEBHOOK_SECRET') {
-            state.webhookSecret = newValue;
-        }
-        saveState();
-        renderSecretsList();
-    }
-}
-
-function downloadSecretsJson() {
-    const secrets = {
-        GITHUB_TOKEN: state.githubToken || '(GitHub에서 생성 필요)',
-        WEBHOOK_SECRET: state.webhookSecret || '',
-        _metadata: {
-            orgName: state.orgName,
-            projectNumber: state.projectNumber,
-            statusLabels: state.labels,
-            workerUrl: state.workerUrl,
-            generatedAt: new Date().toISOString()
-        }
-    };
-
-    const blob = new Blob([JSON.stringify(secrets, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'github-projects-sync-secrets.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showToast('JSON 다운로드 완료');
-}
-
-function downloadSecretsTxt() {
-    const content = `===== GitHub Projects Sync Secrets =====
-생성일: ${new Date().toLocaleString('ko-KR')}
-Organization: ${state.orgName}
-Project Number: ${state.projectNumber}
-Worker URL: ${state.workerUrl || '(미설정)'}
-
-===== Cloudflare Worker Secrets =====
-
-GITHUB_TOKEN=${state.githubToken || '(GitHub에서 생성 필요)'}
-
-WEBHOOK_SECRET=${state.webhookSecret || '(미설정)'}
-
-===== wrangler secret 명령어 =====
-
+# Secrets 설정
 npx wrangler secret put GITHUB_TOKEN
-# 프롬프트에 GITHUB_TOKEN 값 입력
-
 npx wrangler secret put WEBHOOK_SECRET
-# 프롬프트에 WEBHOOK_SECRET 값 입력
+\`\`\`
 
-===== Status Labels =====
-${state.labels.join('\n')}
+## GitHub Webhook 설정
+
+1. https://github.com/organizations/${state.orgName}/settings/hooks 이동
+2. "Add webhook" 클릭
+3. 설정:
+   - **Payload URL:** Worker URL
+   - **Content type:** application/json
+   - **Secret:** config.json의 webhookSecret 값
+   - **Events:** "Project v2 items" 선택
+
+## 테스트
+
+1. Projects Board에서 Issue 카드 이동
+2. Issue Label 자동 변경 확인
+3. 문제 시 로그 확인: \`npx wrangler tail\`
+
+## Secrets
+
+| Secret | 설명 |
+|--------|------|
+| GITHUB_TOKEN | GitHub PAT (repo, project 권한) |
+| WEBHOOK_SECRET | config.json의 webhookSecret 값 |
+
+---
+
+Generated by GitHub Projects Sync Wizard v2.0.0
 `;
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'github-projects-sync-secrets.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showToast('TXT 다운로드 완료');
 }
 
-function copyAllSecrets() {
-    const content = `GITHUB_TOKEN=${state.githubToken || '(GitHub에서 생성 필요)'}
-WEBHOOK_SECRET=${state.webhookSecret || ''}`;
+function generateSetupScriptSh() {
+    return `#!/bin/bash
+# ============================================
+# GitHub Projects Sync Worker 설치 스크립트
+#
+# 사용법: ./projects-sync-worker-setup.sh
+# ============================================
 
-    copyToClipboard(content);
+set -e
+
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+CYAN='\\033[0;36m'
+NC='\\033[0m'
+
+echo ""
+echo -e "\${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\${NC}"
+echo -e "\${CYAN}   🔄 GitHub Projects Sync Worker 설치 스크립트\${NC}"
+echo -e "\${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\${NC}"
+echo ""
+
+if [ ! -f "config.json" ]; then
+    echo -e "\${RED}❌ config.json 파일을 찾을 수 없습니다.\${NC}"
+    exit 1
+fi
+
+ORG_NAME=$(cat config.json | grep -o '"orgName"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+WORKER_NAME=$(cat config.json | grep -o '"workerName"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+WEBHOOK_SECRET=$(cat config.json | grep -o '"webhookSecret"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+
+echo -e "\${BLUE}📋 설정 정보:\${NC}"
+echo -e "   Organization: \${GREEN}$ORG_NAME\${NC}"
+echo -e "   Worker 이름: \${GREEN}$WORKER_NAME\${NC}"
+echo ""
+
+echo -e "\${YELLOW}[1/4]\${NC} 📦 의존성 설치 중..."
+npm config set strict-ssl false 2>/dev/null || true
+npm install && echo -e "\${GREEN}✅ 의존성 설치 완료\${NC}" || { echo -e "\${RED}❌ npm install 실패\${NC}"; exit 1; }
+npm config set strict-ssl true 2>/dev/null || true
+echo ""
+
+echo -e "\${YELLOW}[2/4]\${NC} 🔐 Cloudflare 로그인 중..."
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+npx wrangler login && echo -e "\${GREEN}✅ Cloudflare 로그인 완료\${NC}" || { echo -e "\${RED}❌ 로그인 실패\${NC}"; exit 1; }
+echo ""
+
+echo -e "\${YELLOW}[3/4]\${NC} 🚀 Worker 배포 중..."
+DEPLOY_SUCCESS=false
+WORKER_URL=""
+
+while [ "$DEPLOY_SUCCESS" = false ]; do
+    DEPLOY_OUTPUT=$(npx wrangler deploy 2>&1) || true
+    if echo "$DEPLOY_OUTPUT" | grep -q "https://.*workers.dev"; then
+        WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*workers.dev' | head -1)
+        DEPLOY_SUCCESS=true
+        echo -e "\${GREEN}✅ Worker 배포 완료\${NC}"
+        echo -e "   URL: \${CYAN}$WORKER_URL\${NC}"
+    else
+        echo -e "\${RED}❌ Worker 배포 실패\${NC}"
+        echo "$DEPLOY_OUTPUT" | tail -5
+        echo ""
+        echo -e "새 Worker 이름을 입력하세요 (q로 종료):"
+        read -r NEW_NAME
+        [ "$NEW_NAME" = "q" ] && exit 1
+        [ -n "$NEW_NAME" ] && sed -i.bak "s/^name = \\".*\\"/name = \\"$NEW_NAME\\"/" wrangler.toml && rm -f wrangler.toml.bak
+    fi
+done
+echo ""
+
+echo -e "\${YELLOW}[4/4]\${NC} 🔑 Secrets 설정 중..."
+echo -e "\${CYAN}GitHub PAT을 입력하세요 (repo, project 권한):\${NC}"
+npx wrangler secret put GITHUB_TOKEN
+echo "$WEBHOOK_SECRET" | npx wrangler secret put WEBHOOK_SECRET 2>/dev/null || npx wrangler secret put WEBHOOK_SECRET
+echo ""
+
+echo -e "\${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\${NC}"
+echo -e "\${GREEN}🎉 설치 완료!\${NC}"
+echo -e "📌 Worker URL: \${CYAN}$WORKER_URL\${NC}"
+echo ""
+echo -e "\${BLUE}📋 다음 단계: GitHub Webhook 설정\${NC}"
+echo -e "   https://github.com/organizations/$ORG_NAME/settings/hooks"
+echo -e "   Payload URL: $WORKER_URL"
+echo -e "   Secret: config.json 참조"
+echo -e "   Event: 'Project v2 items' 선택"
+echo -e "\${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\${NC}"
+`;
+}
+
+function generateSetupScriptPs1() {
+    return `# GitHub Projects Sync Worker 설치 스크립트 (Windows)
+$ErrorActionPreference = "Stop"
+
+Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+Write-Host "   🔄 GitHub Projects Sync Worker 설치" -ForegroundColor Cyan
+Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+
+if (-not (Test-Path "config.json")) { Write-Host "❌ config.json 없음" -ForegroundColor Red; exit 1 }
+
+$config = Get-Content "config.json" -Raw | ConvertFrom-Json
+
+Write-Host "[1/4] 📦 의존성 설치..." -ForegroundColor Yellow
+npm config set strict-ssl false 2>$null
+npm install
+npm config set strict-ssl true 2>$null
+
+Write-Host "[2/4] 🔐 Cloudflare 로그인..." -ForegroundColor Yellow
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+npx wrangler login
+
+Write-Host "[3/4] 🚀 Worker 배포..." -ForegroundColor Yellow
+$success = $false
+while (-not $success) {
+    $output = npx wrangler deploy 2>&1 | Out-String
+    if ($output -match "https://[^\\s]*workers\\.dev") {
+        $url = $Matches[0]
+        $success = $true
+        Write-Host "✅ 배포 완료: $url" -ForegroundColor Green
+    } else {
+        Write-Host "❌ 배포 실패" -ForegroundColor Red
+        $new = Read-Host "새 Worker 이름 (q로 종료)"
+        if ($new -eq "q") { exit 1 }
+        if ($new) { (Get-Content wrangler.toml) -replace 'name = "[^"]*"', "name = \`"$new\`"" | Set-Content wrangler.toml }
+    }
+}
+
+Write-Host "[4/4] 🔑 Secrets 설정..." -ForegroundColor Yellow
+npx wrangler secret put GITHUB_TOKEN
+$config.webhookSecret | npx wrangler secret put WEBHOOK_SECRET
+
+Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+Write-Host "🎉 설치 완료!" -ForegroundColor Green
+Write-Host "Worker URL: $url" -ForegroundColor Cyan
+Write-Host "다음: GitHub Webhook 설정" -ForegroundColor Blue
+Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+`;
+}
+
+// ============================================
+// ZIP 다운로드
+// ============================================
+
+async function downloadAllAsZip() {
+    // 유효성 검사
+    const orgName = document.getElementById('orgName').value.trim();
+    const projectNumber = document.getElementById('projectNumber').value.trim();
+
+    if (!orgName || !projectNumber) {
+        showToast('Organization Name과 Project Number를 입력하세요.', 'error');
+        return;
+    }
+
+    // 상태 업데이트
+    state.orgName = orgName;
+    state.projectNumber = projectNumber;
+    state.workerName = document.getElementById('workerName').value.trim() || 'github-projects-sync-worker';
+    saveState();
+
+    try {
+        const zip = new JSZip();
+        const folderName = 'github-projects-sync-worker';
+
+        // 파일 추가
+        zip.file(`${folderName}/wrangler.toml`, generateWranglerToml());
+        zip.file(`${folderName}/package.json`, generatePackageJson());
+        zip.file(`${folderName}/tsconfig.json`, generateTsconfig());
+        zip.file(`${folderName}/src/index.ts`, generateWorkerCode());
+        zip.file(`${folderName}/config.json`, generateConfigJson());
+        zip.file(`${folderName}/README.md`, generateReadme());
+        zip.file(`${folderName}/projects-sync-worker-setup.sh`, generateSetupScriptSh());
+        zip.file(`${folderName}/projects-sync-worker-setup.ps1`, generateSetupScriptPs1());
+
+        // ZIP 생성 및 다운로드
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${folderName}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('ZIP 파일이 다운로드되었습니다.');
+    } catch (error) {
+        console.error('ZIP 생성 실패:', error);
+        showToast('ZIP 생성에 실패했습니다.', 'error');
+    }
 }
 
 // ============================================
@@ -986,9 +1081,8 @@ function escapeHtml(text) {
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
         showToast('클립보드에 복사되었습니다.');
-    }).catch(err => {
-        console.error('Failed to copy:', err);
-        showToast('복사에 실패했습니다.');
+    }).catch(() => {
+        showToast('복사에 실패했습니다.', 'error');
     });
 }
 
@@ -996,47 +1090,25 @@ function copyCommand(command) {
     copyToClipboard(command);
 }
 
-function showToast(message) {
+function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
 
     toastMessage.textContent = message;
+
+    if (type === 'error') {
+        toast.classList.remove('bg-gray-800');
+        toast.classList.add('bg-red-600');
+    } else {
+        toast.classList.remove('bg-red-600');
+        toast.classList.add('bg-gray-800');
+    }
+
     toast.classList.remove('translate-y-full', 'opacity-0');
+    toast.classList.add('translate-y-0', 'opacity-100');
 
     setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-full', 'opacity-0');
     }, 3000);
-}
-
-function resetWizard() {
-    if (confirm('모든 설정을 초기화하시겠습니까?\n저장된 데이터가 모두 삭제됩니다.')) {
-        localStorage.removeItem(STORAGE_KEY);
-        state = {
-            currentStep: 1,
-            maxReachedStep: 1,
-            projectUrl: '',
-            orgName: '',
-            projectNumber: '',
-            subdomain: '',
-            labels: [...DEFAULT_LABELS],
-            workerUrl: '',
-            webhookSecret: '',
-            githubToken: ''
-        };
-
-        // UI 초기화
-        document.getElementById('projectUrl').value = '';
-        document.getElementById('orgName').value = '';
-        document.getElementById('projectNumber').value = '';
-        document.getElementById('subdomain').value = '';
-        document.getElementById('workerUrl').value = '';
-        document.getElementById('webhookSecret').value = '';
-
-        renderLabels();
-        showStep(1);
-        renderStepIndicators();
-        updateNavigationButtons();
-
-        showToast('설정이 초기화되었습니다.');
-    }
 }

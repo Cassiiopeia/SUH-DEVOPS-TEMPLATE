@@ -133,6 +133,7 @@ snake_case.sh / snake_case.py
 #### Flutter
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
+| `PROJECT-FLUTTER-CI` | 코드 분석 + 빌드 검증 (PR/main) | 기본 |
 | `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 | 기본 |
 | `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 | 기본 |
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
@@ -546,7 +547,8 @@ metadata:
 
 | 브랜치 | 트리거 | 워크플로우 |
 |--------|--------|-----------|
-| `main` | push | VERSION-CONTROL |
+| `main` | push | VERSION-CONTROL, FLUTTER-CI |
+| `main` | PR | FLUTTER-CI (코드 분석 + 빌드 검증) |
 | `deploy` | PR | CHANGELOG-CONTROL |
 | `deploy` | push | README-UPDATE, CICD |
 | `test` | push | 테스트 환경 배포 |
@@ -558,9 +560,16 @@ metadata:
 ### 공통
 ```
 _GITHUB_PAT_TOKEN    # PR 자동 머지용 (repo, workflow 권한)
+ENV_FILE (또는 ENV) # .env 파일 내용 (앱 환경변수)
 ```
 
-### Flutter Android
+### Flutter CI (코드 분석 + 빌드 검증)
+```
+ENV_FILE (또는 ENV) # .env 파일 내용 (선택)
+# ※ CI는 빌드 검증 목적이므로 서명/배포 관련 Secrets 불필요
+```
+
+### Flutter Android (CD - Play Store 배포)
 ```
 RELEASE_KEYSTORE_BASE64
 RELEASE_KEYSTORE_PASSWORD
@@ -569,11 +578,12 @@ RELEASE_KEY_PASSWORD
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64
 ```
 
-### Flutter iOS
+### Flutter iOS (CD - TestFlight 배포)
 ```
 APPLE_CERTIFICATE_BASE64
 APPLE_CERTIFICATE_PASSWORD
 APPLE_PROVISIONING_PROFILE_BASE64
+IOS_PROVISIONING_PROFILE_NAME
 APP_STORE_CONNECT_API_KEY_BASE64
 APP_STORE_CONNECT_API_KEY_ID
 APP_STORE_CONNECT_ISSUER_ID
@@ -660,10 +670,67 @@ README.md 구조:
 | 환경변수 추가 | 해당 docs/ |
 | 새 댓글 명령어 | README.md, CLAUDE.md, 해당 docs/ |
 
-### 신규 기능 문서화 체크리스트
+### 기능 유형별 문서화 위치
+
+새 기능 추가 시 아래 테이블을 참고하여 관련 문서를 업데이트합니다:
+
+| 기능 유형 | 필수 업데이트 | 선택적 업데이트 |
+|----------|--------------|----------------|
+| 새 워크플로우 | CLAUDE.md (핵심 워크플로우 테이블) | docs/[관련기능].md |
+| 새 스크립트 | CLAUDE.md (핵심 스크립트 섹션) | 스크립트 내 주석 |
+| 새 Util 마법사 | CLAUDE.md (마법사 도구 섹션), README.md (주요 기능) | docs/[PLATFORM]-[NAME]-WIZARD.md |
+| 새 @suh-lab 명령어 | README.md (댓글 명령어), CLAUDE.md (트리거 키워드), docs/[기능].md | - |
+| 새 GitHub Secret | CLAUDE.md (필수 GitHub Secrets) | docs/[관련기능].md |
+| 새 이슈 템플릿 | CLAUDE.md (이슈/PR 템플릿) | - |
+| 새 IDE 명령어 | CLAUDE.md (IDE 명령어), .claude/commands/, .cursor/commands/ | - |
+| 브랜치/트리거 변경 | CLAUDE.md (트리거 키워드) | docs/VERSION-CONTROL.md |
+
+### 컴포넌트별 상세 체크리스트
+
+#### 워크플로우 추가 시
+```markdown
+- [ ] 원본 작성: `project-types/common/` 또는 `project-types/[type]/`
+- [ ] 공통 워크플로우 → `.github/workflows/` 루트에도 동일 복사
+- [ ] CLAUDE.md "핵심 워크플로우" 테이블에 행 추가
+- [ ] 댓글/브랜치 트리거 있으면 → CLAUDE.md "트리거 키워드" 업데이트
+- [ ] 관련 docs/ 문서 업데이트 또는 신규 생성
+```
+
+#### 스크립트 추가 시
+```markdown
+- [ ] `.github/scripts/`에 `snake_case.sh` 또는 `snake_case.py`로 작성
+- [ ] CLAUDE.md "핵심 스크립트" 섹션에 사용법 예시 추가
+- [ ] 스크립트 상단에 사용법 주석 작성
+```
+
+#### Util 마법사 추가 시
+```markdown
+- [ ] 디렉토리: `.github/util/[platform]/[name]-wizard/`
+- [ ] 필수 파일: `version.json`, `version-sync.sh`, `[name]-wizard.html`, `[name]-wizard.js`
+- [ ] CLAUDE.md "마법사 도구" 섹션에 단계별 프로세스 및 Secrets 추가
+- [ ] README.md "주요 기능" 테이블에 링크 추가
+- [ ] docs/[PLATFORM]-[NAME]-WIZARD.md 상세 가이드 작성
+```
+
+#### @suh-lab 댓글 명령어 추가 시
+```markdown
+- [ ] 워크플로우에 `issue_comment` 트리거 구현
+- [ ] README.md "댓글 명령어" 테이블에 요약 (명령어, 기능, 대상)
+- [ ] CLAUDE.md "트리거 키워드 > 댓글 기반 트리거" 테이블에 추가
+- [ ] docs/[관련기능].md에 상세 사용법, 예시, 트러블슈팅 추가
+```
+
+#### GitHub Secret 추가 시
+```markdown
+- [ ] CLAUDE.md "필수 GitHub Secrets" 해당 섹션에 추가
+- [ ] 관련 docs/ 문서에 Secret 설정 방법 안내
+- [ ] Util 마법사가 생성하는 경우 → 마법사 섹션에도 명시
+```
+
+### 신규 기능 문서화 요약 체크리스트
 
 ```markdown
-새 기능 추가 시:
+새 기능 추가 시 (공통):
 - [ ] 해당 기능의 docs/ 문서 생성/업데이트
 - [ ] README.md "주요 기능" 테이블 업데이트 (필요시)
 - [ ] README.md "댓글 명령어" 테이블 업데이트 (필요시)

@@ -1,0 +1,346 @@
+/**
+ * GitHub Projects Sync Worker
+ *
+ * GitHub Projects의 Status가 변경되면 Issue Label을 자동으로 동기화합니다.
+ *
+ * 환경 변수 (wrangler.toml에서 설정):
+ * - PROJECT_NUMBER: GitHub Projects 번호
+ * - STATUS_FIELD: Status 필드명 (기본값: "Status")
+ * - STATUS_LABELS: 동기화할 Status Label 목록 (JSON 배열)
+ * - ORG_NAME: GitHub Organization 이름
+ *
+ * Secrets (wrangler secret put으로 설정):
+ * - GITHUB_TOKEN: GitHub Personal Access Token (repo, project 권한)
+ * - WEBHOOK_SECRET: GitHub Webhook 검증용 비밀키
+ */
+
+export interface Env {
+  GITHUB_TOKEN: string;
+  WEBHOOK_SECRET: string;
+  PROJECT_NUMBER: string;
+  STATUS_FIELD: string;
+  STATUS_LABELS: string;
+  ORG_NAME: string;
+}
+
+// GitHub Webhook 이벤트 타입 정의
+interface WebhookPayload {
+  action: string;
+  projects_v2_item?: {
+    id: number;
+    node_id: string;
+    project_node_id: string;
+    content_node_id: string;
+    content_type: string;
+  };
+  changes?: {
+    field_value?: {
+      field_node_id: string;
+      field_type: string;
+    };
+  };
+  organization?: {
+    login: string;
+  };
+  sender?: {
+    login: string;
+  };
+}
+
+// GraphQL 응답 타입
+interface ProjectItemResponse {
+  data?: {
+    node?: {
+      content?: {
+        number: number;
+        title: string;
+        labels: {
+          nodes: Array<{ name: string }>;
+        };
+        repository: {
+          name: string;
+          owner: {
+            login: string;
+          };
+        };
+      };
+      fieldValueByName?: {
+        name?: string;
+      };
+    };
+  };
+  errors?: Array<{ message: string }>;
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    // POST 요청만 처리
+    if (request.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+
+    // Webhook 서명 검증
+    const signature = request.headers.get('X-Hub-Signature-256');
+    if (!signature) {
+      console.log('❌ Missing signature header');
+      return new Response('Missing signature', { status: 401 });
+    }
+
+    const body = await request.text();
+    const isValid = await verifySignature(body, signature, env.WEBHOOK_SECRET);
+    if (!isValid) {
+      console.log('❌ Invalid signature');
+      return new Response('Invalid signature', { status: 401 });
+    }
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔄 GitHub Projects Sync Worker');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✅ Webhook signature verified');
+
+    // 이벤트 타입 확인
+    const event = request.headers.get('X-GitHub-Event');
+    console.log(`📌 Event type: ${event}`);
+
+    if (event !== 'projects_v2_item') {
+      console.log('⏭️ Skipping non-projects_v2_item event');
+      return new Response('OK - Event ignored', { status: 200 });
+    }
+
+    const payload: WebhookPayload = JSON.parse(body);
+    console.log(`📌 Action: ${payload.action}`);
+
+    // edited 액션만 처리 (Status 변경)
+    if (payload.action !== 'edited') {
+      console.log('⏭️ Skipping non-edited action');
+      return new Response('OK - Action ignored', { status: 200 });
+    }
+
+    // 필드 변경 확인
+    if (!payload.changes?.field_value) {
+      console.log('⏭️ No field value change detected');
+      return new Response('OK - No field change', { status: 200 });
+    }
+
+    const itemNodeId = payload.projects_v2_item?.node_id;
+    if (!itemNodeId) {
+      console.log('❌ No item node ID found');
+      return new Response('OK - No item ID', { status: 200 });
+    }
+
+    console.log(`📌 Processing item: ${itemNodeId}`);
+
+    try {
+      // GraphQL로 현재 Status와 Issue 정보 조회
+      const itemInfo = await getProjectItemInfo(itemNodeId, env);
+
+      if (!itemInfo?.data?.node?.content) {
+        console.log('❌ Could not get item content');
+        return new Response('OK - No content', { status: 200 });
+      }
+
+      const content = itemInfo.data.node.content;
+      const currentStatus = itemInfo.data.node.fieldValueByName?.name;
+      const issueNumber = content.number;
+      const repoName = content.repository.name;
+      const repoOwner = content.repository.owner.login;
+      const currentLabels = content.labels.nodes.map(l => l.name);
+
+      console.log(`📌 Issue: ${repoOwner}/${repoName}#${issueNumber}`);
+      console.log(`📌 Current Labels: ${currentLabels.join(', ')}`);
+      console.log(`📌 New Status: "${currentStatus}"`);
+
+      if (!currentStatus) {
+        console.log('⏭️ No status value');
+        return new Response('OK - No status', { status: 200 });
+      }
+
+      // Status Labels 파싱
+      const statusLabels: string[] = JSON.parse(env.STATUS_LABELS);
+
+      // 현재 있는 Status Label 제거 대상 찾기
+      const labelsToRemove = currentLabels.filter(label =>
+        statusLabels.includes(label) && label !== currentStatus
+      );
+
+      console.log(`🗑️ Labels to remove: ${labelsToRemove.join(', ') || 'none'}`);
+
+      // 이미 동일한 Label이 있으면 스킵 (무한 루프 방지)
+      if (currentLabels.includes(currentStatus) && labelsToRemove.length === 0) {
+        console.log('⏭️ Label already synced, skipping');
+        return new Response('OK - Already synced', { status: 200 });
+      }
+
+      // Label 제거
+      for (const label of labelsToRemove) {
+        await removeLabel(repoOwner, repoName, issueNumber, label, env);
+        console.log(`  ✅ Label "${label}" 제거됨`);
+      }
+
+      // 새 Status가 statusLabels에 포함되어 있으면 Label 추가
+      if (statusLabels.includes(currentStatus) && !currentLabels.includes(currentStatus)) {
+        console.log(`➕ Adding label: "${currentStatus}"`);
+        await addLabel(repoOwner, repoName, issueNumber, currentStatus, env);
+        console.log(`  ✅ Label "${currentStatus}" 추가됨`);
+      }
+
+      console.log('🎉 Label sync completed!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      return new Response('OK - Synced', { status: 200 });
+
+    } catch (error) {
+      console.error('❌ Error:', error);
+      return new Response('Internal Server Error', { status: 500 });
+    }
+  }
+};
+
+/**
+ * Webhook 서명 검증 (HMAC-SHA256)
+ */
+async function verifySignature(payload: string, signature: string, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signatureBytes = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(payload)
+  );
+
+  const expectedSignature = 'sha256=' + Array.from(new Uint8Array(signatureBytes))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  // Timing-safe comparison
+  if (signature.length !== expectedSignature.length) {
+    return false;
+  }
+
+  let result = 0;
+  for (let i = 0; i < signature.length; i++) {
+    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
+ * GraphQL API로 Project Item 정보 조회
+ */
+async function getProjectItemInfo(nodeId: string, env: Env): Promise<ProjectItemResponse> {
+  const query = `
+    query($nodeId: ID!, $statusField: String!) {
+      node(id: $nodeId) {
+        ... on ProjectV2Item {
+          content {
+            ... on Issue {
+              number
+              title
+              labels(first: 20) {
+                nodes {
+                  name
+                }
+              }
+              repository {
+                name
+                owner {
+                  login
+                }
+              }
+            }
+            ... on PullRequest {
+              number
+              title
+              labels(first: 20) {
+                nodes {
+                  name
+                }
+              }
+              repository {
+                name
+                owner {
+                  login
+                }
+              }
+            }
+          }
+          fieldValueByName(name: $statusField) {
+            ... on ProjectV2ItemFieldSingleSelectValue {
+              name
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'GitHub-Projects-Sync-Worker'
+    },
+    body: JSON.stringify({
+      query,
+      variables: {
+        nodeId,
+        statusField: env.STATUS_FIELD || 'Status'
+      }
+    })
+  });
+
+  return response.json();
+}
+
+/**
+ * REST API로 Label 추가
+ */
+async function addLabel(owner: string, repo: string, issueNumber: number, label: string, env: Env): Promise<void> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'GitHub-Projects-Sync-Worker'
+      },
+      body: JSON.stringify({ labels: [label] })
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`Failed to add label: ${error}`);
+  }
+}
+
+/**
+ * REST API로 Label 제거
+ */
+async function removeLabel(owner: string, repo: string, issueNumber: number, label: string, env: Env): Promise<void> {
+  const encodedLabel = encodeURIComponent(label);
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/labels/${encodedLabel}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+        'User-Agent': 'GitHub-Projects-Sync-Worker'
+      }
+    }
+  );
+
+  if (!response.ok && response.status !== 404) {
+    const error = await response.text();
+    console.error(`Failed to remove label: ${error}`);
+  }
+}

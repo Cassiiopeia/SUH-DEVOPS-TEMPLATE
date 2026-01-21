@@ -8,10 +8,22 @@
     <script type="application/json" id="versionJson">
 {
   "name": "Android Play Store Setup Wizard",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Flutter Android 앱을 Play Store에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2026-01-08",
+  "lastUpdated": "2026-01-20",
   "changelog": [
+    {
+      "version": "1.2.0",
+      "date": "2026-01-20",
+      "changes": [
+        "Step 7에 '추가 Secrets' 섹션 추가 - 사용자 정의 Secret 동적 추가 가능",
+        "파일 타입별 스마트 변환 (텍스트 파일 → 원본, 바이너리 파일 → Base64)",
+        "커스텀 Secret 키 이름 자동 생성 (바이너리 파일은 _BASE64 접미사 자동 추가)",
+        "Drag & Drop 파일 업로드 지원",
+        "커스텀 Secrets를 JSON/TXT/ZIP 내보내기에 통합",
+        "localStorage에 커스텀 Secrets 상태 저장"
+      ]
+    },
     {
       "version": "1.1.0",
       "date": "2026-01-08",
@@ -333,6 +345,118 @@
         .dependency-arrow {
             color: #64748b;
             font-size: 20px;
+        }
+
+        /* Custom Secrets Section */
+        .custom-secrets-section {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 12px;
+            border: 2px dashed #475569;
+        }
+        .custom-secret-item {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #334155;
+        }
+        .custom-secret-item:last-child {
+            margin-bottom: 0;
+        }
+        .secret-key-input {
+            font-family: 'Consolas', 'Monaco', monospace;
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+        }
+        .secret-key-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+        }
+        .add-secret-btn {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px dashed #60a5fa;
+            background: transparent;
+            color: #60a5fa;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+        .add-secret-btn:hover {
+            background: rgba(96, 165, 250, 0.1);
+            border-color: #93c5fd;
+            color: #93c5fd;
+        }
+        .type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .type-badge.text {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        .type-badge.binary {
+            background: rgba(251, 146, 60, 0.2);
+            color: #fb923c;
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+        .usage-hint {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: #0f172a;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        .custom-file-upload {
+            border: 2px dashed #475569;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #0f172a;
+        }
+        .custom-file-upload:hover {
+            border-color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+        .custom-file-upload.has-file {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+        .custom-file-upload input {
+            display: none;
+        }
+        .remove-secret-btn {
+            padding: 0.25rem 0.5rem;
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+        .remove-secret-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
         }
     </style>
 </head>
@@ -1662,6 +1786,31 @@
                         <p class="text-slate-400 mt-1">.env 파일 내용 (환경변수가 필요한 경우)</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- ➕ 추가 Secrets (커스텀) -->
+            <div class="custom-secrets-section">
+                <h4 class="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+                    <span>➕ 추가 Secrets (선택)</span>
+                    <a href="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/tree/main/.github/util/common/secrets-converter"
+                       target="_blank"
+                       class="text-xs text-blue-400 hover:text-blue-300 font-normal">
+                        (별도 도구 열기 →)
+                    </a>
+                </h4>
+                <p class="text-xs text-slate-400 mb-4">
+                    추가 Provisioning Profile, 환경 변수 파일 등을 자유롭게 추가하세요.<br>
+                    <span class="text-blue-400">📄 .json/.yml/.env</span> 등 텍스트 파일은 원본 그대로,
+                    <span class="text-orange-400">🔐 .jks/.p12/.mobileprovision</span> 등 바이너리 파일은 Base64로 자동 변환됩니다.
+                </p>
+
+                <div id="customSecretsList">
+                    <!-- 동적으로 생성됨 -->
+                </div>
+
+                <button class="add-secret-btn" onclick="addCustomSecret()">
+                    + 새 Secret 추가
+                </button>
             </div>
 
             <!-- ⚠️ draft 상태 수동 출시 안내 -->

@@ -1,9 +1,22 @@
 {
   "name": "GitHub Projects Sync Wizard",
-  "version": "2.3.3",
-  "description": "GitHub Projects Status와 Issue Label 간 양방향 동기화를 위한 Cloudflare Worker 설정 마법사",
+  "version": "2.4.0",
+  "description": "GitHub Organization Projects Status와 Issue Label 간 양방향 동기화를 위한 Cloudflare Worker 설정 마법사",
   "lastUpdated": "2026-01-22",
   "changelog": [
+    {
+      "version": "2.4.0",
+      "date": "2026-01-22",
+      "changes": [
+        "⚠️ User Projects 지원 중단: GitHub API 제한으로 인해 Organization Projects 전용으로 변경",
+        "User Projects URL 입력 시 경고 메시지 표시 (Repository Webhook에 'Projects v2 items' 이벤트 없음 안내)",
+        "User 타입 관련 코드 전면 제거: repositoryUrl 상태, parseRepositoryUrl 함수 등",
+        "스크립트 인자 간소화: --type, --repo-owner, --repo-name 옵션 제거",
+        "환경변수 간소화: WIZARD_TYPE, WIZARD_REPO_OWNER, WIZARD_REPO_NAME 제거",
+        "UI 간소화: User Projects용 저장소 URL 입력란 제거",
+        "문서 및 안내 메시지 Organization 전용으로 업데이트"
+      ]
+    },
     {
       "version": "2.3.3",
       "date": "2026-01-22",

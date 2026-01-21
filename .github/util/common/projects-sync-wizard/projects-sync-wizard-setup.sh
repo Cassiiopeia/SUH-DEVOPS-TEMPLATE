@@ -2,6 +2,9 @@
 # ============================================
 # GitHub Projects Sync Wizard - 원클릭 설치 스크립트
 #
+# ⚠️ Organization Projects 전용
+#    (User Projects는 GitHub API 제한으로 미지원)
+#
 # ⚠️ 사전 요구사항:
 #   - Node.js 18.0.0 이상 (node -v로 확인)
 #   - npm (Node.js와 함께 설치됨)
@@ -9,19 +12,12 @@
 #
 # 사용법 (마법사에서 생성된 명령어):
 # curl -fsSL https://raw.githubusercontent.com/.../projects-sync-wizard-setup.sh | bash -s -- \
-#   --type "org" \
 #   --owner "ORG_NAME" \
 #   --project "1" \
 #   --worker-name "my-worker" \
 #   --webhook-secret "abc123" \
+#   --github-token "ghp_xxxx..." \
 #   --labels "작업 전,작업 중,완료"
-#
-# User Projects의 경우 추가 옵션:
-#   --repo-owner "username" \
-#   --repo-name "repository"
-#
-# GitHub Token 전달 옵션:
-#   --github-token "ghp_xxxx..."
 # ============================================
 
 set -e
@@ -34,15 +30,12 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# 기본값
-PROJECT_TYPE="org"
+# 기본값 (Organization Projects 전용)
 OWNER_NAME=""
 PROJECT_NUMBER=""
 WORKER_NAME="github-projects-sync-worker"
 WEBHOOK_SECRET=""
 STATUS_LABELS=""
-REPO_OWNER=""
-REPO_NAME=""
 GITHUB_TOKEN=""
 WORK_DIR=""
 
@@ -62,13 +55,9 @@ cleanup_on_exit() {
 # 스크립트 종료 시 자동 정리 (정상 종료, 에러, 인터럽트 모두 포함)
 trap cleanup_on_exit EXIT ERR INT TERM
 
-# 인자 파싱
+# 인자 파싱 (Organization Projects 전용)
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --type)
-            PROJECT_TYPE="$2"
-            shift 2
-            ;;
         --owner)
             OWNER_NAME="$2"
             shift 2
@@ -89,16 +78,16 @@ while [[ $# -gt 0 ]]; do
             STATUS_LABELS="$2"
             shift 2
             ;;
-        --repo-owner)
-            REPO_OWNER="$2"
-            shift 2
-            ;;
-        --repo-name)
-            REPO_NAME="$2"
-            shift 2
-            ;;
         --github-token)
             GITHUB_TOKEN="$2"
+            shift 2
+            ;;
+        --type)
+            # 하위 호환성: --type 옵션은 무시 (Organization 전용)
+            shift 2
+            ;;
+        --repo-owner|--repo-name)
+            # 하위 호환성: User 관련 옵션은 무시
             shift 2
             ;;
         *)
@@ -117,12 +106,6 @@ fi
 
 # Worker 이름 Cloudflare 규칙 준수 (소문자, 숫자, 하이픈만)
 WORKER_NAME=$(echo "$WORKER_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')
-
-# User 타입인데 저장소 정보가 없는 경우 경고
-if [ "$PROJECT_TYPE" = "user" ] && ([ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]); then
-    echo -e "${YELLOW}⚠️  User Projects는 저장소 정보가 필요합니다.${NC}"
-    echo "  --repo-owner와 --repo-name 옵션을 추가하세요."
-fi
 
 # Node.js 버전 확인
 echo ""
@@ -166,16 +149,13 @@ echo -e "${GREEN}✅ jq $(jq --version)${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}   🔄 GitHub Projects Sync Worker 원클릭 설치${NC}"
+echo -e "${CYAN}   (Organization Projects 전용)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${BLUE}📋 설정 정보:${NC}"
-echo -e "   타입: ${GREEN}$PROJECT_TYPE${NC}"
-echo -e "   Owner: ${GREEN}$OWNER_NAME${NC}"
+echo -e "   Organization: ${GREEN}$OWNER_NAME${NC}"
 echo -e "   Project #: ${GREEN}$PROJECT_NUMBER${NC}"
 echo -e "   Worker 이름: ${GREEN}$WORKER_NAME${NC}"
-if [ "$PROJECT_TYPE" = "user" ] && [ -n "$REPO_OWNER" ]; then
-    echo -e "   대상 저장소: ${GREEN}$REPO_OWNER/$REPO_NAME${NC}"
-fi
 echo ""
 
 # 임시 디렉토리 생성
@@ -606,14 +586,8 @@ echo "$WEBHOOK_SECRET" | npx wrangler secret put WEBHOOK_SECRET 2>/dev/null && e
     exit 1
 }
 
-# Webhook URL 결정
-if [ "$PROJECT_TYPE" = "org" ]; then
-    WEBHOOK_SETTINGS_URL="https://github.com/organizations/$OWNER_NAME/settings/hooks"
-elif [ "$PROJECT_TYPE" = "user" ] && [ -n "$REPO_OWNER" ] && [ -n "$REPO_NAME" ]; then
-    WEBHOOK_SETTINGS_URL="https://github.com/$REPO_OWNER/$REPO_NAME/settings/hooks"
-else
-    WEBHOOK_SETTINGS_URL="(저장소 설정에서 Webhook 추가)"
-fi
+# Webhook URL (Organization Webhook 전용) - /new 추가로 바로 생성 페이지로 이동
+WEBHOOK_SETTINGS_URL="https://github.com/organizations/$OWNER_NAME/settings/hooks/new"
 
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -628,7 +602,7 @@ echo -e "   2. 'Add webhook' 클릭"
 echo -e "   3. 설정 입력:"
 echo -e "      - Payload URL: ${CYAN}$WORKER_URL${NC}"
 echo -e "      - Content type: application/json"
-echo -e "      - Secret: (마법사에서 생성된 값)"
+echo -e "      - Secret: ${CYAN}$WEBHOOK_SECRET${NC}"
 echo -e "   4. Events: 'Let me select individual events' → ${GREEN}'Project v2 items'${NC} 선택"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 

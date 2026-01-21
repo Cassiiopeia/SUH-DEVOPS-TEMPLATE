@@ -1,32 +1,29 @@
 # ============================================
 # GitHub Projects Sync Wizard - 원클릭 설치 스크립트 (Windows)
 #
+# ⚠️ Organization Projects 전용
+#    (User Projects는 GitHub API 제한으로 미지원)
+#
 # ⚠️ 사전 요구사항:
 #   - Node.js 18.0.0 이상 (node -v로 확인)
 #   - npm (Node.js와 함께 설치됨)
 #   - Cloudflare 계정
 #
 # 사용법 (마법사에서 생성된 명령어):
-# irm 'https://raw.githubusercontent.com/.../projects-sync-wizard-setup.ps1' | iex
-#
-# 또는 인자와 함께:
-# $env:WIZARD_TYPE='org'; $env:WIZARD_OWNER='ORG_NAME'; $env:WIZARD_PROJECT='1'; `
+# $env:WIZARD_OWNER='ORG_NAME'; $env:WIZARD_PROJECT='1'; `
 # $env:WIZARD_WORKER_NAME='my-worker'; $env:WIZARD_WEBHOOK_SECRET='abc123'; `
 # $env:WIZARD_LABELS='작업 전,작업 중,완료'; $env:WIZARD_GITHUB_TOKEN='ghp_xxxx'; `
-# irm '...' | iex
+# irm 'https://raw.githubusercontent.com/.../projects-sync-wizard-setup.ps1' | iex
 # ============================================
 
 $ErrorActionPreference = "Stop"
 
-# 환경변수에서 설정 읽기
-$ProjectType = if ($env:WIZARD_TYPE) { $env:WIZARD_TYPE } else { "org" }
+# 환경변수에서 설정 읽기 (Organization Projects 전용)
 $OwnerName = $env:WIZARD_OWNER
 $ProjectNumber = $env:WIZARD_PROJECT
 $WorkerName = if ($env:WIZARD_WORKER_NAME) { $env:WIZARD_WORKER_NAME } else { "github-projects-sync-worker" }
 $WebhookSecret = $env:WIZARD_WEBHOOK_SECRET
 $StatusLabels = $env:WIZARD_LABELS
-$RepoOwner = $env:WIZARD_REPO_OWNER
-$RepoName = $env:WIZARD_REPO_NAME
 $GithubToken = $env:WIZARD_GITHUB_TOKEN
 
 # 필수 인자 확인
@@ -40,22 +37,13 @@ if (-not $OwnerName -or -not $ProjectNumber -or -not $WebhookSecret -or -not $Gi
     Write-Host "  `$env:WIZARD_GITHUB_TOKEN = 'ghp_xxxx...'"
     Write-Host ""
     Write-Host "선택 환경변수:" -ForegroundColor Yellow
-    Write-Host "  `$env:WIZARD_TYPE = 'org' 또는 'user'"
     Write-Host "  `$env:WIZARD_WORKER_NAME = 'my-worker'"
     Write-Host "  `$env:WIZARD_LABELS = '작업 전,작업 중,완료'"
-    Write-Host "  `$env:WIZARD_REPO_OWNER = 'username' (User Projects용)"
-    Write-Host "  `$env:WIZARD_REPO_NAME = 'repo-name' (User Projects용)"
     exit 1
 }
 
 # Worker 이름 Cloudflare 규칙 준수 (소문자, 숫자, 하이픈만)
 $WorkerName = $WorkerName.ToLower() -replace '[^a-z0-9-]', '-' -replace '-+', '-' -replace '^-|-$', ''
-
-# User 타입인데 저장소 정보가 없는 경우 경고
-if ($ProjectType -eq "user" -and (-not $RepoOwner -or -not $RepoName)) {
-    Write-Host "⚠️  User Projects는 저장소 정보가 필요합니다." -ForegroundColor Yellow
-    Write-Host "   WIZARD_REPO_OWNER와 WIZARD_REPO_NAME 환경변수를 설정하세요."
-}
 
 # 작업 디렉토리 변수 (cleanup 함수에서 사용)
 $script:WorkDir = $null
@@ -70,15 +58,12 @@ function Cleanup-OnExit {
         Write-Host "✅ 임시 디렉토리 삭제 완료" -ForegroundColor Green
     }
 
-    # 환경변수 정리
-    Remove-Item Env:WIZARD_TYPE -ErrorAction SilentlyContinue
+    # 환경변수 정리 (Organization 전용)
     Remove-Item Env:WIZARD_OWNER -ErrorAction SilentlyContinue
     Remove-Item Env:WIZARD_PROJECT -ErrorAction SilentlyContinue
     Remove-Item Env:WIZARD_WORKER_NAME -ErrorAction SilentlyContinue
     Remove-Item Env:WIZARD_WEBHOOK_SECRET -ErrorAction SilentlyContinue
     Remove-Item Env:WIZARD_LABELS -ErrorAction SilentlyContinue
-    Remove-Item Env:WIZARD_REPO_OWNER -ErrorAction SilentlyContinue
-    Remove-Item Env:WIZARD_REPO_NAME -ErrorAction SilentlyContinue
     Remove-Item Env:WIZARD_GITHUB_TOKEN -ErrorAction SilentlyContinue
 }
 
@@ -116,16 +101,13 @@ try {
 Write-Host ""
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 Write-Host "   🔄 GitHub Projects Sync Worker 원클릭 설치" -ForegroundColor Cyan
+Write-Host "   (Organization Projects 전용)" -ForegroundColor Cyan
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "📋 설정 정보:" -ForegroundColor Blue
-Write-Host "   타입: $ProjectType" -ForegroundColor Green
-Write-Host "   Owner: $OwnerName" -ForegroundColor Green
+Write-Host "   Organization: $OwnerName" -ForegroundColor Green
 Write-Host "   Project #: $ProjectNumber" -ForegroundColor Green
 Write-Host "   Worker 이름: $WorkerName" -ForegroundColor Green
-if ($ProjectType -eq "user" -and $RepoOwner) {
-    Write-Host "   대상 저장소: $RepoOwner/$RepoName" -ForegroundColor Green
-}
 Write-Host ""
 
 # 임시 디렉토리 생성
@@ -570,14 +552,8 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-# Webhook URL 결정
-if ($ProjectType -eq "org") {
-    $WebhookSettingsUrl = "https://github.com/organizations/$OwnerName/settings/hooks"
-} elseif ($ProjectType -eq "user" -and $RepoOwner -and $RepoName) {
-    $WebhookSettingsUrl = "https://github.com/$RepoOwner/$RepoName/settings/hooks"
-} else {
-    $WebhookSettingsUrl = "(저장소 설정에서 Webhook 추가)"
-}
+# Webhook URL (Organization Webhook 전용) - /new 추가로 바로 생성 페이지로 이동
+$WebhookSettingsUrl = "https://github.com/organizations/$OwnerName/settings/hooks/new"
 
 Write-Host ""
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
@@ -592,7 +568,7 @@ Write-Host "   2. 'Add webhook' 클릭"
 Write-Host "   3. 설정 입력:"
 Write-Host "      - Payload URL: $WorkerUrl" -ForegroundColor Cyan
 Write-Host "      - Content type: application/json"
-Write-Host "      - Secret: (마법사에서 생성된 값)"
+Write-Host "      - Secret: $WebhookSecret" -ForegroundColor Cyan
 Write-Host "   4. Events: 'Let me select individual events' → 'Project v2 items' 선택" -ForegroundColor Green
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 

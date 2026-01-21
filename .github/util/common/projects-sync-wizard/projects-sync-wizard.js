@@ -27,15 +27,14 @@ const DEFAULT_STATUS_LABELS = [
 let state = {
     currentStep: 1,
     projectUrl: '',
-    projectType: '',       // 'org' | 'user'
-    ownerName: '',         // Organization 또는 User 이름
+    projectType: 'org',    // Organization 전용 (User Projects 미지원)
+    ownerName: '',         // Organization 이름
     orgName: '',           // 하위 호환성 유지
     projectNumber: '',
     workerName: 'github-projects-sync-worker',
     statusLabels: [...DEFAULT_STATUS_LABELS],
     webhookSecret: '',
     workerUrl: '',
-    repositoryUrl: '',     // User 타입일 때 Webhook 설정용 저장소 URL
     skipProjectsGuide: false,  // Projects 생성 가이드 건너뛰기
     githubToken: ''        // GitHub PAT (repo, project 권한)
 };
@@ -87,7 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Webhook Secret 변경 이벤트 - 명령어 자동 업데이트
-    document.getElementById('webhookSecret').addEventListener('input', () => {
+    document.getElementById('webhookSecret').addEventListener('input', (e) => {
+        state.webhookSecret = e.target.value;
+        saveState();
         scheduleCommandUpdate();
     });
 
@@ -155,12 +156,6 @@ function loadState() {
             document.getElementById('webhookSecret').value = state.webhookSecret || '';
             document.getElementById('workerUrl').value = state.workerUrl || '';
 
-            // 저장소 URL (User 타입용) - 인라인 위치
-            const repoUrlInput = document.getElementById('repositoryUrl');
-            if (repoUrlInput) {
-                repoUrlInput.value = state.repositoryUrl || '';
-            }
-
             // Projects 가이드 건너뛰기 체크박스
             const skipGuideCheckbox = document.getElementById('skipProjectsGuide');
             if (skipGuideCheckbox) {
@@ -192,7 +187,7 @@ function resetWizard() {
         state = {
             currentStep: 1,
             projectUrl: '',
-            projectType: '',
+            projectType: 'org',
             ownerName: '',
             orgName: '',
             projectNumber: '',
@@ -200,7 +195,6 @@ function resetWizard() {
             statusLabels: [...DEFAULT_STATUS_LABELS],
             webhookSecret: '',
             workerUrl: '',
-            repositoryUrl: '',
             skipProjectsGuide: false,
             githubToken: ''
         };
@@ -217,10 +211,10 @@ function resetWizard() {
         document.getElementById('workerName').value = 'github-projects-sync-worker';
         document.getElementById('workerUrl').value = '';
 
-        // 저장소 URL 초기화
-        const repoUrlInput = document.getElementById('repositoryUrl');
-        if (repoUrlInput) {
-            repoUrlInput.value = '';
+        // User Projects 경고 숨기기
+        const userWarning = document.getElementById('userProjectsWarning');
+        if (userWarning) {
+            userWarning.classList.add('hidden');
         }
 
         // Projects 가이드 체크박스 초기화
@@ -319,14 +313,8 @@ function nextStep() {
             const projectNumber = state.projectNumber || document.getElementById('projectNumber')?.value.trim() || '';
 
             if (!ownerName || !projectNumber) {
-                showToast('Projects URL을 입력하거나 Owner Name과 Project Number를 입력하세요.', 'error');
+                showToast('Projects URL을 입력하거나 Organization Name과 Project Number를 입력하세요.', 'error');
                 return;
-            }
-
-            // User 타입인데 저장소 URL이 없는 경우 경고 (필수는 아님)
-            if (state.projectType === 'user' && !state.repositoryUrl) {
-                const proceed = confirm('User Projects의 경우 Webhook 설정을 위해 저장소 URL이 필요합니다.\n\n나중에 입력하시겠습니까?');
-                if (!proceed) return;
             }
 
             state.ownerName = ownerName;
@@ -378,30 +366,15 @@ function sanitizeWorkerName(name) {
         .replace(/^-|-$/g, '');        // 시작/끝 하이픈 제거
 }
 
-// 기본 Worker 이름 생성 (레포 이름 기반)
+// 기본 Worker 이름 생성 (Organization 이름 기반)
 function generateDefaultWorkerName() {
-    let baseName = '';
-
-    // User 타입이고 저장소 URL이 있으면 레포 이름 사용
-    if (state.projectType === 'user' && state.repositoryUrl) {
-        const match = state.repositoryUrl.match(/github\.com\/[^\/]+\/([^\/\?\#]+)/);
-        if (match) {
-            baseName = match[1].replace(/\.git$/, '');
-        }
-    }
-
-    // 레포 이름이 없으면 owner 이름 사용
-    if (!baseName && state.ownerName) {
-        baseName = state.ownerName;
-    }
-
-    // 기본값
-    if (!baseName) {
+    // Organization 이름 사용
+    if (!state.ownerName) {
         return 'github-projects-sync-worker';
     }
 
-    // github-projects-{name}-sync-worker 형식
-    const sanitized = sanitizeWorkerName(baseName);
+    // github-projects-{org}-sync-worker 형식
+    const sanitized = sanitizeWorkerName(state.ownerName);
     return `github-projects-${sanitized}-sync-worker`;
 }
 
@@ -430,6 +403,34 @@ function parseProjectUrl() {
     const url = document.getElementById('projectUrl').value.trim();
     state.projectUrl = url;
 
+    // User Projects 경고 요소
+    const userWarning = document.getElementById('userProjectsWarning');
+
+    // User Projects URL 감지 → 경고 표시 및 차단
+    // https://github.com/users/USERNAME/projects/NUMBER[/views/VIEW_ID]
+    const userMatch = url.match(/github\.com\/users\/([^\/]+)\/projects\/(\d+)(?:\/views\/\d+)?/);
+
+    if (userMatch) {
+        // User Projects 감지 - 경고 표시
+        if (userWarning) {
+            userWarning.classList.remove('hidden');
+        }
+        // 파싱 결과 초기화 (User Projects 미지원)
+        state.projectType = 'org';
+        state.ownerName = '';
+        state.orgName = '';
+        state.projectNumber = '';
+        updateUIForProjectType();
+        saveState();
+        scheduleCommandUpdate();
+        return;
+    }
+
+    // User Projects 경고 숨기기 (다른 URL 입력 시)
+    if (userWarning) {
+        userWarning.classList.add('hidden');
+    }
+
     // Organization Projects URL 파싱
     // https://github.com/orgs/ORG-NAME/projects/NUMBER[/views/VIEW_ID]
     const orgMatch = url.match(/github\.com\/orgs\/([^\/]+)\/projects\/(\d+)(?:\/views\/\d+)?/);
@@ -446,24 +447,8 @@ function parseProjectUrl() {
         return;
     }
 
-    // User Projects URL 파싱
-    // https://github.com/users/USERNAME/projects/NUMBER[/views/VIEW_ID]
-    const userMatch = url.match(/github\.com\/users\/([^\/]+)\/projects\/(\d+)(?:\/views\/\d+)?/);
-
-    if (userMatch) {
-        state.projectType = 'user';
-        state.ownerName = userMatch[1];
-        state.orgName = userMatch[1]; // 하위 호환성
-        state.projectNumber = userMatch[2];
-        updateUIForProjectType();
-        autoSetWorkerName();
-        saveState();
-        scheduleCommandUpdate();
-        return;
-    }
-
     // 매칭 실패 - 초기화
-    state.projectType = '';
+    state.projectType = 'org';
     state.ownerName = '';
     state.orgName = '';
     state.projectNumber = '';
@@ -472,12 +457,11 @@ function parseProjectUrl() {
     scheduleCommandUpdate();
 }
 
-// 프로젝트 타입에 따른 UI 업데이트
+// 프로젝트 타입에 따른 UI 업데이트 (Organization 전용)
 function updateUIForProjectType() {
     const ownerNameInput = document.getElementById('ownerName');
     const projectNumberInput = document.getElementById('projectNumber');
     const projectTypeBadge = document.getElementById('projectTypeBadge');
-    const repositoryUrlInline = document.getElementById('repositoryUrlInline');
     const parseResultSection = document.getElementById('parseResult');
 
     // 파싱 결과 입력란 업데이트
@@ -490,33 +474,21 @@ function updateUIForProjectType() {
 
     // 파싱 결과 섹션 표시/숨김
     if (parseResultSection) {
-        if (state.projectType && state.ownerName && state.projectNumber) {
+        if (state.ownerName && state.projectNumber) {
             parseResultSection.classList.remove('hidden');
         } else {
             parseResultSection.classList.add('hidden');
         }
     }
 
-    // 프로젝트 타입 뱃지 업데이트
+    // 프로젝트 타입 뱃지 업데이트 (Organization 전용)
     if (projectTypeBadge) {
-        if (state.projectType === 'org') {
+        if (state.ownerName && state.projectNumber) {
             projectTypeBadge.textContent = 'Organization';
             projectTypeBadge.className = 'px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800';
-        } else if (state.projectType === 'user') {
-            projectTypeBadge.textContent = 'User';
-            projectTypeBadge.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800';
         } else {
             projectTypeBadge.textContent = '-';
             projectTypeBadge.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400';
-        }
-    }
-
-    // User 타입일 때만 인라인 저장소 URL 섹션 표시 (Projects URL 바로 아래)
-    if (repositoryUrlInline) {
-        if (state.projectType === 'user') {
-            repositoryUrlInline.classList.remove('hidden');
-        } else {
-            repositoryUrlInline.classList.add('hidden');
         }
     }
 
@@ -543,39 +515,6 @@ function toggleProjectsGuide() {
     }
 }
 
-// 저장소 URL 정규화 (다양한 형식 지원)
-function normalizeRepoUrl(url) {
-    if (!url) return '';
-
-    // github.com/{owner}/{repo} 추출 후 나머지 제거
-    // 지원 형식:
-    // - https://github.com/user/repo
-    // - https://github.com/user/repo/
-    // - https://github.com/user/repo.git
-    // - https://github.com/user/repo/tree/main
-    // - https://github.com/user/repo/tree/main/path/to/file
-    // - https://github.com/user/repo/blob/main/file.js
-    // - https://github.com/user/repo/issues/123
-    const match = url.match(/github\.com\/([^\/]+)\/([^\/\?\#]+)/);
-    if (match) {
-        const owner = match[1];
-        // .git 확장자 제거
-        const repo = match[2].replace(/\.git$/, '');
-        return `https://github.com/${owner}/${repo}`;
-    }
-    return url;
-}
-
-// 저장소 URL 파싱
-function parseRepositoryUrl() {
-    const rawUrl = document.getElementById('repositoryUrl').value.trim();
-    // 정규화된 URL 저장
-    state.repositoryUrl = normalizeRepoUrl(rawUrl);
-    // 저장소 URL이 입력되면 Worker 이름도 업데이트
-    autoSetWorkerName();
-    saveState();
-    scheduleCommandUpdate();
-}
 
 // ============================================
 // Labels 관리
@@ -651,8 +590,8 @@ function updateWebhookDisplay() {
     const webhookTargetLabel = document.getElementById('webhookTargetLabel');
     const webhookTargetDescription = document.getElementById('webhookTargetDescription');
 
-    // 프로젝트 타입에 따른 Webhook URL 생성
-    if (state.projectType === 'org') {
+    // Organization Webhook URL 생성
+    if (state.ownerName) {
         // Organization: github.com/organizations/{org}/settings/hooks
         const webhookUrl = `https://github.com/organizations/${state.ownerName}/settings/hooks`;
         if (webhookSettingsLink) {
@@ -665,47 +604,11 @@ function updateWebhookDisplay() {
         if (webhookTargetDescription) {
             webhookTargetDescription.textContent = `${state.ownerName} Organization의 모든 저장소에서 Projects 이벤트를 수신합니다.`;
         }
-    } else if (state.projectType === 'user') {
-        // User: github.com/{owner}/{repo}/settings/hooks
-        if (state.repositoryUrl) {
-            const repoMatch = state.repositoryUrl.match(/github\.com\/([^\/]+)\/([^\/\?#]+)/);
-            if (repoMatch) {
-                const owner = repoMatch[1];
-                const repo = repoMatch[2].replace(/\.git$/, '');
-                const webhookUrl = `https://github.com/${owner}/${repo}/settings/hooks`;
-                if (webhookSettingsLink) {
-                    webhookSettingsLink.href = webhookUrl;
-                    webhookSettingsLink.textContent = webhookUrl;
-                }
-                if (webhookTargetLabel) {
-                    webhookTargetLabel.textContent = 'Repository Webhook';
-                }
-                if (webhookTargetDescription) {
-                    webhookTargetDescription.textContent = `${owner}/${repo} 저장소의 Projects 이벤트를 수신합니다.`;
-                }
-            } else {
-                if (webhookSettingsLink) {
-                    webhookSettingsLink.href = '#';
-                    webhookSettingsLink.textContent = 'Step 1에서 저장소 URL을 입력하세요';
-                }
-            }
-        } else {
-            if (webhookSettingsLink) {
-                webhookSettingsLink.href = '#';
-                webhookSettingsLink.textContent = 'Step 1에서 저장소 URL을 입력하세요';
-            }
-            if (webhookTargetLabel) {
-                webhookTargetLabel.textContent = 'Repository Webhook';
-            }
-            if (webhookTargetDescription) {
-                webhookTargetDescription.textContent = 'User Projects는 저장소 단위로 Webhook을 설정해야 합니다.';
-            }
-        }
     } else {
-        // 타입 미지정
+        // Organization 미지정
         if (webhookSettingsLink) {
             webhookSettingsLink.href = '#';
-            webhookSettingsLink.textContent = 'Step 1에서 Projects URL을 입력하세요';
+            webhookSettingsLink.textContent = 'Step 1에서 Organization Projects URL을 입력하세요';
         }
     }
 
@@ -1481,10 +1384,7 @@ function updateInstallCommands() {
     const webhookSecret = state.webhookSecret || '';
     const githubToken = state.githubToken || '';
 
-    // User 타입인데 저장소 URL이 없으면 명령어 생성 안함
-    const needsRepoUrl = state.projectType === 'user' && !state.repositoryUrl;
-
-    if (!ownerName || !projectNumber || !webhookSecret || !githubToken || needsRepoUrl) {
+    if (!ownerName || !projectNumber || !webhookSecret || !githubToken) {
         // 입력 대기 메시지 표시
         waitingMessage.classList.remove('hidden');
         commandSection.classList.add('hidden');
@@ -1507,9 +1407,8 @@ function buildBashCommand() {
     // Mac/Linux bash 스크립트 URL
     const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.sh';
 
-    // 인자 구성
+    // 인자 구성 (Organization 전용)
     const args = [];
-    args.push(`--type "${state.projectType || 'org'}"`);
     args.push(`--owner "${state.ownerName}"`);
     args.push(`--project "${state.projectNumber}"`);
     args.push(`--worker-name "${state.workerName}"`);
@@ -1517,43 +1416,20 @@ function buildBashCommand() {
     args.push(`--github-token "${state.githubToken}"`);
     args.push(`--labels "${state.statusLabels.join(',')}"`);
 
-    // User 타입인 경우 저장소 정보 추가
-    if (state.projectType === 'user' && state.repositoryUrl) {
-        const repoMatch = state.repositoryUrl.match(/github\.com\/([^\/]+)\/([^\/\?\#]+)/);
-        if (repoMatch) {
-            const repoOwner = repoMatch[1];
-            const repoName = repoMatch[2].replace(/\.git$/, '');
-            args.push(`--repo-owner "${repoOwner}"`);
-            args.push(`--repo-name "${repoName}"`);
-        }
-    }
-
     // curl 명령어 생성
     return `curl -fsSL ${scriptUrl} | bash -s -- \\
   ${args.join(' \\\n  ')}`;
 }
 
 function buildPowerShellCommand() {
-    // 환경변수 설정
+    // 환경변수 설정 (Organization 전용)
     const envVars = [];
-    envVars.push(`$env:WIZARD_TYPE='${state.projectType || 'org'}'`);
     envVars.push(`$env:WIZARD_OWNER='${state.ownerName}'`);
     envVars.push(`$env:WIZARD_PROJECT='${state.projectNumber}'`);
     envVars.push(`$env:WIZARD_WORKER_NAME='${state.workerName}'`);
     envVars.push(`$env:WIZARD_WEBHOOK_SECRET='${state.webhookSecret}'`);
     envVars.push(`$env:WIZARD_GITHUB_TOKEN='${state.githubToken}'`);
     envVars.push(`$env:WIZARD_LABELS='${state.statusLabels.join(',')}'`);
-
-    // User 타입인 경우 저장소 정보 추가
-    if (state.projectType === 'user' && state.repositoryUrl) {
-        const repoMatch = state.repositoryUrl.match(/github\.com\/([^\/]+)\/([^\/\?\#]+)/);
-        if (repoMatch) {
-            const repoOwner = repoMatch[1];
-            const repoName = repoMatch[2].replace(/\.git$/, '');
-            envVars.push(`$env:WIZARD_REPO_OWNER='${repoOwner}'`);
-            envVars.push(`$env:WIZARD_REPO_NAME='${repoName}'`);
-        }
-    }
 
     // PowerShell 스크립트 URL
     const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.ps1';

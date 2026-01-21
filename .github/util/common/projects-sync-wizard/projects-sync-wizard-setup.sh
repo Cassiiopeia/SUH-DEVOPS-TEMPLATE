@@ -19,6 +19,9 @@
 # User Projects의 경우 추가 옵션:
 #   --repo-owner "username" \
 #   --repo-name "repository"
+#
+# GitHub Token 전달 옵션:
+#   --github-token "ghp_xxxx..."
 # ============================================
 
 set -e
@@ -40,6 +43,24 @@ WEBHOOK_SECRET=""
 STATUS_LABELS=""
 REPO_OWNER=""
 REPO_NAME=""
+GITHUB_TOKEN=""
+WORK_DIR=""
+
+# 임시 디렉토리 자동 정리 함수
+cleanup_on_exit() {
+    local exit_code=$?
+    if [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+        echo ""
+        echo -e "${YELLOW}🧹 임시 디렉토리 정리 중...${NC}"
+        cd ~ 2>/dev/null || cd /tmp
+        rm -rf "$WORK_DIR" 2>/dev/null || true
+        echo -e "${GREEN}✅ 임시 디렉토리 삭제 완료${NC}"
+    fi
+    exit $exit_code
+}
+
+# 스크립트 종료 시 자동 정리 (정상 종료, 에러, 인터럽트 모두 포함)
+trap cleanup_on_exit EXIT ERR INT TERM
 
 # 인자 파싱
 while [[ $# -gt 0 ]]; do
@@ -76,6 +97,10 @@ while [[ $# -gt 0 ]]; do
             REPO_NAME="$2"
             shift 2
             ;;
+        --github-token)
+            GITHUB_TOKEN="$2"
+            shift 2
+            ;;
         *)
             echo -e "${RED}알 수 없는 옵션: $1${NC}"
             exit 1
@@ -84,11 +109,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # 필수 인자 확인
-if [ -z "$OWNER_NAME" ] || [ -z "$PROJECT_NUMBER" ] || [ -z "$WEBHOOK_SECRET" ]; then
+if [ -z "$OWNER_NAME" ] || [ -z "$PROJECT_NUMBER" ] || [ -z "$WEBHOOK_SECRET" ] || [ -z "$GITHUB_TOKEN" ]; then
     echo -e "${RED}❌ 필수 인자가 누락되었습니다.${NC}"
-    echo "필수: --owner, --project, --webhook-secret"
+    echo "필수: --owner, --project, --webhook-secret, --github-token"
     exit 1
 fi
+
+# Worker 이름 Cloudflare 규칙 준수 (소문자, 숫자, 하이픈만)
+WORKER_NAME=$(echo "$WORKER_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')
 
 # User 타입인데 저장소 정보가 없는 경우 경고
 if [ "$PROJECT_TYPE" = "user" ] && ([ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]); then
@@ -564,12 +592,19 @@ while [ "$DEPLOY_SUCCESS" = false ]; do
     fi
 done
 
-# Secrets 설정
+# Secrets 설정 (인자로 전달된 값 사용, pipe 방식)
 echo ""
 echo -e "${CYAN}🔑 Secrets 설정${NC}"
-echo -e "GitHub PAT을 입력하세요 (repo, project 권한 필요):"
-npx wrangler secret put GITHUB_TOKEN
-echo "$WEBHOOK_SECRET" | npx wrangler secret put WEBHOOK_SECRET 2>/dev/null || npx wrangler secret put WEBHOOK_SECRET
+echo -e "${YELLOW}GITHUB_TOKEN 설정 중...${NC}"
+echo "$GITHUB_TOKEN" | npx wrangler secret put GITHUB_TOKEN 2>/dev/null && echo -e "${GREEN}✅ GITHUB_TOKEN 설정 완료${NC}" || {
+    echo -e "${RED}❌ GITHUB_TOKEN 설정 실패${NC}"
+    exit 1
+}
+echo -e "${YELLOW}WEBHOOK_SECRET 설정 중...${NC}"
+echo "$WEBHOOK_SECRET" | npx wrangler secret put WEBHOOK_SECRET 2>/dev/null && echo -e "${GREEN}✅ WEBHOOK_SECRET 설정 완료${NC}" || {
+    echo -e "${RED}❌ WEBHOOK_SECRET 설정 실패${NC}"
+    exit 1
+}
 
 # Webhook URL 결정
 if [ "$PROJECT_TYPE" = "org" ]; then
@@ -597,14 +632,4 @@ echo -e "      - Secret: (마법사에서 생성된 값)"
 echo -e "   4. Events: 'Let me select individual events' → ${GREEN}'Project v2 items'${NC} 선택"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# 작업 디렉토리 정리 옵션
-echo ""
-echo -e "작업 디렉토리를 삭제하시겠습니까? (y/N):"
-read -r CLEANUP
-if [ "$CLEANUP" = "y" ] || [ "$CLEANUP" = "Y" ]; then
-    cd ~
-    rm -rf "$WORK_DIR"
-    echo -e "${GREEN}✅ 작업 디렉토리 삭제됨${NC}"
-else
-    echo -e "작업 디렉토리: $WORK_DIR"
-fi
+# 작업 디렉토리는 trap으로 자동 정리됨

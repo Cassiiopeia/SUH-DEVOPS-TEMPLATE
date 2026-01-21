@@ -36,7 +36,8 @@ let state = {
     webhookSecret: '',
     workerUrl: '',
     repositoryUrl: '',     // User 타입일 때 Webhook 설정용 저장소 URL
-    skipProjectsGuide: false  // Projects 생성 가이드 건너뛰기
+    skipProjectsGuide: false,  // Projects 생성 가이드 건너뛰기
+    githubToken: ''        // GitHub PAT (repo, project 권한)
 };
 
 // ============================================
@@ -75,15 +76,25 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
     });
 
-    // Worker 이름 입력 이벤트 - 명령어 자동 업데이트
+    // Worker 이름 입력 이벤트 - 자동 소문자 변환 + 명령어 업데이트
     document.getElementById('workerName').addEventListener('input', (e) => {
-        state.workerName = e.target.value.trim() || 'github-projects-sync-worker';
+        // Cloudflare 이름 규칙: 소문자, 숫자, 하이픈만 허용
+        const sanitized = sanitizeWorkerName(e.target.value);
+        e.target.value = sanitized;
+        state.workerName = sanitized || 'github-projects-sync-worker';
         saveState();
         scheduleCommandUpdate();
     });
 
     // Webhook Secret 변경 이벤트 - 명령어 자동 업데이트
     document.getElementById('webhookSecret').addEventListener('input', () => {
+        scheduleCommandUpdate();
+    });
+
+    // GitHub Token 입력 이벤트 - 명령어 자동 업데이트
+    document.getElementById('githubToken').addEventListener('input', (e) => {
+        state.githubToken = e.target.value;
+        saveState();
         scheduleCommandUpdate();
     });
 
@@ -157,6 +168,13 @@ function loadState() {
                 toggleProjectsGuide();
             }
 
+            // GitHub Token (보안상 저장하지 않음 - 페이지 새로고침 시 재입력 필요)
+            // state.githubToken은 세션 중에만 유지
+            const githubTokenInput = document.getElementById('githubToken');
+            if (githubTokenInput && state.githubToken) {
+                githubTokenInput.value = state.githubToken;
+            }
+
             // 타입에 따른 UI 업데이트
             updateUIForProjectType();
 
@@ -183,7 +201,8 @@ function resetWizard() {
             webhookSecret: '',
             workerUrl: '',
             repositoryUrl: '',
-            skipProjectsGuide: false
+            skipProjectsGuide: false,
+            githubToken: ''
         };
         generateWebhookSecret();
         renderLabels();
@@ -208,6 +227,12 @@ function resetWizard() {
         const skipGuideCheckbox = document.getElementById('skipProjectsGuide');
         if (skipGuideCheckbox) {
             skipGuideCheckbox.checked = false;
+        }
+
+        // GitHub Token 초기화
+        const githubTokenInput = document.getElementById('githubToken');
+        if (githubTokenInput) {
+            githubTokenInput.value = '';
         }
 
         // UI 초기화
@@ -340,6 +365,64 @@ function updateNavigationButtons() {
 }
 
 // ============================================
+// Worker 이름 유틸리티
+// ============================================
+
+// Worker 이름 Cloudflare 규칙 준수 (소문자, 숫자, 하이픈만)
+function sanitizeWorkerName(name) {
+    if (!name) return '';
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')  // 허용되지 않는 문자 → 하이픈
+        .replace(/-+/g, '-')           // 연속 하이픈 제거
+        .replace(/^-|-$/g, '');        // 시작/끝 하이픈 제거
+}
+
+// 기본 Worker 이름 생성 (레포 이름 기반)
+function generateDefaultWorkerName() {
+    let baseName = '';
+
+    // User 타입이고 저장소 URL이 있으면 레포 이름 사용
+    if (state.projectType === 'user' && state.repositoryUrl) {
+        const match = state.repositoryUrl.match(/github\.com\/[^\/]+\/([^\/\?\#]+)/);
+        if (match) {
+            baseName = match[1].replace(/\.git$/, '');
+        }
+    }
+
+    // 레포 이름이 없으면 owner 이름 사용
+    if (!baseName && state.ownerName) {
+        baseName = state.ownerName;
+    }
+
+    // 기본값
+    if (!baseName) {
+        return 'github-projects-sync-worker';
+    }
+
+    // github-projects-{name}-sync-worker 형식
+    const sanitized = sanitizeWorkerName(baseName);
+    return `github-projects-${sanitized}-sync-worker`;
+}
+
+// Worker 이름 자동 설정 (URL 파싱 후 호출)
+function autoSetWorkerName() {
+    const workerInput = document.getElementById('workerName');
+    if (!workerInput) return;
+
+    // 사용자가 직접 수정한 적 없거나 기본값인 경우에만 자동 설정
+    const currentValue = workerInput.value.trim();
+    const isDefault = currentValue === 'github-projects-sync-worker' || currentValue === '';
+
+    if (isDefault) {
+        const defaultName = generateDefaultWorkerName();
+        workerInput.value = defaultName;
+        state.workerName = defaultName;
+        saveState();
+    }
+}
+
+// ============================================
 // Project URL 파싱
 // ============================================
 
@@ -357,6 +440,7 @@ function parseProjectUrl() {
         state.orgName = orgMatch[1]; // 하위 호환성
         state.projectNumber = orgMatch[2];
         updateUIForProjectType();
+        autoSetWorkerName();
         saveState();
         scheduleCommandUpdate();
         return;
@@ -372,6 +456,7 @@ function parseProjectUrl() {
         state.orgName = userMatch[1]; // 하위 호환성
         state.projectNumber = userMatch[2];
         updateUIForProjectType();
+        autoSetWorkerName();
         saveState();
         scheduleCommandUpdate();
         return;
@@ -486,6 +571,8 @@ function parseRepositoryUrl() {
     const rawUrl = document.getElementById('repositoryUrl').value.trim();
     // 정규화된 URL 저장
     state.repositoryUrl = normalizeRepoUrl(rawUrl);
+    // 저장소 URL이 입력되면 Worker 이름도 업데이트
+    autoSetWorkerName();
     saveState();
     scheduleCommandUpdate();
 }
@@ -1392,11 +1479,12 @@ function updateInstallCommands() {
     const ownerName = state.ownerName || '';
     const projectNumber = state.projectNumber || '';
     const webhookSecret = state.webhookSecret || '';
+    const githubToken = state.githubToken || '';
 
     // User 타입인데 저장소 URL이 없으면 명령어 생성 안함
     const needsRepoUrl = state.projectType === 'user' && !state.repositoryUrl;
 
-    if (!ownerName || !projectNumber || !webhookSecret || needsRepoUrl) {
+    if (!ownerName || !projectNumber || !webhookSecret || !githubToken || needsRepoUrl) {
         // 입력 대기 메시지 표시
         waitingMessage.classList.remove('hidden');
         commandSection.classList.add('hidden');
@@ -1426,6 +1514,7 @@ function buildBashCommand() {
     args.push(`--project "${state.projectNumber}"`);
     args.push(`--worker-name "${state.workerName}"`);
     args.push(`--webhook-secret "${state.webhookSecret}"`);
+    args.push(`--github-token "${state.githubToken}"`);
     args.push(`--labels "${state.statusLabels.join(',')}"`);
 
     // User 타입인 경우 저장소 정보 추가
@@ -1452,6 +1541,7 @@ function buildPowerShellCommand() {
     envVars.push(`$env:WIZARD_PROJECT='${state.projectNumber}'`);
     envVars.push(`$env:WIZARD_WORKER_NAME='${state.workerName}'`);
     envVars.push(`$env:WIZARD_WEBHOOK_SECRET='${state.webhookSecret}'`);
+    envVars.push(`$env:WIZARD_GITHUB_TOKEN='${state.githubToken}'`);
     envVars.push(`$env:WIZARD_LABELS='${state.statusLabels.join(',')}'`);
 
     // User 타입인 경우 저장소 정보 추가

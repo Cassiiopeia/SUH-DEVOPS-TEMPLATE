@@ -484,20 +484,38 @@
                         </label>
                         <input type="text" id="workerName" placeholder="github-projects-sync-worker" value="github-projects-sync-worker"
                             class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <!-- Cloudflare 이름 규칙 가이드 -->
+                        <div class="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <p class="text-xs text-blue-700 dark:text-blue-300">
+                                <strong>📌 Cloudflare 이름 규칙:</strong> 소문자, 숫자, 하이픈(-)만 사용 가능
+                            </p>
+                            <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                입력 시 자동으로 소문자로 변환됩니다. Projects URL 입력 시 기본값이 자동 생성됩니다.
+                            </p>
+                        </div>
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             배포 시 이름이 충돌하면 스크립트에서 새 이름을 입력할 수 있습니다.
                         </p>
                     </div>
 
                     <!-- Webhook Secret -->
-                    <div>
+                    <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Webhook Secret
                             <span class="text-gray-500 font-normal">(자동 생성)</span>
                         </label>
+                        <!-- Webhook Secret 용도 설명 -->
+                        <div class="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <p class="text-xs text-amber-700 dark:text-amber-300">
+                                <strong>🔐 용도:</strong> GitHub Webhook → Cloudflare Worker 요청 인증용 비밀키
+                            </p>
+                            <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                마법사에서 보안 해시값으로 자동 생성됩니다. 원하는 값으로 수정해도 됩니다.
+                            </p>
+                        </div>
                         <div class="flex gap-2">
-                            <input type="text" id="webhookSecret" readonly
-                                class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm">
+                            <input type="text" id="webhookSecret"
+                                class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm">
                             <button onclick="generateWebhookSecret()" class="px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors">
                                 재생성
                             </button>
@@ -505,6 +523,39 @@
                                 복사
                             </button>
                         </div>
+                    </div>
+
+                    <!-- GitHub Token (PAT) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            GitHub Token (PAT)
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <!-- 권한 가이드 -->
+                        <div class="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <p class="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                                <strong>🔑 필요 권한:</strong>
+                            </p>
+                            <ul class="text-xs text-blue-600 dark:text-blue-400 space-y-1 ml-3">
+                                <li>• <strong>repo</strong> - Issue/PR Label 읽기/쓰기</li>
+                                <li>• <strong>project</strong> - Projects 읽기 (read:project)</li>
+                            </ul>
+                            <div class="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+                                <a href="https://github.com/settings/tokens/new?scopes=repo,read:project&description=GitHub%20Projects%20Sync%20Worker"
+                                   target="_blank"
+                                   class="text-xs text-blue-700 dark:text-blue-300 hover:underline font-medium inline-flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                    </svg>
+                                    권한이 미리 선택된 토큰 생성 페이지 열기
+                                </a>
+                            </div>
+                        </div>
+                        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm">
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            ⚠️ 토큰은 명령어에 포함되어 터미널 히스토리에 남을 수 있습니다.
+                        </p>
                     </div>
                 </div>
 
@@ -535,7 +586,7 @@
                         <p class="text-gray-500 dark:text-gray-400">
                             <span class="text-lg">⏳</span> 위 정보를 입력하면 설치 명령어가 자동으로 생성됩니다.
                         </p>
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">필수: Projects URL, Webhook Secret</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">필수: Projects URL, Webhook Secret, GitHub Token</p>
                     </div>
 
                     <!-- 생성된 명령어 (Mac/Linux + Windows) -->

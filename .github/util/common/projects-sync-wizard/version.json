@@ -1,9 +1,41 @@
 {
   "name": "GitHub Projects Sync Wizard",
-  "version": "2.3.0",
+  "version": "2.3.3",
   "description": "GitHub Projects Status와 Issue Label 간 양방향 동기화를 위한 Cloudflare Worker 설정 마법사",
   "lastUpdated": "2026-01-22",
   "changelog": [
+    {
+      "version": "2.3.3",
+      "date": "2026-01-22",
+      "changes": [
+        "오류 발생 시에도 임시 폴더 자동 삭제: bash trap, PowerShell try/finally 패턴 적용",
+        "스크립트 중간 실패 시에도 환경변수 자동 정리"
+      ]
+    },
+    {
+      "version": "2.3.2",
+      "date": "2026-01-22",
+      "changes": [
+        "GitHub Token (PAT) 입력란 추가: 마법사에서 직접 입력",
+        "GitHub Token 권한 가이드 추가: repo, read:project 스코프 설명",
+        "원클릭 토큰 생성 링크: 권한이 미리 선택된 GitHub 페이지 바로가기",
+        "스크립트 인자로 GitHub Token 전달: --github-token (bash), WIZARD_GITHUB_TOKEN (PowerShell)",
+        "Secret 설정 방식 변경: 대화형 입력 → pipe 방식 (echo | npx wrangler secret put)",
+        "임시 폴더 자동 삭제: Worker 배포 완료 후 작업 디렉토리 자동 정리"
+      ]
+    },
+    {
+      "version": "2.3.1",
+      "date": "2026-01-22",
+      "changes": [
+        "Worker 이름 Cloudflare 규칙 준수: 자동 소문자 변환 (대문자 입력 시 에러 방지)",
+        "Worker 이름 기본값 자동 생성: github-projects-{레포이름}-sync-worker 형식",
+        "Worker 이름 입력란에 Cloudflare 이름 규칙 가이드 추가",
+        "Webhook Secret 용도 설명 추가 (GitHub ↔ Worker 인증용)",
+        "Webhook Secret 입력란 readonly 제거 (사용자 수정 가능)",
+        "스크립트(sh/ps1)에서도 Worker 이름 소문자 변환 처리"
+      ]
+    },
     {
       "version": "2.3.0",
       "date": "2026-01-22",

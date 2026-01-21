@@ -12,7 +12,8 @@
 # 또는 인자와 함께:
 # $env:WIZARD_TYPE='org'; $env:WIZARD_OWNER='ORG_NAME'; $env:WIZARD_PROJECT='1'; `
 # $env:WIZARD_WORKER_NAME='my-worker'; $env:WIZARD_WEBHOOK_SECRET='abc123'; `
-# $env:WIZARD_LABELS='작업 전,작업 중,완료'; irm '...' | iex
+# $env:WIZARD_LABELS='작업 전,작업 중,완료'; $env:WIZARD_GITHUB_TOKEN='ghp_xxxx'; `
+# irm '...' | iex
 # ============================================
 
 $ErrorActionPreference = "Stop"
@@ -26,15 +27,17 @@ $WebhookSecret = $env:WIZARD_WEBHOOK_SECRET
 $StatusLabels = $env:WIZARD_LABELS
 $RepoOwner = $env:WIZARD_REPO_OWNER
 $RepoName = $env:WIZARD_REPO_NAME
+$GithubToken = $env:WIZARD_GITHUB_TOKEN
 
 # 필수 인자 확인
-if (-not $OwnerName -or -not $ProjectNumber -or -not $WebhookSecret) {
+if (-not $OwnerName -or -not $ProjectNumber -or -not $WebhookSecret -or -not $GithubToken) {
     Write-Host "❌ 필수 환경변수가 설정되지 않았습니다." -ForegroundColor Red
     Write-Host ""
     Write-Host "필수 환경변수:" -ForegroundColor Yellow
     Write-Host "  `$env:WIZARD_OWNER = 'ORG_NAME'"
     Write-Host "  `$env:WIZARD_PROJECT = '1'"
     Write-Host "  `$env:WIZARD_WEBHOOK_SECRET = 'your-secret'"
+    Write-Host "  `$env:WIZARD_GITHUB_TOKEN = 'ghp_xxxx...'"
     Write-Host ""
     Write-Host "선택 환경변수:" -ForegroundColor Yellow
     Write-Host "  `$env:WIZARD_TYPE = 'org' 또는 'user'"
@@ -45,11 +48,42 @@ if (-not $OwnerName -or -not $ProjectNumber -or -not $WebhookSecret) {
     exit 1
 }
 
+# Worker 이름 Cloudflare 규칙 준수 (소문자, 숫자, 하이픈만)
+$WorkerName = $WorkerName.ToLower() -replace '[^a-z0-9-]', '-' -replace '-+', '-' -replace '^-|-$', ''
+
 # User 타입인데 저장소 정보가 없는 경우 경고
 if ($ProjectType -eq "user" -and (-not $RepoOwner -or -not $RepoName)) {
     Write-Host "⚠️  User Projects는 저장소 정보가 필요합니다." -ForegroundColor Yellow
     Write-Host "   WIZARD_REPO_OWNER와 WIZARD_REPO_NAME 환경변수를 설정하세요."
 }
+
+# 작업 디렉토리 변수 (cleanup 함수에서 사용)
+$script:WorkDir = $null
+
+# 임시 디렉토리 정리 함수
+function Cleanup-OnExit {
+    if ($script:WorkDir -and (Test-Path $script:WorkDir)) {
+        Write-Host ""
+        Write-Host "🧹 임시 디렉토리 정리 중..." -ForegroundColor Yellow
+        Set-Location $env:USERPROFILE 2>$null
+        Remove-Item -Recurse -Force $script:WorkDir -ErrorAction SilentlyContinue
+        Write-Host "✅ 임시 디렉토리 삭제 완료" -ForegroundColor Green
+    }
+
+    # 환경변수 정리
+    Remove-Item Env:WIZARD_TYPE -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_OWNER -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_PROJECT -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_WORKER_NAME -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_WEBHOOK_SECRET -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_LABELS -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_REPO_OWNER -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_REPO_NAME -ErrorAction SilentlyContinue
+    Remove-Item Env:WIZARD_GITHUB_TOKEN -ErrorAction SilentlyContinue
+}
+
+# 메인 로직을 try/finally로 감싸서 오류 발생 시에도 정리 보장
+try {
 
 # Node.js 버전 확인
 Write-Host ""
@@ -95,10 +129,10 @@ if ($ProjectType -eq "user" -and $RepoOwner) {
 Write-Host ""
 
 # 임시 디렉토리 생성
-$WorkDir = Join-Path $env:TEMP "projects-sync-$(Get-Date -Format 'yyyyMMddHHmmss')"
-New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
-Set-Location $WorkDir
-Write-Host "[1/5] 📁 작업 디렉토리: $WorkDir" -ForegroundColor Yellow
+$script:WorkDir = Join-Path $env:TEMP "projects-sync-$(Get-Date -Format 'yyyyMMddHHmmss')"
+New-Item -ItemType Directory -Path $script:WorkDir -Force | Out-Null
+Set-Location $script:WorkDir
+Write-Host "[1/5] 📁 작업 디렉토리: $script:WorkDir" -ForegroundColor Yellow
 
 # Labels를 JSON 배열로 변환
 $LabelArray = $StatusLabels -split ','
@@ -516,12 +550,25 @@ while (-not $DeploySuccess) {
     }
 }
 
-# Secrets 설정
+# Secrets 설정 (환경변수로 전달된 값 사용, pipe 방식)
 Write-Host ""
 Write-Host "🔑 Secrets 설정" -ForegroundColor Cyan
-Write-Host "GitHub PAT을 입력하세요 (repo, project 권한 필요):"
-npx wrangler secret put GITHUB_TOKEN
+Write-Host "GITHUB_TOKEN 설정 중..." -ForegroundColor Yellow
+$GithubToken | npx wrangler secret put GITHUB_TOKEN
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ GITHUB_TOKEN 설정 완료" -ForegroundColor Green
+} else {
+    Write-Host "❌ GITHUB_TOKEN 설정 실패" -ForegroundColor Red
+    exit 1
+}
+Write-Host "WEBHOOK_SECRET 설정 중..." -ForegroundColor Yellow
 $WebhookSecret | npx wrangler secret put WEBHOOK_SECRET
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ WEBHOOK_SECRET 설정 완료" -ForegroundColor Green
+} else {
+    Write-Host "❌ WEBHOOK_SECRET 설정 실패" -ForegroundColor Red
+    exit 1
+}
 
 # Webhook URL 결정
 if ($ProjectType -eq "org") {
@@ -549,23 +596,9 @@ Write-Host "      - Secret: (마법사에서 생성된 값)"
 Write-Host "   4. Events: 'Let me select individual events' → 'Project v2 items' 선택" -ForegroundColor Green
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 
-# 작업 디렉토리 정리 옵션
-Write-Host ""
-$Cleanup = Read-Host "작업 디렉토리를 삭제하시겠습니까? (y/N)"
-if ($Cleanup -eq "y" -or $Cleanup -eq "Y") {
-    Set-Location $env:USERPROFILE
-    Remove-Item -Recurse -Force $WorkDir
-    Write-Host "✅ 작업 디렉토리 삭제됨" -ForegroundColor Green
-} else {
-    Write-Host "작업 디렉토리: $WorkDir"
-}
+# 작업 디렉토리는 finally 블록에서 자동 정리됨
 
-# 환경변수 정리
-Remove-Item Env:WIZARD_TYPE -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_OWNER -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_PROJECT -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_WORKER_NAME -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_WEBHOOK_SECRET -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_LABELS -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_REPO_OWNER -ErrorAction SilentlyContinue
-Remove-Item Env:WIZARD_REPO_NAME -ErrorAction SilentlyContinue
+} finally {
+    # 스크립트 종료 시 자동 정리 (정상 종료, 에러, Ctrl+C 모두 포함)
+    Cleanup-OnExit
+}

@@ -1,0 +1,9 @@
+name = "github-projects-sync-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+PROJECT_NUMBER = "{{PROJECT_NUMBER}}"
+STATUS_FIELD = "Status"
+STATUS_LABELS = '{{STATUS_LABELS}}'
+ORG_NAME = "{{ORG_NAME}}"

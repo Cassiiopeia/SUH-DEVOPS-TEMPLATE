@@ -1,0 +1,25 @@
+{
+  "name": "GitHub Projects Sync Wizard",
+  "version": "1.0.0",
+  "description": "GitHub Projects Status와 Issue Label 간 양방향 동기화를 위한 Cloudflare Worker 설정 마법사",
+  "lastUpdated": "2026-01-21",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-01-21",
+      "changes": [
+        "초기 릴리즈",
+        "7단계 마법사 UI (프로젝트 설정 → Worker 배포 → Webhook 설정)",
+        "Cloudflare Worker 템플릿 자동 생성",
+        "SSL 오류 트러블슈팅 가이드 포함",
+        "GitHub Organization Webhook 설정 가이드",
+        "Secrets 내보내기 (JSON/TXT/클립보드)"
+      ]
+    }
+  ],
+  "compatibility": {
+    "node": ">=18.0.0",
+    "wrangler": ">=3.0.0"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}

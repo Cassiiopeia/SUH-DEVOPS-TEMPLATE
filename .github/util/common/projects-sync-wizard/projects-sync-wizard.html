@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Projects Sync Wizard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        }
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+        }
+        .code-block code {
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+        }
+        .step-indicator {
+            transition: all 0.3s ease;
+        }
+        .step-indicator:hover {
+            transform: scale(1.05);
+        }
+        .label-item {
+            transition: all 0.2s ease;
+        }
+        .label-item:hover {
+            transform: translateX(4px);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- 버전 정보 (version-sync.sh에 의해 자동 동기화) -->
+    <script type="application/json" id="versionJson">
+{
+  "name": "GitHub Projects Sync Wizard",
+  "version": "2.0.0",
+  "description": "GitHub Projects Status와 Issue Label 간 양방향 동기화를 위한 Cloudflare Worker 설정 마법사",
+  "lastUpdated": "2026-01-21",
+  "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2026-01-21",
+      "changes": [
+        "4단계 간소화 (기존 7단계에서 변경)",
+        "projects-sync-worker-setup.sh 원클릭 설치 스크립트 추가",
+        "issue-label.yml 기본값 자동 파싱",
+        "Worker 이름 충돌 시 재입력 기능",
+        "config.json 설정 파일 자동 생성"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-01-21",
+      "changes": [
+        "초기 릴리즈"
+      ]
+    }
+  ],
+  "compatibility": {
+    "node": ">=18.0.0",
+    "wrangler": ">=3.0.0"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <!-- 헤더 -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">GitHub Projects Sync Wizard</h1>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" id="versionDisplay">v2.0.0</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                        <svg class="w-5 h-5 text-gray-600 dark:text-gray-300 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                        <svg class="w-5 h-5 text-gray-300 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                    </button>
+                    <button onclick="resetWizard()" class="px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                        초기화
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Step Indicator -->
+    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between" id="stepIndicators">
+                <!-- JavaScript로 동적 생성 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 -->
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Step 1: 프로젝트 정보 입력 -->
+        <section id="step1" class="step-content hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Step 1: 프로젝트 정보 입력</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">GitHub Projects와 Worker 설정 정보를 입력하세요.</p>
+
+                <!-- Project URL 입력 -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        GitHub Projects URL
+                        <span class="text-gray-500 font-normal">(Organization Projects만 지원)</span>
+                    </label>
+                    <input type="text" id="projectUrl" placeholder="https://github.com/orgs/YOUR-ORG/projects/1"
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        oninput="parseProjectUrl()">
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        URL을 입력하면 Organization과 Project Number가 자동으로 추출됩니다.
+                    </p>
+                </div>
+
+                <!-- 파싱 결과 -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</label>
+                        <input type="text" id="orgName" placeholder="자동 추출됨"
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Project Number</label>
+                        <input type="text" id="projectNumber" placeholder="자동 추출됨"
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                </div>
+
+                <!-- Worker 이름 -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Worker 이름
+                        <span class="text-gray-500 font-normal">(Cloudflare Worker 이름)</span>
+                    </label>
+                    <input type="text" id="workerName" placeholder="github-projects-sync-worker" value="github-projects-sync-worker"
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        배포 시 이름이 충돌하면 스크립트에서 새 이름을 입력할 수 있습니다.
+                    </p>
+                </div>
+
+                <!-- Status Labels -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Status Labels
+                        <span class="text-gray-500 font-normal">(issue-label.yml 기본값)</span>
+                    </label>
+                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-3">
+                        <p class="text-sm text-amber-800 dark:text-amber-200">
+                            <strong>중요:</strong> Label 이름은 GitHub Projects의 Status 컬럼 이름과 정확히 일치해야 합니다.
+                        </p>
+                    </div>
+                    <div id="labelsContainer" class="space-y-2 mb-4">
+                        <!-- JavaScript로 동적 생성 -->
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="addLabel()" class="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Label 추가
+                        </button>
+                        <button onclick="resetLabels()" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-4 py-2">
+                            기본값 복원
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Webhook Secret (자동 생성) -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Webhook Secret
+                        <span class="text-gray-500 font-normal">(자동 생성)</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <input type="text" id="webhookSecret" readonly
+                            class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm">
+                        <button onclick="generateWebhookSecret()" class="px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors">
+                            재생성
+                        </button>
+                        <button onclick="copyToClipboard(document.getElementById('webhookSecret').value)" class="px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors">
+                            복사
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ZIP 다운로드 -->
+                <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <button onclick="downloadAllAsZip()" class="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-lg">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Worker 파일 ZIP 다운로드
+                    </button>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                        설정 파일 + 설치 스크립트가 포함된 ZIP 파일이 다운로드됩니다.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2: Worker 배포 -->
+        <section id="step2" class="step-content hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Step 2: Worker 배포</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">다운로드한 ZIP 파일을 압축 해제하고 스크립트를 실행하세요.</p>
+
+                <!-- 간단한 안내 -->
+                <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-6 h-6 text-green-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div>
+                            <p class="text-green-800 dark:text-green-200 font-medium">스크립트 하나로 모든 설정 완료!</p>
+                            <p class="text-sm text-green-700 dark:text-green-300 mt-1">
+                                npm 설치, Cloudflare 로그인, Worker 배포, Secrets 설정까지 자동으로 처리됩니다.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 명령어 -->
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-medium text-gray-900 dark:text-white mb-2">1. 폴더 이동</h4>
+                        <div class="code-block relative">
+                            <button onclick="copyCommand('cd github-projects-sync-worker')" class="absolute top-2 right-2 p-2 text-gray-400 hover:text-white rounded">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                            <code>cd github-projects-sync-worker</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="font-medium text-gray-900 dark:text-white mb-2">2. 설치 스크립트 실행</h4>
+                        <div class="code-block relative">
+                            <button onclick="copyCommand('./projects-sync-worker-setup.sh')" class="absolute top-2 right-2 p-2 text-gray-400 hover:text-white rounded">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                            <code># Mac/Linux<br>./projects-sync-worker-setup.sh<br><br># Windows PowerShell<br>.\projects-sync-worker-setup.ps1</code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 스크립트 동작 설명 -->
+                <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <h4 class="font-medium text-gray-900 dark:text-white mb-3">스크립트가 자동으로 처리하는 작업:</h4>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                        <li>npm 의존성 설치 (SSL 오류 자동 대응)</li>
+                        <li>Cloudflare 로그인 (브라우저 자동 오픈)</li>
+                        <li>Worker 배포 (이름 충돌 시 재입력 가능)</li>
+                        <li>GITHUB_TOKEN 입력 받기</li>
+                        <li>WEBHOOK_SECRET 자동 설정</li>
+                        <li>Worker URL 출력</li>
+                    </ol>
+                </div>
+
+                <!-- Worker URL 입력 (선택) -->
+                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        배포된 Worker URL (선택)
+                    </label>
+                    <input type="text" id="workerUrl" placeholder="https://xxx.workers.dev (스크립트 완료 후 출력된 URL)"
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        스크립트 완료 후 출력되는 Worker URL을 입력하면 다음 단계에서 자동으로 표시됩니다.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 3: GitHub Webhook 설정 -->
+        <section id="step3" class="step-content hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Step 3: GitHub Webhook 설정</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">GitHub Organization에서 Webhook을 설정하세요.</p>
+
+                <!-- Webhook 설정 단계 -->
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">1</div>
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-white">Organization Webhooks 페이지 이동</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                <a id="webhookSettingsLink" href="#" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">
+                                    https://github.com/organizations/<span id="webhookOrgName">YOUR-ORG</span>/settings/hooks
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">2</div>
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-white">"Add webhook" 클릭</h4>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">3</div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-gray-900 dark:text-white">Webhook 정보 입력</h4>
+                            <div class="mt-3 space-y-3 text-sm">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500 dark:text-gray-400 w-28 flex-shrink-0">Payload URL:</span>
+                                    <code class="flex-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs overflow-x-auto" id="webhookPayloadUrl">Worker URL을 Step 2에서 입력하세요</code>
+                                    <button onclick="copyToClipboard(document.getElementById('workerUrl').value || '입력 필요')" class="text-blue-600 dark:text-blue-400 hover:underline text-xs">복사</button>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500 dark:text-gray-400 w-28 flex-shrink-0">Content type:</span>
+                                    <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">application/json</code>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500 dark:text-gray-400 w-28 flex-shrink-0">Secret:</span>
+                                    <code class="flex-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs overflow-x-auto" id="webhookSecretDisplay">-</code>
+                                    <button onclick="copyToClipboard(document.getElementById('webhookSecret').value)" class="text-blue-600 dark:text-blue-400 hover:underline text-xs">복사</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">4</div>
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-white">이벤트 선택</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                "Let me select individual events" 선택 → <strong class="text-blue-600 dark:text-blue-400">"Project v2 items"</strong>만 체크
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">5</div>
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-white">"Add webhook" 클릭하여 저장</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 주의사항 -->
+                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-amber-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div>
+                            <p class="text-sm text-amber-800 dark:text-amber-200">
+                                <strong>Secret 값 확인:</strong> GitHub Webhook의 Secret과 Cloudflare Worker의 WEBHOOK_SECRET이 동일해야 합니다.
+                                config.json 파일에서 확인하거나 위 "복사" 버튼을 사용하세요.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 4: 완료 -->
+        <section id="step4" class="step-content hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">설정 완료!</h2>
+                    <p class="text-gray-600 dark:text-gray-400">GitHub Projects Sync가 설정되었습니다.</p>
+                </div>
+
+                <!-- 설정 요약 -->
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-6">
+                    <h4 class="font-medium text-gray-900 dark:text-white mb-3">설정 요약</h4>
+                    <dl class="grid grid-cols-2 gap-2 text-sm">
+                        <dt class="text-gray-500 dark:text-gray-400">Organization:</dt>
+                        <dd class="text-gray-900 dark:text-white font-mono" id="summaryOrg">-</dd>
+                        <dt class="text-gray-500 dark:text-gray-400">Project Number:</dt>
+                        <dd class="text-gray-900 dark:text-white font-mono" id="summaryProject">-</dd>
+                        <dt class="text-gray-500 dark:text-gray-400">Worker 이름:</dt>
+                        <dd class="text-gray-900 dark:text-white font-mono" id="summaryWorker">-</dd>
+                        <dt class="text-gray-500 dark:text-gray-400">Status Labels:</dt>
+                        <dd class="text-gray-900 dark:text-white font-mono text-xs" id="summaryLabels">-</dd>
+                    </dl>
+                </div>
+
+                <!-- 테스트 안내 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">테스트 방법</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                        <li>GitHub Projects Board에서 Issue 카드를 다른 Status 컬럼으로 이동</li>
+                        <li>Issue 페이지에서 Label이 자동으로 변경되는지 확인</li>
+                        <li>문제 발생 시 Worker 로그 확인: <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">npx wrangler tail</code></li>
+                    </ol>
+                </div>
+
+                <!-- 트러블슈팅 -->
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <h4 class="font-medium text-blue-800 dark:text-blue-200 mb-2">문제가 발생하면?</h4>
+                    <ul class="list-disc list-inside space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                        <li>GitHub Webhook → Recent Deliveries에서 전송 상태 확인</li>
+                        <li>Webhook Secret이 Worker와 동일한지 확인</li>
+                        <li>GITHUB_TOKEN 권한 확인 (repo, project)</li>
+                        <li>Label 이름이 Projects Status 컬럼과 정확히 일치하는지 확인</li>
+                    </ul>
+                </div>
+
+                <!-- 다시 시작 버튼 -->
+                <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
+                    <button onclick="resetWizard()" class="px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors">
+                        새 프로젝트 설정하기
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 네비게이션 버튼 -->
+        <div class="flex justify-between mt-6">
+            <button id="prevBtn" onclick="prevStep()" class="px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors hidden">
+                이전
+            </button>
+            <button id="nextBtn" onclick="nextStep()" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all ml-auto">
+                다음
+            </button>
+        </div>
+    </main>
+
+    <!-- Toast 알림 -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 dark:bg-gray-700 text-white px-4 py-3 rounded-lg shadow-lg transform translate-y-full opacity-0 transition-all duration-300">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script src="projects-sync-wizard.js"></script>
+</body>
+</html>

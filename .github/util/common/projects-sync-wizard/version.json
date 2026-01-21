@@ -14,7 +14,9 @@
         "스크립트 인자 간소화: --type, --repo-owner, --repo-name 옵션 제거",
         "환경변수 간소화: WIZARD_TYPE, WIZARD_REPO_OWNER, WIZARD_REPO_NAME 제거",
         "UI 간소화: User Projects용 저장소 URL 입력란 제거",
-        "문서 및 안내 메시지 Organization 전용으로 업데이트"
+        "문서 및 안내 메시지 Organization 전용으로 업데이트",
+        "Webhook 설정 URL 개선: /hooks → /hooks/new로 바로 생성 페이지 이동",
+        "스크립트 완료 시 Webhook Secret 값 직접 표시 (복사 편의성 향상)"
       ]
     },
     {

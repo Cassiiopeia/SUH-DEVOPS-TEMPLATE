@@ -562,14 +562,13 @@ Write-Host ""
 Write-Host "📌 Worker URL: $WorkerUrl" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "📋 다음 단계: GitHub Webhook 설정" -ForegroundColor Blue
-Write-Host "   1. Webhook 설정 페이지:"
+Write-Host "   1. Webhook 생성 페이지 열기:"
 Write-Host "      $WebhookSettingsUrl" -ForegroundColor Cyan
-Write-Host "   2. 'Add webhook' 클릭"
-Write-Host "   3. 설정 입력:"
+Write-Host "   2. 설정 입력:"
 Write-Host "      - Payload URL: $WorkerUrl" -ForegroundColor Cyan
 Write-Host "      - Content type: application/json"
 Write-Host "      - Secret: $WebhookSecret" -ForegroundColor Cyan
-Write-Host "   4. Events: 'Let me select individual events' → 'Project v2 items' 선택" -ForegroundColor Green
+Write-Host "   3. Events: 'Let me select individual events' → 'Project v2 items' 선택" -ForegroundColor Green
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 
 # 작업 디렉토리는 finally 블록에서 자동 정리됨

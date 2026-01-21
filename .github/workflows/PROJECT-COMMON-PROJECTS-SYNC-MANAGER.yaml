@@ -1,0 +1,211 @@
+# ============================================
+# PROJECT-COMMON-PROJECTS-SYNC-MANAGER.yaml
+# Issue Label → GitHub Projects Status 동기화
+#
+# GitHub Projects Status → Issue Label은 Cloudflare Worker가 담당합니다.
+# (projects-sync-wizard로 설정)
+#
+# 트리거:
+# - Issue Label 변경 시
+# - 수동 실행 (workflow_dispatch)
+# ============================================
+
+name: 🔄 Projects Sync - Label to Status
+
+on:
+  issues:
+    types: [labeled, unlabeled]
+
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: '동기화할 Issue 번호'
+        required: true
+        type: string
+
+concurrency:
+  group: projects-sync-${{ github.event.issue.number || github.event.inputs.issue_number }}
+  cancel-in-progress: true
+
+env:
+  # 동기화할 Status Label 목록 (JSON 배열)
+  # projects-sync-wizard에서 설정한 값과 동일해야 합니다
+  STATUS_LABELS: '["작업 전", "작업 중", "확인 대기", "피드백", "작업 완료", "취소"]'
+
+  # GitHub Projects 설정
+  # 아래 값들을 실제 프로젝트에 맞게 수정하세요
+  # PROJECT_NUMBER: '1'  # Projects 번호
+  # ORG_NAME: 'YOUR-ORG' # Organization 이름
+
+jobs:
+  sync-label-to-status:
+    runs-on: ubuntu-latest
+    # 조건: Status Label이 변경된 경우에만 실행
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' &&
+       contains(fromJSON('["작업 전", "작업 중", "확인 대기", "피드백", "작업 완료", "취소"]'), github.event.label.name))
+
+    steps:
+      - name: 🔍 Get Issue Info
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "issue_number=${{ github.event.inputs.issue_number }}" >> $GITHUB_OUTPUT
+          else
+            echo "issue_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🏷️ Get Current Labels
+        id: labels
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets._GITHUB_PAT_TOKEN }}
+          script: |
+            const statusLabels = JSON.parse(process.env.STATUS_LABELS);
+            const issueNumber = parseInt('${{ steps.issue.outputs.issue_number }}');
+
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber
+            });
+
+            // Status Label 찾기
+            const currentStatusLabel = issue.labels
+              .map(l => typeof l === 'string' ? l : l.name)
+              .find(name => statusLabels.includes(name));
+
+            if (currentStatusLabel) {
+              core.setOutput('status_label', currentStatusLabel);
+              console.log(`📌 Current Status Label: ${currentStatusLabel}`);
+            } else {
+              core.setOutput('status_label', '');
+              console.log('⏭️ No Status Label found');
+            }
+
+      - name: 📋 Update Projects Status
+        if: steps.labels.outputs.status_label != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets._GITHUB_PAT_TOKEN }}
+          script: |
+            const statusLabel = '${{ steps.labels.outputs.status_label }}';
+            const issueNumber = parseInt('${{ steps.issue.outputs.issue_number }}');
+
+            // 환경 변수에서 프로젝트 정보 가져오기 (설정되지 않은 경우 스킵)
+            const projectNumber = process.env.PROJECT_NUMBER;
+            const orgName = process.env.ORG_NAME;
+
+            if (!projectNumber || !orgName) {
+              console.log('⚠️ PROJECT_NUMBER 또는 ORG_NAME이 설정되지 않았습니다.');
+              console.log('   워크플로우 환경 변수를 확인하세요.');
+              return;
+            }
+
+            console.log(`📌 Syncing Issue #${issueNumber} to Status: "${statusLabel}"`);
+            console.log(`📌 Project: ${orgName}/projects/${projectNumber}`);
+
+            // GraphQL로 Project Item ID 찾기
+            const projectItemQuery = `
+              query($owner: String!, $repo: String!, $issueNumber: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $issueNumber) {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project {
+                          number
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const projectItemResult = await github.graphql(projectItemQuery, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issueNumber: issueNumber
+            });
+
+            const projectItems = projectItemResult.repository?.issue?.projectItems?.nodes || [];
+            const targetItem = projectItems.find(item =>
+              item.project.number === parseInt(projectNumber)
+            );
+
+            if (!targetItem) {
+              console.log('⏭️ Issue is not linked to the target project');
+              return;
+            }
+
+            console.log(`📌 Project Item ID: ${targetItem.id}`);
+
+            // Project 필드 정보 조회
+            const projectQuery = `
+              query($org: String!, $projectNumber: Int!) {
+                organization(login: $org) {
+                  projectV2(number: $projectNumber) {
+                    id
+                    field(name: "Status") {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const projectResult = await github.graphql(projectQuery, {
+              org: orgName,
+              projectNumber: parseInt(projectNumber)
+            });
+
+            const statusField = projectResult.organization?.projectV2?.field;
+            if (!statusField) {
+              console.log('❌ Status field not found in project');
+              return;
+            }
+
+            const targetOption = statusField.options.find(opt => opt.name === statusLabel);
+            if (!targetOption) {
+              console.log(`❌ Status option "${statusLabel}" not found in project`);
+              return;
+            }
+
+            console.log(`📌 Status Option ID: ${targetOption.id}`);
+
+            // Status 업데이트
+            const updateMutation = `
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: {
+                      singleSelectOptionId: $optionId
+                    }
+                  }
+                ) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `;
+
+            await github.graphql(updateMutation, {
+              projectId: projectResult.organization.projectV2.id,
+              itemId: targetItem.id,
+              fieldId: statusField.id,
+              optionId: targetOption.id
+            });
+
+            console.log(`✅ Status updated to "${statusLabel}"`);

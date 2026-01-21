@@ -1,11 +1,43 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-19T12:47:28Z",
-    "currentVersion": "2.6.9",
+    "lastUpdated": "2026-01-21T16:35:06Z",
+    "currentVersion": "2.6.22",
     "projectType": "basic",
-    "totalReleases": 53
+    "totalReleases": 54
   },
   "releases": [
+    {
+      "version": "2.6.22",
+      "project_type": "basic",
+      "date": "2026-01-21",
+      "pr_number": 165,
+      "raw_summary": "## Summary by CodeRabbit\n\n* **신규 기능**\n  * GitHub Projects 상태를 이슈 레이블로 자동 동기화하는 마법사 추가\n  * Flutter 배포 마법사에 사용자 정의 Secrets 관리 기능 추가\n  * GitHub Secrets 변환 도구 UI 추가\n  * Flutter CI 워크플로우로 자동 코드 분석 및 플랫폼별 빌드 검증 지원\n\n* **문서**\n  * GitHub Projects Sync 완벽 설치 및 운영 가이드 추가\n\n* **유지보수**\n  * Xcode 버전 업데이트 (26.0)\n  * 시스템 버전 정보 업데이트 (v2.6.22)",
+      "parsed_changes": {
+        "신규_기능": {
+          "title": "신규 기능",
+          "items": [
+            "GitHub Projects 상태를 이슈 레이블로 자동 동기화하는 마법사 추가",
+            "Flutter 배포 마법사에 사용자 정의 Secrets 관리 기능 추가",
+            "GitHub Secrets 변환 도구 UI 추가",
+            "Flutter CI 워크플로우로 자동 코드 분석 및 플랫폼별 빌드 검증 지원"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "GitHub Projects Sync 완벽 설치 및 운영 가이드 추가"
+          ]
+        },
+        "유지보수": {
+          "title": "유지보수",
+          "items": [
+            "Xcode 버전 업데이트 (26.0)",
+            "시스템 버전 정보 업데이트 (v2.6.22)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.6.9",
       "project_type": "basic",

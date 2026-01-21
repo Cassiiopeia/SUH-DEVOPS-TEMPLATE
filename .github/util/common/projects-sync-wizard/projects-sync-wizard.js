@@ -1,18 +1,14 @@
 /**
- * GitHub Projects Sync Wizard v2.0.0
+ * GitHub Projects Sync Wizard v3.0.0
  *
- * 4단계 간소화 버전:
- * 1. 프로젝트 정보 입력 (URL, Worker 이름, Labels, Webhook Secret) → ZIP 다운로드
- * 2. Worker 배포 (스크립트 실행)
- * 3. GitHub Webhook 설정
- * 4. 완료
+ * 단일 페이지 버전:
+ * - 모든 설정을 한 페이지에서 완료
+ * - 스크립트 실행 결과에 모든 안내가 포함됨
  */
 
 // ============================================
 // 상태 관리
 // ============================================
-
-const TOTAL_STEPS = 4;
 
 // issue-label.yml 기본 Status Labels
 const DEFAULT_STATUS_LABELS = [
@@ -25,14 +21,16 @@ const DEFAULT_STATUS_LABELS = [
 ];
 
 let state = {
-    currentStep: 1,
     projectUrl: '',
-    orgName: '',
+    projectType: 'org',    // Organization 전용 (User Projects 미지원)
+    ownerName: '',         // Organization 이름
+    orgName: '',           // 하위 호환성 유지
     projectNumber: '',
     workerName: 'github-projects-sync-worker',
     statusLabels: [...DEFAULT_STATUS_LABELS],
     webhookSecret: '',
-    workerUrl: ''
+    skipProjectsGuide: false,  // Projects 생성 가이드 건너뛰기
+    githubToken: ''        // GitHub PAT (repo, project 권한)
 };
 
 // ============================================
@@ -54,22 +52,35 @@ document.addEventListener('DOMContentLoaded', () => {
         generateWebhookSecret();
     }
 
-    // Step Indicator 생성
-    renderStepIndicators();
-
     // Labels 렌더링
     renderLabels();
 
-    // UI 초기화
-    showStep(state.currentStep);
-    updateNavigationButtons();
-
-    // Worker URL 입력 이벤트
-    document.getElementById('workerUrl').addEventListener('input', (e) => {
-        state.workerUrl = e.target.value;
-        updateWebhookPayloadUrl();
+    // Worker 이름 입력 이벤트 - 자동 소문자 변환 + 명령어 업데이트
+    document.getElementById('workerName').addEventListener('input', (e) => {
+        // Cloudflare 이름 규칙: 소문자, 숫자, 하이픈만 허용
+        const sanitized = sanitizeWorkerName(e.target.value);
+        e.target.value = sanitized;
+        state.workerName = sanitized || 'github-projects-sync-worker';
         saveState();
+        scheduleCommandUpdate();
     });
+
+    // Webhook Secret 변경 이벤트 - 명령어 자동 업데이트
+    document.getElementById('webhookSecret').addEventListener('input', (e) => {
+        state.webhookSecret = e.target.value;
+        saveState();
+        scheduleCommandUpdate();
+    });
+
+    // GitHub Token 입력 이벤트 - 명령어 자동 업데이트
+    document.getElementById('githubToken').addEventListener('input', (e) => {
+        state.githubToken = e.target.value;
+        saveState();
+        scheduleCommandUpdate();
+    });
+
+    // 초기 명령어 표시
+    updateInstallCommands();
 });
 
 // ============================================
@@ -79,11 +90,95 @@ document.addEventListener('DOMContentLoaded', () => {
 function displayVersion() {
     try {
         const versionJson = JSON.parse(document.getElementById('versionJson').textContent);
-        document.getElementById('versionDisplay').textContent = `v${versionJson.version}`;
+        const versionBadge = document.getElementById('versionBadge');
+        if (versionBadge) {
+            versionBadge.textContent = `v${versionJson.version}`;
+        }
     } catch (e) {
         console.error('버전 정보 로드 실패:', e);
     }
 }
+
+// ============================================
+// 버전 데이터 조회
+// ============================================
+
+function getVersionData() {
+    try {
+        const versionEl = document.getElementById('versionJson');
+        if (versionEl) {
+            return JSON.parse(versionEl.textContent);
+        }
+    } catch (e) {
+        console.error('버전 정보 파싱 실패:', e);
+    }
+    return null;
+}
+
+// ============================================
+// Changelog 모달
+// ============================================
+
+function openChangelogModal() {
+    const modal = document.getElementById('changelogModal');
+    const content = document.getElementById('changelogContent');
+    const lastUpdated = document.getElementById('changelogLastUpdated');
+
+    const data = getVersionData();
+    if (!data) {
+        content.innerHTML = '<div class="text-center text-red-500 py-4">버전 정보를 불러올 수 없습니다.</div>';
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        return;
+    }
+
+    // Build changelog HTML
+    let html = '';
+    data.changelog.forEach((release, index) => {
+        const isLatest = index === 0;
+
+        html += `
+            <div class="pb-4 ${index < data.changelog.length - 1 ? 'border-b border-gray-200 dark:border-slate-700 mb-4' : ''}">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-gray-900 dark:text-white font-semibold">v${release.version}</span>
+                    ${isLatest ? '<span class="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full">Latest</span>' : ''}
+                    <span class="text-gray-400 dark:text-slate-500 text-xs">${release.date}</span>
+                </div>
+                <ul class="space-y-1.5 pl-2">
+                    ${release.changes.map(change => `
+                        <li class="text-sm text-gray-600 dark:text-slate-400 flex items-start gap-2">
+                            <span class="text-gray-400 dark:text-slate-600 mt-1">•</span>
+                            <span>${change}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+    });
+
+    content.innerHTML = html;
+    lastUpdated.textContent = `Last updated: ${data.lastUpdated}`;
+
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeChangelogModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const modal = document.getElementById('changelogModal');
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+// ESC 키로 changelog 모달 닫기
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const changelogModal = document.getElementById('changelogModal');
+        if (changelogModal && !changelogModal.classList.contains('hidden')) {
+            closeChangelogModal();
+        }
+    }
+});
 
 // ============================================
 // 다크 모드
@@ -118,11 +213,31 @@ function loadState() {
 
             // UI에 상태 반영
             document.getElementById('projectUrl').value = state.projectUrl || '';
+            document.getElementById('ownerName').value = state.ownerName || state.orgName || '';
             document.getElementById('orgName').value = state.orgName || '';
             document.getElementById('projectNumber').value = state.projectNumber || '';
             document.getElementById('workerName').value = state.workerName || 'github-projects-sync-worker';
             document.getElementById('webhookSecret').value = state.webhookSecret || '';
-            document.getElementById('workerUrl').value = state.workerUrl || '';
+
+            // Projects 가이드 건너뛰기 체크박스
+            const skipGuideCheckbox = document.getElementById('skipProjectsGuide');
+            if (skipGuideCheckbox) {
+                skipGuideCheckbox.checked = state.skipProjectsGuide || false;
+                toggleProjectsGuide();
+            }
+
+            // GitHub Token (보안상 저장하지 않음 - 페이지 새로고침 시 재입력 필요)
+            // state.githubToken은 세션 중에만 유지
+            const githubTokenInput = document.getElementById('githubToken');
+            if (githubTokenInput && state.githubToken) {
+                githubTokenInput.value = state.githubToken;
+            }
+
+            // 타입에 따른 UI 업데이트
+            updateUIForProjectType();
+
+            // 명령어가 이미 생성되어 있으면 표시
+            updateInstallCommands();
         }
     } catch (e) {
         console.error('상태 복원 실패:', e);
@@ -133,142 +248,94 @@ function resetWizard() {
     if (confirm('모든 설정을 초기화하시겠습니까?')) {
         localStorage.removeItem('projectsSyncWizardState');
         state = {
-            currentStep: 1,
             projectUrl: '',
+            projectType: 'org',
+            ownerName: '',
             orgName: '',
             projectNumber: '',
             workerName: 'github-projects-sync-worker',
             statusLabels: [...DEFAULT_STATUS_LABELS],
             webhookSecret: '',
-            workerUrl: ''
+            skipProjectsGuide: false,
+            githubToken: ''
         };
         generateWebhookSecret();
         renderLabels();
-        showStep(1);
-        updateNavigationButtons();
 
         // 입력 필드 초기화
         document.getElementById('projectUrl').value = '';
+        document.getElementById('ownerName').value = '';
         document.getElementById('orgName').value = '';
         document.getElementById('projectNumber').value = '';
         document.getElementById('workerName').value = 'github-projects-sync-worker';
-        document.getElementById('workerUrl').value = '';
+
+        // User Projects 경고 숨기기
+        const userWarning = document.getElementById('userProjectsWarning');
+        if (userWarning) {
+            userWarning.classList.add('hidden');
+        }
+
+        // Projects 가이드 체크박스 초기화
+        const skipGuideCheckbox = document.getElementById('skipProjectsGuide');
+        if (skipGuideCheckbox) {
+            skipGuideCheckbox.checked = false;
+        }
+
+        // GitHub Token 초기화
+        const githubTokenInput = document.getElementById('githubToken');
+        if (githubTokenInput) {
+            githubTokenInput.value = '';
+        }
+
+        // UI 초기화
+        updateUIForProjectType();
+        toggleProjectsGuide();
+        updateInstallCommands();
 
         showToast('설정이 초기화되었습니다.');
     }
 }
 
 // ============================================
-// Step Indicator
+// Worker 이름 유틸리티
 // ============================================
 
-function renderStepIndicators() {
-    const container = document.getElementById('stepIndicators');
-    const steps = [
-        { num: 1, title: '정보 입력' },
-        { num: 2, title: 'Worker 배포' },
-        { num: 3, title: 'Webhook 설정' },
-        { num: 4, title: '완료' }
-    ];
-
-    container.innerHTML = steps.map((step, index) => `
-        <div class="flex items-center">
-            <div class="step-indicator flex items-center cursor-pointer" onclick="goToStep(${step.num})">
-                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors
-                    ${state.currentStep === step.num
-                        ? 'bg-blue-500 text-white'
-                        : state.currentStep > step.num
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                    }">
-                    ${state.currentStep > step.num
-                        ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
-                        : step.num
-                    }
-                </div>
-                <span class="ml-2 text-sm font-medium ${state.currentStep === step.num ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}">${step.title}</span>
-            </div>
-            ${index < steps.length - 1 ? '<div class="flex-1 h-0.5 mx-4 bg-gray-200 dark:bg-gray-700"></div>' : ''}
-        </div>
-    `).join('');
+// Worker 이름 Cloudflare 규칙 준수 (소문자, 숫자, 하이픈만)
+function sanitizeWorkerName(name) {
+    if (!name) return '';
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')  // 허용되지 않는 문자 → 하이픈
+        .replace(/-+/g, '-')           // 연속 하이픈 제거
+        .replace(/^-|-$/g, '');        // 시작/끝 하이픈 제거
 }
 
-// ============================================
-// Step 네비게이션
-// ============================================
-
-function showStep(stepNum) {
-    // 모든 step 숨기기
-    document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
-
-    // 현재 step 표시
-    const currentSection = document.getElementById(`step${stepNum}`);
-    if (currentSection) {
-        currentSection.classList.remove('hidden');
+// 기본 Worker 이름 생성 (Organization 이름 기반)
+function generateDefaultWorkerName() {
+    // Organization 이름 사용
+    if (!state.ownerName) {
+        return 'github-projects-sync-worker';
     }
 
-    state.currentStep = stepNum;
-    saveState();
-    renderStepIndicators();
-
-    // Step별 추가 처리
-    if (stepNum === 3) {
-        updateWebhookDisplay();
-    } else if (stepNum === 4) {
-        updateSummary();
-    }
+    // github-projects-{org}-sync-worker 형식
+    const sanitized = sanitizeWorkerName(state.ownerName);
+    return `github-projects-${sanitized}-sync-worker`;
 }
 
-function goToStep(stepNum) {
-    if (stepNum >= 1 && stepNum <= TOTAL_STEPS) {
-        showStep(stepNum);
-        updateNavigationButtons();
-    }
-}
+// Worker 이름 자동 설정 (URL 파싱 후 호출)
+function autoSetWorkerName() {
+    const workerInput = document.getElementById('workerName');
+    if (!workerInput) return;
 
-function nextStep() {
-    if (state.currentStep < TOTAL_STEPS) {
-        // Step 1 유효성 검사
-        if (state.currentStep === 1) {
-            const orgName = document.getElementById('orgName').value.trim();
-            const projectNumber = document.getElementById('projectNumber').value.trim();
+    // 사용자가 직접 수정한 적 없거나 기본값인 경우에만 자동 설정
+    const currentValue = workerInput.value.trim();
+    const isDefault = currentValue === 'github-projects-sync-worker' || currentValue === '';
 
-            if (!orgName || !projectNumber) {
-                showToast('Organization Name과 Project Number를 입력하세요.', 'error');
-                return;
-            }
-
-            state.orgName = orgName;
-            state.projectNumber = projectNumber;
-            state.workerName = document.getElementById('workerName').value.trim() || 'github-projects-sync-worker';
-            saveState();
-        }
-
-        showStep(state.currentStep + 1);
-        updateNavigationButtons();
-    }
-}
-
-function prevStep() {
-    if (state.currentStep > 1) {
-        showStep(state.currentStep - 1);
-        updateNavigationButtons();
-    }
-}
-
-function updateNavigationButtons() {
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-
-    // 이전 버튼
-    prevBtn.classList.toggle('hidden', state.currentStep === 1);
-
-    // 다음 버튼
-    if (state.currentStep === TOTAL_STEPS) {
-        nextBtn.classList.add('hidden');
-    } else {
-        nextBtn.classList.remove('hidden');
-        nextBtn.textContent = '다음';
+    if (isDefault) {
+        const defaultName = generateDefaultWorkerName();
+        workerInput.value = defaultName;
+        state.workerName = defaultName;
+        saveState();
     }
 }
 
@@ -280,19 +347,118 @@ function parseProjectUrl() {
     const url = document.getElementById('projectUrl').value.trim();
     state.projectUrl = url;
 
-    // Organization Projects URL 파싱
-    // https://github.com/orgs/ORG-NAME/projects/NUMBER
-    const orgMatch = url.match(/github\.com\/orgs\/([^\/]+)\/projects\/(\d+)/);
+    // User Projects 경고 요소
+    const userWarning = document.getElementById('userProjectsWarning');
 
-    if (orgMatch) {
-        state.orgName = orgMatch[1];
-        state.projectNumber = orgMatch[2];
-        document.getElementById('orgName').value = state.orgName;
-        document.getElementById('projectNumber').value = state.projectNumber;
+    // User Projects URL 감지 → 경고 표시 및 차단
+    // https://github.com/users/USERNAME/projects/NUMBER[/views/VIEW_ID]
+    const userMatch = url.match(/github\.com\/users\/([^\/]+)\/projects\/(\d+)(?:\/views\/\d+)?/);
+
+    if (userMatch) {
+        // User Projects 감지 - 경고 표시
+        if (userWarning) {
+            userWarning.classList.remove('hidden');
+        }
+        // 파싱 결과 초기화 (User Projects 미지원)
+        state.projectType = 'org';
+        state.ownerName = '';
+        state.orgName = '';
+        state.projectNumber = '';
+        updateUIForProjectType();
+        saveState();
+        scheduleCommandUpdate();
+        return;
     }
 
+    // User Projects 경고 숨기기 (다른 URL 입력 시)
+    if (userWarning) {
+        userWarning.classList.add('hidden');
+    }
+
+    // Organization Projects URL 파싱
+    // https://github.com/orgs/ORG-NAME/projects/NUMBER[/views/VIEW_ID]
+    const orgMatch = url.match(/github\.com\/orgs\/([^\/]+)\/projects\/(\d+)(?:\/views\/\d+)?/);
+
+    if (orgMatch) {
+        state.projectType = 'org';
+        state.ownerName = orgMatch[1];
+        state.orgName = orgMatch[1]; // 하위 호환성
+        state.projectNumber = orgMatch[2];
+        updateUIForProjectType();
+        autoSetWorkerName();
+        saveState();
+        scheduleCommandUpdate();
+        return;
+    }
+
+    // 매칭 실패 - 초기화
+    state.projectType = 'org';
+    state.ownerName = '';
+    state.orgName = '';
+    state.projectNumber = '';
+    updateUIForProjectType();
     saveState();
+    scheduleCommandUpdate();
 }
+
+// 프로젝트 타입에 따른 UI 업데이트 (Organization 전용)
+function updateUIForProjectType() {
+    const ownerNameInput = document.getElementById('ownerName');
+    const projectNumberInput = document.getElementById('projectNumber');
+    const projectTypeBadge = document.getElementById('projectTypeBadge');
+    const parseResultSection = document.getElementById('parseResult');
+
+    // 파싱 결과 입력란 업데이트
+    if (ownerNameInput) {
+        ownerNameInput.value = state.ownerName || '';
+    }
+    if (projectNumberInput) {
+        projectNumberInput.value = state.projectNumber || '';
+    }
+
+    // 파싱 결과 섹션 표시/숨김
+    if (parseResultSection) {
+        if (state.ownerName && state.projectNumber) {
+            parseResultSection.classList.remove('hidden');
+        } else {
+            parseResultSection.classList.add('hidden');
+        }
+    }
+
+    // 프로젝트 타입 뱃지 업데이트 (Organization 전용)
+    if (projectTypeBadge) {
+        if (state.ownerName && state.projectNumber) {
+            projectTypeBadge.textContent = 'Organization';
+            projectTypeBadge.className = 'px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800';
+        } else {
+            projectTypeBadge.textContent = '-';
+            projectTypeBadge.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400';
+        }
+    }
+
+    // 하위 호환성을 위해 orgName 필드도 업데이트
+    const orgNameInput = document.getElementById('orgName');
+    if (orgNameInput) {
+        orgNameInput.value = state.orgName || '';
+    }
+}
+
+// Projects 가이드 토글
+function toggleProjectsGuide() {
+    const checkbox = document.getElementById('skipProjectsGuide');
+    const guideContent = document.getElementById('projectsGuideContent');
+
+    if (checkbox && guideContent) {
+        state.skipProjectsGuide = checkbox.checked;
+        if (checkbox.checked) {
+            guideContent.classList.add('hidden');
+        } else {
+            guideContent.classList.remove('hidden');
+        }
+        saveState();
+    }
+}
+
 
 // ============================================
 // Labels 관리
@@ -318,11 +484,13 @@ function addLabel() {
     state.statusLabels.push('새 Label');
     renderLabels();
     saveState();
+    scheduleCommandUpdate();
 }
 
 function updateLabel(index, value) {
     state.statusLabels[index] = value;
     saveState();
+    scheduleCommandUpdate();
 }
 
 function removeLabel(index) {
@@ -330,6 +498,7 @@ function removeLabel(index) {
         state.statusLabels.splice(index, 1);
         renderLabels();
         saveState();
+        scheduleCommandUpdate();
     } else {
         showToast('최소 1개의 Label이 필요합니다.', 'error');
     }
@@ -339,6 +508,7 @@ function resetLabels() {
     state.statusLabels = [...DEFAULT_STATUS_LABELS];
     renderLabels();
     saveState();
+    scheduleCommandUpdate();
     showToast('기본값으로 복원되었습니다.');
 }
 
@@ -352,51 +522,7 @@ function generateWebhookSecret() {
     state.webhookSecret = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
     document.getElementById('webhookSecret').value = state.webhookSecret;
     saveState();
-}
-
-// ============================================
-// Webhook 정보 업데이트
-// ============================================
-
-function updateWebhookDisplay() {
-    // Organization 이름 업데이트
-    const webhookOrgName = document.getElementById('webhookOrgName');
-    if (webhookOrgName) {
-        webhookOrgName.textContent = state.orgName || 'YOUR-ORG';
-    }
-
-    // Webhook 설정 링크 업데이트
-    const webhookSettingsLink = document.getElementById('webhookSettingsLink');
-    if (webhookSettingsLink && state.orgName) {
-        webhookSettingsLink.href = `https://github.com/organizations/${state.orgName}/settings/hooks`;
-    }
-
-    // Webhook Secret 표시
-    const webhookSecretDisplay = document.getElementById('webhookSecretDisplay');
-    if (webhookSecretDisplay) {
-        webhookSecretDisplay.textContent = state.webhookSecret || '-';
-    }
-
-    // Payload URL 표시
-    updateWebhookPayloadUrl();
-}
-
-function updateWebhookPayloadUrl() {
-    const webhookPayloadUrl = document.getElementById('webhookPayloadUrl');
-    if (webhookPayloadUrl) {
-        webhookPayloadUrl.textContent = state.workerUrl || 'Worker URL을 Step 2에서 입력하세요';
-    }
-}
-
-// ============================================
-// Summary 업데이트
-// ============================================
-
-function updateSummary() {
-    document.getElementById('summaryOrg').textContent = state.orgName || '-';
-    document.getElementById('summaryProject').textContent = state.projectNumber || '-';
-    document.getElementById('summaryWorker').textContent = state.workerName || '-';
-    document.getElementById('summaryLabels').textContent = state.statusLabels.join(', ') || '-';
+    scheduleCommandUpdate();
 }
 
 // ============================================
@@ -1111,4 +1237,98 @@ function showToast(message, type = 'success') {
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-full', 'opacity-0');
     }, 3000);
+}
+
+// ============================================
+// 설치 명령어 자동 생성 (OS별)
+// ============================================
+
+// 명령어 자동 업데이트 (debounce 적용)
+let commandUpdateTimer = null;
+
+function scheduleCommandUpdate() {
+    if (commandUpdateTimer) {
+        clearTimeout(commandUpdateTimer);
+    }
+    commandUpdateTimer = setTimeout(() => {
+        updateInstallCommands();
+    }, 300);
+}
+
+function updateInstallCommands() {
+    const commandSection = document.getElementById('installCommandSection');
+    const waitingMessage = document.getElementById('commandWaitingMessage');
+    const bashCommandCode = document.getElementById('bashCommandCode');
+    const powershellCommandCode = document.getElementById('powershellCommandCode');
+
+    if (!commandSection || !waitingMessage) return;
+
+    // 필수 필드 확인
+    const ownerName = state.ownerName || '';
+    const projectNumber = state.projectNumber || '';
+    const webhookSecret = state.webhookSecret || '';
+    const githubToken = state.githubToken || '';
+
+    if (!ownerName || !projectNumber || !webhookSecret || !githubToken) {
+        // 입력 대기 메시지 표시
+        waitingMessage.classList.remove('hidden');
+        commandSection.classList.add('hidden');
+        return;
+    }
+
+    // 명령어 생성 및 표시
+    waitingMessage.classList.add('hidden');
+    commandSection.classList.remove('hidden');
+
+    if (bashCommandCode) {
+        bashCommandCode.textContent = buildBashCommand();
+    }
+    if (powershellCommandCode) {
+        powershellCommandCode.textContent = buildPowerShellCommand();
+    }
+}
+
+function buildBashCommand() {
+    // Mac/Linux bash 스크립트 URL
+    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.sh';
+
+    // 인자 구성 (Organization 전용)
+    const args = [];
+    args.push(`--owner "${state.ownerName}"`);
+    args.push(`--project "${state.projectNumber}"`);
+    args.push(`--worker-name "${state.workerName}"`);
+    args.push(`--webhook-secret "${state.webhookSecret}"`);
+    args.push(`--github-token "${state.githubToken}"`);
+    args.push(`--labels "${state.statusLabels.join(',')}"`);
+
+    // curl 명령어 생성
+    return `curl -fsSL ${scriptUrl} | bash -s -- \\
+  ${args.join(' \\\n  ')}`;
+}
+
+function buildPowerShellCommand() {
+    // 환경변수 설정 (Organization 전용)
+    const envVars = [];
+    envVars.push(`$env:WIZARD_OWNER='${state.ownerName}'`);
+    envVars.push(`$env:WIZARD_PROJECT='${state.projectNumber}'`);
+    envVars.push(`$env:WIZARD_WORKER_NAME='${state.workerName}'`);
+    envVars.push(`$env:WIZARD_WEBHOOK_SECRET='${state.webhookSecret}'`);
+    envVars.push(`$env:WIZARD_GITHUB_TOKEN='${state.githubToken}'`);
+    envVars.push(`$env:WIZARD_LABELS='${state.statusLabels.join(',')}'`);
+
+    // PowerShell 스크립트 URL
+    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.ps1';
+
+    // PowerShell 명령어 생성
+    return `${envVars.join('; ')}; irm '${scriptUrl}' | iex`;
+}
+
+function copyCommand(type) {
+    let command = '';
+    if (type === 'bash') {
+        command = buildBashCommand();
+    } else if (type === 'powershell') {
+        command = buildPowerShellCommand();
+    }
+    copyToClipboard(command);
 }

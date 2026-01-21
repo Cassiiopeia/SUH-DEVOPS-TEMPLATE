@@ -101,92 +101,69 @@ on:
 
 ---
 
-## 마법사 사용법
+## 마법사 사용법 (4단계 간소화)
 
-### 1. 마법사 열기
+### Step 1: 마법사에서 정보 입력
 
-`.github/util/common/projects-sync-wizard/projects-sync-wizard.html` 파일을 브라우저에서 엽니다.
+`.github/util/common/projects-sync-wizard/projects-sync-wizard.html` 파일을 브라우저에서 열고:
 
-### 2. Step 1: 프로젝트 설정
+1. **GitHub Projects URL 입력:**
+   ```
+   https://github.com/orgs/YOUR-ORG/projects/1
+   ```
+   URL을 입력하면 Organization Name과 Project Number가 자동으로 추출됩니다.
 
-**GitHub Projects URL 입력:**
+2. **Worker 이름 설정** (기본값: `github-projects-sync-worker`)
+   - 배포 시 이름이 충돌하면 스크립트에서 새 이름을 입력할 수 있습니다.
 
-```
-https://github.com/orgs/YOUR-ORG/projects/1
-```
+3. **Status Labels 확인/커스텀** (issue-label.yml 기본값 제공)
+   - 작업 전, 작업 중, 확인 대기, 피드백, 작업 완료, 취소
+   - **중요:** Label 이름은 GitHub Projects의 Status 컬럼 이름과 **정확히 일치**해야 합니다.
 
-URL을 입력하면 Organization Name과 Project Number가 자동으로 추출됩니다.
+4. **Webhook Secret** (자동 생성)
 
-### 3. Step 2: Status Labels 설정
+5. **"Worker 파일 ZIP 다운로드"** 클릭
 
-동기화할 Label 목록을 설정합니다. 기본값:
-
-- 작업 전
-- 작업 중
-- 확인 대기
-- 피드백
-- 작업 완료
-- 취소
-
-> **중요:** Label 이름은 GitHub Projects의 Status 컬럼 이름과 **정확히 일치**해야 합니다.
-
-### 4. Step 3: Cloudflare 계정 설정
-
-1. [Cloudflare](https://dash.cloudflare.com/sign-up)에서 무료 계정 생성
-2. **이메일 인증 필수** (Workers 사용을 위해)
-3. Workers 서브도메인 선택 (예: `my-org-sync`)
-
-### 5. Step 4: Worker 파일 생성
-
-"전체 ZIP으로 다운로드" 버튼을 클릭하여 설정이 적용된 Worker 파일을 다운로드합니다.
-
-**포함 파일:**
-- `wrangler.toml` - Cloudflare Worker 설정
-- `package.json` - npm 패키지 정의
-- `tsconfig.json` - TypeScript 설정
-- `src/index.ts` - Worker 코드
-- `README.md` - 배포 안내
-
-### 6. Step 5: Worker 배포
+### Step 2: 스크립트 한 번 실행
 
 ```bash
-# 1. 압축 해제 후 폴더로 이동
+# ZIP 압축 해제 후 폴더로 이동
 cd github-projects-sync-worker
 
-# 2. 의존성 설치 (SSL 오류 대응)
-npm config set strict-ssl false
-npm install
-npm config set strict-ssl true
+# Mac/Linux
+./projects-sync-worker-setup.sh
 
-# 3. Cloudflare 로그인 (SSL 오류 시)
-export NODE_TLS_REJECT_UNAUTHORIZED=0  # Mac/Linux
-# $env:NODE_TLS_REJECT_UNAUTHORIZED=0  # Windows PowerShell
-npx wrangler login
-
-# 4. Worker 배포
-npx wrangler deploy
-
-# 5. Secrets 설정
-npx wrangler secret put GITHUB_TOKEN
-npx wrangler secret put WEBHOOK_SECRET
+# Windows PowerShell
+.\projects-sync-worker-setup.ps1
 ```
 
-배포 완료 후 출력되는 Worker URL을 메모합니다.
+스크립트가 자동으로 처리하는 작업:
+1. npm 의존성 설치 (SSL 오류 자동 대응)
+2. Cloudflare 로그인 (브라우저 자동 오픈)
+3. Worker 배포 (이름 충돌 시 재입력 가능)
+4. GITHUB_TOKEN 입력 받기
+5. WEBHOOK_SECRET 자동 설정
+6. Worker URL 출력
 
-### 7. Step 6: GitHub Webhook 설정
+### Step 3: GitHub Webhook 수동 설정
 
 1. Organization Settings → Webhooks 이동
+   ```
+   https://github.com/organizations/YOUR-ORG/settings/hooks
+   ```
 2. "Add webhook" 클릭
 3. 설정 입력:
-   - **Payload URL:** Worker URL
+   - **Payload URL:** 스크립트에서 출력된 Worker URL
    - **Content type:** `application/json`
-   - **Secret:** 마법사에서 생성된 값
+   - **Secret:** config.json의 webhookSecret 값
    - **Events:** "Let me select individual events" → "Project v2 items" 체크
 4. "Add webhook" 클릭
 
-### 8. Step 7: 완료
+### Step 4: 테스트
 
-Secrets 정보를 다운로드하거나 복사하여 보관합니다.
+1. GitHub Projects Board에서 Issue 카드를 다른 Status 컬럼으로 이동
+2. Issue 페이지에서 Label이 자동으로 변경되는지 확인
+3. 문제 발생 시 Worker 로그 확인: `npx wrangler tail`
 
 ---
 

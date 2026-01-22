@@ -478,6 +478,46 @@ metadata:
    - version.json → HTML 버전 정보 동기화
    - TEMPLATE-UTIL-VERSION-SYNC 워크플로우가 자동 실행
 
+### Breaking Changes 관리
+
+호환성 문제가 발생하는 변경사항은 반드시 `.github/config/breaking-changes.json`에 등록합니다.
+
+**등록이 필요한 경우**:
+- 이슈 라벨 이름 변경
+- 이슈/PR 템플릿 구조 변경
+- 워크플로우 파일명 변경
+- version.yml 구조 변경
+- 필수 GitHub Secrets 추가/변경
+- 스크립트 인터페이스 변경
+
+**등록 형식**:
+```json
+{
+  "버전": {
+    "severity": "critical 또는 warning",
+    "title": "변경사항 제목 (한 줄)",
+    "message": "상세 설명. 영향 범위와 조치 방법 포함."
+  }
+}
+```
+
+**severity 기준**:
+| 레벨 | 기준 | 동작 |
+|------|------|------|
+| `critical` | 수동 조치 필수, 기능 오작동 가능 | Y/N 확인 필수 |
+| `warning` | 알림만, 자동 처리 가능 | 알림 후 진행 |
+
+**예시**:
+```json
+{
+  "2.6.23": {
+    "severity": "critical",
+    "title": "Issue Labels 전면 변경",
+    "message": "이슈 라벨명 변경. 기존 프로젝트는 issue-labels.yml 수동 동기화 필요."
+  }
+}
+```
+
 ---
 
 ## 이슈/PR 템플릿
@@ -491,10 +531,9 @@ metadata:
 | 디자인 요청 | `design_request.md` | UI/UX 디자인 |
 | QA 요청 | `qa_request.md` | 테스트 요청 |
 
-### 이슈 라벨 (`issue-label.yml`)
+### 이슈 라벨 (`.github/config/issue-labels.yml`)
 ```yaml
-긴급, 문서, 작업 전, 작업 중, 코드리뷰 대기중, PR 완료,
-검토 완료, Merge 완료, Done, 보류
+긴급, 문서, 작업전, 작업중, 담당자확인, 피드백, 작업완료, 보류, 취소
 ```
 
 ### PR 템플릿

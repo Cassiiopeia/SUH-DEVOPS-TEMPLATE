@@ -1,11 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-21T16:35:06Z",
-    "currentVersion": "2.6.22",
+    "lastUpdated": "2026-01-22T02:31:24Z",
+    "currentVersion": "2.7.1",
     "projectType": "basic",
-    "totalReleases": 54
+    "totalReleases": 55
   },
   "releases": [
+    {
+      "version": "2.7.1",
+      "project_type": "basic",
+      "date": "2026-01-22",
+      "pr_number": 169,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * 이슈 라벨 체계가 개편되었으며, 새로운 라벨(담당자확인, 작업완료, 보류)이 추가되었습니다.\n  * 주요 변경사항을 추적하는 Breaking Changes 관리 시스템이 도입되었습니다.\n\n* **Documentation**\n  * 이슈 자동화 및 GitHub Projects 동기화 설명서가 업데이트되었습니다.\n\n* **Chores**\n  * 버전이 2.7.1로 업데이트되었습니다.",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "이슈 라벨 체계가 개편되었으며, 새로운 라벨(담당자확인, 작업완료, 보류)이 추가되었습니다.",
+            "주요 변경사항을 추적하는 Breaking Changes 관리 시스템이 도입되었습니다."
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "이슈 자동화 및 GitHub Projects 동기화 설명서가 업데이트되었습니다."
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전이 2.7.1로 업데이트되었습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.6.22",
       "project_type": "basic",

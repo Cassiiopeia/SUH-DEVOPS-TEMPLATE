@@ -2,58 +2,20 @@
 # Spring Boot + Synology PR/Issue Preview 시스템
 # ===================================================================
 #
-# PR 또는 Issue 코멘트 명령어를 통해 Preview 환경을 자동으로 관리합니다.
-# Traefik 리버스 프록시를 통해 동적 라우팅됩니다.
-#
-# 📌 Issue에서 빌드 시:
-#   - Issue Helper 댓글에서 브랜치명을 자동으로 추출합니다.
-#   - ISSUE_HELPER_MARKER 환경변수로 마커를 설정할 수 있습니다.
+# 🔑 필수 GitHub Secrets
+# ===================================================================
+# APPLICATION_PROD_YML (선택): application-prod.yml 내용
+# DOCKERHUB_USERNAME: DockerHub 사용자명
+# DOCKERHUB_TOKEN: DockerHub 액세스 토큰
+# SERVER_HOST: 배포 서버 주소
+# SERVER_USER: SSH 사용자명
+# SERVER_PASSWORD: SSH 비밀번호
+# ===================================================================
 #
 # 🚀 사용법:
-#   @suh-lab server build    - PR/Issue 빌드 및 배포 (기존 컨테이너 자동 교체)
+#   @suh-lab server build    - PR/Issue 빌드 및 배포
 #   @suh-lab server destroy  - Preview 환경 삭제
 #   @suh-lab server status   - 현재 상태 확인
-#
-# ⚙️ 프로젝트별 필수 수정 사항:
-#   아래 env 섹션의 값들을 프로젝트에 맞게 수정하세요.
-#
-# 🔑 GitHub Secrets:
-#
-#   [필수] 모든 프로젝트 공통:
-#   - APPLICATION_PROD_YML: Spring application-prod.yml 전체 내용
-#   - DOCKERHUB_USERNAME: Docker Hub 사용자명
-#   - DOCKERHUB_TOKEN: Docker Hub 액세스 토큰
-#   - SERVER_HOST: 시놀로지 서버 호스트 (예: suh-project.synology.me)
-#   - SERVER_USER: SSH 사용자명
-#   - SERVER_PASSWORD: SSH 비밀번호
-#
-#   [선택] 프로젝트별 추가 (필요 없으면 해당 step 삭제):
-#   - VERTEX_SA_KEY: Vertex AI 서비스 계정 키
-#   - FIREBASE_KEY_JSON: Firebase Admin SDK 키
-#   - FIREBASE_MESSAGING_SW_JS: Firebase Messaging Service Worker
-#   - 기타 프로젝트별 Secret...
-#
-# 📋 사전 요구사항:
-#   - Traefik 컨테이너 실행 중 (traefik-network)
-#   - 와일드카드 DNS 설정: *.pr.suhsaechan.kr → 서버
-#   - 서버에 프로젝트 디렉토리 존재
-#
-#   ※ Health Check 방식:
-#     - HEALTH_CHECK_PATH로 HTTP 엔드포인트 확인 (기본값: /actuator/health)
-#     - 폴백: HEALTH_CHECK_LOG_PATTERN으로 로그 패턴 매칭
-#
-# 🌐 Traefik 대시보드:
-#   https://traefik.suhsaechan.kr/dashboard/#/
-#
-#   대시보드에서 확인 가능한 정보:
-#   - Entrypoints: 트래픽 진입점 (web:80, traefik:8080)
-#   - HTTP Routers: PR Preview 라우팅 규칙 목록
-#   - HTTP Services: 연결된 컨테이너 서비스 목록
-#   - Middlewares: 적용된 미들웨어 (인증, 리다이렉트 등)
-#   - Providers: Docker 프로바이더 상태
-#
-#   배포 후 대시보드에서 새로운 Router/Service가 추가되었는지 확인할 수 있습니다.
-#   예: Router "suh-project-utility-pr-123" → Service "suh-project-utility-pr-123"
 #
 # 📊 리소스 네이밍 규칙:
 #   - 컨테이너: {PROJECT_NAME}-pr-{PR번호}

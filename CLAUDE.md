@@ -127,6 +127,7 @@ snake_case.sh / snake_case.py
 | `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @suh-lab 멘션 | QA 이슈 자동 생성 |
 | `PROJECT-COMMON-SYNC-ISSUE-LABELS` | 라벨 파일 변경 | GitHub 라벨 동기화 |
 | `PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC` | version.json 변경 | Util HTML 버전 동기화 |
+| `PROJECT-COMMON-PROJECTS-SYNC-MANAGER` | 이슈 라벨 변경 | Issue Label → Projects Status 동기화 |
 
 ### 타입별 워크플로우
 
@@ -395,6 +396,7 @@ metadata:
    - `workflow_dispatch` 수동 트리거 포함
    - `concurrency` 설정으로 중복 실행 방지
    - `[skip ci]` 커밋 메시지로 무한 루프 방지
+   - **주석 표준 준수**: [WORKFLOW-COMMENT-GUIDELINES.md](docs/WORKFLOW-COMMENT-GUIDELINES.md) 참조
 
 4. **공통 워크플로우 동기화 규칙**
 
@@ -660,6 +662,8 @@ SYNOLOGY_PASSWORD
 | FLUTTER-TEST-BUILD-TRIGGER.md | docs/ | 테스트 빌드 트리거 |
 | SYNOLOGY-DEPLOYMENT-GUIDE.md | docs/ | Synology NAS 배포 가이드 |
 | TROUBLESHOOTING.md | docs/ | 문제 해결 가이드 |
+| PROJECTS-SYNC.md | docs/ | GitHub Projects 동기화 가이드 |
+| WORKFLOW-COMMENT-GUIDELINES.md | docs/ | 워크플로우 주석 표준 가이드라인 |
 
 ---
 

@@ -1,10 +1,12 @@
 # ===================================================================
-# 범용 프로젝트 버전 자동 관리 워크플로우 v2.1
+# PROJECT-COMMON-VERSION-CONTROL.yaml
+# 버전 자동 관리 워크플로우 v2.1
 # ===================================================================
 #
 # 이 워크플로우는 다양한 프로젝트 타입에서 main 브랜치에 푸시될 때마다
 # patch 버전을 자동으로 증가시키고 모든 관련 파일을 동기화합니다.
 #
+# ===================================================================
 # 주요 개선사항:
 # - 버전 동기화 자동화 (version.yml ↔ 프로젝트 파일)
 # - 에러 처리 강화
@@ -14,13 +16,12 @@
 #
 # 지원 프로젝트 타입:
 # - spring: build.gradle
-# - flutter: pubspec.yaml  
+# - flutter: pubspec.yaml
 # - react/node: package.json
 # - react-native: Info.plist + build.gradle
 # - react-native-expo: app.json
 # - python: pyproject.toml
 # - basic: version.yml만 관리
-#
 # ===================================================================
 
 name: PROJECT-VERSION-CONTROL

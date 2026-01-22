@@ -1,3 +1,21 @@
+# ===================================================================
+# Flutter Android Synology NAS 배포 워크플로우
+# ===================================================================
+#
+# deploy 브랜치 푸시 시 Android APK를 빌드하고
+# Synology NAS SMB 공유에 배포합니다.
+#
+# ===================================================================
+# 🔑 필수 GitHub Secrets
+# ===================================================================
+# ENV_FILE: .env 파일 내용
+# DEBUG_KEYSTORE: 서명용 keystore (base64)
+# GOOGLE_SERVICES_JSON: Firebase google-services.json
+# SERVER_HOST: Synology NAS 호스트
+# SERVER_USER: SMB 사용자명
+# SERVER_PASSWORD: SMB 비밀번호
+# ===================================================================
+
 name: PROJECT-Android-Synology-CICD
 
 on:

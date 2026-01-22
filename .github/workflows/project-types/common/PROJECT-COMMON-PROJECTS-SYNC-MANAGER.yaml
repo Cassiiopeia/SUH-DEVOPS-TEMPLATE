@@ -1,14 +1,22 @@
-# ============================================
+# ===================================================================
 # PROJECT-COMMON-PROJECTS-SYNC-MANAGER.yaml
 # Issue Label → GitHub Projects Status 동기화
+# ===================================================================
 #
 # GitHub Projects Status → Issue Label은 Cloudflare Worker가 담당합니다.
 # (projects-sync-wizard로 설정)
 #
+# ===================================================================
+# 🔑 필수 GitHub Secrets
+# ===================================================================
+# _GITHUB_PAT_TOKEN: Projects API용 PAT (권한: repo, project)
+# ===================================================================
+#
 # 🚀 빠른 시작:
-# 1. 아래 env 섹션의 PROJECT_URL 주석 해제
-# 2. GitHub Projects URL 입력
-# 3. 끝!
+# 1. _GITHUB_PAT_TOKEN Secret 설정
+# 2. 아래 env 섹션의 PROJECT_URL 주석 해제
+# 3. GitHub Projects URL 입력
+# 4. 끝!
 #
 # 지원 URL 형식:
 # - Organization: https://github.com/orgs/{org}/projects/{number}
@@ -23,7 +31,7 @@
 # 트리거:
 # - Issue Label 변경 시
 # - 수동 실행 (workflow_dispatch)
-# ============================================
+# ===================================================================
 
 name: 🔄 Projects Sync - Label to Status
 

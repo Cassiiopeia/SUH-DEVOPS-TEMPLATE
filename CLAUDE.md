@@ -396,6 +396,7 @@ metadata:
    - `workflow_dispatch` 수동 트리거 포함
    - `concurrency` 설정으로 중복 실행 방지
    - `[skip ci]` 커밋 메시지로 무한 루프 방지
+   - **주석 표준 준수**: [WORKFLOW-COMMENT-GUIDELINES.md](docs/WORKFLOW-COMMENT-GUIDELINES.md) 참조
 
 4. **공통 워크플로우 동기화 규칙**
 
@@ -662,6 +663,7 @@ SYNOLOGY_PASSWORD
 | SYNOLOGY-DEPLOYMENT-GUIDE.md | docs/ | Synology NAS 배포 가이드 |
 | TROUBLESHOOTING.md | docs/ | 문제 해결 가이드 |
 | PROJECTS-SYNC.md | docs/ | GitHub Projects 동기화 가이드 |
+| WORKFLOW-COMMENT-GUIDELINES.md | docs/ | 워크플로우 주석 표준 가이드라인 |
 
 ---
 

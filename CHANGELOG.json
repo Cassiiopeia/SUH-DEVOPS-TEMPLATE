@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-22T02:31:24Z",
-    "currentVersion": "2.7.1",
+    "lastUpdated": "2026-01-22T07:47:04Z",
+    "currentVersion": "2.7.3",
     "projectType": "basic",
-    "totalReleases": 55
+    "totalReleases": 56
   },
   "releases": [
+    {
+      "version": "2.7.3",
+      "project_type": "basic",
+      "date": "2026-01-22",
+      "pr_number": 171,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * GitHub Projects 동기화 시스템이 동적 URL 기반 설정을 지원하여 더 유연한 프로젝트 관리 가능\n  * 여러 워크플로우에 런타임 구성 옵션 추가로 빌드 및 배포 자동화 커스터마이징 향상\n\n* **개선 사항**\n  * 워크플로우 에러 핸들링 및 검증 강화로 문제 진단 용이\n  * 다양한 프로젝트 유형의 CI/CD 파이프라인 안정성 개선\n\n* **문서**\n  * GitHub Projects 동기화 가이드 및 워크플로우 주석 표준 문서 추가",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "GitHub Projects 동기화 시스템이 동적 URL 기반 설정을 지원하여 더 유연한 프로젝트 관리 가능",
+            "여러 워크플로우에 런타임 구성 옵션 추가로 빌드 및 배포 자동화 커스터마이징 향상"
+          ]
+        },
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "워크플로우 에러 핸들링 및 검증 강화로 문제 진단 용이",
+            "다양한 프로젝트 유형의 CI/CD 파이프라인 안정성 개선"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "GitHub Projects 동기화 가이드 및 워크플로우 주석 표준 문서 추가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.1",
       "project_type": "basic",

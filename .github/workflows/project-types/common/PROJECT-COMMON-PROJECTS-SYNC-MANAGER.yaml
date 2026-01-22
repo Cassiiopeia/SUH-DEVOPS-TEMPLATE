@@ -5,6 +5,21 @@
 # GitHub Projects Status → Issue Label은 Cloudflare Worker가 담당합니다.
 # (projects-sync-wizard로 설정)
 #
+# 🚀 빠른 시작:
+# 1. 아래 env 섹션의 PROJECT_URL 주석 해제
+# 2. GitHub Projects URL 입력
+# 3. 끝!
+#
+# 지원 URL 형식:
+# - Organization: https://github.com/orgs/{org}/projects/{number}
+# - User: https://github.com/users/{user}/projects/{number}
+# - /views/{id} 경로가 포함되어도 됩니다
+#
+# ⚠️ Organization 프로젝트 사용 시 주의사항:
+# - 이 워크플로우를 사용하는 모든 레포에 동일한 Status Label이 필요합니다
+# - 라벨은 .github/config/issue-labels.yml 파일로 관리됩니다
+# - 자세한 내용: docs/PROJECTS-SYNC.md
+#
 # 트리거:
 # - Issue Label 변경 시
 # - 수동 실행 (workflow_dispatch)
@@ -32,10 +47,27 @@ env:
   # projects-sync-wizard에서 설정한 값과 동일해야 합니다
   STATUS_LABELS: '["작업전", "작업중", "담당자확인", "피드백", "작업완료", "보류", "취소"]'
 
-  # GitHub Projects 설정
-  # 아래 값들을 실제 프로젝트에 맞게 수정하세요
-  # PROJECT_NUMBER: '1'  # Projects 번호
-  # ORG_NAME: 'YOUR-ORG' # Organization 이름
+  # ============================================
+  # GitHub Projects 연동 설정
+  #
+  # 사용하려면 아래 주석을 해제하고 URL을 입력하세요.
+  #
+  # 지원 URL 형식:
+  # - Organization: https://github.com/orgs/{org}/projects/{number}
+  # - User: https://github.com/users/{user}/projects/{number}
+  # - /views/{id} 경로가 포함되어도 됩니다
+  #
+  # 예시:
+  # - https://github.com/orgs/MapSee-Lab/projects/1
+  # - https://github.com/orgs/TEAM-ROMROM/projects/6/views/2
+  # - https://github.com/users/Cassiiopeia/projects/2
+  #
+  # ⚠️ Organization 프로젝트 사용 시:
+  # - 이 워크플로우를 사용하는 모든 레포에 동일한 라벨이 필요합니다
+  # - .github/config/issue-labels.yml 파일로 라벨을 관리하세요
+  # - 자세한 내용: docs/PROJECTS-SYNC.md
+  # ============================================
+  # PROJECT_URL: 'https://github.com/orgs/YOUR-ORG/projects/1'
 
 jobs:
   sync-label-to-status:
@@ -78,10 +110,10 @@ jobs:
 
             if (currentStatusLabel) {
               core.setOutput('status_label', currentStatusLabel);
-              console.log(`📌 Current Status Label: ${currentStatusLabel}`);
+              console.log(`📌 현재 Status Label: ${currentStatusLabel}`);
             } else {
               core.setOutput('status_label', '');
-              console.log('⏭️ No Status Label found');
+              console.log('⏭️ Status Label이 없습니다.');
             }
 
       - name: 📋 Update Projects Status
@@ -93,20 +125,78 @@ jobs:
             const statusLabel = '${{ steps.labels.outputs.status_label }}';
             const issueNumber = parseInt('${{ steps.issue.outputs.issue_number }}');
 
-            // 환경 변수에서 프로젝트 정보 가져오기 (설정되지 않은 경우 스킵)
-            const projectNumber = process.env.PROJECT_NUMBER;
-            const orgName = process.env.ORG_NAME;
+            // ============================================
+            // URL 파싱 함수
+            // ============================================
+            function parseProjectUrl(url) {
+              if (!url) return null;
 
-            if (!projectNumber || !orgName) {
-              console.log('⚠️ PROJECT_NUMBER 또는 ORG_NAME이 설정되지 않았습니다.');
-              console.log('   워크플로우 환경 변수를 확인하세요.');
+              // 지원 패턴:
+              // - https://github.com/orgs/{owner}/projects/{number}
+              // - https://github.com/orgs/{owner}/projects/{number}/views/{view_id}
+              // - https://github.com/users/{owner}/projects/{number}
+              // - https://github.com/users/{owner}/projects/{number}/views/{view_id}
+              const orgPattern = /github\.com\/orgs\/([^\/]+)\/projects\/(\d+)/;
+              const userPattern = /github\.com\/users\/([^\/]+)\/projects\/(\d+)/;
+
+              let match = url.match(orgPattern);
+              if (match) {
+                return {
+                  type: 'organization',
+                  owner: match[1],
+                  number: parseInt(match[2])
+                };
+              }
+
+              match = url.match(userPattern);
+              if (match) {
+                return {
+                  type: 'user',
+                  owner: match[1],
+                  number: parseInt(match[2])
+                };
+              }
+
+              return null;
+            }
+
+            // ============================================
+            // 프로젝트 URL 파싱
+            // ============================================
+            const projectUrl = process.env.PROJECT_URL;
+
+            if (!projectUrl) {
+              console.log('⚠️ PROJECT_URL이 설정되지 않았습니다.');
+              console.log('   워크플로우 환경 변수에서 PROJECT_URL 주석을 해제하세요.');
+              console.log('');
+              console.log('💡 지원 URL 형식:');
+              console.log('   - Organization: https://github.com/orgs/{org}/projects/{number}');
+              console.log('   - User: https://github.com/users/{user}/projects/{number}');
               return;
             }
 
-            console.log(`📌 Syncing Issue #${issueNumber} to Status: "${statusLabel}"`);
-            console.log(`📌 Project: ${orgName}/projects/${projectNumber}`);
+            const projectInfo = parseProjectUrl(projectUrl);
 
+            if (!projectInfo) {
+              console.log('❌ PROJECT_URL 형식이 올바르지 않습니다.');
+              console.log(`   입력된 URL: ${projectUrl}`);
+              console.log('');
+              console.log('💡 지원 URL 형식:');
+              console.log('   - Organization: https://github.com/orgs/{org}/projects/{number}');
+              console.log('   - User: https://github.com/users/{user}/projects/{number}');
+              console.log('   - /views/{id} 경로는 포함되어도 됩니다');
+              return;
+            }
+
+            const isOrgProject = projectInfo.type === 'organization';
+            console.log(`📌 프로젝트 타입: ${isOrgProject ? 'Organization' : 'User'}`);
+            console.log(`📌 소유자: ${projectInfo.owner}`);
+            console.log(`📌 프로젝트 번호: ${projectInfo.number}`);
+            console.log(`📌 Issue #${issueNumber} → Status: "${statusLabel}"`);
+
+            // ============================================
             // GraphQL로 Project Item ID 찾기
+            // ============================================
             const projectItemQuery = `
               query($owner: String!, $repo: String!, $issueNumber: Int!) {
                 repository(owner: $owner, name: $repo) {
@@ -132,20 +222,27 @@ jobs:
 
             const projectItems = projectItemResult.repository?.issue?.projectItems?.nodes || [];
             const targetItem = projectItems.find(item =>
-              item.project.number === parseInt(projectNumber)
+              item.project.number === projectInfo.number
             );
 
             if (!targetItem) {
-              console.log('⏭️ Issue is not linked to the target project');
+              console.log('⏭️ 이슈가 해당 프로젝트에 연결되어 있지 않습니다.');
+              console.log(`   프로젝트 번호: ${projectInfo.number}`);
+              console.log('');
+              console.log('💡 해결 방법:');
+              console.log('   1. GitHub Projects에서 이슈를 프로젝트에 추가하세요.');
+              console.log('   2. 또는 이슈 사이드바에서 "Projects"를 클릭하여 추가하세요.');
               return;
             }
 
             console.log(`📌 Project Item ID: ${targetItem.id}`);
 
-            // Project 필드 정보 조회
-            const projectQuery = `
-              query($org: String!, $projectNumber: Int!) {
-                organization(login: $org) {
+            // ============================================
+            // Project 필드 정보 조회 (Organization vs User)
+            // ============================================
+            const orgProjectQuery = `
+              query($owner: String!, $projectNumber: Int!) {
+                organization(login: $owner) {
                   projectV2(number: $projectNumber) {
                     id
                     field(name: "Status") {
@@ -162,26 +259,85 @@ jobs:
               }
             `;
 
-            const projectResult = await github.graphql(projectQuery, {
-              org: orgName,
-              projectNumber: parseInt(projectNumber)
-            });
+            const userProjectQuery = `
+              query($owner: String!, $projectNumber: Int!) {
+                user(login: $owner) {
+                  projectV2(number: $projectNumber) {
+                    id
+                    field(name: "Status") {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
 
-            const statusField = projectResult.organization?.projectV2?.field;
+            const projectQuery = isOrgProject ? orgProjectQuery : userProjectQuery;
+
+            let projectResult;
+            try {
+              projectResult = await github.graphql(projectQuery, {
+                owner: projectInfo.owner,
+                projectNumber: projectInfo.number
+              });
+            } catch (error) {
+              console.log('❌ 프로젝트 정보를 가져오는데 실패했습니다.');
+              console.log(`   에러: ${error.message}`);
+              console.log('');
+              console.log('💡 확인 사항:');
+              console.log('   1. PROJECT_URL이 올바른지 확인하세요.');
+              console.log('   2. _GITHUB_PAT_TOKEN에 프로젝트 접근 권한이 있는지 확인하세요.');
+              console.log('   3. 프로젝트가 존재하는지 확인하세요.');
+              return;
+            }
+
+            const projectV2 = isOrgProject
+              ? projectResult.organization?.projectV2
+              : projectResult.user?.projectV2;
+
+            if (!projectV2) {
+              console.log('❌ 프로젝트를 찾을 수 없습니다.');
+              console.log(`   소유자: ${projectInfo.owner}`);
+              console.log(`   프로젝트 번호: ${projectInfo.number}`);
+              return;
+            }
+
+            const statusField = projectV2.field;
             if (!statusField) {
-              console.log('❌ Status field not found in project');
+              console.log('❌ 프로젝트에서 Status 필드를 찾을 수 없습니다.');
+              console.log('');
+              console.log('💡 해결 방법:');
+              console.log('   1. GitHub Projects에서 "Status" 필드가 있는지 확인하세요.');
+              console.log('   2. 필드 이름이 정확히 "Status"인지 확인하세요.');
               return;
             }
 
             const targetOption = statusField.options.find(opt => opt.name === statusLabel);
             if (!targetOption) {
-              console.log(`❌ Status option "${statusLabel}" not found in project`);
+              console.log(`❌ 프로젝트에 "${statusLabel}" Status 옵션이 없습니다.`);
+              console.log('');
+              console.log('💡 현재 프로젝트의 Status 옵션:');
+              statusField.options.forEach(opt => {
+                console.log(`   - ${opt.name}`);
+              });
+              console.log('');
+              console.log('💡 해결 방법:');
+              console.log('   1. GitHub Projects에서 Status 옵션을 추가하세요.');
+              console.log('   2. 또는 워크플로우의 STATUS_LABELS를 프로젝트에 맞게 수정하세요.');
               return;
             }
 
             console.log(`📌 Status Option ID: ${targetOption.id}`);
 
+            // ============================================
             // Status 업데이트
+            // ============================================
             const updateMutation = `
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(
@@ -201,11 +357,16 @@ jobs:
               }
             `;
 
-            await github.graphql(updateMutation, {
-              projectId: projectResult.organization.projectV2.id,
-              itemId: targetItem.id,
-              fieldId: statusField.id,
-              optionId: targetOption.id
-            });
+            try {
+              await github.graphql(updateMutation, {
+                projectId: projectV2.id,
+                itemId: targetItem.id,
+                fieldId: statusField.id,
+                optionId: targetOption.id
+              });
 
-            console.log(`✅ Status updated to "${statusLabel}"`);
+              console.log(`✅ Status가 "${statusLabel}"(으)로 업데이트되었습니다.`);
+            } catch (error) {
+              console.log('❌ Status 업데이트에 실패했습니다.');
+              console.log(`   에러: ${error.message}`);
+            }

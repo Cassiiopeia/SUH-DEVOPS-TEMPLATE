@@ -127,6 +127,7 @@ snake_case.sh / snake_case.py
 | `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @suh-lab 멘션 | QA 이슈 자동 생성 |
 | `PROJECT-COMMON-SYNC-ISSUE-LABELS` | 라벨 파일 변경 | GitHub 라벨 동기화 |
 | `PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC` | version.json 변경 | Util HTML 버전 동기화 |
+| `PROJECT-COMMON-PROJECTS-SYNC-MANAGER` | 이슈 라벨 변경 | Issue Label → Projects Status 동기화 |
 
 ### 타입별 워크플로우
 
@@ -660,6 +661,7 @@ SYNOLOGY_PASSWORD
 | FLUTTER-TEST-BUILD-TRIGGER.md | docs/ | 테스트 빌드 트리거 |
 | SYNOLOGY-DEPLOYMENT-GUIDE.md | docs/ | Synology NAS 배포 가이드 |
 | TROUBLESHOOTING.md | docs/ | 문제 해결 가이드 |
+| PROJECTS-SYNC.md | docs/ | GitHub Projects 동기화 가이드 |
 
 ---
 

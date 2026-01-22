@@ -10,7 +10,7 @@
 |------|--------|------|
 | **Issue Helper** | 이슈 생성 | 브랜치명, 커밋 메시지 자동 제안 |
 | **QA 봇** | `@suh-lab create qa` 댓글 | QA 이슈 자동 생성 |
-| **라벨 동기화** | `issue-label.yml` 변경 | GitHub 라벨 자동 동기화 |
+| **라벨 동기화** | `issue-labels.yml` 변경 | GitHub 라벨 자동 동기화 |
 
 ---
 
@@ -126,12 +126,12 @@ on:
 
 ## 라벨 동기화
 
-`issue-label.yml` 파일을 수정하면 GitHub 라벨이 자동으로 동기화됩니다.
+`issue-labels.yml` 파일을 수정하면 GitHub 라벨이 자동으로 동기화됩니다.
 
 ### 라벨 파일 위치
 
 ```
-.github/issue-label.yml
+.github/config/issue-labels.yml
 ```
 
 ### 라벨 파일 형식
@@ -141,13 +141,13 @@ on:
   color: "d73a4a"
   description: "긴급 처리 필요"
 
-- name: "작업 중"
-  color: "0075ca"
-  description: "현재 작업 진행 중"
+- name: "작업중"
+  color: "74D7CB"
+  description: "작업이 진행 중인 상태"
 
-- name: "코드리뷰 대기중"
-  color: "cfd3d7"
-  description: "코드 리뷰 대기"
+- name: "담당자확인"
+  color: "FBC61E"
+  description: "담당자 확인 필요, 대기중 상태"
 ```
 
 ### 기본 제공 라벨
@@ -156,14 +156,13 @@ on:
 |------|------|
 | 긴급 | 긴급 처리 필요 |
 | 문서 | 문서 관련 |
-| 작업 전 | 작업 시작 전 |
-| 작업 중 | 현재 작업 중 |
-| 코드리뷰 대기중 | 리뷰 요청 |
-| PR 완료 | PR 생성됨 |
-| 검토 완료 | 리뷰 완료 |
-| Merge 완료 | 머지됨 |
-| Done | 완료 |
-| 보류 | 보류 중 |
+| 작업전 | 작업 시작 전 준비 상태 |
+| 작업중 | 작업이 진행 중인 상태 |
+| 담당자확인 | 담당자 확인 필요, 대기중 상태 |
+| 피드백 | 담당자 확인 후 수정 필요 |
+| 작업완료 | 작업 완료 상태 (이슈 폐쇄) |
+| 보류 | 작업 일시 중단 상태 |
+| 취소 | 작업 취소됨 |
 
 ### 워크플로우
 
@@ -173,7 +172,7 @@ on:
 on:
   push:
     paths:
-      - '.github/issue-label.yml'
+      - '.github/config/issue-labels.yml'
 ```
 
 ---

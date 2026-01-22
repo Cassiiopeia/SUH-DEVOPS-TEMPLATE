@@ -30,7 +30,7 @@ concurrency:
 env:
   # 동기화할 Status Label 목록 (JSON 배열)
   # projects-sync-wizard에서 설정한 값과 동일해야 합니다
-  STATUS_LABELS: '["작업 전", "작업 중", "확인 대기", "피드백", "작업 완료", "취소"]'
+  STATUS_LABELS: '["작업전", "작업중", "담당자확인", "피드백", "작업완료", "보류", "취소"]'
 
   # GitHub Projects 설정
   # 아래 값들을 실제 프로젝트에 맞게 수정하세요
@@ -44,7 +44,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' &&
-       contains(fromJSON('["작업 전", "작업 중", "확인 대기", "피드백", "작업 완료", "취소"]'), github.event.label.name))
+       contains(fromJSON('["작업전", "작업중", "담당자확인", "피드백", "작업완료", "보류", "취소"]'), github.event.label.name))
 
     steps:
       - name: 🔍 Get Issue Info

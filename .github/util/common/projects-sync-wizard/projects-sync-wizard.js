@@ -10,13 +10,14 @@
 // 상태 관리
 // ============================================
 
-// issue-label.yml 기본 Status Labels
+// issue-labels.yml 기본 Status Labels
 const DEFAULT_STATUS_LABELS = [
-    '작업 전',
-    '작업 중',
-    '확인 대기',
+    '작업전',
+    '작업중',
+    '담당자확인',
     '피드백',
-    '작업 완료',
+    '작업완료',
+    '보류',
     '취소'
 ];
 

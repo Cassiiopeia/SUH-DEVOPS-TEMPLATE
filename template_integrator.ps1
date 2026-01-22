@@ -1023,6 +1023,160 @@ function Save-TemplateOptions {
     }
 }
 
+# 버전 비교 함수 (v1 > v2 이면 1, v1 < v2 이면 -1, 같으면 0)
+function Compare-SemVer {
+    param(
+        [string]$Version1,
+        [string]$Version2
+    )
+
+    # v 접두사 제거
+    $v1 = $Version1 -replace "^v", ""
+    $v2 = $Version2 -replace "^v", ""
+
+    $parts1 = $v1.Split(".")
+    $parts2 = $v2.Split(".")
+
+    for ($i = 0; $i -lt 3; $i++) {
+        $p1 = if ($i -lt $parts1.Length) { [int]$parts1[$i] } else { 0 }
+        $p2 = if ($i -lt $parts2.Length) { [int]$parts2[$i] } else { 0 }
+
+        if ($p1 -gt $p2) { return 1 }
+        if ($p1 -lt $p2) { return -1 }
+    }
+
+    return 0
+}
+
+# Breaking Changes 확인 및 알림
+function Test-BreakingChanges {
+    param(
+        [string]$CurrentVersion,
+        [string]$NewVersion
+    )
+
+    # 버전 정보가 없으면 (레거시 프로젝트) 스킵
+    if ([string]::IsNullOrEmpty($CurrentVersion) -or $CurrentVersion -eq "unknown") {
+        return $true
+    }
+
+    # -Force 모드면 스킵
+    if ($Force) {
+        return $true
+    }
+
+    # breaking-changes.json 다운로드
+    $bcUrl = "$script:TemplateRawUrl/.github/config/breaking-changes.json"
+    try {
+        $bcJson = Invoke-RestMethod -Uri $bcUrl -UseBasicParsing -ErrorAction Stop
+    }
+    catch {
+        return $true
+    }
+
+    # breaking changes 버전 목록 추출 (객체 속성 중 _ 로 시작하지 않는 것)
+    $versions = $bcJson.PSObject.Properties | Where-Object { $_.Name -notlike "_*" } | Select-Object -ExpandProperty Name
+
+    # 해당 버전 범위의 breaking changes 수집
+    $criticalChanges = @()
+    $warningChanges = @()
+
+    foreach ($ver in $versions) {
+        # CurrentVersion < ver <= NewVersion 인 경우만 해당
+        $cmpCurrent = Compare-SemVer -Version1 $ver -Version2 $CurrentVersion
+        $cmpNew = Compare-SemVer -Version1 $ver -Version2 $NewVersion
+
+        if ($cmpCurrent -eq 1 -and $cmpNew -ne 1) {
+            $change = $bcJson.$ver
+            $severity = if ($change.severity) { $change.severity } else { "warning" }
+            $title = if ($change.title) { $change.title } else { "" }
+            $message = if ($change.message) { $change.message } else { "" }
+
+            $changeInfo = @{
+                Version = "v$ver"
+                Title = $title
+                Message = $message
+            }
+
+            if ($severity -eq "critical") {
+                $criticalChanges += $changeInfo
+            }
+            else {
+                $warningChanges += $changeInfo
+            }
+        }
+    }
+
+    # breaking change가 없으면 리턴
+    $totalChanges = $criticalChanges.Count + $warningChanges.Count
+    if ($totalChanges -eq 0) {
+        return $true
+    }
+
+    # 알림 표시
+    Write-Host ""
+    Write-Host "╔══════════════════════════════════════════════════════════════════╗"
+    Write-Host "║  ⚠️  BREAKING CHANGES (v$CurrentVersion → v$NewVersion)"
+    Write-Host "╠══════════════════════════════════════════════════════════════════╣"
+
+    # Critical changes 표시
+    foreach ($change in $criticalChanges) {
+        Write-Host "║"
+        Write-Host "║  " -NoNewline
+        Write-Host "[CRITICAL]" -ForegroundColor Red -NoNewline
+        Write-Host " $($change.Version) - $($change.Title)"
+        Write-Host "║  → $($change.Message)"
+    }
+
+    # Warning changes 표시
+    foreach ($change in $warningChanges) {
+        Write-Host "║"
+        Write-Host "║  " -NoNewline
+        Write-Host "[WARNING]" -ForegroundColor Yellow -NoNewline
+        Write-Host " $($change.Version) - $($change.Title)"
+        Write-Host "║  → $($change.Message)"
+    }
+
+    Write-Host "║"
+    Write-Host "╚══════════════════════════════════════════════════════════════════╝"
+    Write-Host ""
+
+    # Critical이 있으면 Y/N 확인
+    if ($criticalChanges.Count -gt 0) {
+        Print-Warning "CRITICAL 변경사항이 있습니다."
+        Write-Host ""
+        Write-Host "계속 진행하시겠습니까?"
+        Write-Host "  Y/y - 예, 계속 진행"
+        Write-Host "  N/n - 아니오, 취소"
+        Write-Host ""
+
+        if (-not (Ask-YesNo -Prompt "선택: " -Default "N")) {
+            Print-Info "취소되었습니다"
+            exit 0
+        }
+    }
+
+    return $true
+}
+
+# 현재 프로젝트의 템플릿 버전 읽기
+function Get-CurrentTemplateVersion {
+    $versionFile = "version.yml"
+
+    if (-not (Test-Path $versionFile)) {
+        return "unknown"
+    }
+
+    $content = Get-Content -Path $versionFile -Raw
+
+    # metadata.template.version 읽기 (template 섹션 내 version만 정확히 매칭)
+    if ($content -match "template:\s*\r?\n\s+source:[^\r\n]+\r?\n\s+version:\s*[`"']?([0-9.]+)[`"']?") {
+        return $matches[1]
+    }
+
+    return "unknown"
+}
+
 function Ask-SynologyOption {
     param([string]$TypeDir)
 
@@ -2028,6 +2182,12 @@ function Start-InteractiveMode {
 # ===================================================================
 
 function Start-Integration {
+    # Breaking Changes 확인 (업데이트 시)
+    $currentTemplateVersion = Get-CurrentTemplateVersion
+    if ($currentTemplateVersion -ne "unknown") {
+        Test-BreakingChanges -CurrentVersion $currentTemplateVersion -NewVersion $script:DefaultVersion | Out-Null
+    }
+
     # CLI 모드에서만 자동 감지 및 확인
     if (-not $script:IsInteractiveMode) {
         if ([string]::IsNullOrWhiteSpace($script:ProjectType)) {

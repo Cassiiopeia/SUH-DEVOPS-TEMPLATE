@@ -103,7 +103,7 @@ PROJECT_NUMBER = "6"
 STATUS_FIELD = "Status"
 
 # 동기화할 Label 목록 (JSON 배열)
-STATUS_LABELS = '["작업 전","작업 중","확인 대기","피드백","작업 완료","취소"]'
+STATUS_LABELS = '["작업전","작업중","담당자확인","피드백","작업완료","보류","취소"]'
 
 # Organization 이름
 ORG_NAME = "TEAM-ROMROM"
@@ -230,12 +230,12 @@ Recent Deliveries에서 `200 OK` 응답 확인.
 📌 Action: edited
 📌 Processing item: PVTI_xxx
 📌 Issue: TEAM-ROMROM/RomRom-FE#123
-📌 Current Labels: enhancement, 작업 전
-📌 New Status: "작업 중"
-🗑️ Labels to remove: 작업 전
-  ✅ Label "작업 전" 제거됨
-➕ Adding label: "작업 중"
-  ✅ Label "작업 중" 추가됨
+📌 Current Labels: enhancement, 작업전
+📌 New Status: "작업중"
+🗑️ Labels to remove: 작업전
+  ✅ Label "작업전" 제거됨
+➕ Adding label: "작업중"
+  ✅ Label "작업중" 추가됨
 🎉 Label sync completed!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

@@ -1130,6 +1130,182 @@ EOF
     fi
 }
 
+# 버전 비교 함수 (v1 > v2 이면 1, v1 < v2 이면 -1, 같으면 0)
+compare_versions() {
+    local v1="$1"
+    local v2="$2"
+
+    # 버전에서 v 접두사 제거
+    v1="${v1#v}"
+    v2="${v2#v}"
+
+    # 버전을 . 기준으로 분리 (IFS 격리)
+    local V1_PARTS
+    local V2_PARTS
+    V1_PARTS=($(echo "$v1" | tr '.' ' '))
+    V2_PARTS=($(echo "$v2" | tr '.' ' '))
+
+    for i in 0 1 2; do
+        local p1="${V1_PARTS[$i]:-0}"
+        local p2="${V2_PARTS[$i]:-0}"
+
+        if [ "$p1" -gt "$p2" ] 2>/dev/null; then
+            echo 1
+            return
+        elif [ "$p1" -lt "$p2" ] 2>/dev/null; then
+            echo -1
+            return
+        fi
+    done
+
+    echo 0
+}
+
+# Breaking Changes 확인 및 알림
+check_breaking_changes() {
+    local current_version="$1"  # 프로젝트의 현재 템플릿 버전
+    local new_version="$2"      # 업데이트될 템플릿 버전
+
+    # 버전 정보가 없으면 (레거시 프로젝트) 스킵
+    if [ -z "$current_version" ] || [ "$current_version" = "unknown" ]; then
+        return 0
+    fi
+
+    # --force 모드면 스킵
+    if [ "$FORCE_MODE" = true ]; then
+        return 0
+    fi
+
+    # TTY 없으면 스킵
+    if [ "$TTY_AVAILABLE" = false ]; then
+        return 0
+    fi
+
+    # breaking-changes.json 다운로드
+    local bc_url="${TEMPLATE_RAW_URL}/.github/config/breaking-changes.json"
+    local bc_json
+    bc_json=$(curl -fsSL "$bc_url" 2>/dev/null) || return 0
+
+    # JSON 파싱 실패 시 스킵
+    if [ -z "$bc_json" ]; then
+        return 0
+    fi
+
+    # jq 없으면 스킵 (JSON 파싱 불가)
+    if ! command -v jq &> /dev/null; then
+        print_warning "jq가 설치되지 않아 breaking change 확인을 건너뜁니다."
+        return 0
+    fi
+
+    # breaking changes 버전 목록 추출 (버전 키만)
+    local versions
+    versions=$(echo "$bc_json" | jq -r 'keys[] | select(startswith("_") | not)' 2>/dev/null) || return 0
+
+    # 해당 버전 범위의 breaking changes 수집
+    local critical_changes=()
+    local warning_changes=()
+
+    for ver in $versions; do
+        # current_version < ver <= new_version 인 경우만 해당
+        local cmp_current
+        local cmp_new
+        cmp_current=$(compare_versions "$ver" "$current_version")
+        cmp_new=$(compare_versions "$ver" "$new_version")
+
+        if [ "$cmp_current" = "1" ] && [ "$cmp_new" != "1" ]; then
+            local severity
+            local title
+            local message
+            severity=$(echo "$bc_json" | jq -r ".[\"$ver\"].severity // \"warning\"" 2>/dev/null)
+            title=$(echo "$bc_json" | jq -r ".[\"$ver\"].title // \"\"" 2>/dev/null)
+            message=$(echo "$bc_json" | jq -r ".[\"$ver\"].message // \"\"" 2>/dev/null)
+
+            if [ "$severity" = "critical" ]; then
+                critical_changes+=("v$ver|$title|$message")
+            else
+                warning_changes+=("v$ver|$title|$message")
+            fi
+        fi
+    done
+
+    # breaking change가 없으면 리턴
+    local total_changes=$((${#critical_changes[@]} + ${#warning_changes[@]}))
+    if [ "$total_changes" -eq 0 ]; then
+        return 0
+    fi
+
+    # 알림 표시
+    echo "" >&2
+    echo "╔══════════════════════════════════════════════════════════════════╗" >&2
+    echo "║  ⚠️  BREAKING CHANGES (v$current_version → v$new_version)" >&2
+    echo "╠══════════════════════════════════════════════════════════════════╣" >&2
+
+    # Critical changes 표시
+    for change in "${critical_changes[@]}"; do
+        IFS='|' read -r ver title msg <<< "$change"
+        echo "║" >&2
+        echo "║  ${RED}[CRITICAL]${NC} $ver - $title" >&2
+        echo "║  → $msg" >&2
+    done
+
+    # Warning changes 표시
+    for change in "${warning_changes[@]}"; do
+        IFS='|' read -r ver title msg <<< "$change"
+        echo "║" >&2
+        echo "║  ${YELLOW}[WARNING]${NC} $ver - $title" >&2
+        echo "║  → $msg" >&2
+    done
+
+    echo "║" >&2
+    echo "╚══════════════════════════════════════════════════════════════════╝" >&2
+    echo "" >&2
+
+    # Critical이 있으면 Y/N 확인
+    if [ ${#critical_changes[@]} -gt 0 ]; then
+        print_warning "CRITICAL 변경사항이 있습니다."
+        print_to_user ""
+        print_to_user "계속 진행하시겠습니까?"
+        print_to_user "  Y/y - 예, 계속 진행"
+        print_to_user "  N/n - 아니오, 취소"
+        print_to_user ""
+
+        if ! ask_yes_no "선택: " "N"; then
+            print_info "취소되었습니다"
+            exit 0
+        fi
+    fi
+
+    return 0
+}
+
+# 현재 프로젝트의 템플릿 버전 읽기
+get_current_template_version() {
+    local version_file="version.yml"
+
+    if [ ! -f "$version_file" ]; then
+        echo "unknown"
+        return
+    fi
+
+    # metadata.template.version 읽기
+    local in_template=false
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*template: ]]; then
+            in_template=true
+        elif [ "$in_template" = true ]; then
+            if [[ "$line" =~ ^[[:space:]]*version:[[:space:]]*[\"\']?([0-9.]+)[\"\']? ]]; then
+                echo "${BASH_REMATCH[1]}"
+                return
+            elif [[ "$line" =~ ^[[:space:]]*[a-z_]+: ]] && [[ ! "$line" =~ ^[[:space:]]{4,} ]]; then
+                # 다른 최상위 키를 만나면 종료
+                break
+            fi
+        fi
+    done < "$version_file"
+
+    echo "unknown"
+}
+
 # Synology 워크플로우 포함 여부 질문
 ask_synology_option() {
     local type_dir="$1"
@@ -2094,6 +2270,13 @@ interactive_mode() {
 
 # 통합 실행
 execute_integration() {
+    # Breaking Changes 확인 (업데이트 시)
+    local current_template_version
+    current_template_version=$(get_current_template_version)
+    if [ "$current_template_version" != "unknown" ]; then
+        check_breaking_changes "$current_template_version" "$DEFAULT_VERSION"
+    fi
+
     # CLI 모드에서만 자동 감지 및 확인 (interactive 모드에서는 이미 감지 완료)
     if [ "$IS_INTERACTIVE_MODE" = false ]; then
         if [ -z "$PROJECT_TYPE" ]; then

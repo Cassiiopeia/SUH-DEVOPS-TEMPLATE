@@ -17,7 +17,7 @@
 #   --worker-name "my-worker" \
 #   --webhook-secret "abc123" \
 #   --github-token "ghp_xxxx..." \
-#   --labels "작업 전,작업 중,완료"
+#   --labels "작업전,작업중,작업완료"
 # ============================================
 
 set -e

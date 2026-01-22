@@ -120,6 +120,18 @@ REPO_OWNER="${GITHUB_REPOSITORY%/*}"
 # 지원하는 프로젝트 타입
 VALID_TYPES=("spring" "flutter" "next" "react" "react-native" "react-native-expo" "node" "python" "basic")
 
+# 템플릿 버전 (version.yml에서 읽어옴)
+get_template_version() {
+    local version_file="version.yml"
+    if [ -f "$version_file" ]; then
+        grep '^version:' "$version_file" | sed 's/version:[[:space:]]*"\{0,1\}\([^"]*\)"\{0,1\}/\1/' | tr -d ' '
+    else
+        echo "unknown"
+    fi
+}
+
+TEMPLATE_VERSION=$(get_template_version)
+
 # 파라미터 파싱
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -261,8 +273,12 @@ metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "$user"
   default_branch: "$branch"
+  template:
+    source: "SUH-DEVOPS-TEMPLATE"
+    version: "$TEMPLATE_VERSION"
+    initialized_date: "$(date -u +"%Y-%m-%d")"
 EOF
-    
+
     print_success "version.yml 파일이 생성되었습니다."
 }
 

@@ -287,7 +287,7 @@ async function syncLabelFromStatus(payload: WebhookPayload, env: Env): Promise<v
     statusLabels = JSON.parse(env.STATUS_LABELS);
   } catch {
     console.error('❌ Failed to parse STATUS_LABELS');
-    statusLabels = ['작업 전', '작업 중', '확인 대기', '피드백', '작업 완료', '취소'];
+    statusLabels = ['작업전', '작업중', '담당자확인', '피드백', '작업완료', '보류', '취소'];
   }
 
   // 4. 새 Status가 관리 대상인지 확인

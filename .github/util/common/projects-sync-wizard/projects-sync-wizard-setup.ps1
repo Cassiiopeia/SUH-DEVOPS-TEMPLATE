@@ -12,7 +12,7 @@
 # 사용법 (마법사에서 생성된 명령어):
 # $env:WIZARD_OWNER='ORG_NAME'; $env:WIZARD_PROJECT='1'; `
 # $env:WIZARD_WORKER_NAME='my-worker'; $env:WIZARD_WEBHOOK_SECRET='abc123'; `
-# $env:WIZARD_LABELS='작업 전,작업 중,완료'; $env:WIZARD_GITHUB_TOKEN='ghp_xxxx'; `
+# $env:WIZARD_LABELS='작업전,작업중,작업완료'; $env:WIZARD_GITHUB_TOKEN='ghp_xxxx'; `
 # irm 'https://raw.githubusercontent.com/.../projects-sync-wizard-setup.ps1' | iex
 # ============================================
 
@@ -38,7 +38,7 @@ if (-not $OwnerName -or -not $ProjectNumber -or -not $WebhookSecret -or -not $Gi
     Write-Host ""
     Write-Host "선택 환경변수:" -ForegroundColor Yellow
     Write-Host "  `$env:WIZARD_WORKER_NAME = 'my-worker'"
-    Write-Host "  `$env:WIZARD_LABELS = '작업 전,작업 중,완료'"
+    Write-Host "  `$env:WIZARD_LABELS = '작업전,작업중,작업완료'"
     exit 1
 }
 

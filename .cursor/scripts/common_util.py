@@ -4,6 +4,7 @@ Cursor Commands Common Utility Module
 이 모듈은 모든 Cursor command에서 공통으로 사용할 수 있는 유틸리티 함수를 제공합니다.
 특히 한글 경로 처리 등 인코딩 문제를 해결합니다.
 
+작성자: Cursor AI Assistant
 버전: 1.0.0
 생성일: 2025-10-13
 """

@@ -1,11 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-22T07:47:04Z",
-    "currentVersion": "2.7.3",
+    "lastUpdated": "2026-01-24T08:43:41Z",
+    "currentVersion": "2.7.4",
     "projectType": "basic",
-    "totalReleases": 56
+    "totalReleases": 57
   },
   "releases": [
+    {
+      "version": "2.7.4",
+      "project_type": "basic",
+      "date": "2026-01-24",
+      "pr_number": 173,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * /init-workflow 명령어를 통해 브랜치 이름 기반 Git 워크트리 자동 생성 지원\n  * 존재하지 않는 브랜치는 자동으로 생성되며, 특수문자를 안전하게 처리하여 폴더명 자동 생성\n\n* **Documentation**\n  * 워크트리 관리 도구 및 워크플로우 사용 가이드 문서 추가\n\n* **Chores**\n  * 버전 업데이트 (v2.7.4)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "/init-workflow 명령어를 통해 브랜치 이름 기반 Git 워크트리 자동 생성 지원",
+            "존재하지 않는 브랜치는 자동으로 생성되며, 특수문자를 안전하게 처리하여 폴더명 자동 생성"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "워크트리 관리 도구 및 워크플로우 사용 가이드 문서 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (v2.7.4)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.3",
       "project_type": "basic",

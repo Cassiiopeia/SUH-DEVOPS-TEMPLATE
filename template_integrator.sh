@@ -120,6 +120,9 @@ readonly SCRIPTS_DIR=".github/scripts"
 readonly PROJECT_TYPES_DIR="project-types"
 readonly DEFAULT_VERSION="1.3.14"
 
+# 다운로드한 템플릿의 실제 버전 (download_template에서 설정됨)
+TEMPLATE_VERSION=""
+
 # 워크플로우 파일명 패턴
 readonly WORKFLOW_PREFIX="PROJECT"
 readonly WORKFLOW_COMMON_PREFIX="PROJECT-COMMON"
@@ -883,7 +886,18 @@ download_template() {
     if [ -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
         print_info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
     fi
-    
+
+    # 다운로드한 템플릿에서 버전 읽기 (TEMPLATE_VERSION 전역 변수에 저장)
+    if [ -f "$TEMP_DIR/version.yml" ]; then
+        # version.yml에서 version 값 추출 (예: version: "2.7.5" → 2.7.5)
+        TEMPLATE_VERSION=$(grep -E '^version:\s*' "$TEMP_DIR/version.yml" 2>/dev/null | sed 's/version:[[:space:]]*["'\'']*\([^"'\'']*\)["'\'']*$/\1/' | head -1)
+        if [ -z "$TEMPLATE_VERSION" ]; then
+            TEMPLATE_VERSION="$DEFAULT_VERSION"
+        fi
+    else
+        TEMPLATE_VERSION="$DEFAULT_VERSION"
+    fi
+
     print_success "템플릿 다운로드 완료"
 }
 
@@ -943,7 +957,8 @@ create_version_yml() {
             existing_version_code=$(yq -r '.version_code // 1' version.yml 2>/dev/null || echo "1")
         else
             # grep: 주석(#)으로 시작하지 않는 라인에서만 version_code 추출
-            existing_version_code=$(grep -E '^version_code:\s*[0-9]+' version.yml 2>/dev/null | grep -oP '\d+' | head -1 || echo "1")
+            # macOS 호환: grep -P 대신 sed 사용 (BSD grep은 -P 미지원)
+            existing_version_code=$(grep -E '^version_code:\s*[0-9]+' version.yml 2>/dev/null | sed 's/[^0-9]//g' | head -1 || echo "1")
         fi
         
         # 숫자 검증 (0보다 큰 정수만 허용)
@@ -1604,6 +1619,33 @@ copy_scripts() {
     done
     
     print_success "$copied 개 스크립트 다운로드 완료"
+}
+
+# .github/config 폴더 복사
+copy_config_folder() {
+    print_step ".github/config 폴더 복사 중..."
+
+    local src_config_dir="$TEMP_DIR/.github/config"
+    local dst_config_dir=".github/config"
+
+    if [ ! -d "$src_config_dir" ]; then
+        print_info ".github/config 폴더가 템플릿에 없습니다. 건너뜁니다."
+        return
+    fi
+
+    # 기존 config 파일이 있으면 알림
+    if [ -d "$dst_config_dir" ] && [ "$(ls -A "$dst_config_dir" 2>/dev/null)" ]; then
+        print_info "기존 config 파일이 있습니다. 덮어씁니다."
+    fi
+
+    mkdir -p "$dst_config_dir"
+
+    # 항상 최신으로 덮어쓰기
+    cp -r "$src_config_dir/"* "$dst_config_dir/" 2>/dev/null || true
+
+    # 복사된 파일 개수 계산
+    local copied=$(ls -1 "$dst_config_dir" 2>/dev/null | wc -l | tr -d ' ')
+    print_success ".github/config 폴더 복사 완료 ($copied 개 파일)"
 }
 
 # 이슈 템플릿 다운로드
@@ -2344,6 +2386,7 @@ execute_integration() {
             add_version_section_to_readme "$VERSION"
             copy_workflows
             copy_scripts
+            copy_config_folder
             copy_util_modules "$PROJECT_TYPE"
             copy_issue_templates
             copy_discussion_templates
@@ -2357,12 +2400,14 @@ execute_integration() {
             create_version_yml "$VERSION" "$PROJECT_TYPE" "$DETECTED_BRANCH"
             add_version_section_to_readme "$VERSION"
             copy_scripts
+            copy_config_folder
             ensure_gitignore
             copy_setup_guide
             ;;
         workflows)
             copy_workflows
             copy_scripts
+            copy_config_folder
             copy_util_modules "$PROJECT_TYPE"
             copy_setup_guide
             ;;
@@ -2380,8 +2425,8 @@ execute_integration() {
     if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
         # INCLUDE_SYNOLOGY가 설정되어 있으면 저장
         if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
-            # 템플릿 버전 전달 (DEFAULT_VERSION 사용)
-            save_template_options "$DEFAULT_VERSION"
+            # 다운로드한 템플릿의 실제 버전 전달 (TEMPLATE_VERSION 사용)
+            save_template_options "$TEMPLATE_VERSION"
         fi
     fi
 

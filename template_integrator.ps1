@@ -122,6 +122,7 @@ $script:WorkflowsCopied = 0
 $script:UtilModulesCopied = 0
 $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
 $script:IncludeSynology = $null  # Synology 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
+$script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
 
 # ===================================================================
 # 출력 함수 (색상 지원)
@@ -756,7 +757,20 @@ function Download-Template {
     if (Test-Path $guidePath) {
         Print-Info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
     }
-    
+
+    # 다운로드한 템플릿에서 버전 읽기 (TemplateVersion 전역 변수에 저장)
+    $templateVersionFile = Join-Path $TEMP_DIR "version.yml"
+    if (Test-Path $templateVersionFile) {
+        $versionContent = Get-Content $templateVersionFile -Raw -ErrorAction SilentlyContinue
+        if ($versionContent -match 'version:\s*[''"]?([0-9.]+)') {
+            $script:TemplateVersion = $matches[1]
+        } else {
+            $script:TemplateVersion = $DEFAULT_VERSION
+        }
+    } else {
+        $script:TemplateVersion = $DEFAULT_VERSION
+    }
+
     Print-Success "템플릿 다운로드 완료"
 }
 
@@ -1522,6 +1536,38 @@ function Copy-Scripts {
 }
 
 # ===================================================================
+# .github/config 폴더 복사
+# ===================================================================
+
+function Copy-ConfigFolder {
+    Print-Step ".github/config 폴더 복사 중..."
+
+    $srcConfigDir = Join-Path $TEMP_DIR ".github\config"
+    $dstConfigDir = ".github\config"
+
+    if (-not (Test-Path $srcConfigDir)) {
+        Print-Info ".github/config 폴더가 템플릿에 없습니다. 건너뜁니다."
+        return
+    }
+
+    # 기존 config 파일이 있으면 알림
+    if ((Test-Path $dstConfigDir) -and (Get-ChildItem $dstConfigDir -ErrorAction SilentlyContinue)) {
+        Print-Info "기존 config 파일이 있습니다. 덮어씁니다."
+    }
+
+    if (-not (Test-Path $dstConfigDir)) {
+        New-Item -Path $dstConfigDir -ItemType Directory -Force | Out-Null
+    }
+
+    # 항상 최신으로 덮어쓰기
+    Copy-Item -Path "$srcConfigDir\*" -Destination $dstConfigDir -Recurse -Force -ErrorAction SilentlyContinue
+
+    # 복사된 파일 개수 계산
+    $copied = (Get-ChildItem $dstConfigDir -File -ErrorAction SilentlyContinue | Measure-Object).Count
+    Print-Success ".github/config 폴더 복사 완료 ($copied 개 파일)"
+}
+
+# ===================================================================
 # 이슈 템플릿 다운로드
 # ===================================================================
 
@@ -2246,6 +2292,7 @@ function Start-Integration {
             Add-VersionSectionToReadme $script:ProjectVersion
             Copy-Workflows
             Copy-Scripts
+            Copy-ConfigFolder
             Copy-IssueTemplates
             Copy-DiscussionTemplates
             Copy-CodeRabbitConfig
@@ -2259,12 +2306,14 @@ function Start-Integration {
             Create-VersionYml $script:ProjectVersion $script:ProjectType $script:DetectedBranch
             Add-VersionSectionToReadme $script:ProjectVersion
             Copy-Scripts
+            Copy-ConfigFolder
             Ensure-GitIgnore
             Copy-SetupGuide
         }
         "workflows" {
             Copy-Workflows
             Copy-Scripts
+            Copy-ConfigFolder
             Copy-SetupGuide
             Copy-UtilModules $script:ProjectType
         }
@@ -2282,7 +2331,8 @@ function Start-Integration {
     if ($Mode -eq "full" -or $Mode -eq "workflows") {
         # IncludeSynology가 설정되어 있으면 저장
         if ($null -ne $script:IncludeSynology) {
-            Save-TemplateOptions $script:ProjectVersion
+            # 다운로드한 템플릿의 실제 버전 전달 (TemplateVersion 사용)
+            Save-TemplateOptions $script:TemplateVersion
         }
     }
 

@@ -2423,11 +2423,13 @@ execute_integration() {
 
     # 2.1 템플릿 옵션 저장 (Synology 설정 등)
     if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-        # INCLUDE_SYNOLOGY가 설정되어 있으면 저장
-        if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
-            # 다운로드한 템플릿의 실제 버전 전달 (TEMPLATE_VERSION 사용)
-            save_template_options "$TEMPLATE_VERSION"
+        # INCLUDE_SYNOLOGY가 설정되지 않은 경우 기본값 false 사용
+        # (basic 타입 등 Synology 폴더가 없는 경우를 위한 처리)
+        if [ -z "$INCLUDE_SYNOLOGY" ]; then
+            INCLUDE_SYNOLOGY=false
         fi
+        # 다운로드한 템플릿의 실제 버전 전달 (TEMPLATE_VERSION 사용)
+        save_template_options "$TEMPLATE_VERSION"
     fi
 
     # 3. 임시 파일 정리

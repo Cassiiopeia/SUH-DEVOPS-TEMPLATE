@@ -2329,11 +2329,13 @@ function Start-Integration {
 
     # 2.1 템플릿 옵션 저장 (Synology 설정 등)
     if ($Mode -eq "full" -or $Mode -eq "workflows") {
-        # IncludeSynology가 설정되어 있으면 저장
-        if ($null -ne $script:IncludeSynology) {
-            # 다운로드한 템플릿의 실제 버전 전달 (TemplateVersion 사용)
-            Save-TemplateOptions $script:TemplateVersion
+        # IncludeSynology가 설정되지 않은 경우 기본값 false 사용
+        # (basic 타입 등 Synology 폴더가 없는 경우를 위한 처리)
+        if ($null -eq $script:IncludeSynology) {
+            $script:IncludeSynology = $false
         }
+        # 다운로드한 템플릿의 실제 버전 전달 (TemplateVersion 사용)
+        Save-TemplateOptions $script:TemplateVersion
     }
 
     # 3. 임시 파일 정리

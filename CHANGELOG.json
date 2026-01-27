@@ -1,11 +1,93 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-22T07:47:04Z",
-    "currentVersion": "2.7.3",
+    "lastUpdated": "2026-01-25T06:21:26Z",
+    "currentVersion": "2.7.7",
     "projectType": "basic",
-    "totalReleases": 56
+    "totalReleases": 59
   },
   "releases": [
+    {
+      "version": "2.7.7",
+      "project_type": "basic",
+      "date": "2026-01-25",
+      "pr_number": 177,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 템플릿 통합 로직을 개선하여 선택적 옵션의 기본값을 명확히 설정했습니다.\n  * 템플릿 옵션 저장 프로세스를 안정화하여 모든 필수 경로에서 설정이 제대로 저장되도록 개선했습니다.\n\n* **기타**\n  * 버전을 v2.7.7로 업데이트했습니다.",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "템플릿 통합 로직을 개선하여 선택적 옵션의 기본값을 명확히 설정했습니다.",
+            "템플릿 옵션 저장 프로세스를 안정화하여 모든 필수 경로에서 설정이 제대로 저장되도록 개선했습니다."
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전을 v2.7.7로 업데이트했습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
+    {
+      "version": "2.7.6",
+      "project_type": "basic",
+      "date": "2026-01-25",
+      "pr_number": 176,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * 템플릿 설정 폴더 자동 복사 기능 추가\n\n* **Improvements**\n  * 템플릿 통합 워크플로우 개선\n  * 버전 관리 및 메타데이터 정확성 향상\n\n* **Chores**\n  * 버전 업데이트 (v2.7.4 → v2.7.6)\n  * 문서 배지 업데이트",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "템플릿 설정 폴더 자동 복사 기능 추가"
+          ]
+        },
+        "improvements": {
+          "title": "Improvements",
+          "items": [
+            "템플릿 통합 워크플로우 개선",
+            "버전 관리 및 메타데이터 정확성 향상"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (v2.7.4 → v2.7.6)",
+            "문서 배지 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
+    {
+      "version": "2.7.4",
+      "project_type": "basic",
+      "date": "2026-01-24",
+      "pr_number": 173,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **New Features**\n  * /init-workflow 명령어를 통해 브랜치 이름 기반 Git 워크트리 자동 생성 지원\n  * 존재하지 않는 브랜치는 자동으로 생성되며, 특수문자를 안전하게 처리하여 폴더명 자동 생성\n\n* **Documentation**\n  * 워크트리 관리 도구 및 워크플로우 사용 가이드 문서 추가\n\n* **Chores**\n  * 버전 업데이트 (v2.7.4)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "/init-workflow 명령어를 통해 브랜치 이름 기반 Git 워크트리 자동 생성 지원",
+            "존재하지 않는 브랜치는 자동으로 생성되며, 특수문자를 안전하게 처리하여 폴더명 자동 생성"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "워크트리 관리 도구 및 워크플로우 사용 가이드 문서 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (v2.7.4)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.3",
       "project_type": "basic",

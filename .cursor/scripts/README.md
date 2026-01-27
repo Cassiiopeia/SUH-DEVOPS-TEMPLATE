@@ -24,6 +24,57 @@ Cursor command에서 PowerShell 명령어 실행 시 오류가 발생하면, 이
 
 ## 📦 포함된 모듈
 
+### `worktree_manager.py` (v1.0.0) 🆕
+
+Git worktree를 자동으로 생성하고 관리하는 스크립트입니다.
+
+#### 기능
+- 브랜치가 없으면 자동 생성 (현재 브랜치에서 분기)
+- 브랜치명의 특수문자(`#`, `/`, `\` 등)를 안전하게 처리
+- `RomRom-Worktree` 폴더에 worktree 자동 생성
+- 이미 존재하는 worktree는 건너뛰고 경로만 출력
+
+#### 사용법
+
+**Cursor Command로 실행 (권장):**
+
+```
+/init-workflow
+
+20260120_#163_Github_Projects_에_대한_템플릿_개발_필요
+```
+
+**직접 실행:**
+
+```bash
+python .cursor/scripts/worktree_manager.py "20260120_#163_Github_Projects_에_대한_템플릿_개발_필요"
+```
+
+#### 출력 예시
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌿 Git Worktree Manager v1.0.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 입력된 브랜치: 20260120_#163_Github_Projects_에_대한_템플릿_개발_필요
+📁 폴더명: 20260120_163_Github_Projects_에_대한_템플릿_개발_필요
+
+🔍 브랜치 확인 중...
+⚠️  브랜치가 존재하지 않습니다.
+🔄 현재 브랜치(main)에서 새 브랜치 생성 중...
+✅ 브랜치 생성 완료!
+
+📂 Worktree 경로: /Users/.../project/RomRom-Worktree/20260120_163_Github_Projects_에_대한_템플릿_개발_필요
+
+🔄 Worktree 생성 중...
+✅ Worktree 생성 완료!
+
+📍 경로: /Users/.../project/RomRom-Worktree/20260120_163_Github_Projects_에_대한_템플릿_개발_필요
+```
+
+---
+
 ### `common_util.py` (v1.0.0)
 
 한글 경로 처리 등 공통 기능을 제공하는 유틸리티 모듈입니다.

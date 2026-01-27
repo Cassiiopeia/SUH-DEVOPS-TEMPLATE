@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-25T06:21:26Z",
-    "currentVersion": "2.7.7",
+    "lastUpdated": "2026-01-27T06:06:13Z",
+    "currentVersion": "2.7.9",
     "projectType": "basic",
-    "totalReleases": 59
+    "totalReleases": 60
   },
   "releases": [
+    {
+      "version": "2.7.9",
+      "project_type": "basic",
+      "date": "2026-01-27",
+      "pr_number": 179,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * Git 워크트리 생성 시 설정 파일 자동 복사 기능 추가\n  * GitHub Projects 동기화 성능 최적화를 위한 캐싱 메커니즘 추가\n\n* **버그 수정**\n  * Windows 환경에서 UTF-8 인코딩 및 경로 처리 개선\n  * 이슈 처리 워크플로우 최적화\n\n* **Chores**\n  * 버전 업데이트 (v2.7.7 → v2.7.9)",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Git 워크트리 생성 시 설정 파일 자동 복사 기능 추가",
+            "GitHub Projects 동기화 성능 최적화를 위한 캐싱 메커니즘 추가"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows 환경에서 UTF-8 인코딩 및 경로 처리 개선",
+            "이슈 처리 워크플로우 최적화"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (v2.7.7 → v2.7.9)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.7",
       "project_type": "basic",

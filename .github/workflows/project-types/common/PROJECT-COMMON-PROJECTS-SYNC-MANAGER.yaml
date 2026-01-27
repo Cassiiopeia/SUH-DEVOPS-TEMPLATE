@@ -37,7 +37,7 @@ name: 🔄 Projects Sync - Label to Status
 
 on:
   issues:
-    types: [labeled, unlabeled]
+    types: [labeled]
 
   workflow_dispatch:
     inputs:

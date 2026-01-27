@@ -7,10 +7,16 @@
 // 동작 방식:
 // 1. GitHub Webhook (projects_v2_item) 이벤트 수신
 // 2. Webhook Secret 검증
-// 3. GraphQL API로 현재 Status 조회
-// 4. Issue Label 동기화 (기존 Status Label 제거 → 새 Label 추가)
+// 3. Status 필드 변경인지 확인 (다른 필드 변경은 무시)
+// 4. GraphQL API로 현재 Status 조회
+// 5. Issue Label 동기화 (기존 Status Label 제거 → 새 Label 추가)
 //
 // ===================================================================
+
+// Status 필드 ID 인메모리 캐시
+let cachedStatusFieldId: string | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 3600000; // 1시간
 
 export interface Env {
   // Secrets (wrangler secret put으로 설정)
@@ -64,6 +70,20 @@ interface GraphQLResponse {
       };
       fieldValueByName?: {
         name?: string;
+      };
+    };
+    organization?: {
+      projectV2?: {
+        field?: {
+          id?: string;
+        };
+      };
+    };
+    user?: {
+      projectV2?: {
+        field?: {
+          id?: string;
+        };
       };
     };
   };
@@ -133,6 +153,102 @@ async function graphqlQuery(
   }
 
   return response.json();
+}
+
+// ===================================================================
+// Status 필드 ID 조회 (인메모리 캐시)
+// ===================================================================
+async function getStatusFieldId(env: Env): Promise<string | null> {
+  const now = Date.now();
+
+  // 캐시 유효하면 재사용
+  if (cachedStatusFieldId && now - cacheTimestamp < CACHE_TTL) {
+    console.log(`📌 Status 필드 ID (캐시): ${cachedStatusFieldId}`);
+    return cachedStatusFieldId;
+  }
+
+  console.log('📌 Status 필드 ID 조회 중...');
+
+  // Organization 프로젝트 쿼리
+  const orgQuery = `
+    query($org: String!, $number: Int!, $fieldName: String!) {
+      organization(login: $org) {
+        projectV2(number: $number) {
+          field(name: $fieldName) {
+            ... on ProjectV2SingleSelectField {
+              id
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  // User 프로젝트 쿼리
+  const userQuery = `
+    query($user: String!, $number: Int!, $fieldName: String!) {
+      user(login: $user) {
+        projectV2(number: $number) {
+          field(name: $fieldName) {
+            ... on ProjectV2SingleSelectField {
+              id
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const projectNumber = parseInt(env.PROJECT_NUMBER);
+
+  // Organization 프로젝트 먼저 시도
+  try {
+    const orgResult = await graphqlQuery(
+      orgQuery,
+      {
+        org: env.ORG_NAME,
+        number: projectNumber,
+        fieldName: env.STATUS_FIELD,
+      },
+      env.GITHUB_TOKEN
+    );
+
+    const orgFieldId = orgResult.data?.organization?.projectV2?.field?.id;
+    if (orgFieldId) {
+      cachedStatusFieldId = orgFieldId;
+      cacheTimestamp = now;
+      console.log(`✅ Status 필드 ID 조회 성공 (Organization): ${orgFieldId}`);
+      return orgFieldId;
+    }
+  } catch {
+    console.log('ℹ️ Organization 프로젝트가 아님, User 프로젝트로 시도...');
+  }
+
+  // User 프로젝트로 시도
+  try {
+    const userResult = await graphqlQuery(
+      userQuery,
+      {
+        user: env.ORG_NAME,
+        number: projectNumber,
+        fieldName: env.STATUS_FIELD,
+      },
+      env.GITHUB_TOKEN
+    );
+
+    const userFieldId = userResult.data?.user?.projectV2?.field?.id;
+    if (userFieldId) {
+      cachedStatusFieldId = userFieldId;
+      cacheTimestamp = now;
+      console.log(`✅ Status 필드 ID 조회 성공 (User): ${userFieldId}`);
+      return userFieldId;
+    }
+  } catch (error) {
+    console.warn(`⚠️ User 프로젝트 조회 실패: ${error}`);
+  }
+
+  console.warn('⚠️ Status 필드 ID를 찾을 수 없습니다');
+  return null;
 }
 
 // ===================================================================
@@ -379,7 +495,24 @@ export default {
       return new Response('Ignored action', { status: 200 });
     }
 
-    // 7. Label 동기화 실행
+    // 7. Status 필드 변경인지 확인
+    if (payload.changes?.field_value) {
+      const changedFieldId = payload.changes.field_value.field_node_id;
+      const statusFieldId = await getStatusFieldId(env);
+
+      if (statusFieldId && changedFieldId !== statusFieldId) {
+        console.log(`ℹ️ Status 필드 변경이 아님. 건너뜀`);
+        console.log(`   변경된 필드: ${changedFieldId}`);
+        console.log(`   Status 필드: ${statusFieldId}`);
+        return new Response('Ignored: not status field change', { status: 200 });
+      }
+
+      console.log(`✅ Status 필드 변경 확인됨`);
+    } else {
+      console.log(`ℹ️ field_value 변경 정보 없음, 동기화 진행`);
+    }
+
+    // 8. Label 동기화 실행
     try {
       await syncLabelFromStatus(payload, env);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

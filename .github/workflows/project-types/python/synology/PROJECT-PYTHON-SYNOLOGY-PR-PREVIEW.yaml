@@ -103,6 +103,8 @@ jobs:
       command: ${{ steps.parse.outputs.command }}
       is_valid: ${{ steps.parse.outputs.is_valid }}
       is_pr: ${{ steps.parse.outputs.is_pr }}
+      custom_branch: ${{ steps.parse.outputs.custom_branch }}
+      is_custom_branch: ${{ steps.parse.outputs.is_custom_branch }}
     steps:
       - name: 댓글에 👀 리액션 추가
         if: contains(github.event.comment.body, '@suh-lab') && contains(github.event.comment.body, 'server')
@@ -132,18 +134,41 @@ jobs:
             echo "ℹ️ Issue 댓글에서 명령어 감지"
           fi
 
-          if [[ "$COMMENT" =~ @suh-lab[[:space:]]+server[[:space:]]+build ]]; then
+          # 명령어 파싱 (브랜치 파라미터 지원)
+          # 형식: @suh-lab server <command> [브랜치명]
+          if [[ "$COMMENT" =~ @suh-lab[[:space:]]+server[[:space:]]+build([[:space:]]+([^[:space:]]+))? ]]; then
             echo "command=build" >> $GITHUB_OUTPUT
             echo "is_valid=true" >> $GITHUB_OUTPUT
-            echo "✅ 명령어 감지: build"
-          elif [[ "$COMMENT" =~ @suh-lab[[:space:]]+server[[:space:]]+destroy ]]; then
+            if [[ -n "${BASH_REMATCH[2]}" ]]; then
+              echo "custom_branch=${BASH_REMATCH[2]}" >> $GITHUB_OUTPUT
+              echo "is_custom_branch=true" >> $GITHUB_OUTPUT
+              echo "✅ 명령어 감지: build (브랜치: ${BASH_REMATCH[2]})"
+            else
+              echo "is_custom_branch=false" >> $GITHUB_OUTPUT
+              echo "✅ 명령어 감지: build"
+            fi
+          elif [[ "$COMMENT" =~ @suh-lab[[:space:]]+server[[:space:]]+destroy([[:space:]]+([^[:space:]]+))? ]]; then
             echo "command=destroy" >> $GITHUB_OUTPUT
             echo "is_valid=true" >> $GITHUB_OUTPUT
-            echo "✅ 명령어 감지: destroy"
-          elif [[ "$COMMENT" =~ @suh-lab[[:space:]]+server[[:space:]]+status ]]; then
+            if [[ -n "${BASH_REMATCH[2]}" ]]; then
+              echo "custom_branch=${BASH_REMATCH[2]}" >> $GITHUB_OUTPUT
+              echo "is_custom_branch=true" >> $GITHUB_OUTPUT
+              echo "✅ 명령어 감지: destroy (브랜치: ${BASH_REMATCH[2]})"
+            else
+              echo "is_custom_branch=false" >> $GITHUB_OUTPUT
+              echo "✅ 명령어 감지: destroy"
+            fi
+          elif [[ "$COMMENT" =~ @suh-lab[[:space:]]+server[[:space:]]+status([[:space:]]+([^[:space:]]+))? ]]; then
             echo "command=status" >> $GITHUB_OUTPUT
             echo "is_valid=true" >> $GITHUB_OUTPUT
-            echo "✅ 명령어 감지: status"
+            if [[ -n "${BASH_REMATCH[2]}" ]]; then
+              echo "custom_branch=${BASH_REMATCH[2]}" >> $GITHUB_OUTPUT
+              echo "is_custom_branch=true" >> $GITHUB_OUTPUT
+              echo "✅ 명령어 감지: status (브랜치: ${BASH_REMATCH[2]})"
+            else
+              echo "is_custom_branch=false" >> $GITHUB_OUTPUT
+              echo "✅ 명령어 감지: status"
+            fi
           else
             echo "is_valid=false" >> $GITHUB_OUTPUT
             echo "ℹ️ @suh-lab server 명령어가 아님"
@@ -158,7 +183,8 @@ jobs:
     if: |
       needs.check-command.outputs.is_valid == 'true' &&
       needs.check-command.outputs.command == 'build' &&
-      needs.check-command.outputs.is_pr == 'true'
+      needs.check-command.outputs.is_pr == 'true' &&
+      needs.check-command.outputs.is_custom_branch != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: PR 정보 가져오기
@@ -454,6 +480,8 @@ jobs:
             envRows.push(`| **컨테이너** | \`${projectName}-pr-${prNumber}\` |`);
             envRows.push(`| **커밋** | \`${sha}\` |`);
 
+            const branchName = '${{ steps.pr.outputs.ref }}';
+
             const body = [
               '## ✅ PR Preview 배포 완료!',
               '',
@@ -473,6 +501,16 @@ jobs:
               '| `@suh-lab server build` | 최신 커밋으로 재배포 |',
               '| `@suh-lab server destroy` | Preview 환경 삭제 |',
               '| `@suh-lab server status` | 현재 상태 확인 |',
+              '',
+              '<details>',
+              '<summary>🔧 고급 명령어 (다른 Issue/PR에서 제어)</summary>',
+              '',
+              '```',
+              `@suh-lab server build ${branchName}`,
+              `@suh-lab server destroy ${branchName}`,
+              `@suh-lab server status ${branchName}`,
+              '```',
+              '</details>',
               '',
               '---',
               '*🤖 이 댓글은 PR Preview 시스템에 의해 자동 생성되었습니다.*'
@@ -566,7 +604,8 @@ jobs:
     needs: check-command
     if: |
       needs.check-command.outputs.is_valid == 'true' &&
-      needs.check-command.outputs.is_pr == 'false'
+      needs.check-command.outputs.is_pr == 'false' &&
+      needs.check-command.outputs.is_custom_branch != 'true'
     runs-on: ubuntu-latest
     outputs:
       branch_name: ${{ steps.extract.outputs.branch }}
@@ -657,6 +696,7 @@ jobs:
       needs.check-command.outputs.is_valid == 'true' &&
       needs.check-command.outputs.command == 'build' &&
       needs.check-command.outputs.is_pr == 'false' &&
+      needs.check-command.outputs.is_custom_branch != 'true' &&
       needs.get-branch-from-issue.outputs.found == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -1045,6 +1085,16 @@ jobs:
               '| `@suh-lab server destroy` | Preview 환경 삭제 |',
               '| `@suh-lab server status` | 현재 상태 확인 |',
               '',
+              '<details>',
+              '<summary>🔧 고급 명령어 (다른 Issue/PR에서 제어)</summary>',
+              '',
+              '```',
+              `@suh-lab server build ${branchName}`,
+              `@suh-lab server destroy ${branchName}`,
+              `@suh-lab server status ${branchName}`,
+              '```',
+              '</details>',
+              '',
               '---',
               '*🤖 이 댓글은 Issue Preview 시스템에 의해 자동 생성되었습니다.*'
             ].join('\n');
@@ -1187,7 +1237,10 @@ jobs:
             echo "✅ 삭제 완료!"
 
       - name: 삭제 완료 코멘트
-        if: github.event_name == 'issue_comment'
+        if: |
+          github.event_name == 'issue_comment' ||
+          (github.event_name == 'pull_request' && github.event.action == 'closed') ||
+          (github.event_name == 'issues' && github.event.action == 'closed')
         uses: actions/github-script@v7
         with:
           script: |
@@ -1325,5 +1378,740 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: number,
+              body: body
+            });
+
+  # -----------------------------------------------------------------
+  # Job 5: 커스텀 브랜치 빌드 & 배포
+  # -----------------------------------------------------------------
+  build-preview-custom-branch:
+    name: Preview 빌드 & 배포 (Custom Branch)
+    needs: check-command
+    if: |
+      needs.check-command.outputs.is_valid == 'true' &&
+      needs.check-command.outputs.command == 'build' &&
+      needs.check-command.outputs.is_custom_branch == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 브랜치 존재 확인 및 정보 추출
+        id: branch_info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const issueNumber = context.issue.number;
+
+            console.log(`🔍 브랜치 확인: ${branchName}`);
+
+            // 브랜치 존재 여부 확인
+            try {
+              await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: branchName
+              });
+              console.log(`✅ 브랜치 존재: ${branchName}`);
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ 브랜치 없음: ${branchName}`);
+
+                // 에러 댓글 작성
+                const body = [
+                  '## ❌ 브랜치를 찾을 수 없습니다',
+                  '',
+                  '| 항목 | 값 |',
+                  '|------|-----|',
+                  `| **브랜치** | \`${branchName}\` |`,
+                  '',
+                  '### 💡 확인 사항',
+                  '1. 브랜치명이 정확한지 확인하세요',
+                  '2. 브랜치가 push되었는지 확인하세요',
+                  '3. 브랜치가 삭제되지 않았는지 확인하세요',
+                  '',
+                  '---',
+                  '*🤖 이 댓글은 Preview 시스템에 의해 자동 생성되었습니다.*'
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: body
+                });
+
+                core.setFailed('브랜치를 찾을 수 없습니다');
+                return;
+              }
+              throw error;
+            }
+
+            // 브랜치명에서 Issue 번호 추출 (#번호 패턴)
+            const issueMatch = branchName.match(/#(\d+)/);
+
+            if (issueMatch) {
+              // 번호 추출 성공
+              core.setOutput('container_number', issueMatch[1]);
+              core.setOutput('use_hash', 'false');
+              console.log(`✅ Issue 번호 추출: #${issueMatch[1]}`);
+            } else {
+              // 해시 생성
+              let hash = 0;
+              for (let i = 0; i < branchName.length; i++) {
+                const char = branchName.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+              }
+              const hashStr = Math.abs(hash).toString(16).slice(-6).padStart(6, '0');
+              core.setOutput('container_suffix', `custom-${hashStr}`);
+              core.setOutput('use_hash', 'true');
+              console.log(`✅ 해시 생성: custom-${hashStr}`);
+            }
+
+            core.setOutput('branch_name', branchName);
+            core.setOutput('branch_exists', 'true');
+
+      - name: 브랜치의 최신 커밋 SHA 가져오기
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        id: get_sha
+        run: |
+          SHA=$(git ls-remote https://github.com/${{ github.repository }}.git refs/heads/${{ needs.check-command.outputs.custom_branch }} | cut -c1-7)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+      # 진행 상황 댓글 생성
+      - name: 진행 상황 댓글 생성
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        id: progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = context.issue.number;
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const startTime = Date.now();
+
+            const body = [
+              '## 🚀 Custom Branch Preview 빌드 중...',
+              '',
+              `**브랜치**: \`${branchName}\``,
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              '| 🐳 Docker 이미지 빌드 & Push | ⏳ 진행 중... | - |',
+              '| 🚀 서버 배포 & Health Check | ⏸️ 대기 | - |',
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: body
+            });
+
+            core.setOutput('comment_id', comment.id);
+            core.setOutput('start_time', startTime);
+            core.setOutput('docker_start', startTime);
+
+      - name: 코드 체크아웃
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-command.outputs.custom_branch }}
+
+      # 환경변수 파일 생성
+      - name: "[필수] .env 파일 생성"
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        run: |
+          cat << 'EOF' > .env
+          ${{ secrets.ENV_FILE }}
+          EOF
+
+      - name: Docker 로그인
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker Buildx 설정
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: 컨테이너 이름 결정
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        id: container
+        run: |
+          if [[ "${{ steps.branch_info.outputs.use_hash }}" == "true" ]]; then
+            SUFFIX="${{ steps.branch_info.outputs.container_suffix }}"
+          else
+            SUFFIX="pr-${{ steps.branch_info.outputs.container_number }}"
+          fi
+          echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
+          echo "name=${{ env.PROJECT_NAME }}-${SUFFIX}" >> $GITHUB_OUTPUT
+
+      - name: Docker 이미지 빌드 & Push
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.PROJECT_NAME }}:${{ steps.container.outputs.suffix }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 진행 상황 - Docker 완료
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        id: docker_progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = ${{ steps.progress.outputs.comment_id }};
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const dockerStart = ${{ steps.progress.outputs.docker_start }};
+            const now = Date.now();
+            const dockerElapsed = now - dockerStart;
+            const minutes = Math.floor(dockerElapsed / 60000);
+            const seconds = Math.floor((dockerElapsed % 60000) / 1000);
+            const dockerDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              '## 🚀 Custom Branch Preview 빌드 중...',
+              '',
+              `**브랜치**: \`${branchName}\``,
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🐳 Docker 이미지 빌드 & Push | ✅ 완료 | ${dockerDuration} |`,
+              '| 🚀 서버 배포 & Health Check | ⏳ 진행 중... | - |',
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            core.setOutput('docker_duration', dockerDuration);
+            core.setOutput('deploy_start', now);
+
+      - name: 서버에 배포
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            set -e
+
+            # 환경 변수 설정 (시놀로지 NAS용)
+            export PATH=$PATH:/usr/local/bin
+            export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 변수 설정
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+            CONTAINER_NAME="${{ steps.container.outputs.name }}"
+            CONTAINER_SUFFIX="${{ steps.container.outputs.suffix }}"
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${CONTAINER_SUFFIX}"
+            DOMAIN="${CONTAINER_NAME}.${{ env.PREVIEW_DOMAIN_SUFFIX }}"
+            INTERNAL_PORT="${{ env.INTERNAL_PORT }}"
+            TRAEFIK_NETWORK="${{ env.TRAEFIK_NETWORK }}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🚀 Custom Branch Preview 배포 시작"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📦 프로젝트: ${PROJECT_NAME}"
+            echo "📛 컨테이너: ${CONTAINER_NAME}"
+            echo "🌐 도메인: ${DOMAIN}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # 이미지 Pull
+            echo "📥 Docker 이미지 Pull 중..."
+            echo $PW | sudo -S docker pull "${IMAGE}"
+
+            # 기존 컨테이너 삭제
+            echo "🗑️ 기존 컨테이너 정리 중..."
+            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+
+            # 볼륨 마운트 옵션 구성
+            VOLUME_OPTS="-v /etc/localtime:/etc/localtime:ro"
+            if [ -n "${{ env.PROJECT_TARGET_DIR }}" ] && [ -n "${{ env.PROJECT_MNT_DIR }}" ]; then
+              VOLUME_OPTS="$VOLUME_OPTS -v ${{ env.PROJECT_TARGET_DIR }}:${{ env.PROJECT_MNT_DIR }}"
+            fi
+
+            # 새 컨테이너 실행
+            echo "🐳 새 컨테이너 실행 중..."
+            echo $PW | sudo -S docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --network "${TRAEFIK_NETWORK}" \
+              --label "traefik.enable=true" \
+              --label "traefik.http.routers.${CONTAINER_NAME}.rule=Host(\`${DOMAIN}\`)" \
+              --label "traefik.http.routers.${CONTAINER_NAME}.entrypoints=web" \
+              --label "traefik.http.services.${CONTAINER_NAME}.loadbalancer.server.port=${INTERNAL_PORT}" \
+              -e TZ=Asia/Seoul \
+              -e ENVIRONMENT=prod \
+              $VOLUME_OPTS \
+              "${IMAGE}"
+
+            # Health Check
+            echo ""
+            echo "⏳ Health Check 시작 (최대 120초 대기)..."
+            HEALTH_PATH="${{ env.HEALTH_CHECK_PATH }}"
+            LOG_PATTERN="${{ env.HEALTH_CHECK_LOG_PATTERN }}"
+            MAX_RETRIES=24
+            RETRY_COUNT=0
+            HEALTH_CHECK_PASSED=false
+            HEALTH_CHECK_METHOD=""
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              sleep 5
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+
+              STATUS=$(echo $PW | sudo -S docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+
+              if [ "$STATUS" = "exited" ]; then
+                echo "❌ 컨테이너 비정상 종료!"
+                echo ""
+                echo "📋 컨테이너 로그 (최근 100줄):"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                exit 1
+              fi
+
+              if [ "$STATUS" = "running" ]; then
+                if [ -n "$HEALTH_PATH" ]; then
+                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
+
+                  if [ -n "$HEALTH" ]; then
+                    echo "✅ 정상 기동 확인! (HTTP 응답: ${HEALTH_PATH})"
+                    HEALTH_CHECK_PASSED=true
+                    HEALTH_CHECK_METHOD="HTTP"
+                    break
+                  fi
+                fi
+
+                if [ -n "$LOG_PATTERN" ]; then
+                  STARTED=$(echo $PW | sudo -S docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
+
+                  if [ -n "$STARTED" ]; then
+                    echo "✅ 정상 기동 확인! (로그 패턴)"
+                    echo "   $STARTED"
+                    HEALTH_CHECK_PASSED=true
+                    HEALTH_CHECK_METHOD="Log"
+                    break
+                  fi
+                fi
+              fi
+
+              echo "⏳ 대기 중... ($RETRY_COUNT/$MAX_RETRIES) - 상태: $STATUS"
+            done
+
+            if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
+              echo ""
+              echo "❌ Health Check 타임아웃 (120초)"
+              echo ""
+              echo "📋 컨테이너 로그 (최근 100줄):"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              exit 1
+            fi
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "✅ 배포 및 Health Check 완료! (방식: ${HEALTH_CHECK_METHOD})"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: 배포 완료 코멘트
+        if: steps.branch_info.outputs.branch_exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = ${{ steps.progress.outputs.comment_id }};
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
+            const deployStart = ${{ steps.docker_progress.outputs.deploy_start }};
+            const now = Date.now();
+            const deployElapsed = now - deployStart;
+            const minutes = Math.floor(deployElapsed / 60000);
+            const seconds = Math.floor((deployElapsed % 60000) / 1000);
+            const deployDuration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+            const projectName = '${{ env.PROJECT_NAME }}';
+            const domainSuffix = '${{ env.PREVIEW_DOMAIN_SUFFIX }}';
+            const previewPort = '${{ env.PREVIEW_PORT }}';
+            const apiDocsPath = '${{ env.API_DOCS_PATH }}';
+            const containerName = '${{ steps.container.outputs.name }}';
+            const domain = `${containerName}.${domainSuffix}`;
+            const previewUrl = `http://${domain}:${previewPort}`;
+            const sha = '${{ steps.get_sha.outputs.sha }}';
+
+            // Preview 환경 테이블 구성
+            const envRows = [
+              `| **Preview URL** | ${previewUrl} |`,
+            ];
+            if (apiDocsPath) {
+              envRows.push(`| **API Docs** | ${previewUrl}${apiDocsPath} |`);
+            }
+            envRows.push(`| **컨테이너** | \`${containerName}\` |`);
+            envRows.push(`| **브랜치** | \`${branchName}\` |`);
+            envRows.push(`| **커밋** | \`${sha}\` |`);
+
+            const body = [
+              '## ✅ Custom Branch Preview 배포 완료!',
+              '',
+              `**브랜치**: \`${branchName}\``,
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🐳 Docker 이미지 빌드 & Push | ✅ 완료 | ${dockerDuration} |`,
+              `| 🚀 서버 배포 & Health Check | ✅ 완료 | ${deployDuration} |`,
+              '',
+              '### 🌐 Preview 환경',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              ...envRows,
+              '',
+              '### 📋 명령어',
+              '| 명령어 | 설명 |',
+              '|--------|------|',
+              '| `@suh-lab server build` | 최신 커밋으로 재배포 |',
+              '| `@suh-lab server destroy` | Preview 환경 삭제 |',
+              '| `@suh-lab server status` | 현재 상태 확인 |',
+              '',
+              '<details>',
+              '<summary>🔧 고급 명령어 (다른 Issue/PR에서 제어)</summary>',
+              '',
+              '```',
+              `@suh-lab server build ${branchName}`,
+              `@suh-lab server destroy ${branchName}`,
+              `@suh-lab server status ${branchName}`,
+              '```',
+              '</details>',
+              '',
+              '---',
+              '*🤖 이 댓글은 Custom Branch Preview 시스템에 의해 자동 생성되었습니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+      - name: 빌드/배포 실패 시 에러 코멘트
+        if: failure() && steps.branch_info.outputs.branch_exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = ${{ steps.progress.outputs.comment_id || 0 }};
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const dockerDuration = '${{ steps.docker_progress.outputs.docker_duration }}';
+
+            let dockerStatus, deployStatus;
+            let dockerTime = '-';
+
+            if (!commentId) {
+              dockerStatus = '⚠️ 초기화 실패';
+              deployStatus = '-';
+            } else if (!dockerDuration || dockerDuration === '') {
+              dockerStatus = '❌ 실패';
+              deployStatus = '⏸️ 대기';
+            } else {
+              dockerStatus = '✅ 완료';
+              deployStatus = '❌ 실패';
+              dockerTime = dockerDuration;
+            }
+
+            const body = [
+              '## ❌ Custom Branch Preview 배포 실패!',
+              '',
+              `**브랜치**: \`${branchName}\``,
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🐳 Docker 이미지 빌드 & Push | ${dockerStatus} | ${dockerTime} |`,
+              `| 🚀 서버 배포 & Health Check | ${deployStatus} | - |`,
+              '',
+              `**[📋 빌드/배포 로그 확인](${runUrl})**`,
+              '',
+              '### 🔍 가능한 원인',
+              '- Docker 이미지 빌드 실패 (Python 의존성 문제)',
+              '- 컨테이너 시작 실패 (FastAPI/Uvicorn 기동 오류)',
+              '- Health Check 타임아웃 (120초 내 기동 완료 안됨)',
+              '- 환경변수 누락 (.env 파일 설정 확인)',
+              '',
+              '### 💡 다음 단계',
+              '1. 위 링크에서 빌드/배포 로그를 확인하세요',
+              `2. 문제를 수정한 후 다시 시도하세요: \`@suh-lab server build ${branchName}\``,
+              '',
+              '---',
+              '*🤖 이 댓글은 Custom Branch Preview 시스템에 의해 자동 생성되었습니다.*'
+            ].join('\n');
+
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  # -----------------------------------------------------------------
+  # Job 6: 커스텀 브랜치 Preview 삭제
+  # -----------------------------------------------------------------
+  destroy-preview-custom-branch:
+    name: Preview 삭제 (Custom Branch)
+    needs: check-command
+    if: |
+      needs.check-command.outputs.is_valid == 'true' &&
+      needs.check-command.outputs.command == 'destroy' &&
+      needs.check-command.outputs.is_custom_branch == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 브랜치명에서 컨테이너 정보 추출
+        id: container_info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const projectName = '${{ env.PROJECT_NAME }}';
+
+            // 브랜치명에서 Issue 번호 추출 (#번호 패턴)
+            const issueMatch = branchName.match(/#(\d+)/);
+
+            let containerName;
+            if (issueMatch) {
+              containerName = `${projectName}-pr-${issueMatch[1]}`;
+              console.log(`✅ Issue 번호 추출: #${issueMatch[1]}`);
+            } else {
+              // 해시 생성
+              let hash = 0;
+              for (let i = 0; i < branchName.length; i++) {
+                const char = branchName.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+              }
+              const hashStr = Math.abs(hash).toString(16).slice(-6).padStart(6, '0');
+              containerName = `${projectName}-custom-${hashStr}`;
+              console.log(`✅ 해시 생성: custom-${hashStr}`);
+            }
+
+            core.setOutput('container_name', containerName);
+            core.setOutput('branch_name', branchName);
+
+      - name: 컨테이너 & 이미지 삭제
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            # 환경 변수 설정 (시놀로지 NAS용)
+            export PATH=$PATH:/usr/local/bin
+            export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            CONTAINER_NAME="${{ steps.container_info.outputs.container_name }}"
+            PROJECT_NAME="${{ env.PROJECT_NAME }}"
+
+            # 컨테이너명에서 suffix 추출
+            SUFFIX="${CONTAINER_NAME#${PROJECT_NAME}-}"
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${SUFFIX}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🗑️ Custom Branch Preview 삭제"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📦 프로젝트: ${PROJECT_NAME}"
+            echo "📛 컨테이너: ${CONTAINER_NAME}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # 컨테이너 삭제
+            echo "🐳 컨테이너 삭제 중..."
+            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+
+            # 이미지 삭제
+            echo "🖼️ 이미지 삭제 중..."
+            echo $PW | sudo -S docker rmi "${IMAGE}" 2>/dev/null || true
+
+            echo "✅ 삭제 완료!"
+
+      - name: 삭제 완료 코멘트
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const containerName = '${{ steps.container_info.outputs.container_name }}';
+
+            const body = [
+              '## 🗑️ Custom Branch Preview 환경 삭제 완료!',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **브랜치** | \`${branchName}\` |`,
+              `| **컨테이너** | \`${containerName}\` |`,
+              '| **상태** | 삭제됨 |',
+              '',
+              `다시 배포하려면: \`@suh-lab server build ${branchName}\``,
+              '',
+              '---',
+              '*🤖 이 댓글은 Custom Branch Preview 시스템에 의해 자동 생성되었습니다.*'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+  # -----------------------------------------------------------------
+  # Job 7: 커스텀 브랜치 Preview 상태 확인
+  # -----------------------------------------------------------------
+  check-status-custom-branch:
+    name: Preview 상태 확인 (Custom Branch)
+    needs: check-command
+    if: |
+      needs.check-command.outputs.is_valid == 'true' &&
+      needs.check-command.outputs.command == 'status' &&
+      needs.check-command.outputs.is_custom_branch == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 브랜치명에서 컨테이너 정보 추출
+        id: container_info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const projectName = '${{ env.PROJECT_NAME }}';
+
+            // 브랜치명에서 Issue 번호 추출 (#번호 패턴)
+            const issueMatch = branchName.match(/#(\d+)/);
+
+            let containerName;
+            if (issueMatch) {
+              containerName = `${projectName}-pr-${issueMatch[1]}`;
+            } else {
+              // 해시 생성
+              let hash = 0;
+              for (let i = 0; i < branchName.length; i++) {
+                const char = branchName.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+              }
+              const hashStr = Math.abs(hash).toString(16).slice(-6).padStart(6, '0');
+              containerName = `${projectName}-custom-${hashStr}`;
+            }
+
+            core.setOutput('container_name', containerName);
+            core.setOutput('branch_name', branchName);
+
+      - name: 컨테이너 상태 확인
+        uses: appleboy/ssh-action@v1.0.3
+        id: check_running
+        continue-on-error: true
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ env.SSH_PORT }}
+          script: |
+            export PATH=$PATH:/usr/local/bin
+
+            CONTAINER_NAME="${{ steps.container_info.outputs.container_name }}"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🔍 Custom Branch Preview 상태 확인"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            if docker ps --filter "name=${CONTAINER_NAME}" --format "{{.Names}}" | grep -q "${CONTAINER_NAME}"; then
+              echo "STATUS=running"
+              echo "✅ 컨테이너 실행 중"
+              docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}\t{{.RunningFor}}"
+            else
+              echo "STATUS=not_found"
+              echo "❌ 컨테이너 없음"
+              exit 1
+            fi
+
+      - name: 상태 코멘트 작성
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ needs.check-command.outputs.custom_branch }}';
+            const containerName = '${{ steps.container_info.outputs.container_name }}';
+            const projectName = '${{ env.PROJECT_NAME }}';
+            const domainSuffix = '${{ env.PREVIEW_DOMAIN_SUFFIX }}';
+            const previewPort = '${{ env.PREVIEW_PORT }}';
+            const domain = `${containerName}.${domainSuffix}`;
+            const previewUrl = `http://${domain}:${previewPort}`;
+            const isRunning = '${{ steps.check_running.outcome }}' === 'success';
+
+            let body;
+            if (isRunning) {
+              body = [
+                '## ✅ Custom Branch Preview 환경 실행 중',
+                '',
+                '| 항목 | 값 |',
+                '|------|-----|',
+                `| **브랜치** | \`${branchName}\` |`,
+                `| **Preview URL** | ${previewUrl} |`,
+                `| **컨테이너** | \`${containerName}\` |`,
+                '| **상태** | 🟢 Running |',
+                '',
+                '### 📋 명령어',
+                '| 명령어 | 설명 |',
+                '|--------|------|',
+                `| \`@suh-lab server build ${branchName}\` | 최신 커밋으로 재배포 |`,
+                `| \`@suh-lab server destroy ${branchName}\` | Preview 환경 삭제 |`,
+                '',
+                '---',
+                '*🤖 이 댓글은 Custom Branch Preview 시스템에 의해 자동 생성되었습니다.*'
+              ].join('\n');
+            } else {
+              body = [
+                '## ❌ Custom Branch Preview 환경 없음',
+                '',
+                '| 항목 | 값 |',
+                '|------|-----|',
+                `| **브랜치** | \`${branchName}\` |`,
+                `| **컨테이너** | \`${containerName}\` |`,
+                '| **상태** | 🔴 Not Found |',
+                '',
+                `배포하려면: \`@suh-lab server build ${branchName}\``,
+                '',
+                '---',
+                '*🤖 이 댓글은 Custom Branch Preview 시스템에 의해 자동 생성되었습니다.*'
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
               body: body
             });

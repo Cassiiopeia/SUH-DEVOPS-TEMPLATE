@@ -1919,14 +1919,12 @@ function Install-CustomCommand {
 
     Print-Step "$DisplayName 설정 설치 중..."
 
-    # 기존 폴더 삭제 (백업 없이)
+    # 기존 폴더가 있으면 덮어쓰기 알림
     if (Test-Path $FolderName) {
-        Remove-Item -Path $FolderName -Recurse -Force
-        Print-Info "기존 $FolderName 폴더 삭제됨"
+        Print-Info "기존 $FolderName 폴더에 덮어쓰기"
+    } else {
+        New-Item -Path $FolderName -ItemType Directory -Force | Out-Null
     }
-
-    # 새 폴더 복사
-    New-Item -Path $FolderName -ItemType Directory -Force | Out-Null
     Copy-Item -Path "$src\*" -Destination "$FolderName\" -Recurse -Force -ErrorAction SilentlyContinue
     Print-Success "$DisplayName 설정 설치 완료"
     return $true
@@ -1938,7 +1936,7 @@ function Copy-CustomCommands {
     )
 
     # 경고 메시지
-    Print-Warning "⚠️  기존 설정이 완전히 삭제되고 새로운 설정으로 대체됩니다!"
+    Print-Warning "⚠️  기존 설정 파일이 덮어쓰기됩니다! (기존에 추가한 파일은 보존됨)"
     Write-Host ""
 
     if (-not $Force) {

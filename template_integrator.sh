@@ -1949,14 +1949,12 @@ install_custom_command() {
 
     print_step "$display_name 설정 설치 중..."
 
-    # 기존 폴더 삭제 (백업 없이)
+    # 기존 폴더가 있으면 덮어쓰기 알림
     if [ -d "$folder_name" ]; then
-        rm -rf "$folder_name"
-        print_info "기존 $folder_name 폴더 삭제됨"
+        print_info "기존 $folder_name 폴더에 덮어쓰기"
+    else
+        mkdir -p "$folder_name"
     fi
-
-    # 새 폴더 복사
-    mkdir -p "$folder_name"
     cp -r "$src/"* "$folder_name/" 2>/dev/null || true
     print_success "$display_name 설정 설치 완료"
     return 0
@@ -1966,7 +1964,7 @@ copy_custom_commands() {
     local target=$1  # "cursor", "claude", "all"
 
     # 경고 메시지
-    print_warning "⚠️  기존 설정이 완전히 삭제되고 새로운 설정으로 대체됩니다!"
+    print_warning "⚠️  기존 설정 파일이 덮어쓰기됩니다! (기존에 추가한 파일은 보존됨)"
     print_to_user ""
 
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then

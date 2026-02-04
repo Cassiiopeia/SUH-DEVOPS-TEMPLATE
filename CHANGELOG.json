@@ -1,11 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-02-04T09:00:48Z",
-    "currentVersion": "2.7.18",
+    "lastUpdated": "2026-02-04T09:23:19Z",
+    "currentVersion": "2.7.20",
     "projectType": "basic",
-    "totalReleases": 65
+    "totalReleases": 66
   },
   "releases": [
+    {
+      "version": "2.7.20",
+      "project_type": "basic",
+      "date": "2026-02-04",
+      "pr_number": 191,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 버전이 v2.7.20으로 업데이트되었습니다.\n\n* **개선사항**\n  * 빌드 프로세스 및 내부 코드 관리가 개선되었습니다.",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "버전이 v2.7.20으로 업데이트되었습니다."
+          ]
+        },
+        "개선사항": {
+          "title": "개선사항",
+          "items": [
+            "빌드 프로세스 및 내부 코드 관리가 개선되었습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.18",
       "project_type": "basic",

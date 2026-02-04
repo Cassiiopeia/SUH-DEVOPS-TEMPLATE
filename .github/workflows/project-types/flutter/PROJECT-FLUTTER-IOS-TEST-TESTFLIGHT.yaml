@@ -193,12 +193,6 @@ jobs:
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
 
-      - name: Install iOS Platform
-        run: |
-          echo "📱 iOS Platform 다운로드 중..."
-          xcodebuild -downloadPlatform iOS
-          echo "✅ iOS Platform 설치 완료"
-
       - name: Create .env file
         run: |
           cat << 'EOF' > ${{ env.ENV_FILE_PATH }}
@@ -426,12 +420,6 @@ jobs:
 
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
-
-      - name: Install iOS Platform
-        run: |
-          echo "📱 iOS Platform 다운로드 중..."
-          xcodebuild -downloadPlatform iOS
-          echo "✅ iOS Platform 설치 완료"
 
       - name: Download project files
         uses: actions/download-artifact@v4

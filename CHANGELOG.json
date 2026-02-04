@@ -1,11 +1,36 @@
 {
   "metadata": {
-    "lastUpdated": "2026-02-04T07:06:51Z",
-    "currentVersion": "2.7.15",
+    "lastUpdated": "2026-02-04T07:57:55Z",
+    "currentVersion": "2.7.16",
     "projectType": "basic",
-    "totalReleases": 62
+    "totalReleases": 63
   },
   "releases": [
+    {
+      "version": "2.7.16",
+      "project_type": "basic",
+      "date": "2026-02-04",
+      "pr_number": 187,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 버전 업데이트: v2.7.15 → v2.7.16\n  * 빌드 워크플로우 최적화 및 키 관리 체계 개선\n  * 빌드 트리거 메커니즘 단순화 및 안정성 강화\n\n* **Documentation**\n  * 빌드 트리거 프로세스 문서 업데이트\n  * 빌드 진행 상황 및 결과 표시 방식 개선",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트: v2.7.15 → v2.7.16",
+            "빌드 워크플로우 최적화 및 키 관리 체계 개선",
+            "빌드 트리거 메커니즘 단순화 및 안정성 강화"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "빌드 트리거 프로세스 문서 업데이트",
+            "빌드 진행 상황 및 결과 표시 방식 개선"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.15",
       "project_type": "basic",

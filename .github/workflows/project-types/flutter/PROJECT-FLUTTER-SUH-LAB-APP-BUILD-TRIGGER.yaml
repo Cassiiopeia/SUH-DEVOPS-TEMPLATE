@@ -314,18 +314,19 @@ jobs:
               per_page: 100
             });
 
-            // 빌드 타입에 따라 해당하는 완료 댓글만 카운트 (플랫폼별 분리)
+            // 빌드 타입에 따라 해당 트리거 요청 댓글 카운트 (플랫폼별 분리)
             let searchKeyword = '';
             if (buildType === 'app') {
-              searchKeyword = '앱 빌드 트리거 완료';
+              searchKeyword = 'build app';  // @suh-lab build app
             } else if (buildType === 'apk') {
-              searchKeyword = 'APK 빌드 트리거 완료';
+              searchKeyword = 'apk build';  // @suh-lab apk build
             } else if (buildType === 'ios') {
-              searchKeyword = 'iOS 빌드 트리거 완료';
+              searchKeyword = 'ios build';  // @suh-lab ios build
             }
 
             const buildCount = comments.data.filter(c =>
-              c.body.includes(searchKeyword)
+              c.body.toLowerCase().includes('@suh-lab') &&
+              c.body.toLowerCase().includes(searchKeyword)
             ).length;
 
             // 빌드 번호: 소스번호 + 2자리 카운트 (38800, 38801, 38802...)
@@ -414,51 +415,11 @@ jobs:
 
             console.log('✅ iOS 빌드 워크플로우 트리거 완료');
 
-      - name: 트리거 완료 댓글 작성
+      # 트리거 완료 댓글은 제거됨 - Android/iOS 각각의 진행상황 댓글이 이 역할을 대체
+      - name: 트리거 완료 로그
         if: steps.source_info.outputs.found == 'true' && steps.check_branch.outputs.exists == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const sourceType = '${{ steps.source_info.outputs.sourceType }}';
-            const sourceNumber = '${{ steps.source_info.outputs.sourceNumber }}';
-            const branchName = '${{ steps.source_info.outputs.branchName }}';
-            const buildNumber = '${{ steps.build_number_calc.outputs.buildNumber }}';
-            const buildCount = '${{ steps.build_number_calc.outputs.buildCount }}';
-            const buildType = '${{ steps.build_type.outputs.buildType }}';
-
-            // 빌드 타입에 따라 완료 메시지 결정 (플랫폼별 분리)
-            let triggerTypeText = '';
-            let platformText = '';
-
-            if (buildType === 'app') {
-              triggerTypeText = '앱 빌드 트리거 완료';
-              platformText = 'Android와 iOS';
-            } else if (buildType === 'apk') {
-              triggerTypeText = 'APK 빌드 트리거 완료';
-              platformText = 'Android';
-            } else if (buildType === 'ios') {
-              triggerTypeText = 'iOS 빌드 트리거 완료';
-              platformText = 'iOS';
-            }
-
-            const body = [
-              `🚀 **${triggerTypeText}**`,
-              '',
-              `${platformText} 빌드 워크플로우를 시작했습니다.`,
-              '',
-              `- 앱 버전: \`0.0.0(${buildNumber})\``,
-              `- PR/ISSUE: **#${sourceNumber}** (${buildType} ${buildCount}번째 빌드)`,
-              `- 브랜치: \`${branchName}\``,
-              '',
-              '⏳ 빌드가 완료되면 자동으로 결과 댓글이 작성됩니다.'
-            ].join('\n');
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: parseInt(sourceNumber),
-              body: body
-            });
-
-            console.log(`✅ ${triggerTypeText} 댓글 작성 완료`);
+        run: |
+          echo "✅ Android 및 iOS 빌드 워크플로우 트리거 완료"
+          echo "📦 빌드 번호: ${{ steps.build_number_calc.outputs.buildNumber }}"
+          echo "🌿 브랜치: ${{ steps.source_info.outputs.branchName }}"
+          echo "📋 각 플랫폼별 진행상황 댓글이 자동으로 생성됩니다."

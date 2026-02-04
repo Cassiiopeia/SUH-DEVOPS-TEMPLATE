@@ -9,8 +9,11 @@
 # 🔑 필수 GitHub Secrets
 # ===================================================================
 # ENV_FILE: .env 파일 내용
-# DEBUG_KEYSTORE: 서명용 keystore (base64)
-# GOOGLE_SERVICES_JSON: Firebase google-services.json
+# RELEASE_KEYSTORE_BASE64: 서명용 keystore (base64)
+# RELEASE_KEYSTORE_PASSWORD: keystore 비밀번호
+# RELEASE_KEY_ALIAS: key alias
+# RELEASE_KEY_PASSWORD: key 비밀번호
+# GOOGLE_SERVICES_JSON (선택): Firebase google-services.json
 # SERVER_HOST: Synology NAS 호스트
 # SERVER_USER: SMB 사용자명
 # SERVER_PASSWORD: SMB 비밀번호

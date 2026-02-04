@@ -24,23 +24,23 @@
 #   4. fastlane upload_testflight (마법사 생성 Fastfile 사용)
 #
 # ===================================================================
-# 📋 필요한 GitHub Secrets
+# 🔑 필수 GitHub Secrets
 # ===================================================================
 #
-# 🔐 Apple 인증서 & 프로비저닝 프로파일 (필수):
-#   - APPLE_CERTIFICATE_BASE64        : .p12 인증서 (base64 인코딩)
-#   - APPLE_CERTIFICATE_PASSWORD      : .p12 인증서 비밀번호
-#   - APPLE_PROVISIONING_PROFILE_BASE64 : .mobileprovision 파일 (base64 인코딩)
-#   - IOS_PROVISIONING_PROFILE_NAME   : 프로비저닝 프로파일 이름 (예: "MyApp Distribution")
+# 🔐 Apple 인증서 & 프로비저닝 프로파일:
+# APPLE_CERTIFICATE_BASE64: .p12 인증서 (base64 인코딩)
+# APPLE_CERTIFICATE_PASSWORD: .p12 인증서 비밀번호
+# APPLE_PROVISIONING_PROFILE_BASE64: .mobileprovision 파일 (base64 인코딩)
+# IOS_PROVISIONING_PROFILE_NAME: 프로비저닝 프로파일 이름
 #
-# 🔑 App Store Connect API (필수):
-#   - APP_STORE_CONNECT_API_KEY_ID    : API Key ID (10자리, 예: ABC123DEF4)
-#   - APP_STORE_CONNECT_ISSUER_ID     : Issuer ID (UUID 형식)
-#   - APP_STORE_CONNECT_API_KEY_BASE64: AuthKey_XXXXXX.p8 파일 (base64 인코딩)
+# 🔑 App Store Connect API:
+# APP_STORE_CONNECT_API_KEY_ID: API Key ID (10자리)
+# APP_STORE_CONNECT_ISSUER_ID: Issuer ID (UUID 형식)
+# APP_STORE_CONNECT_API_KEY_BASE64: AuthKey_XXXXXX.p8 파일 (base64 인코딩)
 #
 # 📝 환경 설정 (선택):
-#   - ENV_FILE (또는 ENV)             : .env 파일 내용 (앱에서 사용하는 환경변수)
-#   - SECRETS_XCCONFIG                : ios/Flutter/Secrets.xcconfig 내용 (선택)
+# ENV_FILE (선택): .env 파일 내용
+# SECRETS_XCCONFIG (선택): ios/Flutter/Secrets.xcconfig 내용
 #
 # ===================================================================
 

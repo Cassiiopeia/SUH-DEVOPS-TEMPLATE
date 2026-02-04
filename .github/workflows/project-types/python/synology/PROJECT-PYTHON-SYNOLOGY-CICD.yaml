@@ -1,73 +1,52 @@
 # ===================================================================
-# Python FastAPI 전용 CI/CD 배포 워크플로우 (Synology)
+# Python FastAPI CI/CD 배포 (Synology)
+# ===================================================================
+#
+# deploy 브랜치 푸시 시 Docker 이미지를 빌드하고
+# Synology NAS에 자동 배포합니다.
+#
+# ===================================================================
+# 🔑 필수 GitHub Secrets
+# ===================================================================
+# ENV_FILE: .env 파일 내용
+# DOCKERHUB_USERNAME: DockerHub 사용자명
+# DOCKERHUB_TOKEN: DockerHub 액세스 토큰
+# SERVER_HOST: 배포 서버 주소
+# SERVER_USER: SSH 사용자명
+# SERVER_PASSWORD: SSH 비밀번호
+# ===================================================================
+#
+# 🔧 환경변수 설정 (env 섹션에서 설정)
+# ===================================================================
+#
+# 🌐 포트 및 컨테이너:
+# CONTAINER_INTERNAL_PORT: FastAPI 내부 포트 (기본: 8000)
+# DEPLOY_PORT: 배포 포트
+# CONTAINER_NAME: 컨테이너 이름 (기본: PROJECT_NAME)
+#
+# 📦 볼륨 마운트:
+# ENABLE_VOLUME_MOUNT: 볼륨 마운트 활성화 (true/false)
+# VOLUME_HOST_PATH: 호스트 볼륨 경로
+# VOLUME_CONTAINER_PATH: 컨테이너 내부 마운트 경로
+#
+# 🔌 SSH 연결:
+# SSH_PORT: SSH 포트 (기본: 2022)
+# SSH_COMMAND_TIMEOUT: SSH 명령 타임아웃 (기본: 600s)
+# SSH_CONNECTION_TIMEOUT: SSH 연결 타임아웃 (기본: 60s)
+#
+# ⏱️ 헬스체크:
+# HEALTHCHECK_WAIT_SECONDS: 초기화 대기 시간 (기본: 10초)
+# HEALTHCHECK_PATH: HTTP 엔드포인트 경로 (비어있으면 로그만 사용)
+# HEALTHCHECK_MAX_RETRIES: HTTP 재시도 횟수 (기본: 5회)
+# HEALTHCHECK_RETRY_INTERVAL: 재시도 간격 (기본: 3초)
+# HEALTHCHECK_LOG_PATTERN: Fallback 로그 검색 패턴
+#
+# 💡 HEALTHCHECK_PATH 예시:
+#   FastAPI: "/docs"
+#   커스텀: "/api/v1/health"
 # ===================================================================
 
 name: PROJECT-PYTHON-SYNOLOGY-CICD
-
-# ===================================================================
-# 📋 필수 GitHub Secrets 설정 가이드
-# ===================================================================
-#
-# ⚠️ 사용하기 전에 반드시 다음 GitHub Secrets를 설정하세요!
-# (저장소 Settings > Secrets and variables > Actions에서 설정)
-#
-# 🔧 필수 Secrets:
-# ┌─────────────────────────────┬────────────────────────────────────┐
-# │ Secret 이름                 │ 설명                               │
-# ├─────────────────────────────┼────────────────────────────────────┤
-# │ DOCKERHUB_USERNAME          │ DockerHub 사용자명                 │
-# │ DOCKERHUB_TOKEN             │ DockerHub 액세스 토큰              │
-# │ SERVER_HOST                 │ 배포 대상 서버 IP/도메인           │
-# │ SERVER_USER                 │ 서버 SSH 접속 사용자명             │
-# │ SERVER_PASSWORD             │ 서버 SSH 접속 비밀번호             │
-# │ ENV_FILE                    │ .env 파일 전체 내용                │
-# └─────────────────────────────┴────────────────────────────────────┘
-#
-# 🌐 포트 및 컨테이너 설정 (워크플로우 env 섹션에서 설정):
-# ┌──────────────────────────────┬────────────────────────────────────┐
-# │ CONTAINER_INTERNAL_PORT      │ FastAPI 내부 포트 (기본: 8000)     │
-# │ DEPLOY_PORT                  │ deploy/main 브랜치 배포 포트       │
-# │ CONTAINER_NAME               │ Docker 컨테이너 이름               │
-# │                              │ (기본값: PROJECT_NAME)             │
-# ├──────────────────────────────┼────────────────────────────────────┤
-# │ ENABLE_VOLUME_MOUNT          │ 볼륨 마운트 활성화 (true/false)    │
-# │ VOLUME_HOST_PATH             │ 호스트 볼륨 풀 경로                │
-# │ VOLUME_CONTAINER_PATH        │ 컨테이너 내부 마운트 경로          │
-# ├──────────────────────────────┼────────────────────────────────────┤
-# │ SSH_PORT                     │ SSH 포트 (기본: 2022)              │
-# │ SSH_COMMAND_TIMEOUT          │ SSH 명령 타임아웃 (기본: 600s)     │
-# │ SSH_CONNECTION_TIMEOUT       │ SSH 연결 타임아웃 (기본: 60s)      │
-# └──────────────────────────────┴────────────────────────────────────┘
-#
-# ⏱️ 헬스체크 설정 (워크플로우 env 섹션에서 설정):
-# ┌────────────────────────────┬────────────────────────────────────┐
-# │ HEALTHCHECK_WAIT_SECONDS   │ 초기화 대기 시간 (기본: 10초)      │
-# │ HEALTHCHECK_PATH           │ HTTP 엔드포인트 경로               │
-# │                            │ (비어있으면 로그 패턴만 사용)      │
-# │ HEALTHCHECK_MAX_RETRIES    │ HTTP 재시도 횟수 (기본: 5회)       │
-# │ HEALTHCHECK_RETRY_INTERVAL │ 재시도 간격 (기본: 3초)            │
-# │ HEALTHCHECK_LOG_PATTERN    │ Fallback 로그 검색 패턴            │
-# └────────────────────────────┴────────────────────────────────────┘
-#
-# 💡 HEALTHCHECK_PATH 설정 예시:
-#   FastAPI (기본):                    "/docs"
-#   FastAPI (커스텀 헬스체크):         "/health"
-#   커스텀 엔드포인트:                 "/api/v1/health"
-#
-# 💡 HEALTHCHECK_LOG_PATTERN 설정 예시:
-#   FastAPI:      "Uvicorn running on"
-#   Django:       "Django version"
-#   커스텀:       "Application started successfully"
-#
-# 💡 환경변수 설정 예시 (env 섹션에서 변경):
-#   PROJECT_NAME: "프로젝트명-ai"
-#   DEPLOY_PORT: "8092"
-#   CONTAINER_INTERNAL_PORT: "8000"
-#   ENABLE_VOLUME_MOUNT: "false"
-#   VOLUME_HOST_PATH: "/volume1/projects/프로젝트명/ai"
-#   SSH_PORT: "2022"
-#
-# ===================================================================
 
 # ===================================================================
 # 트리거 설정

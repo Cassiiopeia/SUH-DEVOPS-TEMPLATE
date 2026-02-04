@@ -1,11 +1,29 @@
 {
   "metadata": {
-    "lastUpdated": "2026-01-28T06:47:01Z",
-    "currentVersion": "2.7.12",
+    "lastUpdated": "2026-02-04T07:06:51Z",
+    "currentVersion": "2.7.15",
     "projectType": "basic",
-    "totalReleases": 61
+    "totalReleases": 62
   },
   "releases": [
+    {
+      "version": "2.7.15",
+      "project_type": "basic",
+      "date": "2026-02-04",
+      "pr_number": 185,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 버전을 2.7.15로 업데이트했습니다.\n  * 빌드 인프라를 현대화하고 워크플로우를 최적화했습니다.\n  * README 문서를 갱신하고 프로젝트 URL 정보를 추가했습니다.",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전을 2.7.15로 업데이트했습니다.",
+            "빌드 인프라를 현대화하고 워크플로우를 최적화했습니다.",
+            "README 문서를 갱신하고 프로젝트 URL 정보를 추가했습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.12",
       "project_type": "basic",

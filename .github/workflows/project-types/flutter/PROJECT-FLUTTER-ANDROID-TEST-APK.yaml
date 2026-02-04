@@ -441,13 +441,6 @@ jobs:
           echo "✅ Java setup completed"
           java -version
 
-      # Android SDK 설정
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Verify Android SDK setup
-        run: echo "✅ Android SDK setup completed"
-
       # Ruby 설정
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

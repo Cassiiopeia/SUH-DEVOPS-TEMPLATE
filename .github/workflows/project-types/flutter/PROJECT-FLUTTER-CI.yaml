@@ -438,7 +438,7 @@ jobs:
     if: |
       needs.prepare.outputs.analyze_only != 'true' &&
       needs.prepare.outputs.enable_ios == 'true'
-    runs-on: macos-15
+    runs-on: macos-26
     needs: prepare
 
     outputs:

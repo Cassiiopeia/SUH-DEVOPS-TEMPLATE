@@ -63,7 +63,7 @@ env:
 jobs:
   prepare-test-build:
     name: 테스트 빌드 준비
-    runs-on: macos-15
+    runs-on: macos-26
 
     outputs:
       version: ${{ steps.test_version.outputs.version }}
@@ -394,7 +394,7 @@ jobs:
   # ============================================
   build-ios-test:
     name: iOS 테스트 빌드
-    runs-on: macos-15
+    runs-on: macos-26
     needs: prepare-test-build
 
     outputs:
@@ -659,7 +659,7 @@ jobs:
   # ============================================
   deploy-testflight-test:
     name: TestFlight 테스트 배포
-    runs-on: macos-15
+    runs-on: macos-26
     needs: [prepare-test-build, build-ios-test]
 
     steps:

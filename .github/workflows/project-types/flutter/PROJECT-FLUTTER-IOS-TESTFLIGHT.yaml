@@ -88,7 +88,7 @@ env:
 jobs:
   prepare-build:
     name: 환경 설정 및 준비
-    runs-on: macos-15
+    runs-on: macos-26
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
 
     outputs:
@@ -214,7 +214,7 @@ jobs:
   # ============================================
   build-ios:
     name: iOS 앱 빌드
-    runs-on: macos-15
+    runs-on: macos-26
     needs: prepare-build
 
     steps:
@@ -333,7 +333,7 @@ jobs:
   # ============================================
   deploy-testflight:
     name: TestFlight 배포
-    runs-on: macos-15
+    runs-on: macos-26
     needs: [prepare-build, build-ios]
 
     steps:

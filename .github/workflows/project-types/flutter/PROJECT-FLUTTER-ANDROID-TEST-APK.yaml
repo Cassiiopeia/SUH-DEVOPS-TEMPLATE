@@ -21,13 +21,18 @@
 # 4. 빌드 완료 후 아티팩트에서 APK 다운로드
 #
 # ===================================================================
-# 📋 필요한 GitHub Secrets
+# 🔑 필수 GitHub Secrets
 # ===================================================================
 #
+# 🔐 Release Keystore (Play Store 배포와 동일):
+# RELEASE_KEYSTORE_BASE64: 릴리즈 키스토어 파일 (base64)
+# RELEASE_KEYSTORE_PASSWORD: 키스토어 비밀번호
+# RELEASE_KEY_ALIAS: 키 별칭
+# RELEASE_KEY_PASSWORD: 키 비밀번호
+#
 # 📝 환경 설정 (선택):
-#   - ENV_FILE (또는 ENV)       : .env 파일 내용 (앱에서 사용하는 환경변수)
-#   - DEBUG_KEYSTORE            : debug.keystore 파일 (base64 인코딩)
-#   - GOOGLE_SERVICES_JSON      : google-services.json 내용 (Firebase 사용 시)
+# ENV_FILE (선택): .env 파일 내용
+# GOOGLE_SERVICES_JSON (선택): google-services.json 내용 (Firebase 사용 시)
 #
 # ===================================================================
 

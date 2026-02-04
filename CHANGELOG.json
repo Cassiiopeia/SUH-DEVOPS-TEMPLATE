@@ -1,11 +1,36 @@
 {
   "metadata": {
-    "lastUpdated": "2026-02-04T07:57:55Z",
-    "currentVersion": "2.7.16",
+    "lastUpdated": "2026-02-04T08:22:12Z",
+    "currentVersion": "2.7.17",
     "projectType": "basic",
-    "totalReleases": 63
+    "totalReleases": 64
   },
   "releases": [
+    {
+      "version": "2.7.17",
+      "project_type": "basic",
+      "date": "2026-02-04",
+      "pr_number": 188,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Documentation**\n  * 다양한 플랫폼의 CI/CD 워크플로우 문서 개선 및 정리\n  * GitHub Secrets 섹션 레이블 및 설명 표준화\n  * 필수 및 선택적 시크릿 구성 요소 명확화\n\n* **Chores**\n  * 애플리케이션 버전을 2.7.17로 업데이트\n  * 빌드 번호 증가",
+      "parsed_changes": {
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "다양한 플랫폼의 CI/CD 워크플로우 문서 개선 및 정리",
+            "GitHub Secrets 섹션 레이블 및 설명 표준화",
+            "필수 및 선택적 시크릿 구성 요소 명확화"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "애플리케이션 버전을 2.7.17로 업데이트",
+            "빌드 번호 증가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.16",
       "project_type": "basic",

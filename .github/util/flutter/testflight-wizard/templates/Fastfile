@@ -52,7 +52,8 @@ platform :ios do
     UI.message("📦 IPA 경로: #{ipa_path}")
 
     # 릴리즈 노트 설정
-    release_notes = ENV["RELEASE_NOTES"] || "새로운 빌드가 업로드되었습니다."
+    # Ruby 3.4+ frozen string 호환성: .dup으로 mutable 복사본 생성
+    release_notes = (ENV["RELEASE_NOTES"] || "새로운 빌드가 업로드되었습니다.").dup
     UI.message("📝 릴리즈 노트: #{release_notes}")
 
     # TestFlight 업로드 (upload_to_testflight = pilot)
@@ -106,10 +107,12 @@ platform :ios do
 
     # TestFlight 업로드
     ipa_path = Dir.glob("build/ipa/*.ipa").first
+    # Ruby 3.4+ frozen string 호환성: .dup으로 mutable 복사본 생성
+    changelog = (options[:changelog] || "새로운 빌드가 업로드되었습니다.").dup
     pilot(
       api_key: api_key,
       ipa: ipa_path,
-      changelog: options[:changelog] || "새로운 빌드가 업로드되었습니다.",
+      changelog: changelog,
       skip_waiting_for_build_processing: ENV["SKIP_WAITING_FOR_BUILD_PROCESSING"] == "true",
       distribute_external: false,
       notify_external_testers: false,

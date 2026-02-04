@@ -3,7 +3,8 @@
 source "https://rubygems.org"
 
 # Fastlane - iOS 빌드 자동화
-gem "fastlane", "~> 2.225"
+# Ruby 3.4+ 공식 지원 버전 (2.228+)
+gem "fastlane", "~> 2.228"
 
 # CocoaPods - iOS 의존성 관리
 gem "cocoapods", "~> 1.15"

@@ -314,25 +314,50 @@ jobs:
               per_page: 100
             });
 
-            // 빌드 타입에 따라 해당 트리거 요청 댓글 카운트 (플랫폼별 분리)
-            let searchKeyword = '';
-            if (buildType === 'app') {
-              searchKeyword = 'build app';  // @suh-lab build app
-            } else if (buildType === 'apk') {
-              searchKeyword = 'apk build';  // @suh-lab apk build
-            } else if (buildType === 'ios') {
-              searchKeyword = 'ios build';  // @suh-lab ios build
-            }
+            // 빌드 타입에 따라 해당 플랫폼의 빌드 횟수 카운트
+            // iOS: 'ios build' + 'build app' 통합 카운트 (App Store Connect는 앱 전체에서 빌드 번호 unique)
+            // Android: 'apk build' + 'build app' 통합 카운트 (Play Store도 동일)
+            // App: 모든 빌드 명령어 통합 카운트
+            let buildCount = 0;
 
-            const buildCount = comments.data.filter(c =>
-              c.body.toLowerCase().includes('@suh-lab') &&
-              c.body.toLowerCase().includes(searchKeyword)
-            ).length;
+            if (buildType === 'ios') {
+              // iOS 빌드: 'ios build' + 'build app' 둘 다 카운트
+              buildCount = comments.data.filter(c => {
+                const body = c.body.toLowerCase();
+                return body.includes('@suh-lab') && (
+                  body.includes('ios build') ||
+                  (body.includes('build') && body.includes('app'))
+                );
+              }).length;
+              console.log(`📊 iOS 빌드 카운트: 'ios build' + 'build app' 통합`);
+
+            } else if (buildType === 'apk') {
+              // Android 빌드: 'apk build' + 'build app' 둘 다 카운트
+              buildCount = comments.data.filter(c => {
+                const body = c.body.toLowerCase();
+                return body.includes('@suh-lab') && (
+                  body.includes('apk build') ||
+                  (body.includes('build') && body.includes('app'))
+                );
+              }).length;
+              console.log(`📊 Android 빌드 카운트: 'apk build' + 'build app' 통합`);
+
+            } else if (buildType === 'app') {
+              // 전체 앱 빌드: 모든 빌드 명령어 카운트
+              buildCount = comments.data.filter(c => {
+                const body = c.body.toLowerCase();
+                return body.includes('@suh-lab') && (
+                  body.includes('ios build') ||
+                  body.includes('apk build') ||
+                  (body.includes('build') && body.includes('app'))
+                );
+              }).length;
+              console.log(`📊 전체 앱 빌드 카운트: 모든 빌드 명령어 통합`);
+            }
 
             // 빌드 번호: 소스번호 + 2자리 카운트 (38800, 38801, 38802...)
             const buildNumber = `${sourceNumber}${String(buildCount).padStart(2, '0')}`;
 
-            console.log(`📊 카운트 키워드: "${searchKeyword}"`);
             console.log(`📊 ${sourceType} #${sourceNumber}: ${buildType} ${buildCount}번째 빌드`);
             console.log(`📦 생성된 빌드 번호: ${buildNumber}`);
 

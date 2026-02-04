@@ -335,42 +335,27 @@ jobs:
       - name: Pull latest changes
         run: git pull origin ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}
 
-      # Debug Keystore 설정 (선택적)
-      - name: Setup Debug Keystore
-        run: |
-          mkdir -p ~/.android
-          if [ -n "${{ secrets.DEBUG_KEYSTORE }}" ]; then
-            echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ~/.android/debug.keystore
-            echo "✅ Debug Keystore created from secrets"
-          else
-            echo "ℹ️ DEBUG_KEYSTORE secret not provided, using default"
-          fi
-          ls -la ~/.android/ || true
-
-      # .env 파일 생성
       - name: Create .env file
         run: |
-          cat << 'EOF' > ${{ env.ENV_FILE_PATH }}
-          ${{ secrets.ENV_FILE || secrets.ENV }}
-          EOF
+          echo "${{ secrets.ENV_FILE || secrets.ENV }}" > ${{ env.ENV_FILE_PATH }}
           echo "✅ ${{ env.ENV_FILE_PATH }} file created"
 
-      # Keystore와 key.properties 설정 (선택적)
-      - name: Setup Keystore and key.properties
+      - name: Setup Release Keystore
         run: |
-          mkdir -p android/app/keystore
-          if [ -n "${{ secrets.DEBUG_KEYSTORE }}" ]; then
-            echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > android/app/keystore/key.jks
-            echo "✅ Keystore created from DEBUG_KEYSTORE"
-            echo "storeFile=app/keystore/key.jks" > android/key.properties
-            echo "storePassword=android" >> android/key.properties
-            echo "keyAlias=androiddebugkey" >> android/key.properties
-            echo "keyPassword=android" >> android/key.properties
-            echo "✅ key.properties created"
-          else
-            echo "ℹ️ DEBUG_KEYSTORE not provided, skipping keystore setup"
-          fi
-          ls -la android/ || true
+          mkdir -p android/keystore
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > android/keystore/key.jks
+          echo "✅ Release Keystore 생성 완료"
+          ls -la android/keystore/
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties << EOF
+          storeFile=keystore/key.jks
+          storePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
+          keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
+          EOF
+          echo "✅ key.properties 생성 완료"
 
       # google-services.json 생성 (선택적)
       - name: Create google-services.json

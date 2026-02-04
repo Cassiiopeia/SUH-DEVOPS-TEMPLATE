@@ -4,20 +4,23 @@
 
 **완전 자동화된 GitHub 프로젝트 관리 템플릿**
 
+> 개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 자동으로 처리됩니다.
+
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
 ## 최신 버전 : v2.7.12 (2026-01-28)
 
-[전체 버전 기록 보기](CHANGELOG.md)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-> 개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 자동으로 처리됩니다.
+[전체 버전 기록 보기](CHANGELOG.md) 
 
 </div>
 
 ---
-## 소개 사이트
-## https://lab.suhsaechan.kr/suh-devops-template
+
+<div align="center">
+
+
+  ## https://lab.suhsaechan.kr/suh-devops-template
+
+</div>
 
 ## 왜 이 템플릿인가?
 

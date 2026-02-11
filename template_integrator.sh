@@ -330,6 +330,7 @@ ${BLUE}옵션:${NC}
   -t, --type TYPE          프로젝트 타입 (미지정 시 자동 감지)
   --no-backup              백업 생성 안 함
   --force                  확인 없이 즉시 실행
+  --target TARGET        commands 모드 설치 대상 (cursor, claude, all)
   --synology               Synology 워크플로우 포함 (기본: 제외)
   --no-synology            Synology 워크플로우 제외
   -h, --help               이 도움말 표시
@@ -372,8 +373,11 @@ ${BLUE}사용 예시:${NC}
   # 수동 설정
   ${GREEN}./template_integrator.sh --mode full --version 1.0.0 --type node${NC}
 
-  # Custom Command만 설치 (Cursor/Claude 설정)
+  # Custom Command만 설치 (대화형 메뉴)
   ${GREEN}./template_integrator.sh --mode commands${NC}
+
+  # Custom Command 모두 설치 (확인 없이)
+  ${GREEN}./template_integrator.sh --mode commands --target all --force${NC}
 
 ${BLUE}통합 후 작업:${NC}
   1. ${CYAN}README.md${NC} - 버전 정보 섹션 자동 추가됨 (기존 내용 보존)
@@ -408,6 +412,7 @@ PROJECT_TYPE=""
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
 INCLUDE_SYNOLOGY=""  # Synology 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
+COMMAND_TARGET=""
 
 # 지원하는 프로젝트 타입
 VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
@@ -438,6 +443,10 @@ while [[ $# -gt 0 ]]; do
         --no-synology)
             INCLUDE_SYNOLOGY=false
             shift
+            ;;
+        --target)
+            COMMAND_TARGET="$2"
+            shift 2
             ;;
         -h|--help)
             show_help
@@ -2414,7 +2423,11 @@ execute_integration() {
             copy_discussion_templates
             ;;
         commands)
-            show_custom_command_menu
+            if [ -n "$COMMAND_TARGET" ]; then
+                copy_custom_commands "$COMMAND_TARGET"
+            else
+                show_custom_command_menu
+            fi
             return  # commands 모드는 자체적으로 정리하고 종료
             ;;
     esac

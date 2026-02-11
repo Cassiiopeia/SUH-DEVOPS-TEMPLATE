@@ -39,7 +39,7 @@ Git worktree를 자동으로 생성하고 관리하는 스크립트입니다.
 **Cursor Command로 실행 (권장):**
 
 ```
-/init-workflow
+/init-worktree
 
 20260120_#163_Github_Projects_에_대한_템플릿_개발_필요
 ```

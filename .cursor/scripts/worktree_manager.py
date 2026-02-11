@@ -97,7 +97,7 @@ def get_branch_name() -> str:
         if branch_name:
           return branch_name
 
-    # 방법 2: 임시 파일에서 읽기 (init-workflow에서 파일 생성 후 전달)
+    # 방법 2: 임시 파일에서 읽기 (init-worktree에서 파일 생성 후 전달)
     temp_file = os.environ.get('BRANCH_NAME_FILE', '')
     if temp_file and os.path.exists(temp_file):
       try:

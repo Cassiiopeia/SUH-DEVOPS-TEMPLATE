@@ -78,6 +78,9 @@ param(
     [switch]$NoSynology,
 
     [Parameter(Mandatory=$false)]
+    [string]$Target = "",
+
+    [Parameter(Mandatory=$false)]
     [switch]$Help
 )
 
@@ -320,6 +323,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Type <TYPE>          프로젝트 타입 (미지정 시 자동 감지)
   -NoBackup             백업 생성 안 함
   -Force                확인 없이 즉시 실행
+  -Target <TARGET>      commands 모드 설치 대상 (cursor, claude, all)
   -Synology             Synology 워크플로우 포함 (기본: 제외)
   -NoSynology           Synology 워크플로우 제외
   -Help                 이 도움말 표시
@@ -359,8 +363,11 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   # 수동 설정
   .\template_integrator.ps1 -Mode full -Version "1.0.0" -Type node
 
-  # Custom Command만 설치 (Cursor/Claude 설정)
+  # Custom Command만 설치 (대화형 메뉴)
   .\template_integrator.ps1 -Mode commands
+
+  # Custom Command 모두 설치 (확인 없이)
+  .\template_integrator.ps1 -Mode commands -Target all -Force
 
 통합 후 작업:
   1. README.md - 버전 정보 섹션 자동 추가됨 (기존 내용 보존)
@@ -2320,7 +2327,11 @@ function Start-Integration {
             Copy-DiscussionTemplates
         }
         "commands" {
-            Show-CustomCommandMenu
+            if ($Target -ne "") {
+                Copy-CustomCommands -Target $Target
+            } else {
+                Show-CustomCommandMenu
+            }
             return  # commands 모드는 자체적으로 정리하고 종료
         }
     }

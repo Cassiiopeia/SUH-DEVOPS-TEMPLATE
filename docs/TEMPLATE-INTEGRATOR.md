@@ -52,15 +52,33 @@ iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
 
 ## CLI 옵션
 
-### 공통 옵션
+### Bash (macOS/Linux) 옵션
 
 | 옵션 | 설명 | 예시 |
 |------|------|------|
-| `--mode <mode>` | 통합 모드 선택 | `--mode full` |
-| `--type <type>` | 프로젝트 타입 지정 | `--type spring` |
-| `--version <ver>` | 초기 버전 지정 | `--version 1.0.0` |
+| `-m`, `--mode <mode>` | 통합 모드 선택 | `--mode full` |
+| `-t`, `--type <type>` | 프로젝트 타입 지정 | `--type spring` |
+| `-v`, `--version <ver>` | 초기 버전 지정 | `--version 1.0.0` |
 | `--force` | 확인 없이 실행 | `--force` |
-| `--help` | 도움말 표시 | `--help` |
+| `--no-backup` | 백업 생성 안 함 | `--no-backup` |
+| `--target <target>` | commands 모드 설치 대상 (`cursor`, `claude`, `all`) | `--target all` |
+| `--synology` | Synology 워크플로우 포함 | `--synology` |
+| `--no-synology` | Synology 워크플로우 제외 (기본값) | `--no-synology` |
+| `-h`, `--help` | 도움말 표시 | `--help` |
+
+### PowerShell (Windows) 옵션
+
+| 옵션 | 설명 | 예시 |
+|------|------|------|
+| `-Mode <mode>` | 통합 모드 선택 | `-Mode full` |
+| `-Type <type>` | 프로젝트 타입 지정 | `-Type spring` |
+| `-Version <ver>` | 초기 버전 지정 | `-Version "1.0.0"` |
+| `-Force` | 확인 없이 실행 | `-Force` |
+| `-NoBackup` | 백업 생성 안 함 | `-NoBackup` |
+| `-Target <target>` | commands 모드 설치 대상 (`cursor`, `claude`, `all`) | `-Target all` |
+| `-Synology` | Synology 워크플로우 포함 | `-Synology` |
+| `-NoSynology` | Synology 워크플로우 제외 (기본값) | `-NoSynology` |
+| `-Help` | 도움말 표시 | `-Help` |
 
 ### 프로젝트 타입
 
@@ -79,6 +97,10 @@ iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
 
 ## 사용 예시
 
+> 아래 원격 URL은 가독성을 위해 줄여서 표기합니다.
+> - **Bash**: `https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh`
+> - **PS1**: `https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1`
+
 ### 대화형 모드 (권장)
 ```bash
 # macOS/Linux
@@ -88,7 +110,11 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
 ```
 
-### 전체 통합 (자동 감지)
+---
+
+### 전체 통합 (`--mode full`)
+
+#### 전체 통합 (자동 감지)
 ```bash
 # macOS/Linux
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --force
@@ -97,7 +123,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Force"
 ```
 
-### 특정 타입/버전 지정
+#### 전체 통합 + 타입/버전 지정
 ```bash
 # macOS/Linux
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
@@ -107,7 +133,60 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Type spring -Version '1.0.0' -Force"
 ```
 
-### 워크플로우만 설치
+#### 전체 통합 + Synology 포함
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --synology --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Synology -Force"
+```
+
+#### 전체 통합 + Synology 제외 (명시적)
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --no-synology --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -NoSynology -Force"
+```
+
+#### 전체 통합 + 백업 없이
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --no-backup --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -NoBackup -Force"
+```
+
+#### 전체 통합 + 모든 옵션 조합
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+  --mode full --type flutter --version 1.0.0 --synology --no-backup --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode full -Type flutter -Version '1.0.0' -Synology -NoBackup -Force"
+```
+
+---
+
+### 버전 관리만 (`--mode version`)
+
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode version --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode version -Force"
+```
+
+---
+
+### 워크플로우만 (`--mode workflows`)
+
+#### 워크플로우만 설치
 ```bash
 # macOS/Linux
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode workflows --force
@@ -116,13 +195,80 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode workflows -Force"
 ```
 
-### Custom Command만 설치
+#### 워크플로우 + Synology 포함
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode commands --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode workflows --synology --force
 
 # Windows
-iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode commands -Force"
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode workflows -Synology -Force"
+```
+
+---
+
+### 이슈 템플릿만 (`--mode issues`)
+
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode issues --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode issues -Force"
+```
+
+---
+
+### Custom Command (`--mode commands`)
+
+#### 대화형 메뉴 (1~4번 선택)
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode commands
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode commands"
+```
+
+#### Cursor만 설치
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode commands --target cursor --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode commands -Target cursor -Force"
+```
+
+#### Claude만 설치
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode commands --target claude --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode commands -Target claude -Force"
+```
+
+#### 모두 설치 (Cursor + Claude)
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode commands --target all --force
+
+# Windows
+iex "& { $(iwr -Uri 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1' -UseBasicParsing).Content } -Mode commands -Target all -Force"
+```
+
+---
+
+### CI/CD 환경 (stdin 모드)
+
+TTY가 없는 환경에서는 `--mode`와 `--force`를 반드시 지정해야 합니다.
+
+```bash
+# macOS/Linux - curl | bash 방식
+curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh" | bash -s -- --mode version --force
+
+curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh" | bash -s -- --mode full --type spring --force
+
+curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh" | bash -s -- --mode commands --target all --force
 ```
 
 ---
@@ -138,9 +284,28 @@ Custom Command 모드는 **Cursor IDE**와 **Claude Code**의 설정 파일을 �
 | `.cursor/` | Cursor IDE 커스텀 명령어 설정 |
 | `.claude/` | Claude Code 커스텀 명령어 설정 |
 
+### `--target` 옵션
+
+`--target` 옵션으로 대화형 메뉴 없이 설치 대상을 직접 지정할 수 있습니다.
+
+| `--target` 값 | 설명 |
+|---------------|------|
+| `cursor` | Cursor IDE 설정만 설치 (`.cursor` 폴더) |
+| `claude` | Claude Code 설정만 설치 (`.claude` 폴더) |
+| `all` | Cursor + Claude 모두 설치 |
+
+### `--target`과 `--force` 조합
+
+| 조합 | 대화형 메뉴 | 덮어쓰기 확인(Y/N) |
+|------|:-----------:|:------------------:|
+| `--mode commands` | 표시 | 표시 |
+| `--mode commands --target claude` | 스킵 | 표시 |
+| `--mode commands --force` | 표시 | 스킵 |
+| `--mode commands --target all --force` | 스킵 | 스킵 |
+
 ### 대화형 모드 서브메뉴
 
-대화형 모드에서 Custom Command를 선택하면 다음 옵션이 표시됩니다:
+`--target`을 지정하지 않으면 다음 대화형 메뉴가 표시됩니다:
 
 ```
 Custom Command 설치 대상 선택:
@@ -152,9 +317,8 @@ Custom Command 설치 대상 선택:
 
 ### 주의사항
 
-- **기존 폴더 덮어쓰기**: 기존 `.cursor` 또는 `.claude` 폴더가 있으면 삭제 후 새로 설치됩니다
-- **백업 없음**: 기존 설정은 백업되지 않으므로 필요시 미리 백업하세요
-- **경고 표시**: 설치 전 경고 메시지가 표시됩니다
+- **기존 폴더 덮어쓰기**: 기존 `.cursor` 또는 `.claude` 폴더가 있으면 기존에 추가한 파일은 보존되고 템플릿 파일만 덮어쓰기됩니다
+- **경고 표시**: `--force` 없이 실행하면 설치 전 확인 메시지가 표시됩니다
 
 ---
 

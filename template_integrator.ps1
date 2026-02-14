@@ -19,10 +19,10 @@
 # powershell -ExecutionPolicy Bypass -File .\template_integrator.ps1
 #
 # 방법 2: 원격 실행 - 대화형 (추천)
-# iex (iwr -Uri "https://raw.githubusercontent.com/.../template_integrator.ps1" -UseBasicParsing).Content
+# $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/.../template_integrator.ps1")
 #
-# 방법 3: 원격 실행 - 자동화 (CI/CD)
-# iex (iwr -Uri "URL" -UseBasicParsing).Content -mode full -force
+# 방법 3: 원격 실행 - CLI 파라미터 전달
+# $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("URL"))) -Mode full -Force
 #
 # 옵션:
 #   -Mode <MODE>             통합 모드 선택 (기본: interactive)
@@ -352,7 +352,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   .\template_integrator.ps1
 
   # 원격 실행 - 대화형 모드
-  iex (iwr -Uri "https://raw.../template_integrator.ps1" -UseBasicParsing).Content
+  $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.../template_integrator.ps1")
 
   # 버전 관리만 추가
   .\template_integrator.ps1 -Mode version
@@ -1757,7 +1757,8 @@ function Ensure-GitIgnore {
     $requiredEntries = @(
         "/.idea",
         "/.claude/settings.local.json",
-        "/.report"
+        "/.report",
+        "/.issue"
     )
     
     # .gitignore가 없으면 생성
@@ -1773,6 +1774,9 @@ function Ensure-GitIgnore {
 
 # Implementation Reports (자동 생성)
 /.report
+
+# Issue Drafts (자동 생성)
+/.issue
 "@
         
         Set-Content -Path ".gitignore" -Value $gitignoreContent -Encoding UTF8
@@ -1832,7 +1836,23 @@ function Ensure-GitIgnore {
             # Git 명령 실패 시 무시 (Git 저장소가 아닐 수 있음)
         }
     }
-    
+
+    # .issue 폴더가 이미 Git에 추적 중인 경우 제거
+    if ($entriesToAdd -contains "/.issue") {
+        try {
+            git ls-files --error-unmatch .issue 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Print-Info ".issue 폴더가 Git에 추적 중입니다. 추적 해제 중..."
+                git rm -r --cached .issue 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    Print-Success ".issue 폴더의 Git 추적이 해제되었습니다"
+                }
+            }
+        } catch {
+            # Git 명령 실패 시 무시 (Git 저장소가 아닐 수 있음)
+        }
+    }
+
     Print-Success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 

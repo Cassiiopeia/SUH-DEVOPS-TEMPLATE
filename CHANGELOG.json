@@ -1,11 +1,42 @@
 {
   "metadata": {
-    "lastUpdated": "2026-02-04T09:23:19Z",
-    "currentVersion": "2.7.20",
+    "lastUpdated": "2026-02-14T13:32:32Z",
+    "currentVersion": "2.7.28",
     "projectType": "basic",
-    "totalReleases": 66
+    "totalReleases": 67
   },
   "releases": [
+    {
+      "version": "2.7.28",
+      "project_type": "basic",
+      "date": "2026-02-14",
+      "pr_number": 196,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리스 노트 (v2.7.28)\n\n* **New Features**\n  * 이슈 자동 작성 기능 추가: GitHub 이슈 제목과 본문을 자동 생성하고 로컬에 저장\n  * Git 워크트리 초기화 개선: 원격 브랜치 자동 감지 및 추적 브랜치 생성\n  * 설치 대상 선택 옵션 추가: `--target` 옵션으로 Claude/Cursor 명령어 선택 설치 가능\n\n* **Documentation**\n  * 배포 및 템플릿 통합 가이드 업데이트\n\n* **Chores**\n  * .issue 폴더를 .gitignore에 추가하여 자동 생성 파일 제외\n  * 버전 업데이트 (v2.7.20 → v2.7.28)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "이슈 자동 작성 기능 추가: GitHub 이슈 제목과 본문을 자동 생성하고 로컬에 저장",
+            "Git 워크트리 초기화 개선: 원격 브랜치 자동 감지 및 추적 브랜치 생성",
+            "설치 대상 선택 옵션 추가: `--target` 옵션으로 Claude/Cursor 명령어 선택 설치 가능"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "배포 및 템플릿 통합 가이드 업데이트"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            ".issue 폴더를 .gitignore에 추가하여 자동 생성 파일 제외",
+            "버전 업데이트 (v2.7.20 → v2.7.28)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.20",
       "project_type": "basic",

@@ -1,11 +1,11 @@
-# init-workflow
+# init-worktree
 
 Git worktree를 자동으로 생성하는 커맨드입니다.
 
 브랜치명을 입력받아 자동으로:
-1. 브랜치명은 사용자 입력 그대로 사용 (예: `20260127_#16_...`)
-2. 브랜치가 없으면 생성 (현재 브랜치에서 분기)
-3. 폴더명만 특수문자(`#` 포함)를 `_`로 변환하여 생성 (예: `20260127_16_...`)
+1. 브랜치명에서 `#` 문자 제거 (Git 브랜치명으로 사용)
+2. 브랜치가 없으면 리모트(origin) 확인 → 있으면 tracking 브랜치로 가져오기, 없으면 현재 브랜치에서 새로 생성
+3. 브랜치명의 특수문자를 `_`로 변환하여 폴더명 생성
 4. `{프로젝트명}-Worktree` 폴더에 worktree 생성 (예: `RomRom-FE-Worktree`)
 5. 설정 파일 자동 복사 (Firebase, iOS, Android 키 등)
 6. 이미 존재하면 경로만 출력
@@ -13,7 +13,7 @@ Git worktree를 자동으로 생성하는 커맨드입니다.
 ## 사용법
 
 ```
-/init-workflow
+/init-worktree
 
 20260120_#163_Github_Projects_에_대한_템플릿_개발_필요_및_관련_Sync_워크플로우_개발_필요
 ```
@@ -21,7 +21,7 @@ Git worktree를 자동으로 생성하는 커맨드입니다.
 ## 실행 로직
 
 1. 사용자 입력에서 두 번째 줄의 브랜치명 추출
-2. 브랜치명은 그대로 사용 (임시 Python 스크립트에 포함)
+2. 브랜치명에서 `#` 문자 제거
 3. 임시 Python 스크립트 파일 생성 (인코딩 문제 해결)
 4. Python 스크립트 실행 (worktree 생성 + 설정 파일 복사)
 5. 임시 파일 자동 삭제
@@ -37,22 +37,20 @@ Git worktree를 자동으로 생성하는 커맨드입니다.
 브랜치명이 제공된 경우:
 1. 프로젝트 루트로 이동
 2. Git 긴 경로 지원 활성화: `git config --global core.longpaths true` (최초 1회만 실행)
-3. 브랜치명은 사용자 입력 그대로 사용 (예: `20260116_#432_...` 그대로 유지)
-4. 임시 Python 스크립트 파일 생성:
-   - 파일명: `init_worktree_temp_{timestamp}.py`
-   - 브랜치명을 코드에 직접 포함 (인코딩 문제 해결)
-   - worktree 생성 로직 포함
-5. **Python 스크립트 실행** (Windows에서는 `-X utf8` 플래그 필수):
+3. 임시 Python 스크립트 파일 생성:
+    - 파일명: `init_worktree_temp_{timestamp}.py`
+    - 브랜치명을 코드에 직접 포함 (인코딩 문제 해결, `#` 문자 유지)
+    - worktree 생성 로직 포함
+4. **Python 스크립트 실행** (Windows에서는 `-X utf8` 플래그 필수):
    ```bash
    python -X utf8 init_worktree_temp_{timestamp}.py
    ```
-6. 임시 파일 삭제
-7. 결과 출력
-8. 에이전트가 `.gitignore` 분석 후 민감 파일 복사
+5. 임시 파일 삭제
+6. 결과 출력
+7. 에이전트가 `.gitignore` 분석 후 민감 파일 복사
 
 **중요**:
-- **브랜치명 처리**: 브랜치명은 사용자 입력 그대로 사용됩니다 (`#` 문자 포함)
-- **폴더명 처리**: 폴더명만 `normalize_branch_name()` 함수로 특수문자(`#` 포함)를 `_`로 변환합니다
+- **브랜치명 처리**: 브랜치명은 `#` 문자를 포함하여 **원본 그대로** 전달됩니다. `#`은 **폴더명 생성 시에만** `_`로 변환됩니다.
 - **인코딩 문제 해결**: Python 스크립트 파일에 브랜치명을 직접 포함시켜 Windows PowerShell 인코딩 문제 회피
 - **Windows UTF-8 모드**: Python 실행 시 `-X utf8` 플래그 사용 필수
 - **설정 파일 자동 복사**: worktree 생성 후 에이전트가 동적으로 파일 복사
@@ -67,7 +65,7 @@ git config --global core.longpaths true
 # Python UTF-8 모드로 실행 (Windows 한글 인코딩 문제 해결)
 python -X utf8 init_worktree_temp.py
 
-# 입력 브랜치명: 20260116_#432_UX_개선_및_페이지_디자인_수정
+# 브랜치명: 20260116_#432_UX_개선_및_페이지_디자인_수정
 # → Git 브랜치: 20260116_#432_UX_개선_및_페이지_디자인_수정 (# 유지)
 # → 폴더명: 20260116_432_UX_개선_및_페이지_디자인_수정 (# → _ 변환)
 ```
@@ -83,7 +81,7 @@ import glob
 # 프로젝트 루트로 이동
 os.chdir('프로젝트_루트_경로')
 
-# 브랜치명 (사용자 입력 그대로)
+# 브랜치명 (원본 그대로, # 유지)
 branch_name = '20260116_#432_UX_개선_및_페이지_디자인_수정'
 
 # worktree_manager 실행
@@ -96,18 +94,18 @@ exit_code = worktree_manager.main()
 
 # worktree 경로를 환경변수로 설정 (에이전트가 파일 복사에 사용)
 if exit_code == 0:
-    import subprocess
-    result = subprocess.run(['git', 'worktree', 'list', '--porcelain'],
+  import subprocess
+  result = subprocess.run(['git', 'worktree', 'list', '--porcelain'],
                           capture_output=True, text=True, encoding='utf-8')
-    lines = result.stdout.split('\n')
-    worktree_path = None
-    for i, line in enumerate(lines):
-        if line.startswith(f'branch refs/heads/{branch_name}'):
-            worktree_path = lines[i-1].replace('worktree ', '')
-            break
+  lines = result.stdout.split('\n')
+  worktree_path = None
+  for i, line in enumerate(lines):
+    if line.startswith(f'branch refs/heads/{branch_name}'):
+      worktree_path = lines[i-1].replace('worktree ', '')
+      break
 
-    if worktree_path:
-        print(f'📍 WORKTREE_PATH={worktree_path}')
+  if worktree_path:
+    print(f'📍 WORKTREE_PATH={worktree_path}')
 
 sys.exit(exit_code)
 ```

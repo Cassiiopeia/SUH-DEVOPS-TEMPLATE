@@ -53,8 +53,8 @@ suh-github-template/
 │   ├── DISCUSSION_TEMPLATE/                # 토론 템플릿
 │   └── PULL_REQUEST_TEMPLATE.md
 │
-├── .claude/commands/                       # Claude IDE 명령어 (17개)
-├── .cursor/commands/                       # Cursor IDE 명령어 (17개)
+├── .claude/commands/                       # Claude IDE 명령어 (19개)
+├── .cursor/commands/                       # Cursor IDE 명령어 (19개)
 ├── docs/                                   # 문서
 │
 ├── version.yml                             # 중앙 버전 관리
@@ -231,7 +231,7 @@ docs/
 bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)
 
 # Windows PowerShell (원격 실행)
-irm https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1 | iex
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
 ```
 
 **통합 시 복사되지 않는 템플릿 전용 문서**:
@@ -552,7 +552,7 @@ metadata:
 
 ## IDE 명령어
 
-`.claude/commands/` 및 `.cursor/commands/`에 동일하게 존재 (17개):
+`.claude/commands/` 및 `.cursor/commands/`에 동일하게 존재 (19개):
 
 | 명령어 | 용도 |
 |--------|------|
@@ -570,6 +570,8 @@ metadata:
 | `/test`, `/testcase` | 테스트 |
 | `/troubleshoot` | 트러블슈팅 |
 | `/suh-spring-test` | Spring 테스트 생성 |
+| `/init-worktree` | Git worktree 자동 생성 |
+| `/issue` | 이슈 자동 작성 |
 
 ---
 

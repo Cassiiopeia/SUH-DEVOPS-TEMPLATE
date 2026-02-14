@@ -7,7 +7,7 @@
 > 개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 자동으로 처리됩니다.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v2.7.18 (2026-02-04)
+## 최신 버전 : v2.7.20 (2026-02-04)
 
 [전체 버전 기록 보기](CHANGELOG.md) 
 
@@ -48,7 +48,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 ```
 ##### Windows PowerShell
 ```bash
-iex (iwr -Uri "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1" -UseBasicParsing).Content
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
 ```
 
 > 대화형 모드로 프로젝트 타입과 버전을 자동 감지합니다.

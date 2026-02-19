@@ -446,7 +446,7 @@ jobs:
       # Fastlane 설치
       - name: Install Fastlane
         run: |
-          gem install fastlane
+          gem install fastlane --force
           echo "✅ Fastlane installed"
           fastlane --version
 

@@ -443,12 +443,14 @@ jobs:
           echo "✅ Ruby setup completed"
           ruby -v
 
-      # Fastlane 설치
+      # Fastlane 설치 (Bundler 방식 - gem 충돌 방지)
       - name: Install Fastlane
+        working-directory: android
         run: |
-          gem install fastlane --force
-          echo "✅ Fastlane installed"
-          fastlane --version
+          printf 'source "https://rubygems.org"\ngem "fastlane"\n' > Gemfile
+          bundle install
+          echo "✅ Fastlane installed (Bundler)"
+          bundle exec fastlane --version
 
       # APK 파일명 생성
       - name: Generate APK filename
@@ -467,7 +469,7 @@ jobs:
           if [ -f "android/fastlane/Fastfile" ]; then
             echo "📦 Fastlane을 사용하여 빌드..."
             cd android
-            fastlane build --verbose || flutter build apk --release
+            bundle exec fastlane build --verbose || flutter build apk --release
           else
             echo "📦 Flutter 직접 빌드..."
             flutter build apk --release

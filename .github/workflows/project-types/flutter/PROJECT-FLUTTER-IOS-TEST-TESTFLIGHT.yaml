@@ -705,7 +705,11 @@ jobs:
           echo "✅ Fastfile 확인됨: ios/fastlane/Fastfile"
 
       - name: Install Fastlane
-        run: gem install fastlane --force
+        working-directory: ios
+        run: |
+          printf 'source "https://rubygems.org"\ngem "fastlane"\n' > Gemfile
+          bundle install
+          echo "✅ Fastlane installed (Bundler)"
 
       - name: Upload to TestFlight
         env:
@@ -743,7 +747,7 @@ jobs:
 
           # Fastlane 실행 (마법사가 생성한 Fastfile 사용)
           cd ios
-          fastlane upload_testflight
+          bundle exec fastlane upload_testflight
 
       - name: Notify TestFlight Upload Success
         if: success()

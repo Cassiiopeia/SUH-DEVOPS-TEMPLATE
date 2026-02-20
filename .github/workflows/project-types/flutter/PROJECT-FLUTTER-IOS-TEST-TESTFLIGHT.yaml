@@ -61,26 +61,22 @@ env:
   ENV_FILE_PATH: ".env"
 
 jobs:
-  prepare-test-build:
-    name: 테스트 빌드 준비
-    runs-on: macos-26
+  # ============================================
+  # 즉시 댓글 생성 (ubuntu-latest로 빠르게 실행)
+  # ============================================
+  notify-start:
+    name: 진행 상황 알림
+    runs-on: ubuntu-latest
+    if: github.event_name == 'repository_dispatch'
 
     outputs:
-      version: ${{ steps.test_version.outputs.version }}
-      build_number: ${{ steps.test_version.outputs.build_number }}
-      issue_url: ${{ steps.issue_info.outputs.issue_url }}
-      issue_title: ${{ steps.issue_info.outputs.issue_title }}
-      issue_number: ${{ steps.issue_info.outputs.issue_number }}
-      branch_name: ${{ steps.issue_info.outputs.branch_name }}
-      pr_number: ${{ steps.test_version.outputs.pr_number }}
-      commit_hash: ${{ steps.release_notes.outputs.commit_hash }}
-      progress_comment_id: ${{ steps.progress.outputs.comment_id }}
-      prepare_start: ${{ steps.progress.outputs.start_time }}
+      comment_id: ${{ steps.progress.outputs.comment_id }}
+      start_time: ${{ steps.progress.outputs.start_time }}
+      branch_valid: ${{ steps.verify_branch.outputs.valid }}
 
     steps:
       - name: 브랜치 존재 여부 사전 확인
         id: verify_branch
-        if: github.event_name == 'repository_dispatch'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -99,11 +95,11 @@ jobs:
                 branch: branchName
               });
               console.log(`✅ 브랜치 존재 확인됨: ${branchName}`);
+              core.setOutput('valid', 'true');
             } catch (error) {
               if (error.status === 404) {
                 console.log(`❌ 브랜치를 찾을 수 없음: ${branchName}`);
 
-                // 에러 댓글 작성
                 const body = [
                   '🍎 ❌ **iOS TestFlight 빌드 실패 - 브랜치를 찾을 수 없습니다**',
                   '',
@@ -133,12 +129,10 @@ jobs:
               }
             }
 
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      # 진행 상황 댓글 시스템
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       - name: 진행 상황 댓글 생성
         id: progress
-        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
+        if: github.event.client_payload.pr_number != ''
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -181,6 +175,28 @@ jobs:
             core.setOutput('comment_id', comment.id);
             core.setOutput('start_time', startTime);
 
+  # ============================================
+  # 테스트 빌드 준비 (macOS 환경 설정)
+  # ============================================
+  prepare-test-build:
+    name: 테스트 빌드 준비
+    runs-on: macos-26
+    needs: notify-start
+    if: |
+      always() &&
+      (needs.notify-start.result == 'skipped' || needs.notify-start.outputs.branch_valid == 'true')
+
+    outputs:
+      version: ${{ steps.test_version.outputs.version }}
+      build_number: ${{ steps.test_version.outputs.build_number }}
+      issue_url: ${{ steps.issue_info.outputs.issue_url }}
+      issue_title: ${{ steps.issue_info.outputs.issue_title }}
+      issue_number: ${{ steps.issue_info.outputs.issue_number }}
+      branch_name: ${{ steps.issue_info.outputs.branch_name }}
+      pr_number: ${{ steps.test_version.outputs.pr_number }}
+      commit_hash: ${{ steps.release_notes.outputs.commit_hash }}
+
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -342,13 +358,13 @@ jobs:
 
       # 진행 상황 업데이트 - 준비 완료
       - name: 진행 상황 업데이트 - 준비 완료
-        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && steps.progress.outputs.comment_id != ''
+        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentId = parseInt('${{ steps.progress.outputs.comment_id }}');
-            const startTime = parseInt('${{ steps.progress.outputs.start_time }}');
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
             const runId = '${{ github.run_id }}';
@@ -389,13 +405,64 @@ jobs:
 
             console.log(`✅ 진행 상황 업데이트 완료: 준비 완료 (${duration})`);
 
+      # 진행 상황 업데이트 - 준비 실패
+      - name: 진행 상황 업데이트 - 준비 실패
+        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            const duration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+            const body = [
+              '## 🍎 ❌ iOS TestFlight 빌드 실패',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ❌ 실패 | ${duration} |`,
+              '| 🔨 IPA 빌드 | ⏸️ 취소됨 | - |',
+              '| 📤 TestFlight 배포 | ⏸️ 취소됨 | - |',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              '',
+              '❌ **환경 준비 중 오류가 발생했습니다.**',
+              '',
+              `🔗 [워크플로우 실행 로그 확인](${runUrl})`
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            console.log(`❌ 진행 상황 업데이트 완료: 준비 실패`);
+
   # ============================================
   # iOS 빌드 (xcodebuild 직접 사용)
   # ============================================
   build-ios-test:
     name: iOS 테스트 빌드
     runs-on: macos-26
-    needs: prepare-test-build
+    needs: [notify-start, prepare-test-build]
+    if: |
+      !cancelled() &&
+      needs.prepare-test-build.result == 'success'
 
     outputs:
       build_start: ${{ steps.build_start.outputs.time }}
@@ -539,13 +606,13 @@ jobs:
 
       # 진행 상황 업데이트 - IPA 빌드 완료
       - name: 진행 상황 업데이트 - IPA 빌드 완료
-        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
+        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
-            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
             const buildStart = parseInt('${{ steps.build_start.outputs.time }}');
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
@@ -597,13 +664,13 @@ jobs:
 
       # 빌드 실패 시 progress 댓글 업데이트
       - name: 빌드 실패 시 progress 댓글 업데이트
-        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
+        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
-            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
             const buildStart = parseInt('${{ steps.build_start.outputs.time }}');
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
@@ -660,7 +727,10 @@ jobs:
   deploy-testflight-test:
     name: TestFlight 테스트 배포
     runs-on: macos-26
-    needs: [prepare-test-build, build-ios-test]
+    needs: [notify-start, prepare-test-build, build-ios-test]
+    if: |
+      !cancelled() &&
+      needs.build-ios-test.result == 'success'
 
     steps:
       # 배포 시작 시간 기록
@@ -768,13 +838,13 @@ jobs:
 
       # 진행 상황 최종 업데이트 - 성공
       - name: 진행 상황 최종 업데이트 - 성공
-        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
+        if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
-            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
             const buildStart = parseInt('${{ needs.build-ios-test.outputs.build_start }}');
             const deployStart = parseInt('${{ steps.deploy_start.outputs.time }}');
             const branchName = '${{ github.event.client_payload.branch_name }}';
@@ -842,13 +912,13 @@ jobs:
 
       # 진행 상황 최종 업데이트 - 실패
       - name: 진행 상황 최종 업데이트 - 실패
-        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.prepare-test-build.outputs.progress_comment_id != ''
+        if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentId = parseInt('${{ needs.prepare-test-build.outputs.progress_comment_id }}');
-            const prepareStart = parseInt('${{ needs.prepare-test-build.outputs.prepare_start }}');
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
             const buildStart = parseInt('${{ needs.build-ios-test.outputs.build_start }}');
             const deployStart = parseInt('${{ steps.deploy_start.outputs.time }}');
             const branchName = '${{ github.event.client_payload.branch_name }}';

@@ -369,7 +369,7 @@ jobs:
           echo "✅ Fastfile 확인됨: ios/fastlane/Fastfile"
 
       - name: Install Fastlane
-        run: gem install fastlane
+        run: gem install fastlane --force
 
       - name: Upload to TestFlight
         env:

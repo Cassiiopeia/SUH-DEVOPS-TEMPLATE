@@ -634,7 +634,7 @@ jobs:
             const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
 
             const body = [
-              '## 🍎 iOS TestFlight 빌드 진행 중...',
+              '## 🍎 ✅ iOS 빌드 완료',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
@@ -775,7 +775,7 @@ jobs:
           echo "✅ Fastfile 확인됨: ios/fastlane/Fastfile"
 
       - name: Install Fastlane
-        run: gem install fastlane
+        run: gem install fastlane --force
 
       - name: Upload to TestFlight
         env:
@@ -880,7 +880,7 @@ jobs:
             const totalDuration = totalMin > 0 ? `${totalMin}분 ${totalSec}초` : `${totalSec}초`;
 
             const body = [
-              '## 🍎 ✅ iOS TestFlight 빌드 완료',
+              '## 🍎 ✅ iOS TestFlight 배포 완료',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
@@ -948,7 +948,7 @@ jobs:
             const deployDuration = deployMin > 0 ? `${deployMin}분 ${deploySec}초` : `${deploySec}초`;
 
             const body = [
-              '## 🍎 ❌ iOS TestFlight 빌드 실패',
+              '## 🍎 ❌ iOS TestFlight 배포 실패',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',

@@ -422,6 +422,7 @@ ensure_gitignore() {
         "/.idea"
         "/.claude/settings.local.json"
         "/.report"
+        "/.issue"
     )
     
     # .gitignore가 없으면 생성
@@ -437,6 +438,9 @@ ensure_gitignore() {
 
 # Implementation Reports (자동 생성)
 /.report
+
+# Issue Drafts (자동 생성)
+/.issue
 EOF
         
         print_success ".gitignore 파일 생성 완료"
@@ -490,7 +494,17 @@ EOF
             fi
         fi
     fi
-    
+
+    # .issue 폴더가 이미 Git에 추적 중인 경우 제거
+    if printf '%s\n' "${entries_to_add[@]}" | grep -q "^/.issue$"; then
+        if git ls-files --error-unmatch .issue >/dev/null 2>&1; then
+            print_info ".issue 폴더가 Git에 추적 중입니다. 추적 해제 중..."
+            if git rm -r --cached .issue >/dev/null 2>&1; then
+                print_success ".issue 폴더의 Git 추적이 해제되었습니다"
+            fi
+        fi
+    fi
+
     print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 

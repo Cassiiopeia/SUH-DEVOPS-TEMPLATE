@@ -1334,9 +1334,10 @@ get_current_template_version() {
 ask_synology_option() {
     local type_dir="$1"
     local synology_dir="$type_dir/synology"
+    local common_synology_dir="$(dirname "$type_dir")/common/synology"
 
-    # synology 폴더가 없으면 건너뛰기
-    if [ ! -d "$synology_dir" ]; then
+    # 타입별/공통 synology 폴더 모두 없으면 건너뛰기
+    if [ ! -d "$synology_dir" ] && [ ! -d "$common_synology_dir" ]; then
         return
     fi
 
@@ -1359,11 +1360,18 @@ ask_synology_option() {
         return
     fi
 
-    # synology 폴더 내 파일 개수 확인
+    # synology 폴더 내 파일 개수 확인 (타입별 + 공통)
     local synology_files=0
-    for f in "$synology_dir"/*.{yaml,yml}; do
-        [ -e "$f" ] && synology_files=$((synology_files + 1))
-    done
+    if [ -d "$synology_dir" ]; then
+        for f in "$synology_dir"/*.{yaml,yml}; do
+            [ -e "$f" ] && synology_files=$((synology_files + 1))
+        done
+    fi
+    if [ -d "$common_synology_dir" ]; then
+        for f in "$common_synology_dir"/*.{yaml,yml}; do
+            [ -e "$f" ] && synology_files=$((synology_files + 1))
+        done
+    fi
 
     if [ $synology_files -eq 0 ]; then
         return
@@ -1375,11 +1383,20 @@ ask_synology_option() {
     print_to_user "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
     print_to_user ""
     print_to_user "   포함되는 워크플로우:"
-    for f in "$synology_dir"/*.{yaml,yml}; do
-        [ -e "$f" ] || continue
-        local fname=$(basename "$f")
-        print_to_user "     • $fname"
-    done
+    if [ -d "$synology_dir" ]; then
+        for f in "$synology_dir"/*.{yaml,yml}; do
+            [ -e "$f" ] || continue
+            local fname=$(basename "$f")
+            print_to_user "     • $fname"
+        done
+    fi
+    if [ -d "$common_synology_dir" ]; then
+        for f in "$common_synology_dir"/*.{yaml,yml}; do
+            [ -e "$f" ] || continue
+            local fname=$(basename "$f")
+            print_to_user "     • $fname (공통)"
+        done
+    fi
     print_to_user ""
     print_to_user "  Y/y - 예, 포함"
     print_to_user "  N/n - 아니오, 제외 (기본)"
@@ -1414,6 +1431,7 @@ copy_workflows() {
     fi
 
     # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
+    # *.{yaml,yml} 글로브는 common/ 직접 하위 파일만 매칭 (common/synology/ 등 하위 디렉토리 제외)
     print_info "공통 워크플로우 다운로드 중..."
     if [ -d "$project_types_dir/common" ]; then
         for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
@@ -1569,6 +1587,37 @@ copy_workflows() {
             done
             if [ $synology_count -gt 0 ]; then
                 print_info "Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
+            fi
+        fi
+    fi
+
+    # 4. Common Synology 워크플로우 처리 (선택적)
+    local common_synology_dir="$project_types_dir/common/synology"
+    if [ -d "$common_synology_dir" ]; then
+        if [ "$INCLUDE_SYNOLOGY" = true ]; then
+            print_info "공통 Synology 워크플로우 다운로드 중..."
+            for workflow in "$common_synology_dir"/*.{yaml,yml}; do
+                [ -e "$workflow" ] || continue
+                local filename=$(basename "$workflow")
+
+                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (공통 Synology, 백업: ${filename}.bak)"
+                else
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (공통 Synology)"
+                fi
+                synology_copied=$((synology_copied + 1))
+                copied=$((copied + 1))
+            done
+        else
+            local common_syn_count=0
+            for f in "$common_synology_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && common_syn_count=$((common_syn_count + 1))
+            done
+            if [ $common_syn_count -gt 0 ]; then
+                print_info "공통 Synology 워크플로우 $common_syn_count개 제외됨 (--synology 옵션으로 포함 가능)"
             fi
         fi
     fi

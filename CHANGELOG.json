@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-02-14T13:32:32Z",
-    "currentVersion": "2.7.28",
+    "lastUpdated": "2026-03-10T05:47:12Z",
+    "currentVersion": "2.8.1",
     "projectType": "basic",
-    "totalReleases": 67
+    "totalReleases": 68
   },
   "releases": [
+    {
+      "version": "2.8.1",
+      "project_type": "basic",
+      "date": "2026-03-10",
+      "pr_number": 201,
+      "raw_summary": "## Summary by CodeRabbit\n\n* **새로운 기능**\n  * Synology NAS에 GitHub 시크릿 자동 업로드 워크플로우 추가\n  * iOS TestFlight 빌드 상태 보고 및 진행 상황 추적 개선\n\n* **문서**\n  * Synology 워크플로우 지원 관련 설명서 업데이트\n\n* **Chores**\n  * 버전 2.8.1로 업그레이드\n  * Flutter 빌드 도구 설치 안정성 향상",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "Synology NAS에 GitHub 시크릿 자동 업로드 워크플로우 추가",
+            "iOS TestFlight 빌드 상태 보고 및 진행 상황 추적 개선"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "Synology 워크플로우 지원 관련 설명서 업데이트"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 2.8.1로 업그레이드",
+            "Flutter 빌드 도구 설치 안정성 향상"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.7.28",
       "project_type": "basic",

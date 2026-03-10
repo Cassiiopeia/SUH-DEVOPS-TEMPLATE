@@ -1600,14 +1600,14 @@ copy_workflows() {
                 [ -e "$workflow" ] || continue
                 local filename=$(basename "$workflow")
 
+                # 타입별 synology에서 이미 복사된 파일이면 스킵
                 if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (공통 Synology, 백업: ${filename}.bak)"
-                else
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (공통 Synology)"
+                    print_warning "$filename: 타입별 Synology에 동일 파일 존재. 타입별 버전 유지."
+                    continue
                 fi
+
+                cp "$workflow" "$WORKFLOWS_DIR/"
+                echo "  ✓ $filename (공통 Synology)"
                 synology_copied=$((synology_copied + 1))
                 copied=$((copied + 1))
             done

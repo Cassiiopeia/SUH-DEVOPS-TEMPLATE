@@ -1014,7 +1014,7 @@ function Save-TemplateOptions {
     if ($content -match "template:") {
         # synology 값 업데이트 또는 추가
         if ($content -match "synology:") {
-            $content = $content -replace "synology:.*$", "synology: $($script:IncludeSynology.ToString().ToLower())"
+            $content = $content -replace "(?m)synology:.*$", "synology: $($script:IncludeSynology.ToString().ToLower())"
         }
         elseif ($content -match "options:") {
             # options 다음 줄에 synology 추가
@@ -1023,7 +1023,7 @@ function Save-TemplateOptions {
 
         # last_update_date 업데이트
         if ($content -match "last_update_date:") {
-            $content = $content -replace 'last_update_date:.*$', "last_update_date: `"$today`""
+            $content = $content -replace '(?m)last_update_date:.*$', "last_update_date: `"$today`""
         }
 
         Set-Content -Path $versionFile -Value $content -Encoding UTF8
@@ -1200,6 +1200,26 @@ function Get-CurrentTemplateVersion {
 
 function Ask-SynologyOption {
     param([string]$TypeDir)
+
+    # 비대화형 환경 감지 (파이프라인, 리디렉션, 비대화형 세션 등)
+    $isNonInteractive = $false
+    try {
+        if (-not [Environment]::UserInteractive) {
+            $isNonInteractive = $true
+        }
+        elseif ([Console]::IsInputRedirected) {
+            $isNonInteractive = $true
+        }
+    }
+    catch {
+        # Console 접근 실패 시 비대화형으로 간주
+        $isNonInteractive = $true
+    }
+
+    if ($isNonInteractive) {
+        $script:IncludeSynology = $false
+        return
+    }
 
     $synologyDir = Join-Path $TypeDir "synology"
     $commonSynologyDir = Join-Path (Split-Path $TypeDir -Parent) "common\synology"
@@ -1511,15 +1531,14 @@ function Copy-Workflows {
                 $filename = $workflow.Name
                 $destPath = Join-Path $WORKFLOWS_DIR $filename
 
+                # 타입별 synology에서 이미 복사된 파일이면 스킵
                 if (Test-Path $destPath) {
-                    $backupPath = [string]$destPath + ".bak"
-                    Move-Item -Path $destPath -Destination $backupPath -Force
-                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (공통 Synology, 백업: ${filename}.bak)"
-                } else {
-                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (공통 Synology)"
+                    Print-Warning "$($filename): 타입별 Synology에 동일 파일 존재. 타입별 버전 유지."
+                    continue
                 }
+
+                Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                Write-Host "  ✓ $filename (공통 Synology)"
                 $synologyCopied++
                 $copied++
             }

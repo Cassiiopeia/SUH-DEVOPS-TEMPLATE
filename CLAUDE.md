@@ -614,7 +614,7 @@ ENV_FILE (또는 ENV) # .env 파일 내용 (앱 환경변수)
 
 ### Synology 서버 접속 (공통)
 > **⚠️ 모든 Synology 관련 워크플로우에서 공통으로 사용하는 키입니다.**
-> Spring CICD, Python CICD, React/Next CICD, PR-Preview, Secret 파일 업로드 등
+> Spring CICD, Python CICD, React/Next CICD, Flutter Synology CICD, PR-Preview, Secret 파일 업로드 등
 > 모두 동일한 키를 사용합니다. 새 워크플로우 작성 시 반드시 이 키를 사용하세요.
 ```
 SERVER_HOST        # Synology NAS 주소 (IP 또는 도메인)
@@ -651,6 +651,22 @@ IOS_BUNDLE_ID
 ```
 
 ### Spring/Docker
+```
+DOCKER_REGISTRY_URL
+DOCKER_USERNAME
+DOCKER_PASSWORD
+# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
+```
+
+### React/Docker
+```
+DOCKER_REGISTRY_URL
+DOCKER_USERNAME
+DOCKER_PASSWORD
+# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
+```
+
+### Next/Docker
 ```
 DOCKER_REGISTRY_URL
 DOCKER_USERNAME

@@ -155,9 +155,9 @@ git commit -m "fix: add execute permission to scripts"
 1. Actions 로그 확인
 2. Dockerfile 경로 확인 (./Dockerfile 기본)
 3. Secrets 설정 확인:
-   - SYNOLOGY_HOST
-   - SYNOLOGY_USERNAME
-   - SYNOLOGY_PASSWORD
+   - SERVER_HOST
+   - SERVER_USER
+   - SERVER_PASSWORD
    - DOCKER_REGISTRY_URL
    - DOCKER_USERNAME
    - DOCKER_PASSWORD
@@ -230,9 +230,9 @@ docker rmi registry/project-pr-123:latest
    제어판 → 터미널 및 SNMP → SSH 서비스 활성화
 
 2. Secrets 값 확인
-   - SYNOLOGY_HOST: IP 또는 도메인
-   - SYNOLOGY_USERNAME: 관리자 계정
-   - SYNOLOGY_PASSWORD: 비밀번호
+   - SERVER_HOST: IP 또는 도메인
+   - SERVER_USER: 관리자 계정
+   - SERVER_PASSWORD: 비밀번호
 
 3. 방화벽에서 22번 포트 허용
 ```

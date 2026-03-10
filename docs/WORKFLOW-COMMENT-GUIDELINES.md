@@ -352,6 +352,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 | SYNC-ISSUE-LABELS | A | ✅ |
 | PROJECTS-SYNC-MANAGER | B | ✅ |
 | SUH-ISSUE-HELPER-API | B | ✅ |
+| SYNOLOGY-SECRET-FILE-UPLOAD | D | ✅ |
 
 ### project-types/flutter/
 

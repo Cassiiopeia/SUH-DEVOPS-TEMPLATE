@@ -1202,9 +1202,10 @@ function Ask-SynologyOption {
     param([string]$TypeDir)
 
     $synologyDir = Join-Path $TypeDir "synology"
+    $commonSynologyDir = Join-Path (Split-Path $TypeDir -Parent) "common\synology"
 
-    # synology 폴더가 없으면 건너뛰기
-    if (-not (Test-Path $synologyDir)) {
+    # 타입별/공통 synology 폴더 모두 없으면 건너뛰기
+    if (-not (Test-Path $synologyDir) -and -not (Test-Path $commonSynologyDir)) {
         return
     }
 
@@ -1231,25 +1232,38 @@ function Ask-SynologyOption {
         return
     }
 
-    # synology 폴더 내 파일 개수 확인
+    # synology 폴더 내 파일 개수 확인 (타입별 + 공통)
     $synologyFiles = @()
-    $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-    $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-    if ($yamlFiles) { $synologyFiles += $yamlFiles }
-    if ($ymlFiles) { $synologyFiles += $ymlFiles }
+    $commonSynologyFiles = @()
+    if (Test-Path $synologyDir) {
+        $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $synologyFiles += $yamlFiles }
+        if ($ymlFiles) { $synologyFiles += $ymlFiles }
+    }
+    if (Test-Path $commonSynologyDir) {
+        $yamlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $commonSynologyFiles += $yamlFiles }
+        if ($ymlFiles) { $commonSynologyFiles += $ymlFiles }
+    }
 
-    if ($synologyFiles.Count -eq 0) {
+    $totalSynologyCount = $synologyFiles.Count + $commonSynologyFiles.Count
+    if ($totalSynologyCount -eq 0) {
         return
     }
 
     Print-SeparatorLine
     Write-Host ""
-    Write-Host "🗄️ Synology 워크플로우가 발견되었습니다. ($($synologyFiles.Count)개 파일)"
+    Write-Host "🗄️ Synology 워크플로우가 발견되었습니다. ($totalSynologyCount개 파일)"
     Write-Host "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
     Write-Host ""
     Write-Host "   포함되는 워크플로우:"
     foreach ($f in $synologyFiles) {
         Write-Host "     • $($f.Name)"
+    }
+    foreach ($f in $commonSynologyFiles) {
+        Write-Host "     • $($f.Name) (공통)"
     }
     Write-Host ""
     Write-Host "  Y/y - 예, 포함"
@@ -1477,6 +1491,47 @@ function Copy-Workflows {
 
             if ($synologyFiles.Count -gt 0) {
                 Print-Info "Synology 워크플로우 $($synologyFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
+            }
+        }
+    }
+
+    # 4. Common Synology 워크플로우 처리 (선택적)
+    $commonSynologyDir = Join-Path $projectTypesDir "common\synology"
+    if (Test-Path $commonSynologyDir) {
+        if ($script:IncludeSynology -eq $true) {
+            Print-Info "공통 Synology 워크플로우 다운로드 중..."
+
+            $commonSynWorkflows = @()
+            $yamlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $commonSynWorkflows += $yamlFiles }
+            if ($ymlFiles) { $commonSynWorkflows += $ymlFiles }
+
+            foreach ($workflow in $commonSynWorkflows) {
+                $filename = $workflow.Name
+                $destPath = Join-Path $WORKFLOWS_DIR $filename
+
+                if (Test-Path $destPath) {
+                    $backupPath = [string]$destPath + ".bak"
+                    Move-Item -Path $destPath -Destination $backupPath -Force
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $filename (공통 Synology, 백업: ${filename}.bak)"
+                } else {
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $filename (공통 Synology)"
+                }
+                $synologyCopied++
+                $copied++
+            }
+        } else {
+            $commonSynFiles = @()
+            $yamlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $commonSynFiles += $yamlFiles }
+            if ($ymlFiles) { $commonSynFiles += $ymlFiles }
+
+            if ($commonSynFiles.Count -gt 0) {
+                Print-Info "공통 Synology 워크플로우 $($commonSynFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
             }
         }
     }

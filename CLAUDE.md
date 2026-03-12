@@ -33,6 +33,7 @@ suh-github-template/
 │   │   ├── PROJECT-COMMON-*.yaml           # 공통 워크플로우
 │   │   └── project-types/
 │   │       ├── common/                     # 공통 (복사본)
+│   │       │   └── synology/               # Synology 공통 (선택적)
 │   │       ├── flutter/                    # Flutter 전용
 │   │       │   └── synology/               # Synology 배포 (선택적)
 │   │       ├── spring/                     # Spring 전용
@@ -150,7 +151,12 @@ snake_case.sh / snake_case.py
 | `PROJECT-SPRING-NEXUS-CI` | Nexus CI (빌드/테스트) | synology/ |
 | `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | synology/ |
 
-> **참고**: `synology/` 위치의 워크플로우는 `--synology` 옵션으로만 포함됩니다.
+> **참고**: `synology/` 위치의 워크플로우는 `--synology` 옵션으로만 포함됩니다. (타입별 및 공통 synology/ 모두 해당)
+
+#### 공통 Synology (선택적)
+| 파일명 | 트리거 | 기능 | 위치 |
+|--------|--------|------|------|
+| `PROJECT-COMMON-SYNOLOGY-SECRET-FILE-UPLOAD` | main 푸시 | GitHub Secret 파일 Synology 업로드 | common/synology/ |
 
 #### React / Next (각 2개)
 | 파일명 | 용도 |
@@ -606,6 +612,16 @@ _GITHUB_PAT_TOKEN    # PR 자동 머지용 (repo, workflow 권한)
 ENV_FILE (또는 ENV) # .env 파일 내용 (앱 환경변수)
 ```
 
+### Synology 서버 접속 (공통)
+> **⚠️ 모든 Synology 관련 워크플로우에서 공통으로 사용하는 키입니다.**
+> Spring CICD, Python CICD, React/Next CICD, Flutter Synology CICD, PR-Preview, Secret 파일 업로드 등
+> 모두 동일한 키를 사용합니다. 새 워크플로우 작성 시 반드시 이 키를 사용하세요.
+```
+SERVER_HOST        # Synology NAS 주소 (IP 또는 도메인)
+SERVER_USER        # SSH 사용자명
+SERVER_PASSWORD    # SSH 비밀번호
+```
+
 ### Flutter CI (코드 분석 + 빌드 검증)
 ```
 ENV_FILE (또는 ENV) # .env 파일 내용 (선택)
@@ -639,9 +655,23 @@ IOS_BUNDLE_ID
 DOCKER_REGISTRY_URL
 DOCKER_USERNAME
 DOCKER_PASSWORD
-SYNOLOGY_HOST
-SYNOLOGY_USERNAME
-SYNOLOGY_PASSWORD
+# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
+```
+
+### React/Docker
+```
+DOCKER_REGISTRY_URL
+DOCKER_USERNAME
+DOCKER_PASSWORD
+# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
+```
+
+### Next/Docker
+```
+DOCKER_REGISTRY_URL
+DOCKER_USERNAME
+DOCKER_PASSWORD
+# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
 ```
 
 ---

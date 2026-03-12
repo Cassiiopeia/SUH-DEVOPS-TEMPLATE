@@ -104,7 +104,7 @@ jobs:
     steps:
       # 1. 소스코드 체크아웃
       - name: 코드 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2. 디스크 공간 확보
       - name: 디스크 공간 확보

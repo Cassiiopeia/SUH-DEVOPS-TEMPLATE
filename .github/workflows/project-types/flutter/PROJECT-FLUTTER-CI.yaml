@@ -243,7 +243,7 @@ jobs:
             core.setOutput('time', Date.now().toString());
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # .env 파일 생성
       - name: Create .env file
@@ -331,7 +331,7 @@ jobs:
             core.setOutput('time', Date.now().toString());
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # .env 파일 생성
       - name: Create .env file
@@ -450,7 +450,7 @@ jobs:
             core.setOutput('time', Date.now().toString());
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer

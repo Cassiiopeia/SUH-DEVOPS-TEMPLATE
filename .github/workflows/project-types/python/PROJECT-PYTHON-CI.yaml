@@ -43,7 +43,7 @@ jobs:
     steps:
       # 1. 소스코드 체크아웃
       - name: 코드 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2. .env 파일 생성 (빌드 검증용)
       - name: .env 파일 생성

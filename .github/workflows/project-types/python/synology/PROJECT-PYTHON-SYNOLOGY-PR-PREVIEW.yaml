@@ -239,7 +239,7 @@ jobs:
             core.setOutput('docker_start', startTime);
 
       - name: 코드 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.pr.outputs.ref }}
 
@@ -810,7 +810,7 @@ jobs:
 
       - name: 코드 체크아웃
         if: steps.check_branch.outputs.exists == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.get-branch-from-issue.outputs.branch_name }}
 
@@ -1518,7 +1518,7 @@ jobs:
 
       - name: 코드 체크아웃
         if: steps.branch_info.outputs.branch_exists == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.check-command.outputs.custom_branch }}
 

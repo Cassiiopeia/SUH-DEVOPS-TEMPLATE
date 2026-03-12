@@ -198,7 +198,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref }}
@@ -477,7 +477,7 @@ jobs:
             core.setOutput('time', Date.now().toString());
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref }}
@@ -742,7 +742,7 @@ jobs:
             core.setOutput('time', Date.now().toString());
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref }}

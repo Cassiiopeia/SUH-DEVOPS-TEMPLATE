@@ -528,10 +528,12 @@ jobs:
           ruby-version: "3.4.1"
 
       - name: Install Fastlane
+        working-directory: android
         run: |
-          gem install fastlane --force
-          echo "✅ Fastlane 설치 완료"
-          fastlane --version
+          printf 'source "https://rubygems.org"\ngem "fastlane"\n' > Gemfile
+          bundle install
+          echo "✅ Fastlane 설치 완료 (Bundler)"
+          bundle exec fastlane --version
 
       # Fastfile 복사 (Play Store 배포용)
       # android/fastlane/Fastfile.playstore를 사용하여 일관성 유지
@@ -650,7 +652,7 @@ jobs:
           echo "=========================================="
           
           cd android
-          fastlane deploy_internal
+          bundle exec fastlane deploy_internal
 
       # 성공 알림
       - name: Notify Play Store Upload Success

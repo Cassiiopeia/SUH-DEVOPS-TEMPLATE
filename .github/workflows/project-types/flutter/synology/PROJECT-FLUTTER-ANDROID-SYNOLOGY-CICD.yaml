@@ -168,12 +168,14 @@ jobs:
           echo "Ruby setup completed"
           ruby -v
 
-      # Fastlane 설치
+      # Fastlane 설치 (Bundler 방식 - gem 충돌 방지)
       - name: Install Fastlane
+        working-directory: android
         run: |
-          gem install fastlane --force
-          echo "Fastlane installed"
-          fastlane --version
+          printf 'source "https://rubygems.org"\ngem "fastlane"\n' > Gemfile
+          bundle install
+          echo "Fastlane installed (Bundler)"
+          bundle exec fastlane --version
 
       # 현재 버전 정보 및 짧은 커밋 해시 계산
       - name: Get version info and calculate short commit hash
@@ -196,7 +198,7 @@ jobs:
       - name: Build APK with Fastlane
         run: |
           cd android
-          fastlane build --verbose
+          bundle exec fastlane build --verbose
           ls -la ../build/app/outputs/flutter-apk/ || true
           echo "APK built with Fastlane"
 

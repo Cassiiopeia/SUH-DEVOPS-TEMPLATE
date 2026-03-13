@@ -411,6 +411,22 @@ cleanup_template_files() {
         echo "  ✓ docs 폴더 삭제"
     fi
 
+    # 플러그인 전용 파일/폴더 삭제 (마켓플레이스 전용, 일반 프로젝트에서 불필요)
+    if [ -d ".claude-plugin" ]; then
+        rm -rf .claude-plugin
+        echo "  ✓ .claude-plugin 폴더 삭제 (플러그인 매니페스트)"
+    fi
+
+    if [ -d "skills" ]; then
+        rm -rf skills
+        echo "  ✓ skills 폴더 삭제 (마켓플레이스 전용 스킬)"
+    fi
+
+    if [ -d "scripts" ]; then
+        rm -rf scripts
+        echo "  ✓ scripts 폴더 삭제 (마켓플레이스 전용 스크립트)"
+    fi
+
     print_success "템플릿 관련 파일 삭제 완료"
 }
 

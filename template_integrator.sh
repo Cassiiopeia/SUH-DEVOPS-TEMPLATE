@@ -321,7 +321,6 @@ ${BLUE}통합 모드:${NC}
   ${GREEN}version${NC}     - 버전 관리 시스템만 (version.yml + scripts)
   ${GREEN}workflows${NC}   - GitHub Actions 워크플로우만
   ${GREEN}issues${NC}      - 이슈/PR 템플릿만
-  ${GREEN}commands${NC}    - Custom Command만 (Cursor/Claude 설정)
   ${GREEN}interactive${NC} - 대화형 선택 (기본값, 추천)
 
 ${BLUE}옵션:${NC}
@@ -330,7 +329,6 @@ ${BLUE}옵션:${NC}
   -t, --type TYPE          프로젝트 타입 (미지정 시 자동 감지)
   --no-backup              백업 생성 안 함
   --force                  확인 없이 즉시 실행
-  --target TARGET        commands 모드 설치 대상 (cursor, claude, all)
   --synology               Synology 워크플로우 포함 (기본: 제외)
   --no-synology            Synology 워크플로우 제외
   -h, --help               이 도움말 표시
@@ -373,12 +371,6 @@ ${BLUE}사용 예시:${NC}
   # 수동 설정
   ${GREEN}./template_integrator.sh --mode full --version 1.0.0 --type node${NC}
 
-  # Custom Command만 설치 (대화형 메뉴)
-  ${GREEN}./template_integrator.sh --mode commands${NC}
-
-  # Custom Command 모두 설치 (확인 없이)
-  ${GREEN}./template_integrator.sh --mode commands --target all --force${NC}
-
 ${BLUE}통합 후 작업:${NC}
   1. ${CYAN}README.md${NC} - 버전 정보 섹션 자동 추가됨 (기존 내용 보존)
   2. ${CYAN}version.yml${NC} - 버전 관리 설정 파일 생성
@@ -412,7 +404,6 @@ PROJECT_TYPE=""
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
 INCLUDE_SYNOLOGY=""  # Synology 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
-COMMAND_TARGET=""
 
 # 지원하는 프로젝트 타입
 VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
@@ -443,10 +434,6 @@ while [[ $# -gt 0 ]]; do
         --no-synology)
             INCLUDE_SYNOLOGY=false
             shift
-            ;;
-        --target)
-            COMMAND_TARGET="$2"
-            shift 2
             ;;
         -h|--help)
             show_help
@@ -889,7 +876,23 @@ download_template() {
             rm -f "$TEMP_DIR/$doc"
         fi
     done
-    
+
+    # 플러그인 전용 파일/폴더 제거 (마켓플레이스 전용, template_integrator로 배포하지 않음)
+    print_info "플러그인 전용 파일 제외 중..."
+    local plugin_items_to_remove=(
+        ".claude-plugin"    # Claude Code 플러그인 매니페스트
+        "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
+    )
+    # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (offer_ide_tools_install에서 사용 후 정리)
+
+    for item in "${plugin_items_to_remove[@]}"; do
+        if [ -d "$TEMP_DIR/$item" ]; then
+            rm -rf "$TEMP_DIR/$item"
+        elif [ -f "$TEMP_DIR/$item" ]; then
+            rm -f "$TEMP_DIR/$item"
+        fi
+    done
+
     # 사용자 적용 가이드 문서는 포함 (SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)
     print_info "사용자 적용 가이드 문서 다운로드 중..."
     if [ -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
@@ -1945,184 +1948,6 @@ EOF
     print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 
-# .cursor 폴더 다운로드
-copy_cursor_folder() {
-    print_step ".cursor 폴더 다운로드 여부 확인 중..."
-    
-    if [ ! -d "$TEMP_DIR/.cursor" ]; then
-        print_info ".cursor 폴더가 템플릿에 없습니다. 건너뜁니다."
-        return
-    fi
-    
-    # 사용자 동의 확인
-    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_separator_line
-        print_to_user ""
-        print_to_user ".cursor 폴더를 다운로드하시겠습니까? (Cursor IDE 설정)"
-        print_to_user "  Y/y - 예, 다운로드하기"
-        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
-        print_to_user ""
-        
-        if ! ask_yes_no "선택: " "N"; then
-            print_info ".cursor 폴더 다운로드 건너뜁니다"
-            return
-        fi
-    fi
-    
-    # 다운로드 실행
-    mkdir -p .cursor
-    cp -r "$TEMP_DIR/.cursor/"* .cursor/ 2>/dev/null || true
-    print_success ".cursor 폴더 다운로드 완료"
-}
-
-# .claude 폴더 다운로드
-copy_claude_folder() {
-    print_step ".claude 폴더 다운로드 여부 확인 중..."
-
-    if [ ! -d "$TEMP_DIR/.claude" ]; then
-        print_info ".claude 폴더가 템플릿에 없습니다. 건너뜁니다."
-        return
-    fi
-
-    # 사용자 동의 확인
-    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_separator_line
-        print_to_user ""
-        print_to_user ".claude 폴더를 다운로드하시겠습니까? (Claude Code 설정)"
-        print_to_user "  Y/y - 예, 다운로드하기"
-        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
-        print_to_user ""
-
-        if ! ask_yes_no "선택: " "N"; then
-            print_info ".claude 폴더 다운로드 건너뜁니다"
-            return
-        fi
-    fi
-
-    # 다운로드 실행
-    mkdir -p .claude
-    cp -r "$TEMP_DIR/.claude/"* .claude/ 2>/dev/null || true
-    print_success ".claude 폴더 다운로드 완료"
-}
-
-# ===================================================================
-# Custom Command 설치 (백업 없이 덮어쓰기)
-# ===================================================================
-
-install_custom_command() {
-    local folder_name=$1
-    local display_name=$2
-    local src="$TEMP_DIR/$folder_name"
-
-    if [ ! -d "$src" ]; then
-        print_warning "$display_name 폴더가 템플릿에 없습니다"
-        return 1
-    fi
-
-    print_step "$display_name 설정 설치 중..."
-
-    # 기존 폴더가 있으면 덮어쓰기 알림
-    if [ -d "$folder_name" ]; then
-        print_info "기존 $folder_name 폴더에 덮어쓰기"
-    else
-        mkdir -p "$folder_name"
-    fi
-    cp -r "$src/"* "$folder_name/" 2>/dev/null || true
-    print_success "$display_name 설정 설치 완료"
-    return 0
-}
-
-copy_custom_commands() {
-    local target=$1  # "cursor", "claude", "all"
-
-    # 경고 메시지
-    print_warning "⚠️  기존 설정 파일이 덮어쓰기됩니다! (기존에 추가한 파일은 보존됨)"
-    print_to_user ""
-
-    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "계속 진행하시겠습니까?"
-        print_to_user "  Y/y - 예, 계속 진행"
-        print_to_user "  N/n - 아니오, 취소 (기본)"
-        print_to_user ""
-
-        if ! ask_yes_no "선택: " "N"; then
-            print_info "취소되었습니다"
-            return
-        fi
-    fi
-
-    # 템플릿 다운로드 (필요시)
-    if [ ! -d "$TEMP_DIR" ]; then
-        download_template
-    fi
-
-    local installed=0
-
-    case $target in
-        cursor)
-            if install_custom_command ".cursor" "Cursor IDE"; then
-                installed=$((installed + 1))
-            fi
-            ;;
-        claude)
-            if install_custom_command ".claude" "Claude Code"; then
-                installed=$((installed + 1))
-            fi
-            ;;
-        all)
-            if install_custom_command ".cursor" "Cursor IDE"; then
-                installed=$((installed + 1))
-            fi
-            if install_custom_command ".claude" "Claude Code"; then
-                installed=$((installed + 1))
-            fi
-            ;;
-    esac
-
-    # 임시 폴더 정리
-    rm -rf "$TEMP_DIR"
-
-    if [ $installed -gt 0 ]; then
-        print_to_user ""
-        print_success "Custom Command 설치 완료 ($installed 개 폴더)"
-    fi
-}
-
-show_custom_command_menu() {
-    print_question_header "📦" "어떤 Custom Command를 설치하시겠습니까?"
-
-    print_to_user "  1) Cursor IDE 설정 (.cursor 폴더)"
-    print_to_user "  2) Claude Code 설정 (.claude 폴더)"
-    print_to_user "  3) 모두 설치"
-    print_to_user "  4) 취소"
-    print_to_user ""
-
-    local choice
-    local valid_input=false
-
-    while [ "$valid_input" = false ]; do
-        if safe_read "선택 (1-4): " choice "-n 1"; then
-            print_to_user ""
-
-            if [[ "$choice" =~ ^[1-4]$ ]]; then
-                valid_input=true
-                case $choice in
-                    1) copy_custom_commands "cursor" ;;
-                    2) copy_custom_commands "claude" ;;
-                    3) copy_custom_commands "all" ;;
-                    4) print_info "취소되었습니다" ;;
-                esac
-            else
-                print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
-                print_to_user ""
-            fi
-        else
-            print_error "입력을 읽을 수 없습니다"
-            return 1
-        fi
-    done
-}
-
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
 copy_setup_guide() {
     print_step "템플릿 설정 가이드 다운로드 중..."
@@ -2341,35 +2166,33 @@ interactive_mode() {
     print_to_user "  2) 버전 관리 시스템만"
     print_to_user "  3) GitHub Actions 워크플로우만"
     print_to_user "  4) 이슈/PR 템플릿만"
-    print_to_user "  5) Custom Command만 (Cursor/Claude 설정)"
-    print_to_user "  6) 취소"
+    print_to_user "  5) 취소"
     print_to_user ""
 
     local choice
     local valid_input=false
 
-    # 입력 검증 루프 - 올바른 값(1-6)이 입력될 때까지 반복
+    # 입력 검증 루프 - 올바른 값(1-5)이 입력될 때까지 반복
     while [ "$valid_input" = false ]; do
-        if safe_read "선택 (1-6): " choice "-n 1"; then
+        if safe_read "선택 (1-5): " choice "-n 1"; then
             print_to_user ""
 
-            # 입력값 검증: 1-6 숫자만 허용
-            if [[ "$choice" =~ ^[1-6]$ ]]; then
+            # 입력값 검증: 1-5 숫자만 허용
+            if [[ "$choice" =~ ^[1-5]$ ]]; then
                 valid_input=true
                 case $choice in
                     1) MODE="full" ;;
                     2) MODE="version" ;;
                     3) MODE="workflows" ;;
                     4) MODE="issues" ;;
-                    5) MODE="commands" ;;
-                    6)
+                    5)
                         print_info "취소되었습니다"
                         exit 0
                         ;;
                 esac
             else
                 # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
-                print_error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
+                print_error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
                 print_to_user ""
             fi
         else
@@ -2462,8 +2285,6 @@ execute_integration() {
             copy_discussion_templates
             copy_coderabbit_config
             ensure_gitignore
-            copy_cursor_folder
-            copy_claude_folder
             copy_setup_guide
             ;;
         version)
@@ -2485,14 +2306,6 @@ execute_integration() {
             copy_issue_templates
             copy_discussion_templates
             ;;
-        commands)
-            if [ -n "$COMMAND_TARGET" ]; then
-                copy_custom_commands "$COMMAND_TARGET"
-            else
-                show_custom_command_menu
-            fi
-            return  # commands 모드는 자체적으로 정리하고 종료
-            ;;
     esac
 
     # 2.1 템플릿 옵션 저장 (Synology 설정 등)
@@ -2506,11 +2319,146 @@ execute_integration() {
         save_template_options "$TEMPLATE_VERSION"
     fi
 
-    # 3. 임시 파일 정리
+    # 3. IDE 도구(Skills) 설치 제안
+    offer_ide_tools_install
+
+    # 4. 임시 파일 정리
     rm -rf "$TEMP_DIR"
 
     # 완료 메시지
     print_summary
+}
+
+# ===================================================================
+# IDE 도구(Skills) 설치 제안
+# Claude Code: 플러그인 마켓플레이스 자동 설치
+# Cursor: skills/ → .cursor/skills/ 복사
+# ===================================================================
+
+offer_ide_tools_install() {
+    local claude_available=false
+    local cursor_available=false
+
+    # CLI 존재 여부 감지
+    if command -v claude &> /dev/null; then
+        claude_available=true
+    fi
+    if command -v cursor &> /dev/null; then
+        cursor_available=true
+    fi
+
+    # 둘 다 없으면 안내만 출력
+    if [ "$claude_available" = false ] && [ "$cursor_available" = false ]; then
+        echo "" >&2
+        print_separator_line
+        print_info "IDE 도구(Skills) 수동 설치 안내"
+        echo "" >&2
+        echo "  Claude Code 사용자:" >&2
+        echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
+        echo "" >&2
+        echo "  Cursor 사용자:" >&2
+        echo "    template_integrator 재실행 시 Cursor가 감지되면 자동 설치됩니다." >&2
+        echo "" >&2
+        return
+    fi
+
+    echo "" >&2
+    print_separator_line
+    echo "" >&2
+
+    # ─── Claude Code 플러그인 설치 ───
+    if [ "$claude_available" = true ]; then
+        print_step "Claude Code CLI 감지됨"
+
+        local do_claude_install=true
+        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+            print_to_user ""
+            print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
+            print_to_user "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
+            print_to_user ""
+            print_to_user "  Y/y - 예, 설치하기 (추천)"
+            print_to_user "  N/n - 아니오, 건너뛰기"
+            print_to_user ""
+
+            if ! ask_yes_no "선택: " "Y"; then
+                do_claude_install=false
+                print_info "Claude Code 플러그인 설치 건너뜁니다"
+                echo "" >&2
+                echo "  수동 설치 명령어:" >&2
+                echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+                echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
+                echo "" >&2
+            fi
+        fi
+
+        if [ "$do_claude_install" = true ]; then
+            print_step "Claude Code 마켓플레이스 등록 중..."
+            if claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+                print_success "마켓플레이스 등록 완료"
+
+                print_step "Claude Code 플러그인 설치 중..."
+                if claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user 2>/dev/null; then
+                    print_success "Claude Code 플러그인 설치 완료 (cassiiopeia)"
+                else
+                    print_warning "플러그인 설치 실패. 수동으로 설치해주세요:"
+                    echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
+                    echo "" >&2
+                fi
+            else
+                print_warning "마켓플레이스 등록 실패. 수동으로 설치해주세요:"
+                echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+                echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
+                echo "" >&2
+            fi
+        fi
+    else
+        # Claude Code CLI 없음 → 수동 안내
+        echo "" >&2
+        echo "  💡 Claude Code 사용자라면 다음 명령어로 Skills를 설치하세요:" >&2
+        echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
+        echo "" >&2
+    fi
+
+    # ─── Cursor Skills 복사 (루트 skills/ → .cursor/skills/) ───
+    if [ "$cursor_available" = true ]; then
+        print_step "Cursor CLI 감지됨"
+
+        # skills 폴더가 템플릿에 있는지 확인
+        if [ ! -d "$TEMP_DIR/skills" ]; then
+            print_info "skills 폴더가 템플릿에 없습니다. 건너뜁니다."
+        else
+            local do_cursor_install=true
+            if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+                print_to_user ""
+                print_to_user "Cursor IDE Skills를 설치하시겠습니까?"
+                print_to_user "  설치 시 Cursor에서 /analyze, /review 등 20개 스킬 사용 가능"
+                print_to_user ""
+                print_to_user "  Y/y - 예, 설치하기 (추천)"
+                print_to_user "  N/n - 아니오, 건너뛰기"
+                print_to_user ""
+
+                if ! ask_yes_no "선택: " "Y"; then
+                    do_cursor_install=false
+                    print_info "Cursor Skills 설치 건너뜁니다"
+                fi
+            fi
+
+            if [ "$do_cursor_install" = true ]; then
+                print_step "Cursor Skills 설치 중..."
+                mkdir -p .cursor/skills
+                if cp -r "$TEMP_DIR/skills/"* .cursor/skills/ 2>/dev/null; then
+                    print_success "Cursor Skills 설치 완료 (.cursor/skills/)"
+                else
+                    print_warning "Cursor Skills 복사 실패"
+                fi
+            fi
+        fi
+    else
+        # Cursor CLI 없음 → 별도 안내하지 않음 (Claude Code 안내만으로 충분)
+        :
+    fi
 }
 
 # 완료 요약

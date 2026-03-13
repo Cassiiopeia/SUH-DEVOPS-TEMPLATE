@@ -19,5 +19,11 @@
     "severity": "critical",
     "title": "Issue Labels 전면 변경",
     "message": "이슈 라벨이 전면 변경되었습니다. 변경사항: 띄어쓰기 제거(작업 전→작업전, 작업 중→작업중 등), 확인대기→담당자확인, 작업보류→보류. 기존 프로젝트는 .github/config/issue-labels.yml 및 GitHub Labels를 수동 동기화하세요. 이슈 템플릿(.github/ISSUE_TEMPLATE/*.md)도 업데이트 필요."
+  },
+
+  "2.9.0": {
+    "severity": "critical",
+    "title": "Skills 배포 방식 변경 - 마켓플레이스 전용 전환",
+    "message": "Skills(IDE 명령어)가 template_integrator 복사 방식에서 Claude Code 플러그인 마켓플레이스 전용으로 변경되었습니다. 기존 .claude/skills/, .claude/scripts/ 경로가 루트 skills/, scripts/로 이동했습니다. Claude Code 사용자는 'claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE && claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user' 명령어로 설치하세요. Cursor 사용자는 통합 시 자동으로 .cursor 폴더 복사 여부를 물어봅니다. 기존 .claude/skills/, .claude/scripts/ 폴더는 더 이상 업데이트되지 않습니다."
   }
 }

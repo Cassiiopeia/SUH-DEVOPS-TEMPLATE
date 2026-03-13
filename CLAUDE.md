@@ -54,8 +54,12 @@ suh-github-template/
 │   ├── DISCUSSION_TEMPLATE/                # 토론 템플릿
 │   └── PULL_REQUEST_TEMPLATE.md
 │
-├── .claude/commands/                       # Claude IDE 명령어 (19개)
-├── .cursor/commands/                       # Cursor IDE 명령어 (19개)
+├── .claude-plugin/                         # Claude Code 플러그인 매니페스트
+│   ├── plugin.json                         # 플러그인 정보
+│   └── marketplace.json                    # 마켓플레이스 등록 정보
+├── skills/                                 # 플러그인 Skills (20개, 마켓플레이스 전용)
+├── scripts/                                # 플러그인 Scripts (마켓플레이스 전용)
+├── .cursor/skills/                       # Cursor IDE 명령어 (19개)
 ├── docs/                                   # 문서
 │
 ├── version.yml                             # 중앙 버전 관리
@@ -121,6 +125,7 @@ snake_case.sh / snake_case.py
 | 파일명 | 트리거 | 기능 |
 |--------|--------|------|
 | `PROJECT-TEMPLATE-INITIALIZER` | 저장소 생성 | 템플릿 초기화 (일회성) |
+| `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` | version.yml 변경 | 플러그인 매니페스트 버전 동기화 (템플릿 전용) |
 | `PROJECT-COMMON-VERSION-CONTROL` | main 푸시 | patch 버전 자동 증가 |
 | `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` | deploy PR | AI 체인지로그 생성 |
 | `PROJECT-COMMON-README-VERSION-UPDATE` | deploy 푸시 | README 버전 동기화 |
@@ -226,6 +231,9 @@ CLAUDE.md
 docs/
 .github/scripts/test/
 .github/workflows/test/
+.claude-plugin/          # 플러그인 매니페스트 (마켓플레이스 전용)
+skills/                  # 플러그인 Skills (마켓플레이스 전용)
+scripts/                 # 플러그인 Scripts (마켓플레이스 전용)
 ```
 
 ### template_integrator.sh / template_integrator.ps1
@@ -240,11 +248,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPL
 $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
 ```
 
-**통합 시 복사되지 않는 템플릿 전용 문서**:
+**통합 시 복사되지 않는 템플릿 전용 파일**:
 ```
 CONTRIBUTING.md
 CLAUDE.md
+.claude-plugin/          # 플러그인 매니페스트 (마켓플레이스 전용)
+skills/                  # 플러그인 Skills (마켓플레이스 전용)
+scripts/                 # 플러그인 Scripts (마켓플레이스 전용)
 ```
+
+**통합 완료 후 IDE 도구 설치**:
+- Claude Code CLI 감지 시: 플러그인 마켓플레이스 자동 설치 제안 (`--scope user`)
+- Cursor CLI 감지 시: `.cursor` 폴더 복사 제안
+- CLI 미감지 시: 수동 설치 명령어 안내
 
 **통합 모드 옵션**:
 | 모드 | 설명 |
@@ -497,6 +513,8 @@ metadata:
 - version.yml 구조 변경
 - 필수 GitHub Secrets 추가/변경
 - 스크립트 인터페이스 변경
+- Skills/플러그인 배포 방식 변경
+- template_integrator 통합 모드/옵션 변경
 
 **등록 형식**:
 ```json
@@ -556,28 +574,39 @@ metadata:
 
 ---
 
-## IDE 명령어
+## Skills (Claude Code 플러그인)
 
-`.claude/commands/` 및 `.cursor/commands/`에 동일하게 존재 (19개):
+**플러그인명**: `cassiiopeia` (마켓플레이스 배포)
+**위치**: 루트 `skills/` 폴더 (플러그인 전용, template_integrator로 복사되지 않음)
+
+**설치 방법**:
+```bash
+claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+```
+
+**사용법**: `/cassiiopeia:명령어` (예: `/cassiiopeia:analyze`)
 
 | 명령어 | 용도 |
 |--------|------|
-| `/analyze` | 코드 분석 (구현 X) |
-| `/build` | 빌드 관리 |
-| `/design`, `/design-analyze` | 설계/디자인 |
-| `/document` | 문서화 |
-| `/figma` | Figma 연동 |
-| `/implement` | 구현 |
-| `/plan` | 계획 수립 |
-| `/ppt` | 프레젠테이션 생성 |
-| `/refactor`, `/refactor-analyze` | 리팩토링 |
-| `/report` | 보고서 생성 |
-| `/review` | 코드 리뷰 |
-| `/test`, `/testcase` | 테스트 |
-| `/troubleshoot` | 트러블슈팅 |
-| `/suh-spring-test` | Spring 테스트 생성 |
-| `/init-worktree` | Git worktree 자동 생성 |
-| `/issue` | 이슈 자동 작성 |
+| `analyze` | 코드 분석 (구현 X) |
+| `build` | 빌드 관리 |
+| `design`, `design-analyze` | 설계/디자인 |
+| `document` | 문서화 |
+| `figma` | Figma 연동 |
+| `implement` | 구현 |
+| `plan` | 계획 수립 |
+| `ppt` | 프레젠테이션 생성 |
+| `refactor`, `refactor-analyze` | 리팩토링 |
+| `report` | 보고서 생성 |
+| `review` | 코드 리뷰 |
+| `test`, `testcase` | 테스트 |
+| `troubleshoot` | 트러블슈팅 |
+| `suh-spring-test` | Spring 테스트 생성 |
+| `init-worktree` | Git worktree 자동 생성 |
+| `issue` | 이슈 자동 작성 |
+
+**버전 동기화**: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 `plugin.json`, `marketplace.json` 버전을 자동 동기화
 
 ---
 
@@ -757,7 +786,7 @@ README.md 구조:
 | 새 @suh-lab 명령어 | README.md (댓글 명령어), CLAUDE.md (트리거 키워드), docs/[기능].md | - |
 | 새 GitHub Secret | CLAUDE.md (필수 GitHub Secrets) | docs/[관련기능].md |
 | 새 이슈 템플릿 | CLAUDE.md (이슈/PR 템플릿) | - |
-| 새 IDE 명령어 | CLAUDE.md (IDE 명령어), .claude/commands/, .cursor/commands/ | - |
+| 새 Skill | CLAUDE.md (Skills), skills/ (루트), .cursor/skills/ | - |
 | 브랜치/트리거 변경 | CLAUDE.md (트리거 키워드) | docs/VERSION-CONTROL.md |
 
 ### 컴포넌트별 상세 체크리스트

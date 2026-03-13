@@ -55,6 +55,29 @@ git checkout main
 
 ---
 
+## 🛠️ IDE 도구 (Skills) 설치 (선택)
+
+template_integrator로 통합 시 자동 안내되지만, 수동으로도 설치할 수 있습니다.
+
+| IDE | 설치 방법 | 사용 예시 |
+|-----|----------|----------|
+| **Claude Code** | 플러그인 마켓플레이스 (CLI) | `/cassiiopeia:analyze`, `/cassiiopeia:review` |
+| **Cursor** | `.cursor/skills/` 폴더 복사 | Skills 패널에서 선택 |
+
+### Claude Code
+
+```bash
+# 마켓플레이스 등록 + 플러그인 설치
+claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+```
+
+### Cursor
+
+template_integrator 실행 시 Cursor 설치를 선택하면 자동으로 `skills/` → `.cursor/skills/`로 복사됩니다.
+
+---
+
 ## 🎉 완료!
 
 **이제 코드를 푸시하면 모든 자동화가 작동합니다.**

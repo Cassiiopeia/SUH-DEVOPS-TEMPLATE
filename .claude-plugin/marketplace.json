@@ -1,0 +1,28 @@
+{
+  "name": "cassiiopeia-marketplace",
+  "owner": {
+    "name": "Cassiiopeia",
+    "email": "cassiiopeia@github.com"
+  },
+  "metadata": {
+    "description": "Cassiiopeia DevOps 자동화 스킬 마켓플레이스",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "cassiiopeia",
+      "source": {
+        "source": "github",
+        "repo": "Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+      },
+      "description": "DevOps 자동화 스킬 모음 - 코드 분석, 설계, 구현, 테스트, 리뷰, 리팩토링, 문서화, 트러블슈팅 등 19+ 스킬",
+      "version": "2.9.0",
+      "category": "DevOps",
+      "keywords": [
+        "devops",
+        "automation",
+        "skills"
+      ]
+    }
+  ]
+}

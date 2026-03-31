@@ -142,7 +142,7 @@ snake_case.sh / snake_case.py
 |--------|------|------|
 | `PROJECT-FLUTTER-CI` | 코드 분석 + 빌드 검증 (PR/main) | 기본 |
 | `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 | 기본 |
-| `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 | 기본 |
+| `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 + Firebase App Distribution | 기본 |
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 | 기본 |
 | `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
@@ -655,6 +655,11 @@ SERVER_PASSWORD    # SSH 비밀번호
 ```
 ENV_FILE (또는 ENV) # .env 파일 내용 (선택)
 # ※ CI는 빌드 검증 목적이므로 서명/배포 관련 Secrets 불필요
+```
+
+### Flutter Android (테스트 APK + Firebase App Distribution)
+```
+FIREBASE_SERVICE_ACCOUNT_JSON_BASE64  # Firebase App Distribution (선택 - 없으면 아티팩트만 업로드)
 ```
 
 ### Flutter Android (CD - Play Store 배포)

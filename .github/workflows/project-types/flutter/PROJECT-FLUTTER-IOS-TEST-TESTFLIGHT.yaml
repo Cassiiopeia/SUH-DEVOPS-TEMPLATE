@@ -33,7 +33,7 @@
 # APPLE_PROVISIONING_PROFILE_BASE64: .mobileprovision 파일 (base64 인코딩)
 # IOS_PROVISIONING_PROFILE_NAME: 프로비저닝 프로파일 이름
 #
-# 🔑 App Store Connect API:
+# 🔐 App Store Connect API:
 # APP_STORE_CONNECT_API_KEY_ID: API Key ID (10자리)
 # APP_STORE_CONNECT_ISSUER_ID: Issuer ID (UUID 형식)
 # APP_STORE_CONNECT_API_KEY_BASE64: AuthKey_XXXXXX.p8 파일 (base64 인코딩)
@@ -45,6 +45,10 @@
 # ===================================================================
 
 name: PROJECT-Flutter-iOS-Test-TestFlight
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
@@ -61,9 +65,9 @@ env:
   ENV_FILE_PATH: ".env"
 
 jobs:
-  # ============================================
+  # ===================================================================
   # 즉시 댓글 생성 (ubuntu-latest로 빠르게 실행)
-  # ============================================
+  # ===================================================================
   notify-start:
     name: 진행 상황 알림
     runs-on: ubuntu-latest
@@ -175,9 +179,9 @@ jobs:
             core.setOutput('comment_id', comment.id);
             core.setOutput('start_time', startTime);
 
-  # ============================================
+  # ===================================================================
   # 테스트 빌드 준비 (macOS 환경 설정)
-  # ============================================
+  # ===================================================================
   prepare-test-build:
     name: 테스트 빌드 준비
     runs-on: macos-26
@@ -217,10 +221,12 @@ jobs:
           echo "✅ ${{ env.ENV_FILE_PATH }} file created"
 
       - name: Create Secrets.xcconfig file
+        env:
+          SECRETS_XCCONFIG_CONTENT: ${{ secrets.SECRETS_XCCONFIG }}
         run: |
           mkdir -p ios/Flutter
-          if [ -n "${{ secrets.SECRETS_XCCONFIG }}" ]; then
-            echo "${{ secrets.SECRETS_XCCONFIG }}" > ios/Flutter/Secrets.xcconfig
+          if [ -n "$SECRETS_XCCONFIG_CONTENT" ]; then
+            echo "$SECRETS_XCCONFIG_CONTENT" > ios/Flutter/Secrets.xcconfig
             echo "✅ Secrets.xcconfig created"
           else
             echo "// No secrets provided" > ios/Flutter/Secrets.xcconfig
@@ -356,55 +362,6 @@ jobs:
             assets/
           retention-days: 1
 
-      # 진행 상황 업데이트 - 준비 완료
-      - name: 진행 상황 업데이트 - 준비 완료
-        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
-            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
-            const branchName = '${{ github.event.client_payload.branch_name }}';
-            const buildNumber = '${{ github.event.client_payload.build_number }}';
-            const runId = '${{ github.run_id }}';
-            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-
-            const now = Date.now();
-            const elapsed = now - startTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            const duration = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
-
-            const body = [
-              '## 🍎 iOS TestFlight 빌드 진행 중...',
-              '',
-              '| 단계 | 상태 | 소요 시간 |',
-              '|------|------|----------|',
-              `| 🔧 준비 | ✅ 완료 | ${duration} |`,
-              '| 🔨 IPA 빌드 | ⏳ 진행 중... | - |',
-              '| 📤 TestFlight 배포 | ⏸️ 대기 | - |',
-              '',
-              '| 항목 | 값 |',
-              '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
-              `| **브랜치** | \`${branchName}\` |`,
-              '',
-              `**[📋 실시간 로그 보기](${runUrl})**`,
-              '',
-              '---',
-              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
-            ].join('\n');
-
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: commentId,
-              body: body
-            });
-
-            console.log(`✅ 진행 상황 업데이트 완료: 준비 완료 (${duration})`);
-
       # 진행 상황 업데이트 - 준비 실패
       - name: 진행 상황 업데이트 - 준비 실패
         if: failure() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
@@ -453,9 +410,9 @@ jobs:
 
             console.log(`❌ 진행 상황 업데이트 완료: 준비 실패`);
 
-  # ============================================
+  # ===================================================================
   # iOS 빌드 (xcodebuild 직접 사용)
-  # ============================================
+  # ===================================================================
   build-ios-test:
     name: iOS 테스트 빌드
     runs-on: macos-26
@@ -465,16 +422,63 @@ jobs:
       needs.prepare-test-build.result == 'success'
 
     outputs:
-      build_start: ${{ steps.build_start.outputs.time }}
+      step1_elapsed: ${{ steps.progress_step1.outputs.elapsed }}
+      step1_end_time: ${{ steps.progress_step1.outputs.end_time }}
+      step2_elapsed: ${{ steps.progress_step2.outputs.elapsed }}
+      step2_end_time: ${{ steps.progress_step2.outputs.end_time }}
 
     steps:
-      # 빌드 시작 시간 기록 (JavaScript로 밀리초 단위 기록)
-      - name: 빌드 시작 시간 기록
-        id: build_start
+      # 진행 상황 업데이트 - 준비 완료 (build job 시작 시점에 업데이트해야 준비 시간이 정확히 표시됨)
+      - name: 진행 상황 업데이트 - 준비 완료
+        id: progress_step1
+        if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            core.setOutput('time', Date.now().toString());
+            const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
+            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
+            const branchName = '${{ github.event.client_payload.branch_name }}';
+            const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const runId = '${{ github.run_id }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            const now = Date.now();
+            const elapsed = Math.round((now - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const elapsedStr = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+
+            const body = [
+              '## 🍎 iOS TestFlight 빌드 진행 중...',
+              '',
+              '| 단계 | 상태 | 소요 시간 |',
+              '|------|------|----------|',
+              `| 🔧 준비 | ✅ 완료 | ${elapsedStr} |`,
+              '| 🔨 IPA 빌드 | ⏳ 진행 중... | - |',
+              '| 📤 TestFlight 배포 | ⏸️ 대기 | - |',
+              '',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **브랜치** | \`${branchName}\` |`,
+              '',
+              `**[📋 실시간 로그 보기](${runUrl})**`,
+              '',
+              '---',
+              '*🤖 이 댓글은 자동으로 업데이트됩니다.*'
+            ].join('\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              body: body
+            });
+
+            console.log(`✅ 진행 상황 업데이트 완료: 준비 완료 (${elapsedStr})`);
+            core.setOutput('elapsed', elapsedStr);
+            core.setOutput('end_time', now.toString());
 
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -606,14 +610,15 @@ jobs:
 
       # 진행 상황 업데이트 - IPA 빌드 완료
       - name: 진행 상황 업데이트 - IPA 빌드 완료
+        id: progress_step2
         if: success() && github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != '' && needs.notify-start.outputs.comment_id != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
-            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
-            const buildStart = parseInt('${{ steps.build_start.outputs.time }}');
+            const step1EndTime = parseInt('${{ steps.progress_step1.outputs.end_time }}');
+            const step1Elapsed = '${{ steps.progress_step1.outputs.elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
             const runId = '${{ github.run_id }}';
@@ -621,25 +626,19 @@ jobs:
 
             const now = Date.now();
 
-            // 준비 단계 소요 시간
-            const prepareElapsed = buildStart - prepareStart;
-            const prepareMin = Math.floor(prepareElapsed / 60000);
-            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
-            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
-
-            // 빌드 단계 소요 시간
-            const buildElapsed = now - buildStart;
-            const buildMin = Math.floor(buildElapsed / 60000);
-            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
-            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
+            // 빌드 단계 소요 시간 (step1 종료 ~ 현재)
+            const elapsed = Math.round((now - step1EndTime) / 1000);
+            const buildMin = Math.floor(elapsed / 60);
+            const buildSec = elapsed % 60;
+            const elapsedStr = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
 
             const body = [
               '## 🍎 ✅ iOS 빌드 완료',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
-              `| 🔨 IPA 빌드 | ✅ 완료 | ${buildDuration} |`,
+              `| 🔧 준비 | ✅ 완료 | ${step1Elapsed || '-'} |`,
+              `| 🔨 IPA 빌드 | ✅ 완료 | ${elapsedStr} |`,
               '| 📤 TestFlight 배포 | ⏳ 진행 중... | - |',
               '',
               '| 항목 | 값 |',
@@ -660,7 +659,9 @@ jobs:
               body: body
             });
 
-            console.log(`✅ 진행 상황 업데이트 완료: IPA 빌드 완료 (${buildDuration})`);
+            console.log(`✅ 진행 상황 업데이트 완료: IPA 빌드 완료 (${elapsedStr})`);
+            core.setOutput('elapsed', elapsedStr);
+            core.setOutput('end_time', now.toString());
 
       # 빌드 실패 시 progress 댓글 업데이트
       - name: 빌드 실패 시 progress 댓글 업데이트
@@ -670,8 +671,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
-            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
-            const buildStart = parseInt('${{ steps.build_start.outputs.time }}');
+            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
+            const step1EndTime = parseInt('${{ steps.progress_step1.outputs.end_time }}') || 0;
+            const step1Elapsed = '${{ steps.progress_step1.outputs.elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
@@ -680,25 +682,22 @@ jobs:
 
             const now = Date.now();
 
-            // 준비 단계 소요 시간
-            const prepareElapsed = buildStart - prepareStart;
-            const prepareMin = Math.floor(prepareElapsed / 60000);
-            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
-            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
-
-            // 빌드 단계 소요 시간
-            const buildElapsed = now - buildStart;
-            const buildMin = Math.floor(buildElapsed / 60000);
-            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
-            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
+            // 빌드 단계 소요 시간 (step1 종료 ~ 현재)
+            let step2ElapsedStr = '-';
+            if (step1EndTime > 0) {
+              const step2_s = Math.round((now - step1EndTime) / 1000);
+              const s2Min = Math.floor(step2_s / 60);
+              const s2Sec = step2_s % 60;
+              step2ElapsedStr = s2Min > 0 ? `${s2Min}분 ${s2Sec}초` : `${s2Sec}초`;
+            }
 
             const body = [
               '## 🍎 ❌ iOS TestFlight 빌드 실패',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
-              `| 🔨 IPA 빌드 | ❌ 실패 | ${buildDuration} |`,
+              `| 🔧 준비 | ✅ 완료 | ${step1Elapsed || '-'} |`,
+              `| 🔨 IPA 빌드 | ❌ 실패 | ${step2ElapsedStr} |`,
               '| 📤 TestFlight 배포 | ⏸️ 취소됨 | - |',
               '',
               '| 항목 | 값 |',
@@ -721,9 +720,9 @@ jobs:
 
             console.log(`❌ 진행 상황 업데이트 완료: IPA 빌드 실패`);
 
-  # ============================================
+  # ===================================================================
   # TestFlight 배포 (마법사 생성 Fastfile 사용)
-  # ============================================
+  # ===================================================================
   deploy-testflight-test:
     name: TestFlight 테스트 배포
     runs-on: macos-26
@@ -733,14 +732,6 @@ jobs:
       needs.build-ios-test.result == 'success'
 
     steps:
-      # 배포 시작 시간 기록
-      - name: 배포 시작 시간 기록
-        id: deploy_start
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.setOutput('time', Date.now().toString());
-
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
@@ -848,9 +839,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
-            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
-            const buildStart = parseInt('${{ needs.build-ios-test.outputs.build_start }}');
-            const deployStart = parseInt('${{ steps.deploy_start.outputs.time }}');
+            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
+            const step2EndTime = parseInt('${{ needs.build-ios-test.outputs.step2_end_time }}');
+            const step1Elapsed = '${{ needs.build-ios-test.outputs.step1_elapsed }}';
+            const step2Elapsed = '${{ needs.build-ios-test.outputs.step2_elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
@@ -859,46 +851,33 @@ jobs:
 
             const now = Date.now();
 
-            // 준비 단계 소요 시간
-            const prepareElapsed = buildStart - prepareStart;
-            const prepareMin = Math.floor(prepareElapsed / 60000);
-            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
-            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
-
-            // 빌드 단계 소요 시간
-            const buildElapsed = deployStart - buildStart;
-            const buildMin = Math.floor(buildElapsed / 60000);
-            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
-            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
-
-            // 배포 단계 소요 시간
-            const deployElapsed = now - deployStart;
-            const deployMin = Math.floor(deployElapsed / 60000);
-            const deploySec = Math.floor((deployElapsed % 60000) / 1000);
-            const deployDuration = deployMin > 0 ? `${deployMin}분 ${deploySec}초` : `${deploySec}초`;
+            // 배포 단계 소요 시간 (step2 종료 ~ 현재)
+            const step3_s = Math.round((now - step2EndTime) / 1000);
+            const s3Min = Math.floor(step3_s / 60);
+            const s3Sec = step3_s % 60;
+            const step3Elapsed = s3Min > 0 ? `${s3Min}분 ${s3Sec}초` : `${s3Sec}초`;
 
             // 전체 소요 시간
-            const totalElapsed = now - prepareStart;
-            const totalMin = Math.floor(totalElapsed / 60000);
-            const totalSec = Math.floor((totalElapsed % 60000) / 1000);
-            const totalDuration = totalMin > 0 ? `${totalMin}분 ${totalSec}초` : `${totalSec}초`;
+            const total_s = Math.round((now - startTime) / 1000);
+            const tMin = Math.floor(total_s / 60);
+            const tSec = total_s % 60;
+            const totalElapsed = tMin > 0 ? `${tMin}분 ${tSec}초` : `${tSec}초`;
 
             const body = [
               '## 🍎 ✅ iOS TestFlight 배포 완료',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
-              `| 🔨 IPA 빌드 | ✅ 완료 | ${buildDuration} |`,
-              `| 📤 TestFlight 배포 | ✅ 완료 | ${deployDuration} |`,
-              '',
-              `**총 소요 시간: ${totalDuration}**`,
+              `| 🔧 준비 | ✅ 완료 | ${step1Elapsed || '-'} |`,
+              `| 🔨 IPA 빌드 | ✅ 완료 | ${step2Elapsed || '-'} |`,
+              `| 📤 TestFlight 배포 | ✅ 완료 | ${step3Elapsed} |`,
               '',
               '| 항목 | 값 |',
               '|------|-----|',
               `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               `| **커밋** | \`${commitHash}\` |`,
+              `| **총 소요 시간** | ${totalElapsed} |`,
               '',
               '📱 **TestFlight에서 테스트 앱을 다운로드할 수 있습니다.**',
               '',
@@ -912,7 +891,7 @@ jobs:
               body: body
             });
 
-            console.log(`✅ 진행 상황 최종 업데이트 완료: 전체 성공 (${totalDuration})`);
+            console.log(`✅ 진행 상황 최종 업데이트 완료: 전체 성공 (${totalElapsed})`);
 
       # 진행 상황 최종 업데이트 - 실패
       - name: 진행 상황 최종 업데이트 - 실패
@@ -922,9 +901,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const commentId = parseInt('${{ needs.notify-start.outputs.comment_id }}');
-            const prepareStart = parseInt('${{ needs.notify-start.outputs.start_time }}');
-            const buildStart = parseInt('${{ needs.build-ios-test.outputs.build_start }}');
-            const deployStart = parseInt('${{ steps.deploy_start.outputs.time }}');
+            const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
+            const step2EndTime = parseInt('${{ needs.build-ios-test.outputs.step2_end_time }}') || 0;
+            const step1Elapsed = '${{ needs.build-ios-test.outputs.step1_elapsed }}';
+            const step2Elapsed = '${{ needs.build-ios-test.outputs.step2_elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
@@ -933,32 +913,23 @@ jobs:
 
             const now = Date.now();
 
-            // 준비 단계 소요 시간
-            const prepareElapsed = buildStart - prepareStart;
-            const prepareMin = Math.floor(prepareElapsed / 60000);
-            const prepareSec = Math.floor((prepareElapsed % 60000) / 1000);
-            const prepareDuration = prepareMin > 0 ? `${prepareMin}분 ${prepareSec}초` : `${prepareSec}초`;
-
-            // 빌드 단계 소요 시간
-            const buildElapsed = deployStart - buildStart;
-            const buildMin = Math.floor(buildElapsed / 60000);
-            const buildSec = Math.floor((buildElapsed % 60000) / 1000);
-            const buildDuration = buildMin > 0 ? `${buildMin}분 ${buildSec}초` : `${buildSec}초`;
-
-            // 배포 단계 소요 시간
-            const deployElapsed = now - deployStart;
-            const deployMin = Math.floor(deployElapsed / 60000);
-            const deploySec = Math.floor((deployElapsed % 60000) / 1000);
-            const deployDuration = deployMin > 0 ? `${deployMin}분 ${deploySec}초` : `${deploySec}초`;
+            // 배포 단계 소요 시간 (step2 종료 ~ 현재)
+            let step3Elapsed = '-';
+            if (step2EndTime > 0) {
+              const step3_s = Math.round((now - step2EndTime) / 1000);
+              const s3Min = Math.floor(step3_s / 60);
+              const s3Sec = step3_s % 60;
+              step3Elapsed = s3Min > 0 ? `${s3Min}분 ${s3Sec}초` : `${s3Sec}초`;
+            }
 
             const body = [
               '## 🍎 ❌ iOS TestFlight 배포 실패',
               '',
               '| 단계 | 상태 | 소요 시간 |',
               '|------|------|----------|',
-              `| 🔧 준비 | ✅ 완료 | ${prepareDuration} |`,
-              `| 🔨 IPA 빌드 | ✅ 완료 | ${buildDuration} |`,
-              `| 📤 TestFlight 배포 | ❌ 실패 | ${deployDuration} |`,
+              `| 🔧 준비 | ✅ 완료 | ${step1Elapsed || '-'} |`,
+              `| 🔨 IPA 빌드 | ✅ 완료 | ${step2Elapsed || '-'} |`,
+              `| 📤 TestFlight 배포 | ❌ 실패 | ${step3Elapsed} |`,
               '',
               '| 항목 | 값 |',
               '|------|-----|',

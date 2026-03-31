@@ -54,7 +54,7 @@
 | **Type B: 기본** | Secrets 있음, 환경변수 단순 | CHANGELOG-CONTROL, NEXUS-CI |
 | **Type C: CI** | 빌드 검증, 설정 옵션 다수 | FLUTTER-CI, REACT-CI |
 | **Type D: CD** | 배포, 환경변수 상세 가이드 | SPRING-CICD, PYTHON-CICD |
-| **Type E: 특수** | 마법사 연동, 복잡한 설명 | IOS-TESTFLIGHT, PLAYSTORE-CICD |
+| **Type E: 특수** | 마법사 연동, 복잡한 설명 | IOS-TESTFLIGHT, PLAYSTORE-CICD, FIREBASE-CICD |
 
 ---
 
@@ -277,6 +277,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 **적용 파일:**
 - IOS-TESTFLIGHT
 - PLAYSTORE-CICD
+- FIREBASE-CICD
 - SUH-LAB-BUILD-TRIGGER
 - PR-PREVIEW
 
@@ -360,6 +361,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 |------|------|------|
 | FLUTTER-CI | C | ✅ |
 | PLAYSTORE-CICD | E | ✅ |
+| FIREBASE-CICD | E | ✅ |
 | IOS-TESTFLIGHT | E | ✅ |
 | SUH-LAB-BUILD-TRIGGER | E | ✅ |
 

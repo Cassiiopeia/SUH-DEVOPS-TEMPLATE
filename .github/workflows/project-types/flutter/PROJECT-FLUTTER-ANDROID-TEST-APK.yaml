@@ -147,9 +147,9 @@ jobs:
             echo "⚠️ Firebase 서비스 계정 없음 - App Distribution 업로드 건너뜀"
           fi
 
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # ===================================================================
       # 진행 상황 댓글 시스템
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # ===================================================================
       - name: 진행 상황 댓글 생성
         id: progress_comment
         if: github.event_name == 'repository_dispatch' && github.event.client_payload.pr_number != ''
@@ -302,25 +302,33 @@ jobs:
         run: git pull origin ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}
 
       - name: Create .env file
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE || secrets.ENV }}
         run: |
-          echo "${{ secrets.ENV_FILE || secrets.ENV }}" > ${{ env.ENV_FILE_PATH }}
+          printf '%s\n' "$ENV_CONTENT" > ${{ env.ENV_FILE_PATH }}
           echo "✅ ${{ env.ENV_FILE_PATH }} file created"
 
       - name: Setup Release Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
           mkdir -p android/keystore
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > android/keystore/key.jks
+          echo "$KEYSTORE_BASE64" | base64 -d > android/keystore/key.jks
           echo "✅ Release Keystore 생성 완료"
           ls -la android/keystore/
 
       - name: Create key.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           cat > android/key.properties << EOF
-          storeFile=keystore/key.jks
-          storePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
-          keyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}
-          EOF
+storeFile=keystore/key.jks
+storePassword=$STORE_PASSWORD
+keyAlias=$KEY_ALIAS
+keyPassword=$KEY_PASSWORD
+EOF
           echo "✅ key.properties 생성 완료"
 
       # google-services.json 생성 (선택적)
@@ -615,24 +623,24 @@ jobs:
           BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
           cat > build-info.txt << EOF
-          테스트 APK 빌드 정보
+테스트 APK 빌드 정보
 
-          빌드 번호: #$BUILD_NUMBER
-          EOF
+빌드 번호: #$BUILD_NUMBER
+EOF
 
           if [ -n "$PR_NUMBER" ]; then
             cat >> build-info.txt << EOF
-          PR 번호: #$PR_NUMBER
-          EOF
+PR 번호: #$PR_NUMBER
+EOF
           fi
 
           cat >> build-info.txt << EOF
-          브랜치: $BRANCH_NAME
-          커밋: $COMMIT_SHORT
-          전체 커밋 해시: $COMMIT_SHA
-          빌드 날짜: $BUILD_DATE
+브랜치: $BRANCH_NAME
+커밋: $COMMIT_SHORT
+전체 커밋 해시: $COMMIT_SHA
+빌드 날짜: $BUILD_DATE
 
-          EOF
+EOF
 
           # 이슈 정보가 있으면 추가
           if [ -n "${{ needs.prepare-test-build.outputs.issue_number }}" ]; then
@@ -641,11 +649,11 @@ jobs:
             ISSUE_URL="${{ needs.prepare-test-build.outputs.issue_url }}"
 
             cat >> build-info.txt << EOF
-          관련 이슈:
-          - #$ISSUE_NUMBER: $ISSUE_TITLE
-          - URL: $ISSUE_URL
+관련 이슈:
+- #$ISSUE_NUMBER: $ISSUE_TITLE
+- URL: $ISSUE_URL
 
-          EOF
+EOF
           fi
 
           echo "📋 빌드 정보 파일 생성 완료:"
@@ -655,13 +663,13 @@ jobs:
       - name: Create build metadata file
         run: |
           cat > build-metadata.json << EOF
-          {
-            "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
-            "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
-            "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
-            "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
-          }
-          EOF
+{
+  "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
+  "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
+  "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
+  "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+}
+EOF
           cat build-metadata.json
 
       # APK와 빌드 정보를 아티팩트로 업로드 (브랜치명 포함)
@@ -695,8 +703,10 @@ jobs:
       # Firebase App Distribution 업로드 (시크릿 존재 시에만)
       - name: Setup Firebase credentials file
         if: needs.prepare-test-build.outputs.firebase_available == 'true'
+        env:
+          FIREBASE_SA_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
         run: |
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}" | base64 --decode > firebase-service-account.json
+          echo "$FIREBASE_SA_BASE64" | base64 --decode > firebase-service-account.json
           echo "✅ Firebase 서비스 계정 JSON 파일 생성 완료"
 
       - name: Upload to Firebase App Distribution

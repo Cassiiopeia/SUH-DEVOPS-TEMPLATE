@@ -142,6 +142,7 @@ snake_case.sh / snake_case.py
 |--------|------|------|
 | `PROJECT-FLUTTER-CI` | 코드 분석 + 빌드 검증 (PR/main) | 기본 |
 | `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 | 기본 |
+| `PROJECT-FLUTTER-ANDROID-FIREBASE-CICD` | Firebase App Distribution 배포 | 기본 |
 | `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 + Firebase App Distribution | 기본 |
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 | 기본 |
@@ -669,6 +670,15 @@ RELEASE_KEYSTORE_PASSWORD
 RELEASE_KEY_ALIAS
 RELEASE_KEY_PASSWORD
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64
+```
+
+### Flutter Android (CD - Firebase App Distribution 배포)
+```
+RELEASE_KEYSTORE_BASE64
+RELEASE_KEYSTORE_PASSWORD
+RELEASE_KEY_ALIAS
+RELEASE_KEY_PASSWORD
+FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
 ```
 
 ### Flutter iOS (CD - TestFlight 배포)

@@ -28,7 +28,7 @@ jobs:
   label-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Sync labels from config
         uses: crazy-max/ghaction-github-labeler@v5
         with:

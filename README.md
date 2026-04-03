@@ -7,7 +7,7 @@
 > 개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 자동으로 처리됩니다.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v2.7.28 (2026-02-14)
+## 최신 버전 : v2.8.1 (2026-03-10)
 
 [전체 버전 기록 보기](CHANGELOG.md) 
 
@@ -89,6 +89,33 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 ```
 main 푸시 → 버전 증가 → deploy PR 생성 → AI 체인지로그 → 자동 머지 → CI/CD 배포
 ```
+
+---
+
+## Claude Code 플러그인
+
+20개 DevOps 자동화 스킬을 Claude Code에서 바로 사용할 수 있습니다.
+
+```bash
+# 설치 (2줄)
+claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+```
+
+| 스킬 | 용도 |
+|------|------|
+| `/cassiiopeia:analyze` | 코드 분석 (구현 없이 분석만) |
+| `/cassiiopeia:review` | 코드 리뷰 (버그, 보안, 개선점) |
+| `/cassiiopeia:implement` | 기능 구현 (코드 스타일 자동 감지) |
+| `/cassiiopeia:plan` | 구현 계획 수립 |
+| `/cassiiopeia:test` | 테스트 코드 생성 |
+| `/cassiiopeia:refactor` | 리팩토링 |
+| `/cassiiopeia:troubleshoot` | 체계적 디버깅 |
+| `/cassiiopeia:document` | 문서화 |
+| `/cassiiopeia:report` | 구현 보고서 생성 |
+| `/cassiiopeia:issue` | GitHub 이슈 초안 작성 |
+
+> 이 외 `build`, `design`, `design-analyze`, `figma`, `ppt`, `refactor-analyze`, `testcase`, `suh-spring-test`, `init-worktree`, `review` 스킬도 포함
 
 ---
 

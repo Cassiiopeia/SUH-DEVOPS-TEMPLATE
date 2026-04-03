@@ -187,7 +187,7 @@ HEALTH_CHECK_LOG_PATTERN: 'Uvicorn running on'
 **확인 사항**:
 1. GitHub Actions 로그 확인
 2. Dockerfile 경로 확인 (`./Dockerfile` 기본)
-3. Secrets 설정 확인 (SYNOLOGY_HOST, DOCKER_* 등)
+3. Secrets 설정 확인 (SERVER_HOST, DOCKER_* 등)
 
 ### Health Check 실패
 
@@ -225,9 +225,9 @@ docker rmi registry/project-pr-123:latest
 
 | Secret | 설명 |
 |--------|------|
-| `SYNOLOGY_HOST` | Synology NAS 주소 |
-| `SYNOLOGY_USERNAME` | SSH 사용자명 |
-| `SYNOLOGY_PASSWORD` | SSH 비밀번호 |
+| `SERVER_HOST` | Synology NAS 주소 |
+| `SERVER_USER` | SSH 사용자명 |
+| `SERVER_PASSWORD` | SSH 비밀번호 |
 | `DOCKER_REGISTRY_URL` | Docker Registry URL |
 | `DOCKER_USERNAME` | Registry 사용자명 |
 | `DOCKER_PASSWORD` | Registry 비밀번호 |

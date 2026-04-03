@@ -1,11 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-03-10T05:47:12Z",
-    "currentVersion": "2.8.1",
+    "lastUpdated": "2026-04-03T05:38:26Z",
+    "currentVersion": "2.9.6",
     "projectType": "basic",
-    "totalReleases": 68
+    "totalReleases": 69
   },
   "releases": [
+    {
+      "version": "2.9.6",
+      "project_type": "basic",
+      "date": "2026-04-03",
+      "pr_number": 211,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * 플러그인이 Cassiiopeia 마켓플레이스에 등록되어 마켓플레이스를 통해 검색 및 설치 가능해졌습니다.\n  * 플러그인 메타데이터가 공식화되었으며, DevOps 자동화 관련 19개 이상의 스킬 정보가 추가되었습니다.\n\n* **Chores**\n  * 내부 명령 문서가 재구성되었습니다.",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "플러그인이 Cassiiopeia 마켓플레이스에 등록되어 마켓플레이스를 통해 검색 및 설치 가능해졌습니다.",
+            "플러그인 메타데이터가 공식화되었으며, DevOps 자동화 관련 19개 이상의 스킬 정보가 추가되었습니다."
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "내부 명령 문서가 재구성되었습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.8.1",
       "project_type": "basic",

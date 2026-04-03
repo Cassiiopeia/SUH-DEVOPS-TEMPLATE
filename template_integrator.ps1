@@ -78,9 +78,6 @@ param(
     [switch]$NoSynology,
 
     [Parameter(Mandatory=$false)]
-    [string]$Target = "",
-
-    [Parameter(Mandatory=$false)]
     [switch]$Help
 )
 
@@ -314,7 +311,6 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   version     - 버전 관리 시스템만 (version.yml + scripts)
   workflows   - GitHub Actions 워크플로우만
   issues      - 이슈/PR 템플릿만
-  commands    - Custom Command만 (Cursor/Claude 설정)
   interactive - 대화형 선택 (기본값, 추천)
 
 옵션:
@@ -323,7 +319,6 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Type <TYPE>          프로젝트 타입 (미지정 시 자동 감지)
   -NoBackup             백업 생성 안 함
   -Force                확인 없이 즉시 실행
-  -Target <TARGET>      commands 모드 설치 대상 (cursor, claude, all)
   -Synology             Synology 워크플로우 포함 (기본: 제외)
   -NoSynology           Synology 워크플로우 제외
   -Help                 이 도움말 표시
@@ -362,12 +357,6 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
 
   # 수동 설정
   .\template_integrator.ps1 -Mode full -Version "1.0.0" -Type node
-
-  # Custom Command만 설치 (대화형 메뉴)
-  .\template_integrator.ps1 -Mode commands
-
-  # Custom Command 모두 설치 (확인 없이)
-  .\template_integrator.ps1 -Mode commands -Target all -Force
 
 통합 후 작업:
   1. README.md - 버전 정보 섹션 자동 추가됨 (기존 내용 보존)
@@ -757,7 +746,22 @@ function Download-Template {
             Remove-Item -Path $docPath -Force
         }
     }
-    
+
+    # 플러그인 전용 파일/폴더 제거 (마켓플레이스 전용, template_integrator로 배포하지 않음)
+    Print-Info "플러그인 전용 파일 제외 중..."
+    $pluginItemsToRemove = @(
+        ".claude-plugin",   # Claude Code 플러그인 매니페스트
+        "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
+    )
+    # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (Offer-IdeToolsInstall에서 사용 후 정리)
+
+    foreach ($item in $pluginItemsToRemove) {
+        $itemPath = Join-Path $TEMP_DIR $item
+        if (Test-Path $itemPath) {
+            Remove-Item -Path $itemPath -Recurse -Force
+        }
+    }
+
     # 사용자 적용 가이드 문서는 포함
     Print-Info "사용자 적용 가이드 문서 다운로드 중..."
     $guidePath = Join-Path $TEMP_DIR "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
@@ -1014,7 +1018,7 @@ function Save-TemplateOptions {
     if ($content -match "template:") {
         # synology 값 업데이트 또는 추가
         if ($content -match "synology:") {
-            $content = $content -replace "synology:.*$", "synology: $($script:IncludeSynology.ToString().ToLower())"
+            $content = $content -replace "(?m)synology:.*$", "synology: $($script:IncludeSynology.ToString().ToLower())"
         }
         elseif ($content -match "options:") {
             # options 다음 줄에 synology 추가
@@ -1023,7 +1027,7 @@ function Save-TemplateOptions {
 
         # last_update_date 업데이트
         if ($content -match "last_update_date:") {
-            $content = $content -replace 'last_update_date:.*$', "last_update_date: `"$today`""
+            $content = $content -replace '(?m)last_update_date:.*$', "last_update_date: `"$today`""
         }
 
         Set-Content -Path $versionFile -Value $content -Encoding UTF8
@@ -1200,6 +1204,26 @@ function Get-CurrentTemplateVersion {
 
 function Ask-SynologyOption {
     param([string]$TypeDir)
+
+    # 비대화형 환경 감지 (파이프라인, 리디렉션, 비대화형 세션 등)
+    $isNonInteractive = $false
+    try {
+        if (-not [Environment]::UserInteractive) {
+            $isNonInteractive = $true
+        }
+        elseif ([Console]::IsInputRedirected) {
+            $isNonInteractive = $true
+        }
+    }
+    catch {
+        # Console 접근 실패 시 비대화형으로 간주
+        $isNonInteractive = $true
+    }
+
+    if ($isNonInteractive) {
+        $script:IncludeSynology = $false
+        return
+    }
 
     $synologyDir = Join-Path $TypeDir "synology"
     $commonSynologyDir = Join-Path (Split-Path $TypeDir -Parent) "common\synology"
@@ -1511,15 +1535,14 @@ function Copy-Workflows {
                 $filename = $workflow.Name
                 $destPath = Join-Path $WORKFLOWS_DIR $filename
 
+                # 타입별 synology에서 이미 복사된 파일이면 스킵
                 if (Test-Path $destPath) {
-                    $backupPath = [string]$destPath + ".bak"
-                    Move-Item -Path $destPath -Destination $backupPath -Force
-                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (공통 Synology, 백업: ${filename}.bak)"
-                } else {
-                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (공통 Synology)"
+                    Print-Warning "$($filename): 타입별 Synology에 동일 파일 존재. 타입별 버전 유지."
+                    continue
                 }
+
+                Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                Write-Host "  ✓ $filename (공통 Synology)"
                 $synologyCopied++
                 $copied++
             }
@@ -1912,185 +1935,6 @@ function Ensure-GitIgnore {
 }
 
 # ===================================================================
-# .cursor 폴더 다운로드
-# ===================================================================
-
-function Copy-CursorFolder {
-    Print-Step ".cursor 폴더 다운로드 여부 확인 중..."
-    
-    $srcCursorDir = Join-Path $TEMP_DIR ".cursor"
-    if (-not (Test-Path $srcCursorDir)) {
-        Print-Info ".cursor 폴더가 템플릿에 없습니다. 건너뜁니다."
-        return
-    }
-    
-    # 사용자 동의 확인
-    if (-not $Force) {
-        Print-SeparatorLine
-        Write-Host ""
-        Write-Host ".cursor 폴더를 다운로드하시겠습니까? (Cursor IDE 설정)"
-        Write-Host "  Y/y - 예, 다운로드하기"
-        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
-        Write-Host ""
-        
-        if (-not (Ask-YesNo "선택" "N")) {
-            Print-Info ".cursor 폴더 다운로드 건너뜁니다"
-            return
-        }
-    }
-    
-    # 다운로드 실행
-    if (-not (Test-Path ".cursor")) {
-        New-Item -Path ".cursor" -ItemType Directory -Force | Out-Null
-    }
-    Copy-Item -Path "$srcCursorDir\*" -Destination ".cursor\" -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success ".cursor 폴더 다운로드 완료"
-}
-
-# ===================================================================
-# .claude 폴더 다운로드
-# ===================================================================
-
-function Copy-ClaudeFolder {
-    Print-Step ".claude 폴더 다운로드 여부 확인 중..."
-
-    $srcClaudeDir = Join-Path $TEMP_DIR ".claude"
-    if (-not (Test-Path $srcClaudeDir)) {
-        Print-Info ".claude 폴더가 템플릿에 없습니다. 건너뜁니다."
-        return
-    }
-
-    # 사용자 동의 확인
-    if (-not $Force) {
-        Print-SeparatorLine
-        Write-Host ""
-        Write-Host ".claude 폴더를 다운로드하시겠습니까? (Claude Code 설정)"
-        Write-Host "  Y/y - 예, 다운로드하기"
-        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
-        Write-Host ""
-
-        if (-not (Ask-YesNo "선택" "N")) {
-            Print-Info ".claude 폴더 다운로드 건너뜁니다"
-            return
-        }
-    }
-
-    # 다운로드 실행
-    if (-not (Test-Path ".claude")) {
-        New-Item -Path ".claude" -ItemType Directory -Force | Out-Null
-    }
-    Copy-Item -Path "$srcClaudeDir\*" -Destination ".claude\" -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success ".claude 폴더 다운로드 완료"
-}
-
-# ===================================================================
-# Custom Command 설치 (백업 없이 덮어쓰기)
-# ===================================================================
-
-function Install-CustomCommand {
-    param(
-        [string]$FolderName,
-        [string]$DisplayName
-    )
-
-    $src = Join-Path $TEMP_DIR $FolderName
-    if (-not (Test-Path $src)) {
-        Print-Warning "$DisplayName 폴더가 템플릿에 없습니다"
-        return $false
-    }
-
-    Print-Step "$DisplayName 설정 설치 중..."
-
-    # 기존 폴더가 있으면 덮어쓰기 알림
-    if (Test-Path $FolderName) {
-        Print-Info "기존 $FolderName 폴더에 덮어쓰기"
-    } else {
-        New-Item -Path $FolderName -ItemType Directory -Force | Out-Null
-    }
-    Copy-Item -Path "$src\*" -Destination "$FolderName\" -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success "$DisplayName 설정 설치 완료"
-    return $true
-}
-
-function Copy-CustomCommands {
-    param(
-        [string]$Target  # "cursor", "claude", "all"
-    )
-
-    # 경고 메시지
-    Print-Warning "⚠️  기존 설정 파일이 덮어쓰기됩니다! (기존에 추가한 파일은 보존됨)"
-    Write-Host ""
-
-    if (-not $Force) {
-        Write-Host "계속 진행하시겠습니까?"
-        Write-Host "  Y/y - 예, 계속 진행"
-        Write-Host "  N/n - 아니오, 취소 (기본)"
-        Write-Host ""
-
-        if (-not (Ask-YesNo "선택" "N")) {
-            Print-Info "취소되었습니다"
-            return
-        }
-    }
-
-    # 템플릿 다운로드 (필요시)
-    if (-not (Test-Path $TEMP_DIR)) {
-        Download-Template
-    }
-
-    $installed = 0
-
-    switch ($Target) {
-        "cursor" {
-            if (Install-CustomCommand ".cursor" "Cursor IDE") { $installed++ }
-        }
-        "claude" {
-            if (Install-CustomCommand ".claude" "Claude Code") { $installed++ }
-        }
-        "all" {
-            if (Install-CustomCommand ".cursor" "Cursor IDE") { $installed++ }
-            if (Install-CustomCommand ".claude" "Claude Code") { $installed++ }
-        }
-    }
-
-    # 임시 폴더 정리
-    if (Test-Path $TEMP_DIR) {
-        Remove-Item -Path $TEMP_DIR -Recurse -Force
-    }
-
-    if ($installed -gt 0) {
-        Write-Host ""
-        Print-Success "Custom Command 설치 완료 ($installed 개 폴더)"
-    }
-}
-
-function Show-CustomCommandMenu {
-    Print-QuestionHeader "📦" "어떤 Custom Command를 설치하시겠습니까?"
-
-    Write-Host "  1) Cursor IDE 설정 (.cursor 폴더)"
-    Write-Host "  2) Claude Code 설정 (.claude 폴더)"
-    Write-Host "  3) 모두 설치"
-    Write-Host "  4) 취소"
-    Write-Host ""
-
-    while ($true) {
-        $choice = Read-SingleKey "선택 (1-4) "
-
-        if ($choice -match '^[1-4]$') {
-            switch ($choice) {
-                "1" { Copy-CustomCommands -Target "cursor"; return }
-                "2" { Copy-CustomCommands -Target "claude"; return }
-                "3" { Copy-CustomCommands -Target "all"; return }
-                "4" { Print-Info "취소되었습니다"; return }
-            }
-        } else {
-            Print-Error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
-            Write-Host ""
-        }
-    }
-}
-
-# ===================================================================
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
 # ===================================================================
 
@@ -2275,29 +2119,27 @@ function Start-InteractiveMode {
     Write-Host "  2) 버전 관리 시스템만"
     Write-Host "  3) GitHub Actions 워크플로우만"
     Write-Host "  4) 이슈/PR 템플릿만"
-    Write-Host "  5) Custom Command만 (Cursor/Claude 설정)"
-    Write-Host "  6) 취소"
+    Write-Host "  5) 취소"
     Write-Host ""
 
     # 입력 검증 루프
     while ($true) {
-        $choice = Read-SingleKey "선택 (1-6) "
+        $choice = Read-SingleKey "선택 (1-5) "
 
-        if ($choice -match '^[1-6]$') {
+        if ($choice -match '^[1-5]$') {
             switch ($choice) {
                 "1" { $script:Mode = "full"; break }
                 "2" { $script:Mode = "version"; break }
                 "3" { $script:Mode = "workflows"; break }
                 "4" { $script:Mode = "issues"; break }
-                "5" { $script:Mode = "commands"; break }
-                "6" {
+                "5" {
                     Print-Info "취소되었습니다"
                     exit 0
                 }
             }
             break
         } else {
-            Print-Error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
+            Print-Error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
             Write-Host ""
         }
     }
@@ -2377,8 +2219,6 @@ function Start-Integration {
             Copy-DiscussionTemplates
             Copy-CodeRabbitConfig
             Ensure-GitIgnore
-            Copy-CursorFolder
-            Copy-ClaudeFolder
             Copy-SetupGuide
             Copy-UtilModules $script:ProjectType
         }
@@ -2401,14 +2241,6 @@ function Start-Integration {
             Copy-IssueTemplates
             Copy-DiscussionTemplates
         }
-        "commands" {
-            if ($Target -ne "") {
-                Copy-CustomCommands -Target $Target
-            } else {
-                Show-CustomCommandMenu
-            }
-            return  # commands 모드는 자체적으로 정리하고 종료
-        }
     }
 
     # 2.1 템플릿 옵션 저장 (Synology 설정 등)
@@ -2422,13 +2254,142 @@ function Start-Integration {
         Save-TemplateOptions $script:TemplateVersion
     }
 
-    # 3. 임시 파일 정리
+    # 3. IDE 도구(Skills) 설치 제안
+    Offer-IdeToolsInstall
+
+    # 4. 임시 파일 정리
     if (Test-Path $TEMP_DIR) {
         Remove-Item -Path $TEMP_DIR -Recurse -Force
     }
 
     # 완료 메시지
     Show-Summary
+}
+
+# ===================================================================
+# IDE 도구(Skills) 설치 제안
+# Claude Code: 플러그인 마켓플레이스 자동 설치
+# Cursor: skills/ → .cursor/skills/ 복사
+# ===================================================================
+
+function Offer-IdeToolsInstall {
+    $claudeAvailable = $null -ne (Get-Command "claude" -ErrorAction SilentlyContinue)
+    $cursorAvailable = $null -ne (Get-Command "cursor" -ErrorAction SilentlyContinue)
+
+    # 둘 다 없으면 안내만 출력
+    if (-not $claudeAvailable -and -not $cursorAvailable) {
+        Write-Host ""
+        Print-SeparatorLine
+        Print-Info "IDE 도구(Skills) 수동 설치 안내"
+        Write-Host ""
+        Write-Host "  Claude Code 사용자:"
+        Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
+        Write-Host ""
+        Write-Host "  Cursor 사용자:"
+        Write-Host "    template_integrator 재실행 시 Cursor가 감지되면 자동 설치됩니다."
+        Write-Host ""
+        return
+    }
+
+    Write-Host ""
+    Print-SeparatorLine
+    Write-Host ""
+
+    # ─── Claude Code 플러그인 설치 ───
+    if ($claudeAvailable) {
+        Print-Step "Claude Code CLI 감지됨"
+
+        $doClaudeInstall = $true
+        if (-not $Force) {
+            Write-Host ""
+            Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
+            Write-Host "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
+            Write-Host ""
+            Write-Host "  Y/y - 예, 설치하기 (추천)"
+            Write-Host "  N/n - 아니오, 건너뛰기"
+            Write-Host ""
+
+            if (-not (Ask-YesNo "선택" "Y")) {
+                $doClaudeInstall = $false
+                Print-Info "Claude Code 플러그인 설치 건너뜁니다"
+                Write-Host ""
+                Write-Host "  수동 설치 명령어:"
+                Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+                Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
+                Write-Host ""
+            }
+        }
+
+        if ($doClaudeInstall) {
+            Print-Step "Claude Code 마켓플레이스 등록 중..."
+            try {
+                $null = & claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1
+                Print-Success "마켓플레이스 등록 완료"
+
+                Print-Step "Claude Code 플러그인 설치 중..."
+                try {
+                    $null = & claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user 2>&1
+                    Print-Success "Claude Code 플러그인 설치 완료 (cassiiopeia)"
+                } catch {
+                    Print-Warning "플러그인 설치 실패. 수동으로 설치해주세요:"
+                    Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
+                    Write-Host ""
+                }
+            } catch {
+                Print-Warning "마켓플레이스 등록 실패. 수동으로 설치해주세요:"
+                Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+                Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
+                Write-Host ""
+            }
+        }
+    } else {
+        # Claude Code CLI 없음 → 수동 안내
+        Write-Host ""
+        Write-Host "  💡 Claude Code 사용자라면 다음 명령어로 Skills를 설치하세요:"
+        Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
+        Write-Host ""
+    }
+
+    # ─── Cursor Skills 복사 (루트 skills/ → .cursor/skills/) ───
+    if ($cursorAvailable) {
+        Print-Step "Cursor CLI 감지됨"
+
+        $srcSkillsDir = Join-Path $TEMP_DIR "skills"
+        if (-not (Test-Path $srcSkillsDir)) {
+            Print-Info "skills 폴더가 템플릿에 없습니다. 건너뜁니다."
+        } else {
+            $doCursorInstall = $true
+            if (-not $Force) {
+                Write-Host ""
+                Write-Host "Cursor IDE Skills를 설치하시겠습니까?"
+                Write-Host "  설치 시 Cursor에서 /analyze, /review 등 20개 스킬 사용 가능"
+                Write-Host ""
+                Write-Host "  Y/y - 예, 설치하기 (추천)"
+                Write-Host "  N/n - 아니오, 건너뛰기"
+                Write-Host ""
+
+                if (-not (Ask-YesNo "선택" "Y")) {
+                    $doCursorInstall = $false
+                    Print-Info "Cursor Skills 설치 건너뜁니다"
+                }
+            }
+
+            if ($doCursorInstall) {
+                Print-Step "Cursor Skills 설치 중..."
+                try {
+                    if (-not (Test-Path ".cursor\skills")) {
+                        New-Item -Path ".cursor\skills" -ItemType Directory -Force | Out-Null
+                    }
+                    Copy-Item -Path "$srcSkillsDir\*" -Destination ".cursor\skills\" -Recurse -Force -ErrorAction Stop
+                    Print-Success "Cursor Skills 설치 완료 (.cursor/skills/)"
+                } catch {
+                    Print-Warning "Cursor Skills 복사 실패"
+                }
+            }
+        }
+    }
 }
 
 # ===================================================================
@@ -2548,7 +2509,7 @@ function Main {
     }
     
     # 파라미터 검증
-    $validModes = @("interactive", "full", "version", "workflows", "issues", "commands")
+    $validModes = @("interactive", "full", "version", "workflows", "issues")
     if ($Mode -ne "" -and $Mode -notin $validModes) {
         Print-Error "잘못된 모드: $Mode"
         Write-Host "지원되는 모드: $($validModes -join ', ')"

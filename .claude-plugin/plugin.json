@@ -1,0 +1,25 @@
+{
+  "name": "cassiiopeia",
+  "description": "DevOps 자동화 스킬 모음 - 코드 분석, 설계, 구현, 테스트, 리뷰, 리팩토링, 문서화, 트러블슈팅 등 19+ 스킬",
+  "version": "2.9.0",
+  "author": {
+    "name": "Cassiiopeia",
+    "url": "https://github.com/Cassiiopeia"
+  },
+  "homepage": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
+  "license": "MIT",
+  "keywords": [
+    "devops",
+    "automation",
+    "skills",
+    "code-review",
+    "testing",
+    "documentation",
+    "refactoring",
+    "troubleshooting",
+    "flutter",
+    "spring",
+    "react"
+  ]
+}

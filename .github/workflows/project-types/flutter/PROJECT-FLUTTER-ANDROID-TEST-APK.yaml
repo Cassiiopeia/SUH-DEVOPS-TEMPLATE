@@ -7,7 +7,7 @@
 #
 # 주요 특징:
 # - workflow_dispatch로 수동 실행 또는 repository_dispatch로 트리거
-# - 버전 관리 불필요 (Android는 버전 제약 없음)
+# - 버전은 version.yml에서 동적으로 읽어 사용 (운영 버전과 동일, 빌드 번호로 구분)
 # - 브랜치명에서 이슈 번호 자동 추출 (YYYYMMDD_#이슈번호_내용 형식)
 # - GitHub API로 이슈 정보 가져와서 빌드 정보에 포함
 # - APK 파일만 생성 (Play Store 배포 제거)
@@ -67,6 +67,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
+      version: ${{ steps.build_info.outputs.version }}
       issue_url: ${{ steps.issue_info.outputs.issue_url }}
       issue_title: ${{ steps.issue_info.outputs.issue_title }}
       issue_number: ${{ steps.issue_info.outputs.issue_number }}
@@ -251,10 +252,18 @@ jobs:
             fi
           fi
 
+      # 버전 관리 스크립트 권한 설정
+      - name: 버전 관리 스크립트 권한 설정
+        run: chmod +x ./.github/scripts/version_manager.sh
+
       # 빌드 정보 생성
       - name: 빌드 정보 생성
         id: build_info
         run: |
+          # version_manager.sh로 버전 가져오기 (프로덕션 워크플로우와 동일한 방식)
+          VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
           COMMIT_SHA="${{ github.sha }}"
           COMMIT_SHORT=$(echo "$COMMIT_SHA" | cut -c1-7)
           BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
@@ -517,11 +526,12 @@ EOF
           echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
           echo "📦 APK 파일명: $APK_NAME"
 
-      - name: Set test build version (0.0.0)
+      - name: Set test build version
         run: |
+          VERSION="${{ needs.prepare-test-build.outputs.version }}"
           BUILD_NUMBER="${{ needs.prepare-test-build.outputs.build_number }}"
-          echo "📋 테스트 빌드 버전 설정: 0.0.0+${BUILD_NUMBER}"
-          sed -i "s/^version: .*/version: 0.0.0+${BUILD_NUMBER}/" pubspec.yaml
+          echo "📋 테스트 빌드 버전 설정: ${VERSION}+${BUILD_NUMBER}"
+          sed -i "s/^version: .*/version: ${VERSION}+${BUILD_NUMBER}/" pubspec.yaml
           echo "✅ pubspec.yaml 버전 변경 완료:"
           grep "^version:" pubspec.yaml
 
@@ -805,12 +815,14 @@ EOF
               }
             }
 
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
+
             lines.push(
               '',
               '### 📦 빌드 결과',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **앱 버전** | \`${version}(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               `| **커밋** | \`${commitHash}\` |`,
               `| **총 소요 시간** | ${totalElapsed} |`,
@@ -844,7 +856,7 @@ EOF
               const issueLines = [
                 '🤖 ✅ **Android APK 빌드 완료**',
                 '',
-                `- 앱 버전: \`0.0.0(${buildNumber})\``,
+                `- 앱 버전: \`${version}(${buildNumber})\``,
                 `- 커밋: \`${commitHash}\``,
                 '',
               ];
@@ -879,6 +891,7 @@ EOF
             const step1Elapsed = '${{ steps.progress_step1.outputs.elapsed }}';
             const prNumber = parseInt('${{ github.event.client_payload.pr_number }}');
             const buildNumber = '${{ needs.prepare-test-build.outputs.build_number }}';
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
             const branchName = '${{ needs.prepare-test-build.outputs.branch_name }}';
             const issueNumber = '${{ needs.prepare-test-build.outputs.issue_number }}';
             const runId = '${{ github.run_id }}';
@@ -917,7 +930,7 @@ EOF
               '|------|------|----------|',
               ...rows,
               '',
-              `- 앱 버전: \`0.0.0(${buildNumber})\``,
+              `- 앱 버전: \`${version}(${buildNumber})\``,
               `- 브랜치: \`${branchName}\``,
               `- 총 소요 시간: ${totalElapsed}`,
               '',
@@ -939,7 +952,7 @@ EOF
               const issueBody = [
                 '🤖 ❌ **Android APK 빌드 실패**',
                 '',
-                `- 앱 버전: \`0.0.0(${buildNumber})\``,
+                `- 앱 버전: \`${version}(${buildNumber})\``,
                 '',
                 '❌ 빌드 중 오류가 발생했습니다.',
                 '',

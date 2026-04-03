@@ -12,7 +12,7 @@
 #
 # 주요 특징:
 # - workflow_dispatch로 수동 실행 또는 repository_dispatch로 트리거
-# - 버전은 0.0.0으로 고정 (운영 버전과 분리)
+# - 버전은 version.yml에서 동적으로 읽어 사용 (운영 버전과 동일, 빌드 번호로 구분)
 # - 빌드 번호는 PR번호 + 카운트 또는 GITHUB_RUN_NUMBER 사용
 # - 브랜치명에서 이슈 번호 자동 추출 (YYYYMMDD_#이슈번호_내용 형식)
 # - GitHub API로 이슈 정보 가져와서 릴리즈 노트에 포함
@@ -159,7 +159,7 @@ jobs:
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **빌드 번호** | \`${buildNumber}\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -233,11 +233,16 @@ jobs:
             echo "ℹ️ Empty Secrets.xcconfig created (no secrets provided)"
           fi
 
-      # 테스트 빌드 버전 설정 (0.0.0 고정)
+      # 테스트 빌드 버전 설정 (version.yml에서 동적 읽기)
+      - name: 버전 관리 스크립트 권한 설정
+        run: chmod +x ./.github/scripts/version_manager.sh
+
       - name: 테스트 빌드 버전 설정
         id: test_version
         run: |
-          echo "version=0.0.0" >> $GITHUB_OUTPUT
+          # version_manager.sh로 버전 가져오기 (프로덕션 워크플로우와 동일한 방식)
+          VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           # repository_dispatch 이벤트인 경우 PR 번호를 빌드 번호로 사용
           if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
@@ -255,7 +260,7 @@ jobs:
 
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "📋 테스트 빌드: 버전=0.0.0, 빌드번호=$BUILD_NUMBER"
+          echo "📋 테스트 빌드: 버전=$VERSION, 빌드번호=$BUILD_NUMBER"
 
       # 브랜치명에서 이슈 번호 추출 및 GitHub API로 이슈 정보 가져오기
       - name: 브랜치명에서 이슈 정보 추출
@@ -393,7 +398,7 @@ EOF
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **빌드 번호** | \`${buildNumber}\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               '',
               '❌ **환경 준비 중 오류가 발생했습니다.**',
@@ -440,6 +445,7 @@ EOF
             const startTime = parseInt('${{ needs.notify-start.outputs.start_time }}');
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
@@ -460,7 +466,7 @@ EOF
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **앱 버전** | \`${version}(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -564,7 +570,7 @@ EOF
       - name: Flutter build (no codesign)
         run: |
           flutter build ios --release --no-codesign \
-            --build-name="0.0.0" \
+            --build-name="${{ needs.prepare-test-build.outputs.version }}" \
             --build-number="${{ needs.prepare-test-build.outputs.build_number }}"
 
       - name: Create Archive
@@ -623,6 +629,7 @@ EOF
             const step1Elapsed = '${{ steps.progress_step1.outputs.elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
@@ -645,7 +652,7 @@ EOF
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **앱 버전** | \`${version}(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               '',
               `**[📋 실시간 로그 보기](${runUrl})**`,
@@ -678,6 +685,7 @@ EOF
             const step1Elapsed = '${{ steps.progress_step1.outputs.elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
@@ -704,7 +712,7 @@ EOF
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **앱 버전** | \`${version}(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               `| **커밋** | \`${commitHash}\` |`,
               '',
@@ -819,7 +827,7 @@ EOF
         if: success()
         run: |
           echo "✅ TestFlight 테스트 빌드 업로드 성공!"
-          echo "버전: 0.0.0"
+          echo "버전: ${{ needs.prepare-test-build.outputs.version }}"
           echo "빌드 번호: ${{ needs.prepare-test-build.outputs.build_number }}"
           if [ -n "${{ needs.prepare-test-build.outputs.pr_number }}" ]; then
             echo "PR 번호: ${{ needs.prepare-test-build.outputs.pr_number }}"
@@ -850,6 +858,7 @@ EOF
             const step2Elapsed = '${{ needs.build-ios-test.outputs.step2_elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
@@ -879,7 +888,7 @@ EOF
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **앱 버전** | \`${version}(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               `| **커밋** | \`${commitHash}\` |`,
               `| **총 소요 시간** | ${totalElapsed} |`,
@@ -912,6 +921,7 @@ EOF
             const step2Elapsed = '${{ needs.build-ios-test.outputs.step2_elapsed }}';
             const branchName = '${{ github.event.client_payload.branch_name }}';
             const buildNumber = '${{ github.event.client_payload.build_number }}';
+            const version = '${{ needs.prepare-test-build.outputs.version }}';
             const commitHash = '${{ needs.prepare-test-build.outputs.commit_hash }}';
             const runId = '${{ github.run_id }}';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
@@ -938,7 +948,7 @@ EOF
               '',
               '| 항목 | 값 |',
               '|------|-----|',
-              `| **앱 버전** | \`0.0.0(${buildNumber})\` |`,
+              `| **앱 버전** | \`${version}(${buildNumber})\` |`,
               `| **브랜치** | \`${branchName}\` |`,
               `| **커밋** | \`${commitHash}\` |`,
               '',

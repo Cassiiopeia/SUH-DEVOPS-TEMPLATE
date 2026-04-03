@@ -606,6 +606,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `suh-spring-test` | Spring 테스트 생성 |
 | `init-worktree` | Git worktree 자동 생성 |
 | `issue` | 이슈 자동 작성 |
+| `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
 
 **버전 동기화**: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 `plugin.json`, `marketplace.json` 버전을 자동 동기화
 

@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-03T05:38:26Z",
-    "currentVersion": "2.9.6",
+    "lastUpdated": "2026-04-07T08:11:08Z",
+    "currentVersion": "2.9.8",
     "projectType": "basic",
-    "totalReleases": 69
+    "totalReleases": 70
   },
   "releases": [
+    {
+      "version": "2.9.8",
+      "project_type": "basic",
+      "date": "2026-04-07",
+      "pr_number": 213,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 플러그인 및 앱 버전 업데이트 (v2.9.6 / v2.9.8)\n  * 내부 계획 문서 정리\n\n* **Documentation**\n  * README의 최신 버전 정보 업데이트\n\n* **Improvements**\n  * Issue Mode에서 생성된 이슈를 마크다운 파일로 자동 저장\n  * 이슈 템플릿 형식 및 서식 규칙 개선",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "플러그인 및 앱 버전 업데이트 (v2.9.6 / v2.9.8)",
+            "내부 계획 문서 정리"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "README의 최신 버전 정보 업데이트"
+          ]
+        },
+        "improvements": {
+          "title": "Improvements",
+          "items": [
+            "Issue Mode에서 생성된 이슈를 마크다운 파일로 자동 저장",
+            "이슈 템플릿 형식 및 서식 규칙 개선"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.6",
       "project_type": "basic",

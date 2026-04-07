@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-07T08:11:08Z",
-    "currentVersion": "2.9.8",
+    "lastUpdated": "2026-04-07T08:21:44Z",
+    "currentVersion": "2.9.9",
     "projectType": "basic",
-    "totalReleases": 70
+    "totalReleases": 71
   },
   "releases": [
+    {
+      "version": "2.9.9",
+      "project_type": "basic",
+      "date": "2026-04-07",
+      "pr_number": 215,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **Chores**\n  * 애플리케이션 버전을 2.9.9로 업데이트했습니다.\n  * Cassiiopeia 플러그인 버전을 2.9.8로 업데이트하고 소스 참조 방식을 개선했습니다.",
+      "parsed_changes": {
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "애플리케이션 버전을 2.9.9로 업데이트했습니다.",
+            "Cassiiopeia 플러그인 버전을 2.9.8로 업데이트하고 소스 참조 방식을 개선했습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.8",
       "project_type": "basic",

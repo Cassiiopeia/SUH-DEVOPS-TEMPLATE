@@ -32,6 +32,8 @@
 | CI/CD 처음부터 설정 | 프로젝트 타입별 워크플로우 자동 구성 |
 | 이슈 템플릿 수동 설정 | 4종 템플릿 자동 설치 |
 | PR Preview 환경 수동 구축 | 댓글 한 줄로 임시 서버 배포 |
+| Claude Code 매번 같은 프롬프트 반복 | `/cassiiopeia:xxx` 20종 Skill로 일관된 작업 수행 |
+| 코드 리뷰·이슈 작성·보고서 수동 작성 | Skill 한 번에 표준 포맷으로 생성 |
 
 ---
 
@@ -54,12 +56,22 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 
 > 대화형 모드로 프로젝트 타입과 버전을 자동 감지합니다.
 
+### Claude Code Skill만 설치
+
+```bash
+claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+```
+
+> `/cassiiopeia:` 입력 시 20종 Skill 자동완성. 자세한 내용은 [docs/SKILLS.md](docs/SKILLS.md)
+
 ---
 
 ## 주요 기능
 
 | 기능 | 설명 | 문서 |
 |------|------|------|
+| **Claude Code Skills** | `/cassiiopeia:xxx` 20종 DevOps/개발 Skill 플러그인 (리뷰·이슈·리팩토링·테스트·보고서 등) | [상세](docs/SKILLS.md) |
 | **버전 자동화** | main 푸시 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
 | **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | Issue/PR 댓글로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
@@ -87,8 +99,15 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 
 ## 자동화 흐름
 
+**GitHub Actions 파이프라인**
 ```
 main 푸시 → 버전 증가 → deploy PR 생성 → AI 체인지로그 → 자동 머지 → CI/CD 배포
+```
+
+**Claude Code Skill 개발 흐름**
+```
+/issue → /init-worktree → /plan → /implement → /test → /review → /report
+이슈      worktree 생성    계획    구현          테스트  리뷰     보고서
 ```
 
 ---

@@ -338,16 +338,18 @@ Spring Boot 프로젝트용 테스트 샘플 코드를 생성합니다. `build.g
 
 상황별 추천:
 
+실제 작업 순서는 **이슈 등록 → 작업 환경 분리 → 계획 → 구현 → 테스트 → 리뷰 → 보고서** 입니다.
+
 | 상황 | 추천 흐름 |
 |------|----------|
-| 새 기능 개발 | `plan` → `implement` → `test` → `review` → `report` |
-| 버그 수정 | `troubleshoot` → `implement` → `test` → `report` |
-| 리팩토링 | `refactor-analyze` → `refactor` → `test` → `review` |
+| **새 기능 개발 (표준 흐름)** | `issue` → `init-worktree` → `plan` → `implement` → `test` → `review` → `report` |
+| 버그 수정 | `issue` → `init-worktree` → `troubleshoot` → `implement` → `test` → `report` |
+| 리팩토링 | `issue` → `init-worktree` → `refactor-analyze` → `refactor` → `test` → `review` → `report` |
+| 설계부터 시작 | `issue` → `init-worktree` → `design-analyze` → `design` → `test` → `review` → `report` |
 | 코드 리뷰만 필요 | `review` |
-| 이슈 작성 | `issue` |
-| 구현 완료 후 정리 | `report` (PR 설명용) / `ppt` (발표용) / `testcase` (QA용) |
+| 이슈만 빠르게 초안 작성 | `issue` |
+| 구현 완료 후 산출물만 정리 | `report` (PR 설명용) / `ppt` (발표용) / `testcase` (QA용) |
 | 디자인 변환 | `figma` |
-| Git 작업 환경 분리 | `init-worktree` |
 
 ---
 

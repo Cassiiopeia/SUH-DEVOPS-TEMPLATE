@@ -100,15 +100,32 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ## 자동화 흐름
 
 **GitHub Actions 파이프라인**
-```
-main 푸시 → 버전 증가 → deploy PR 생성 → AI 체인지로그 → 자동 머지 → CI/CD 배포
+
+```mermaid
+flowchart LR
+    A([main 푸시]) --> B[버전 자동 증가]
+    B --> C[deploy PR 생성]
+    C --> D[AI 체인지로그]
+    D --> E[자동 머지]
+    E --> F[CI/CD 배포]
+    F --> G([완료])
 ```
 
 **Claude Code Skill 개발 흐름**
+
+```mermaid
+flowchart LR
+    A([작업 시작]) --> B[/issue<br/>이슈 등록/]
+    B --> C[/init-worktree<br/>worktree 생성/]
+    C --> D[/plan<br/>계획 수립/]
+    D --> E[/implement<br/>구현/]
+    E --> F[/test<br/>테스트/]
+    F --> G[/review<br/>리뷰/]
+    G --> H[/report<br/>보고서/]
+    H --> I([PR 등록])
 ```
-/issue → /init-worktree → /plan → /implement → /test → /review → /report
-이슈      worktree 생성    계획    구현          테스트  리뷰     보고서
-```
+
+> Skill별 상세 흐름(버그/리팩토링/설계 등): [docs/SKILLS.md](docs/SKILLS.md#어떤-skill을-언제-쓸까)
 
 ---
 

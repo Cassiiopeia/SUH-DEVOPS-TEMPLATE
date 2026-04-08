@@ -336,20 +336,60 @@ Spring Boot 프로젝트용 테스트 샘플 코드를 생성합니다. `build.g
 
 ## 어떤 Skill을 언제 쓸까?
 
-상황별 추천:
-
 실제 작업 순서는 **이슈 등록 → 작업 환경 분리 → 계획 → 구현 → 테스트 → 리뷰 → 보고서** 입니다.
+
+### 표준 개발 흐름 (전체 사이클)
+
+```mermaid
+flowchart LR
+    A([작업 시작]) --> B[/issue<br/>이슈 등록/]
+    B --> C[/init-worktree<br/>worktree 생성/]
+    C --> D{작업 유형?}
+
+    D -->|새 기능| E1[/plan<br/>전략 수립/]
+    D -->|버그| E2[/troubleshoot<br/>원인 분석/]
+    D -->|리팩토링| E3[/refactor-analyze<br/>Smell 탐지/]
+    D -->|설계 변경| E4[/design-analyze<br/>설계 분석/]
+
+    E1 --> F1[/implement<br/>구현/]
+    E2 --> F1
+    E3 --> F2[/refactor<br/>리팩토링 적용/]
+    E4 --> F3[/design<br/>설계 + 구현/]
+
+    F1 --> G[/test<br/>테스트 작성/]
+    F2 --> G
+    F3 --> G
+
+    G --> H[/review<br/>셀프 리뷰/]
+    H --> I[/report<br/>구현 보고서/]
+    I --> J([PR 등록])
+
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style I fill:#fff4e1
+```
+
+### 시나리오별 흐름 정리
 
 | 상황 | 추천 흐름 |
 |------|----------|
-| **새 기능 개발 (표준 흐름)** | `issue` → `init-worktree` → `plan` → `implement` → `test` → `review` → `report` |
-| 버그 수정 | `issue` → `init-worktree` → `troubleshoot` → `implement` → `test` → `report` |
-| 리팩토링 | `issue` → `init-worktree` → `refactor-analyze` → `refactor` → `test` → `review` → `report` |
-| 설계부터 시작 | `issue` → `init-worktree` → `design-analyze` → `design` → `test` → `review` → `report` |
+| **새 기능 개발 (표준)** | `issue` → `init-worktree` → `plan` → `implement` → `test` → `review` → `report` |
+| **버그 수정** | `issue` → `init-worktree` → `troubleshoot` → `implement` → `test` → `report` |
+| **리팩토링** | `issue` → `init-worktree` → `refactor-analyze` → `refactor` → `test` → `review` → `report` |
+| **설계부터 시작** | `issue` → `init-worktree` → `design-analyze` → `design` → `test` → `review` → `report` |
+
+### 단건 작업 (사이클 없이 단독 호출)
+
+| 상황 | 사용 Skill |
+|------|----------|
 | 코드 리뷰만 필요 | `review` |
 | 이슈만 빠르게 초안 작성 | `issue` |
-| 구현 완료 후 산출물만 정리 | `report` (PR 설명용) / `ppt` (발표용) / `testcase` (QA용) |
-| 디자인 변환 | `figma` |
+| PR 설명 / 발표 자료 / QA 체크리스트 생성 | `report` / `ppt` / `testcase` |
+| Figma 디자인을 코드로 변환 | `figma` |
+| Spring Boot 테스트 샘플 생성 | `suh-spring-test` |
+| Synology 외부 노출 가이드 | `synology-expose` |
+| 빌드 실행 / 에러 분석 | `build` |
+| 코드 주석 / 문서 작성 | `document` |
 
 ---
 

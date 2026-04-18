@@ -12,4 +12,6 @@ SUPPORTED_SKILL_IDS = [
     "report",
     "ppt",
     "review",
+    "issue",
+    "synology-expose",
 ]

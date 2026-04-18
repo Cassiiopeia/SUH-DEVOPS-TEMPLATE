@@ -73,3 +73,14 @@ Step 1~N: 기법 + Before/After + 테스트 확인
 ## 다음 단계
 
 분석 완료 후 → `/refactor`로 실제 리팩토링 진행
+
+## 산출물 저장
+
+`references/doc-output-path.md` 규칙을 따른다.
+
+산출물 md 저장 전:
+```bash
+python3 -m suh_template.cli get-output-path refactor-analyze
+```
+
+반환된 경로에 파일을 저장한다.

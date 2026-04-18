@@ -40,8 +40,6 @@ git status
 
 ## 출력
 
-**파일 위치**: `.report/[YYYYMMDD]_[#이슈번호]_설명.md`
-
 ```markdown
 # [이슈 제목]
 
@@ -62,3 +60,14 @@ git status
 ## 주의사항
 [특이사항, 추후 개선점]
 ```
+
+## 산출물 저장
+
+`references/doc-output-path.md` 규칙을 따른다.
+
+산출물 md 저장 전:
+```bash
+python3 -m suh_template.cli get-output-path report
+```
+
+반환된 경로에 파일을 저장한다.

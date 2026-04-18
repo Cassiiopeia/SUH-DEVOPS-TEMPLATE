@@ -32,6 +32,7 @@ def get_current_branch() -> Optional[str]:
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True,
             text=True,
+            errors='replace',
             check=True,
         )
         return result.stdout.strip()

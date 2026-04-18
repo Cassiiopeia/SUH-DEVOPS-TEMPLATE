@@ -10,6 +10,7 @@ suh_template CLI 진입점.
     get-next-seq <skill_id>
     normalize-title <제목>
     config-get <skill_id> <key>
+    init-config <skill_id>
 """
 
 from __future__ import annotations
@@ -175,6 +176,42 @@ def cmd_config_get(args: list) -> int:
     return 0
 
 
+def cmd_init_config(args: list) -> int:
+    """init-config <skill_id>
+
+    .suh-template.example/config/{skill_id}.config.example.json 경로를 stdout에 출력한다.
+    AI(skill)가 이 파일을 읽어 스키마를 파악하고 대화형 수집 후 config.save()를 호출한다.
+    """
+    if not args:
+        _err("ERROR", "init-config", "skill_id 인수가 필요합니다.", "missing_argument")
+        return 1
+
+    skill_id = args[0]
+    if skill_id not in SUPPORTED_SKILL_IDS:
+        _err("ERROR", "init-config",
+             f"지원하지 않는 skill_id입니다. 지원: {', '.join(SUPPORTED_SKILL_IDS)}",
+             "skill_id_invalid")
+        return 1
+
+    project_root = _get_project_root()
+    if project_root is None:
+        _err("ERROR", "init-config", "git 저장소가 아닙니다.", "git_not_found")
+        return 1
+
+    example_path = (
+        project_root / ".suh-template.example" / "config"
+        / f"{skill_id}.config.example.json"
+    )
+    if not example_path.exists():
+        _err("ERROR", "init-config",
+             f".suh-template.example/config/{skill_id}.config.example.json 파일이 없습니다.",
+             "example_not_found")
+        return 1
+
+    print(str(example_path))
+    return 0
+
+
 # 커맨드 → 핸들러 함수 매핑
 _COMMANDS = {
     "get-output-path": cmd_get_output_path,
@@ -182,6 +219,7 @@ _COMMANDS = {
     "get-next-seq": cmd_get_next_seq,
     "normalize-title": cmd_normalize_title,
     "config-get": cmd_config_get,
+    "init-config": cmd_init_config,
 }
 
 

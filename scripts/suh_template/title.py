@@ -25,17 +25,17 @@ def normalize(text: str) -> str:
     제목 문자열을 파일명 안전 형식으로 정규화한다.
 
     - 공백 → _
-    - 허용되지 않는 문자 제거 (한글/영문/숫자/_ 만 허용)
+    - 허용되지 않는 문자 제거 (한글/영문/숫자/_ 외 문자는 삭제)
     - 연속 언더스코어 → 단일 언더스코어
     - 최대 50자
     """
     # 공백을 언더스코어로 변환
     text = text.replace(" ", "_")
-    # 허용되지 않는 문자를 언더스코어로 변환
-    text = _ALLOWED.sub("_", text)
+    # 허용되지 않는 문자를 제거 (한글/영문/숫자/_ 만 허용)
+    text = _ALLOWED.sub("", text)
     # 연속 언더스코어를 단일 언더스코어로 변환
     text = _MULTI_UNDERSCORE.sub("_", text)
     # 양쪽 언더스코어 제거
     text = text.strip("_")
-    # 최대 길이로 자르기
-    return text[:MAX_LENGTH]
+    # 최대 길이로 자른 후 trailing 언더스코어 제거
+    return text[:MAX_LENGTH].strip("_")

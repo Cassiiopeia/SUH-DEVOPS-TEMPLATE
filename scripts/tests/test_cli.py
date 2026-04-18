@@ -9,9 +9,11 @@ SCRIPTS_DIR = Path(__file__).parent.parent
 def run_cli(*args, cwd=None):
     """CLI를 서브프로세스로 실행하고 (stdout, stderr, returncode) 반환."""
     # cwd가 변경되어도 suh_template 패키지를 찾을 수 있도록 PYTHONPATH 설정
+    # os.pathsep 사용으로 Windows(:) / macOS/Linux(;) 모두 호환
     env = os.environ.copy()
     existing = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = f"{SCRIPTS_DIR}:{existing}" if existing else str(SCRIPTS_DIR)
+    sep = os.pathsep
+    env["PYTHONPATH"] = f"{SCRIPTS_DIR}{sep}{existing}" if existing else str(SCRIPTS_DIR)
     result = subprocess.run(
         [sys.executable, "-m", "suh_template.cli", *args],
         capture_output=True,
@@ -32,8 +34,8 @@ def test_normalize_title():
 def test_normalize_title_special_chars():
     stdout, stderr, code = run_cli("normalize-title", "fix: 버그#1 수정!")
     assert code == 0
-    # title.py normalize: 비허용 문자 → '_' 로 대체 후 연속 언더스코어 병합
-    assert stdout == "fix_버그_1_수정"
+    # title.py normalize: 비허용 문자 제거 후 연속 언더스코어 병합
+    assert stdout == "fix_버그1_수정"
 
 
 def test_get_issue_number_no_git(tmp_path):
@@ -43,9 +45,10 @@ def test_get_issue_number_no_git(tmp_path):
 
 
 def test_get_next_seq_empty(tmp_path):
+    # git 저장소가 아닌 경로에서는 git_not_found 에러로 exit 1 반환
     stdout, stderr, code = run_cli("get-next-seq", "plan", cwd=tmp_path)
-    assert code == 0
-    assert stdout == "001"
+    assert code == 1
+    assert "git_not_found" in stderr
 
 
 def test_invalid_command():

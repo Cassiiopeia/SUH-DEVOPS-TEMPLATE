@@ -18,6 +18,7 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 # 패키지 루트를 sys.path에 추가 (직접 실행 시)
 _HERE = Path(__file__).parent.parent
@@ -36,8 +37,8 @@ def _err(level: str, command: str, message: str, code: str) -> None:
     print(f"[{level}] {command}: {message} ({code})", file=sys.stderr)
 
 
-def _get_project_root() -> Path:
-    """git 루트를 찾아 반환. 없으면 cwd 반환."""
+def _get_project_root() -> Optional[Path]:
+    """git 루트를 찾아 반환. git 저장소가 아니면 None."""
     import subprocess
     try:
         result = subprocess.run(
@@ -46,7 +47,7 @@ def _get_project_root() -> Path:
         )
         return Path(result.stdout.strip())
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return Path.cwd()
+        return None
 
 
 def cmd_get_output_path(args: list) -> int:
@@ -84,6 +85,9 @@ def cmd_get_output_path(args: list) -> int:
              "issue_number_mismatch")
 
     project_root = _get_project_root()
+    if project_root is None:
+        _err("ERROR", "get-output-path", "git 저장소가 아닙니다.", "git_not_found")
+        return 1
     output_base = project_root / "docs" / "suh-template"
     skill_dir = output_base / skill_id
 
@@ -136,6 +140,9 @@ def cmd_get_next_seq(args: list) -> int:
              "skill_id_invalid")
         return 1
     project_root = _get_project_root()
+    if project_root is None:
+        _err("ERROR", "get-next-seq", "git 저장소가 아닙니다.", "git_not_found")
+        return 1
     skill_dir = project_root / "docs" / "suh-template" / skill_id
     today = date.today().strftime("%Y%m%d")
     print(_paths.get_next_seq(skill_dir, today))

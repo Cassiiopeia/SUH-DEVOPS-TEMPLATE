@@ -19,7 +19,7 @@ def test_normalize_spaces_to_underscore():
 
 
 def test_normalize_removes_special_chars():
-    assert normalize("fix: 버그#1 수정!") == "fix_버그_1_수정"
+    assert normalize("fix: 버그#1 수정!") == "fix_버그1_수정"
 
 
 def test_normalize_max_length():

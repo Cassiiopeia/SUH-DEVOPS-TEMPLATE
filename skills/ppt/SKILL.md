@@ -65,3 +65,14 @@ description: "PPT Mode - 기술 발표 자료 작성 전문가. 개발 과정에
 - 텍스트보다 다이어그램/테이블/코드 우선
 - 코드 블록은 핵심 부분만 발췌 (10줄 이내)
 - 마크다운 형식으로 작성 (실제 PPT 도구에서 활용)
+
+## 산출물 저장
+
+`references/doc-output-path.md` 규칙을 따른다.
+
+산출물 md 저장 전:
+```bash
+python3 -m suh_template.cli get-output-path ppt
+```
+
+반환된 경로에 파일을 저장한다.

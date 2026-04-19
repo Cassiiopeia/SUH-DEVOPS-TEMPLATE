@@ -1,16 +1,14 @@
 ---
 name: changelogfix
-description: "deploy PR의 automerge가 실패했을 때 기존 PR을 닫고 새 PR을 열어 AUTO-CHANGELOG-CONTROL 워크플로우를 재트리거한다. 'changelogfix', 'deploy 머지 안 됐어', 'PR 다시 열어줘', 'changelog 재실행' 등의 요청 시 사용."
+description: "deploy PR의 automerge가 실패했을 때 기존 PR을 닫고 새 PR을 열어 AUTO-CHANGELOG-CONTROL 워크플로우를 재트리거한 뒤, 직접 릴리스 노트를 작성해 PR 본문에 올려 10분 대기 없이 automerge가 진행되게 한다. 'changelogfix', 'deploy 머지 안 됐어', 'PR 다시 열어줘', 'changelog 재실행' 등의 요청 시 사용."
 ---
 
 # Changelog Fix Mode
 
-deploy PR의 automerge가 실패했거나 워크플로우가 정상 동작하지 않을 때,
-기존 PR을 닫고 새 PR을 열어 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우를 재트리거한다.
-
-**왜 이 방법인가**: 워크플로우는 `pull_request_target: [opened]`에만 트리거된다.
-PR 본문을 수동으로 수정해도 워크플로우가 다시 돌지 않는다.
-새 PR을 열어야 전체 파이프라인(CodeRabbit 대기 → 폴백 → automerge)이 재실행된다.
+deploy PR automerge 실패 시 기존 PR을 닫고 새 PR을 열어 워크플로우를 재트리거한다.
+워크플로우가 CodeRabbit을 10분 대기하는 동안, 스킬이 먼저 git diff를 분석해
+릴리스 노트를 작성하고 PR 본문에 올린다.
+워크플로우 폴링 중 `Summary by CodeRabbit`을 감지하면 automerge가 즉시 진행된다.
 
 ## 핵심 원칙
 
@@ -64,30 +62,100 @@ GH_TOKEN=$GITHUB_PAT gh pr close {pr_number} --repo $OWNER/$REPO
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-GH_TOKEN=$GITHUB_PAT gh pr create \
+NEW_PR_NUMBER=$(GH_TOKEN=$GITHUB_PAT gh pr create \
   --repo $OWNER/$REPO \
   --base deploy \
   --head main \
   --title "$TITLE" \
-  --body ""
+  --body "" \
+  --json number -q .number)
+
+echo "✅ PR #$NEW_PR_NUMBER 생성 완료, 릴리스 노트 작성 시작..."
 ```
 
-### 4단계: 결과 안내
+### 4단계: git diff 분석
+
+워크플로우가 본문 초기화 + CodeRabbit 요청을 처리하는 동안, 스킬이 바로 커밋을 분석한다.
+
+```bash
+git fetch origin deploy 2>/dev/null || true
+git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head -60
+```
+
+커밋 메시지를 타입별로 분류한다:
+
+| prefix | 분류 |
+|--------|------|
+| `feat` | 새 기능 |
+| `fix` | 버그 수정 |
+| `refactor` / `perf` / `style` | 개선 |
+| `docs` | 문서 |
+| 나머지 | 기타 |
+
+**커밋 메시지를 그대로 쓰지 않는다.** 이슈 제목, URL, 타입 prefix를 제거하고
+핵심 변경 내용만 간결한 한국어로 재작성한다.
+
+예시:
+```
+입력: 📄[문서][README/Docs] 전체 문서 개편 : docs : README 재구성·가치 어필 강화 https://...
+출력: README 재구성 및 가치 어필 강화, SKILLS.md /commit 스킬 추가
+```
+
+### 5단계: PR 본문 업데이트
+
+워크플로우가 파싱하는 형식과 100% 동일하게 작성해야 한다:
+
+```bash
+cat > /tmp/pr_release_notes.md << 'EOF'
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+
+## Summary by CodeRabbit
+
+## 릴리스 노트
+
+* **새 기능**
+  * (항목)
+
+* **버그 수정**
+  * (항목)
+
+* **개선**
+  * (항목)
+
+* **문서**
+  * (항목)
+
+* **기타**
+  * (항목)
+
+<!-- end of auto-generated comment: release notes by coderabbit.ai -->
+EOF
+```
+
+항목이 없는 카테고리는 생략한다.
+
+PR 본문 업데이트:
+
+```bash
+BODY=$(cat /tmp/pr_release_notes.md | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+curl -s -H "Authorization: token $GITHUB_PAT" \
+     -H "Content-Type: application/json" \
+     -X PATCH -d "{\"body\": $BODY}" \
+     "https://api.github.com/repos/$OWNER/$REPO/pulls/$NEW_PR_NUMBER"
+```
+
+### 6단계: 결과 안내
 
 ```
-✅ 새 PR #NNN 생성 완료!
+✅ PR #NNN 본문 업데이트 완료!
 
-PROJECT-COMMON-AUTO-CHANGELOG-CONTROL 워크플로우가 자동 트리거됩니다.
-- CodeRabbit Summary 최대 10분 대기
-- 없으면 커밋 분석 폴백 자동 실행
-- 완료 시 deploy 브랜치 자동 머지
-
+워크플로우가 폴링 중 "Summary by CodeRabbit"을 감지하면 automerge가 자동 진행됩니다.
 GitHub Actions 탭에서 진행 상황을 확인하세요:
 https://github.com/{owner}/{repo}/actions
 ```
 
 ## 주의사항
 
-- 워크플로우가 PR 본문을 즉시 빈 문자열로 초기화하고 제목도 변경한다 — 정상 동작
-- 10분 이상 기다려도 automerge가 안 되면 이 스킬을 다시 실행하거나
-  `/github` 스킬로 PR 상태를 확인한다
+- 워크플로우가 PR 본문을 초기화하는 타이밍과 스킬이 본문을 올리는 타이밍이 겹칠 수 있다.
+  만약 워크플로우가 본문을 다시 지워버리면 `/changelogfix`를 재실행한다.
+- 10분이 지나도 automerge가 안 되면 스킬을 다시 실행한다.

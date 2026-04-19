@@ -893,3 +893,14 @@ Key routing rules:
 - Save progress, save state, save my work → invoke context-save
 - Resume, where was I, pick up where I left off → invoke context-restore
 - Code quality, health check → invoke health
+
+## 기능 구현 워크플로우
+
+새 기능 구현 시 반드시 이 순서로 스킬을 호출한다:
+
+1. `/office-hours` — 문제 정의, 전제 도전, 설계 문서 생성 (gstack)
+2. `/plan-eng-review` — 아키텍처·테스트 계획 검토 (gstack)
+3. `superpowers:brainstorming` — 구현 아이디어 브레인스토밍
+4. `superpowers:writing-plans` — 상세 구현 계획 작성
+5. `superpowers:executing-plans` — 계획 기반 실제 구현
+6. `superpowers:requesting-code-review` — 구현 완료 후 코드 리뷰 요청

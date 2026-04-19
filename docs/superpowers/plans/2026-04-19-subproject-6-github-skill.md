@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `branch.py`(브랜치명 계산)와 `github.py`(REST API 클라이언트)를 신규 구현하고, `cli.py`에 GitHub 커맨드를 추가한 뒤, `/issue`·`/report`·`/github` 세 스킬을 GitHub API와 연결한다.
+**Goal:** `gh_branch.py`(브랜치명 계산)와 `gh_client.py`(REST API 클라이언트)를 신규 구현하고, `cli.py`에 GitHub 커맨드를 추가한 뒤, `/issue`·`/report`·`/github` 세 스킬을 GitHub API와 연결한다.
 
-**Architecture:** `branch.py`는 순수 함수 모듈로 외부 의존성 없이 브랜치명을 계산한다. `github.py`는 `urllib` 표준 라이브러리만 사용해 GitHub REST API를 호출하고 `GitHubAPIError` 예외를 발생시킨다. `cli.py`가 두 모듈을 묶어 스킬에서 쉘 명령으로 호출할 수 있는 인터페이스를 제공한다.
+**Architecture:** `gh_branch.py`는 순수 함수 모듈로 외부 의존성 없이 브랜치명을 계산한다. `gh_client.py`는 `urllib` 표준 라이브러리만 사용해 GitHub REST API를 호출하고 `GitHubAPIError` 예외를 발생시킨다. `cli.py`가 두 모듈을 묶어 스킬에서 쉘 명령으로 호출할 수 있는 인터페이스를 제공한다.
 
 **Tech Stack:** Python 3.9+, urllib (표준), unittest.mock, pytest
 
@@ -14,15 +14,15 @@
 
 ```
 scripts/suh_template/
-├── branch.py          ← 신규
-├── github.py          ← 신규
+├── gh_branch.py          ← 신규
+├── gh_client.py          ← 신규
 ├── cli.py             ← 수정 (5개 커맨드 추가)
 └── __init__.py        ← 수정 (SUPPORTED_SKILL_IDS에 'github' 추가)
 
 scripts/tests/
-├── test_branch.py     ← 신규
-├── test_github.py     ← 신규
-└── test_cli_github.py ← 신규
+├── test_gh_branch.py     ← 신규
+├── test_gh_client.py     ← 신규
+└── test_cli_gh_client.py ← 신규
 
 skills/
 ├── issue/SKILL.md     ← 수정
@@ -35,22 +35,22 @@ skills/
 
 ---
 
-### Task 1: `branch.py` — 브랜치명 계산 모듈
+### Task 1: `gh_branch.py` — 브랜치명 계산 모듈
 
 **Files:**
-- Create: `scripts/suh_template/branch.py`
-- Test: `scripts/tests/test_branch.py`
+- Create: `scripts/suh_template/gh_branch.py`
+- Test: `scripts/tests/test_gh_branch.py`
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
-`scripts/tests/test_branch.py`:
+`scripts/tests/test_gh_branch.py`:
 
 ```python
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from suh_template.branch import normalize_title, create_branch_name, get_commit_template
+from suh_template.gh_branch import normalize_title, create_branch_name, get_commit_template
 
 
 def test_normalize_title_special_chars():
@@ -95,14 +95,14 @@ def test_get_commit_template():
 - [ ] **Step 2: 테스트 실패 확인**
 
 ```bash
-cd /path/to/project && python -m pytest scripts/tests/test_branch.py -v 2>&1 | head -20
+cd /path/to/project && python -m pytest scripts/tests/test_gh_branch.py -v 2>&1 | head -20
 ```
 
-Expected: `ModuleNotFoundError: No module named 'suh_template.branch'`
+Expected: `ModuleNotFoundError: No module named 'suh_template.gh_branch'`
 
-- [ ] **Step 3: `branch.py` 구현**
+- [ ] **Step 3: `gh_branch.py` 구현**
 
-`scripts/suh_template/branch.py`:
+`scripts/suh_template/gh_branch.py`:
 
 ```python
 """브랜치명 계산 모듈 — SUH-ISSUE-HELPER TypeScript 로직의 Python 포팅."""
@@ -147,7 +147,7 @@ def get_commit_template(issue_title: str, issue_url: str) -> str:
 - [ ] **Step 4: 테스트 통과 확인**
 
 ```bash
-python -m pytest scripts/tests/test_branch.py -v
+python -m pytest scripts/tests/test_gh_branch.py -v
 ```
 
 Expected: 8 passed
@@ -155,21 +155,21 @@ Expected: 8 passed
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add scripts/suh_template/branch.py scripts/tests/test_branch.py
-git commit -m "feat: branch.py 브랜치명 계산 모듈 추가 [skip ci]"
+git add scripts/suh_template/gh_branch.py scripts/tests/test_gh_branch.py
+git commit -m "feat: gh_branch.py 브랜치명 계산 모듈 추가 [skip ci]"
 ```
 
 ---
 
-### Task 2: `github.py` — GitHub REST API 클라이언트
+### Task 2: `gh_client.py` — GitHub REST API 클라이언트
 
 **Files:**
-- Create: `scripts/suh_template/github.py`
-- Test: `scripts/tests/test_github.py`
+- Create: `scripts/suh_template/gh_client.py`
+- Test: `scripts/tests/test_gh_client.py`
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
-`scripts/tests/test_github.py`:
+`scripts/tests/test_gh_client.py`:
 
 ```python
 import sys
@@ -179,7 +179,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from suh_template.github import (
+from suh_template.gh_client import (
     create_issue, add_comment, get_issue, list_issues,
     create_pull_request, GitHubAPIError,
 )
@@ -289,14 +289,14 @@ def test_create_pull_request_already_exists():
 - [ ] **Step 2: 테스트 실패 확인**
 
 ```bash
-python -m pytest scripts/tests/test_github.py -v 2>&1 | head -10
+python -m pytest scripts/tests/test_gh_client.py -v 2>&1 | head -10
 ```
 
-Expected: `ModuleNotFoundError: No module named 'suh_template.github'`
+Expected: `ModuleNotFoundError: No module named 'suh_template.gh_client'`
 
-- [ ] **Step 3: `github.py` 구현**
+- [ ] **Step 3: `gh_client.py` 구현**
 
-`scripts/suh_template/github.py`:
+`scripts/suh_template/gh_client.py`:
 
 ```python
 """GitHub REST API 클라이언트 — urllib 표준 라이브러리만 사용."""
@@ -422,7 +422,7 @@ def create_pull_request(
 - [ ] **Step 4: 테스트 통과 확인**
 
 ```bash
-python -m pytest scripts/tests/test_github.py -v
+python -m pytest scripts/tests/test_gh_client.py -v
 ```
 
 Expected: 9 passed
@@ -430,8 +430,8 @@ Expected: 9 passed
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add scripts/suh_template/github.py scripts/tests/test_github.py
-git commit -m "feat: github.py GitHub REST API 클라이언트 추가 [skip ci]"
+git add scripts/suh_template/gh_client.py scripts/tests/test_gh_client.py
+git commit -m "feat: gh_client.py GitHub REST API 클라이언트 추가 [skip ci]"
 ```
 
 ---
@@ -441,11 +441,11 @@ git commit -m "feat: github.py GitHub REST API 클라이언트 추가 [skip ci]"
 **Files:**
 - Modify: `scripts/suh_template/cli.py`
 - Modify: `scripts/suh_template/__init__.py`
-- Test: `scripts/tests/test_cli_github.py`
+- Test: `scripts/tests/test_cli_gh_client.py`
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
-`scripts/tests/test_cli_github.py`:
+`scripts/tests/test_cli_gh_client.py`:
 
 ```python
 import sys
@@ -514,7 +514,7 @@ def test_add_comment_missing_pat():
 - [ ] **Step 2: 테스트 실패 확인**
 
 ```bash
-python -m pytest scripts/tests/test_cli_github.py -v 2>&1 | head -15
+python -m pytest scripts/tests/test_cli_gh_client.py -v 2>&1 | head -15
 ```
 
 Expected: 오류 (`unknown_command` 코드로 실패)
@@ -544,8 +544,8 @@ SUPPORTED_SKILL_IDS = [
 `scripts/suh_template/cli.py` 상단 import 블록에 추가:
 
 ```python
-from suh_template import branch as _branch
-from suh_template import github as _github
+from suh_template import gh_branch as _branch
+from suh_template import gh_client as _github
 ```
 
 다음 함수들을 `cmd_init_config` 함수 아래에 추가:
@@ -681,7 +681,7 @@ _COMMANDS = {
 - [ ] **Step 5: 테스트 통과 확인**
 
 ```bash
-python -m pytest scripts/tests/test_cli_github.py -v
+python -m pytest scripts/tests/test_cli_gh_client.py -v
 ```
 
 Expected: 5 passed
@@ -697,7 +697,7 @@ Expected: 모든 테스트 통과 (기존 테스트 포함)
 - [ ] **Step 7: 커밋**
 
 ```bash
-git add scripts/suh_template/__init__.py scripts/suh_template/cli.py scripts/tests/test_cli_github.py
+git add scripts/suh_template/__init__.py scripts/suh_template/cli.py scripts/tests/test_cli_gh_client.py
 git commit -m "feat: cli.py에 GitHub/Branch CLI 커맨드 5개 추가 [skip ci]"
 ```
 
@@ -1071,7 +1071,7 @@ repo의 열린 PR 목록은 GitHub API를 직접 호출한다:
 ```bash
 GITHUB_PAT={pat} python3 -c "
 import sys; sys.path.insert(0, 'scripts')
-from suh_template.github import list_issues
+from suh_template.gh_client import list_issues
 # PR 목록은 pulls endpoint를 직접 사용
 import urllib.request, json, os
 url = 'https://api.github.com/repos/{owner}/{repo}/pulls?state=open'
@@ -1155,8 +1155,8 @@ git commit -m "docs: CLAUDE.md Skills 테이블에 github 스킬 추가 [skip ci
 
 | 스펙 요구사항 | 담당 Task |
 |---------------|-----------|
-| `branch.py` normalize_title, create_branch_name, get_commit_template | Task 1 |
-| `github.py` 5개 함수 + GitHubAPIError | Task 2 |
+| `gh_branch.py` normalize_title, create_branch_name, get_commit_template | Task 1 |
+| `gh_client.py` 5개 함수 + GitHubAPIError | Task 2 |
 | CLI: create-branch-name, create-issue, add-comment, get-issue, create-pr | Task 3 |
 | GITHUB_PAT 환경변수 | Task 3 |
 | `__init__.py` SUPPORTED_SKILL_IDS에 'github' 추가 | Task 3 |

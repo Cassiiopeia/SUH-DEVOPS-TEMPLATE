@@ -46,7 +46,7 @@
 
 ## 새 Python 모듈
 
-### `scripts/suh_template/branch.py`
+### `scripts/suh_template/gh_branch.py`
 
 SUH-ISSUE-HELPER TypeScript 로직을 Python으로 포팅한다.
 
@@ -66,7 +66,7 @@ def get_commit_template(issue_title: str, issue_url: str) -> str: ...
 
 커밋 메시지 템플릿: `"{issue_title} : feat : {설명} {issue_url}"`
 
-### `scripts/suh_template/github.py`
+### `scripts/suh_template/gh_client.py`
 
 GitHub REST API 클라이언트. `urllib` 표준 라이브러리만 사용 (외부 의존성 없음).
 
@@ -107,7 +107,7 @@ def create_pull_request(owner: str, repo: str, title: str, body: str, head: str,
 4. 이슈 제목/본문 작성 (허용 이모지+태그만 사용)
 5. 제목 사용자 확인 (수정 가능)
 6. GitHub API → 이슈 생성 → issue_number, issue_url 획득
-7. branch.py로 즉시 브랜치명 계산 (YYYYMMDD_#번호_제목)
+7. gh_branch.py로 즉시 브랜치명 계산 (YYYYMMDD_#번호_제목)
 8. 로컬 .issue/*.md 파일 저장
 9. 선택지 제시:
    1. 지금 git worktree 생성 (`git worktree add -b {브랜치명} ../{브랜치명}`)
@@ -178,7 +178,7 @@ def create_pull_request(owner: str, repo: str, title: str, body: str, head: str,
 
 ## CLI 커맨드 추가
 
-`cli.py`에 `github-*` 계열 커맨드는 추가하지 않는다. `github.py`와 `branch.py`는 스킬에서 직접 `python3 -c "..."` 또는 새 서브커맨드로 호출한다.
+`cli.py`에 `github-*` 계열 커맨드는 추가하지 않는다. `gh_client.py`와 `gh_branch.py`는 스킬에서 직접 `python3 -c "..."` 또는 새 서브커맨드로 호출한다.
 
 ### 새 CLI 커맨드
 
@@ -196,13 +196,13 @@ PAT는 환경변수 `GITHUB_PAT`로 전달 (CLI 인수에 노출 방지).
 
 ## 테스트 계획
 
-### `tests/test_branch.py`
+### `tests/test_gh_branch.py`
 
 - `normalize_title`: 특수문자, 연속 언더스코어, 한국어, 영문, 숫자 혼합
 - `create_branch_name`: 형식 검증 `YYYYMMDD_#번호_제목`
 - 길이 초과 시 잘라내기 검증
 
-### `tests/test_github.py`
+### `tests/test_gh_client.py`
 
 - `unittest.mock.patch('urllib.request.urlopen')` 으로 HTTP 응답 모킹
 - `create_issue`: 정상 응답, 401, 422 오류 처리
@@ -210,7 +210,7 @@ PAT는 환경변수 `GITHUB_PAT`로 전달 (CLI 인수에 노출 방지).
 - `get_issue`: 정상 응답, 404 처리
 - `create_pull_request`: 정상 응답, 422 (이미 PR 존재) 처리
 
-### `tests/test_cli_github.py`
+### `tests/test_cli_gh_client.py`
 
 - `create-branch-name` CLI 커맨드 인수 검증
 - `create-issue` 환경변수 `GITHUB_PAT` 누락 시 오류
@@ -221,8 +221,8 @@ PAT는 환경변수 `GITHUB_PAT`로 전달 (CLI 인수에 노출 방지).
 
 ```
 scripts/suh_template/
-├── branch.py          ← 신규: 브랜치명 계산 (TypeScript 포팅)
-├── github.py          ← 신규: GitHub REST API 클라이언트
+├── gh_branch.py          ← 신규: 브랜치명 계산 (TypeScript 포팅)
+├── gh_client.py          ← 신규: GitHub REST API 클라이언트
 ├── cli.py             ← 수정: create-issue, add-comment, get-issue, create-branch-name, create-pr 추가
 └── __init__.py        ← 수정: SUPPORTED_SKILL_IDS에 'github' 추가
 

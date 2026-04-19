@@ -599,13 +599,14 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `plan` | 계획 수립 |
 | `ppt` | 프레젠테이션 생성 |
 | `refactor`, `refactor-analyze` | 리팩토링 |
-| `report` | 보고서 생성 |
+| `report` | 구현 보고서 생성 + GitHub 댓글 포스팅 |
 | `review` | 코드 리뷰 |
 | `test`, `testcase` | 테스트 |
 | `troubleshoot` | 트러블슈팅 |
 | `suh-spring-test` | Spring 테스트 생성 |
 | `init-worktree` | Git worktree 자동 생성 |
-| `issue` | 이슈 자동 작성 |
+| `issue` | 이슈 작성 + GitHub 등록 + 브랜치 생성 |
+| `github` | GitHub 이슈/PR 조회·댓글·PR 생성 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
 
 **버전 동기화**: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 `plugin.json`, `marketplace.json` 버전을 자동 동기화

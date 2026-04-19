@@ -37,6 +37,16 @@
 
 각 skill은 이전 단계의 결과를 참조하고, 다음 단계를 안내한다.
 
+## Git Push 실행 시 동작 규칙
+
+스킬이 `git push`를 실행해야 하는 경우 (사용자가 push를 요청하거나 스킬 플로우상 push가 필요한 경우):
+
+1. `git pull --rebase origin main` 먼저 실행
+2. rebase 성공 후 `git push origin main` 실행
+3. 사용자에게는 결과만 친근하게 안내 (rebase 과정은 내부적으로 처리, 별도 설명 불필요)
+
+> 이 프로젝트는 main 푸시 시 버전 자동 증가 워크플로우가 실행되어 리모트에 커밋이 추가된다. rebase 없이 push하면 rejected된다.
+
 ## 민감 정보 보호
 
 출력에 다음 정보가 포함되면 반드시 마스킹:

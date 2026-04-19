@@ -184,12 +184,135 @@ jobs:
           path: pr_body.md
           retention-days: 1
 
+  # Job 1-B: CodeRabbit 폴백 — rate limit 등으로 Summary 없을 때 커밋 분석으로 대체
+  fallback-summary:
+    name: AI 폴백 릴리스 노트 생성
+    runs-on: ubuntu-latest
+    needs: detect-and-parse
+    if: needs.detect-and-parse.outputs.summary_found == 'false'
+    outputs:
+      summary_found: ${{ steps.generate.outputs.summary_found }}
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+
+      - name: 커밋 분석 및 릴리스 노트 생성
+        id: generate
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          VERSION="${{ needs.detect-and-parse.outputs.version }}"
+
+          echo "🤖 CodeRabbit 폴백: 커밋 분석으로 릴리스 노트 생성 중..."
+
+          # deploy 브랜치 대비 변경된 커밋 목록 수집
+          git fetch origin deploy 2>/dev/null || true
+          COMMITS=$(git log origin/deploy..HEAD --pretty=format:"%s" 2>/dev/null | grep -v "\[skip ci\]" | head -50)
+
+          if [ -z "$COMMITS" ]; then
+            # deploy 브랜치가 없으면 최근 30개 커밋 사용
+            COMMITS=$(git log --pretty=format:"%s" -30 | grep -v "\[skip ci\]")
+          fi
+
+          echo "📋 분석할 커밋 수: $(echo "$COMMITS" | wc -l)"
+
+          # 커밋 메시지를 카테고리별로 분류
+          FEATURES=""
+          FIXES=""
+          DOCS=""
+          REFACTORS=""
+          CHORES=""
+
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            case "$line" in
+              feat:*|"feat("*)   FEATURES="$FEATURES\n  * ${line#feat: }" ;;
+              fix:*|"fix("*)     FIXES="$FIXES\n  * ${line#fix: }" ;;
+              docs:*|"docs("*)   DOCS="$DOCS\n  * ${line#docs: }" ;;
+              refactor:*|"refactor("*) REFACTORS="$REFACTORS\n  * ${line#refactor: }" ;;
+              chore:*|"chore("*) CHORES="$CHORES\n  * ${line#chore: }" ;;
+              *)                 CHORES="$CHORES\n  * $line" ;;
+            esac
+          done <<< "$COMMITS"
+
+          # CodeRabbit 형식과 동일한 구조로 PR 본문 작성
+          {
+            echo "<!-- This is an auto-generated comment: release notes by coderabbit.ai -->"
+            echo ""
+            echo "## Summary by CodeRabbit"
+            echo ""
+            echo "## 릴리스 노트"
+            echo ""
+
+            if [ -n "$FEATURES" ]; then
+              echo "* **New Features**"
+              printf "%b\n" "$FEATURES"
+              echo ""
+            fi
+
+            if [ -n "$FIXES" ]; then
+              echo "* **Bug Fixes**"
+              printf "%b\n" "$FIXES"
+              echo ""
+            fi
+
+            if [ -n "$REFACTORS" ]; then
+              echo "* **Improvements**"
+              printf "%b\n" "$REFACTORS"
+              echo ""
+            fi
+
+            if [ -n "$DOCS" ]; then
+              echo "* **Documentation**"
+              printf "%b\n" "$DOCS"
+              echo ""
+            fi
+
+            if [ -n "$CHORES" ]; then
+              echo "* **Chores**"
+              printf "%b\n" "$CHORES"
+              echo ""
+            fi
+
+            echo "<!-- end of auto-generated comment: release notes by coderabbit.ai -->"
+          } > pr_body.md
+
+          echo "✅ 폴백 릴리스 노트 생성 완료"
+          cat pr_body.md
+
+          # PR 본문에 직접 업데이트
+          PR_BODY_CONTENT=$(cat pr_body.md)
+          ESCAPED=$(echo "$PR_BODY_CONTENT" | jq -Rs .)
+
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               -X PATCH \
+               -d "{\"body\": $ESCAPED}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+
+          echo "✅ PR 본문 업데이트 완료"
+          echo "summary_found=true" >> $GITHUB_OUTPUT
+
+      - name: 폴백 Summary 파일 업로드
+        if: steps.generate.outputs.summary_found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-content
+          path: pr_body.md
+          retention-days: 1
+
   # Job 2: CHANGELOG 업데이트
   update-changelog:
     name: CHANGELOG 업데이트
     runs-on: ubuntu-latest
-    needs: detect-and-parse
-    if: needs.detect-and-parse.outputs.summary_found == 'true'
+    needs: [detect-and-parse, fallback-summary]
+    if: |
+      always() &&
+      (needs.detect-and-parse.outputs.summary_found == 'true' ||
+       needs.fallback-summary.outputs.summary_found == 'true')
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
@@ -292,8 +415,12 @@ jobs:
   merge-and-deploy:
     name: PR 머지 및 배포 트리거
     runs-on: ubuntu-latest
-    needs: [detect-and-parse, update-changelog]
-    if: needs.detect-and-parse.outputs.summary_found == 'true'
+    needs: [detect-and-parse, fallback-summary, update-changelog]
+    if: |
+      always() &&
+      needs.update-changelog.result == 'success' &&
+      (needs.detect-and-parse.outputs.summary_found == 'true' ||
+       needs.fallback-summary.outputs.summary_found == 'true')
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v5

@@ -427,6 +427,12 @@ cleanup_template_files() {
         echo "  ✓ scripts 폴더 삭제 (마켓플레이스 전용 스크립트)"
     fi
 
+    # .suh-template.example 폴더 삭제 (템플릿 전용 config 스키마)
+    if [ -d ".suh-template.example" ]; then
+        rm -rf .suh-template.example
+        echo "  ✓ .suh-template.example 폴더 삭제 (템플릿 전용)"
+    fi
+
     print_success "템플릿 관련 파일 삭제 완료"
 }
 

@@ -1,9 +1,9 @@
 /.idea
 /.claude/settings.local.json
-/docs/suh-template/
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.suh-template/config/issue.config.json

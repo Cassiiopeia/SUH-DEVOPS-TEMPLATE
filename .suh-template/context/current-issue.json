@@ -1,0 +1,7 @@
+{
+  "issue_number": 225,
+  "issue_title": "⚙️[기능개선][Skills] commit 스킬 superpowers 원칙 준수 개선",
+  "issue_url": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/225",
+  "branch_name": "20260419_#225_기능개선_Skills_commit_스킬_superpowers_원칙_준수_개선",
+  "commit_template": "⚙️[기능개선][Skills] commit 스킬 superpowers 원칙 준수 개선 : feat : {설명} https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/225"
+}

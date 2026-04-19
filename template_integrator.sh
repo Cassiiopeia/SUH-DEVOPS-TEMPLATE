@@ -1863,7 +1863,6 @@ ensure_gitignore() {
     local required_entries=(
         "/.idea"
         "/.claude/settings.local.json"
-        "/docs/suh-template/"
     )
     
     # .gitignore가 없으면 생성
@@ -1876,9 +1875,6 @@ ensure_gitignore() {
 
 # Claude AI Settings
 /.claude/settings.local.json
-
-# AI 산출물 (자동 생성, 로컬 전용)
-/docs/suh-template/
 EOF
         
         print_success ".gitignore 파일 생성 완료"
@@ -1923,16 +1919,6 @@ EOF
         print_info "  ✓ $entry"
     done
     
-    # docs/suh-template/ 폴더가 이미 Git에 추적 중인 경우 제거
-    if printf '%s\n' "${entries_to_add[@]}" | grep -q "^/docs/suh-template/$"; then
-        if git ls-files --error-unmatch docs/suh-template >/dev/null 2>&1; then
-            print_info "docs/suh-template/ 폴더가 Git에 추적 중입니다. 추적 해제 중..."
-            if git rm -r --cached docs/suh-template >/dev/null 2>&1; then
-                print_success "docs/suh-template/ 폴더의 Git 추적이 해제되었습니다"
-            fi
-        fi
-    fi
-
     print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 
@@ -2366,49 +2352,109 @@ offer_ide_tools_install() {
     print_separator_line
     echo "" >&2
 
-    # ─── Claude Code 플러그인 설치 ───
+    # ─── Claude Code 플러그인 설치/관리 ───
     if [ "$claude_available" = true ]; then
         print_step "Claude Code CLI 감지됨"
 
-        local do_claude_install=true
-        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user ""
-            print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-            print_to_user "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
-            print_to_user ""
-            print_to_user "  Y/y - 예, 설치하기 (추천)"
-            print_to_user "  N/n - 아니오, 건너뛰기"
-            print_to_user ""
-
-            if ! ask_yes_no "선택: " "Y"; then
-                do_claude_install=false
-                print_info "Claude Code 플러그인 설치 건너뜁니다"
-                echo "" >&2
-                echo "  수동 설치 명령어:" >&2
-                echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-                echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-                echo "" >&2
-            fi
+        # 현재 설치 상태 확인 (JSON 파싱)
+        local installed_scope=""
+        local installed_version=""
+        local plugin_json
+        plugin_json=$(claude plugin list --json 2>/dev/null || echo "[]")
+        # cassiiopeia 플러그인 항목 추출
+        local plugin_entry
+        plugin_entry=$(echo "$plugin_json" | grep -A5 '"cassiiopeia@' | head -10)
+        if [ -n "$plugin_entry" ]; then
+            installed_scope=$(echo "$plugin_entry" | grep '"scope"' | sed 's/.*"scope": *"\([^"]*\)".*/\1/')
+            installed_version=$(echo "$plugin_entry" | grep '"version"' | sed 's/.*"version": *"\([^"]*\)".*/\1/')
         fi
 
-        if [ "$do_claude_install" = true ]; then
-            print_step "Claude Code 마켓플레이스 등록 중..."
-            if claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
-                print_success "마켓플레이스 등록 완료"
+        if [ -n "$installed_scope" ]; then
+            # 이미 설치된 경우 → 현재 상태 표시 후 선택 메뉴
+            print_info "현재 설치 상태: cassiiopeia v${installed_version} (scope: ${installed_scope})"
+            echo "" >&2
 
-                print_step "Claude Code 플러그인 설치 중..."
-                if claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user 2>/dev/null; then
-                    print_success "Claude Code 플러그인 설치 완료 (cassiiopeia)"
+            if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+                print_to_user "어떻게 하시겠습니까?"
+                print_to_user "  1 - 업데이트 (최신 버전으로)"
+                print_to_user "  2 - 재설치 (scope 변경 포함)"
+                print_to_user "  3 - 삭제"
+                print_to_user "  4 - 건너뛰기 (현재 상태 유지)"
+                print_to_user ""
+
+                local choice
+                if [ -c /dev/tty ]; then
+                    read -r choice < /dev/tty
                 else
-                    print_warning "플러그인 설치 실패. 수동으로 설치해주세요:"
+                    read -r choice
+                fi
+
+                case "$choice" in
+                    1)
+                        # 업데이트
+                        print_step "플러그인 업데이트 중..."
+                        if claude plugin update cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
+                            print_success "업데이트 완료 (scope: ${installed_scope})"
+                        else
+                            print_warning "업데이트 실패. 수동으로 실행해주세요:"
+                            echo "    claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
+                        fi
+                        ;;
+                    2)
+                        # 재설치: 기존 삭제 후 scope 선택하여 재설치
+                        print_step "기존 플러그인 삭제 중 (scope: ${installed_scope})..."
+                        claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
+
+                        local new_scope
+                        new_scope=$(_ask_claude_scope)
+                        _do_claude_plugin_install "$new_scope"
+                        ;;
+                    3)
+                        # 삭제
+                        print_step "플러그인 삭제 중 (scope: ${installed_scope})..."
+                        if claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
+                            print_success "플러그인 삭제 완료"
+                        else
+                            print_warning "삭제 실패. 수동으로 실행해주세요:"
+                            echo "    claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
+                        fi
+                        ;;
+                    *)
+                        print_info "Claude Code 플러그인 변경 없이 건너뜁니다"
+                        ;;
+                esac
+            else
+                # FORCE 모드: 업데이트만 수행
+                print_step "플러그인 업데이트 중 (FORCE)..."
+                claude plugin update cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
+                print_success "업데이트 완료 (scope: ${installed_scope})"
+            fi
+        else
+            # 미설치 → scope 선택 후 신규 설치
+            if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+                print_to_user ""
+                print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
+                print_to_user "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
+                print_to_user ""
+                print_to_user "  Y/y - 예, 설치하기 (추천)"
+                print_to_user "  N/n - 아니오, 건너뛰기"
+                print_to_user ""
+
+                if ask_yes_no "선택: " "Y"; then
+                    local scope
+                    scope=$(_ask_claude_scope)
+                    _do_claude_plugin_install "$scope"
+                else
+                    print_info "Claude Code 플러그인 설치 건너뜁니다"
+                    echo "" >&2
+                    echo "  수동 설치 명령어:" >&2
+                    echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
                     echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
                     echo "" >&2
                 fi
             else
-                print_warning "마켓플레이스 등록 실패. 수동으로 설치해주세요:"
-                echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-                echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-                echo "" >&2
+                # FORCE 모드: user scope로 바로 설치
+                _do_claude_plugin_install "user"
             fi
         fi
     else
@@ -2457,6 +2503,48 @@ offer_ide_tools_install() {
     else
         # Cursor CLI 없음 → 별도 안내하지 않음 (Claude Code 안내만으로 충분)
         :
+    fi
+}
+
+# scope 선택 헬퍼 (user / project)
+_ask_claude_scope() {
+    print_to_user ""
+    print_to_user "설치 scope를 선택하세요:"
+    print_to_user "  1 - user  (모든 프로젝트에서 사용, 추천)"
+    print_to_user "  2 - project (현재 프로젝트에서만 사용)"
+    print_to_user ""
+
+    local scope_choice
+    if [ -c /dev/tty ]; then
+        read -r scope_choice < /dev/tty
+    else
+        read -r scope_choice
+    fi
+
+    case "$scope_choice" in
+        2) echo "project" ;;
+        *) echo "user" ;;
+    esac
+}
+
+# 마켓플레이스 등록 + 플러그인 설치 실행
+_do_claude_plugin_install() {
+    local scope="$1"
+    print_step "Claude Code 마켓플레이스 등록 중..."
+    if claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+        print_success "마켓플레이스 등록 완료"
+    else
+        # 이미 등록된 경우 무시하고 진행
+        print_info "마켓플레이스 이미 등록되어 있거나 등록 생략"
+    fi
+
+    print_step "Claude Code 플러그인 설치 중 (scope: ${scope})..."
+    if claude plugin install cassiiopeia@cassiiopeia-marketplace --scope "$scope" 2>/dev/null; then
+        print_success "Claude Code 플러그인 설치 완료 (cassiiopeia, scope: ${scope})"
+    else
+        print_warning "플러그인 설치 실패. 수동으로 설치해주세요:"
+        echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope ${scope}" >&2
+        echo "" >&2
     fi
 }
 

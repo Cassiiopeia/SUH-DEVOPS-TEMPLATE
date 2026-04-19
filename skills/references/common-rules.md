@@ -135,8 +135,28 @@ PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-commit-templa
 
 ## 민감 정보 보호
 
-출력에 다음 정보가 포함되면 반드시 마스킹:
-- API Key → `{API_KEY}`
-- Password → `{PASSWORD}`
-- Token → `{TOKEN}`
-- Secret → `{SECRET}`
+`docs/suh-template/` 폴더는 Git에 공개 커밋된다. 이슈/보고서/플랜 등 모든 산출물 파일에 민감 정보가 포함되지 않도록 반드시 아래 규칙을 따른다.
+
+### 절대 포함 금지 항목
+
+- GitHub PAT, API Key, Secret, Token, Password 실제 값
+- 서버 IP, 내부 도메인, SSH 접속 정보
+- 개인 이메일, 전화번호 등 개인정보
+- `.env` 파일 내용, DB 접속 정보
+
+### 마스킹 규칙
+
+실제 값이 아닌 플레이스홀더로 표기:
+
+| 종류 | 표기 방식 |
+|------|-----------|
+| API Key / PAT / Token | `{API_KEY}`, `{PAT}`, `{TOKEN}` |
+| Password / Secret | `{PASSWORD}`, `{SECRET}` |
+| 서버 주소 | `{SERVER_HOST}` |
+| 개인정보 | `{EMAIL}`, `{PHONE}` |
+
+### 보고서/이슈 작성 시 추가 주의
+
+- 에러 로그에 토큰/키가 포함된 경우 반드시 마스킹 후 기재
+- 재현 방법에 실제 서버 정보 대신 `{SERVER_HOST}` 등 플레이스홀더 사용
+- 스크린샷/로그 인용 시 민감 값은 `***` 또는 플레이스홀더로 대체

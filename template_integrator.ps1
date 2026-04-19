@@ -1836,8 +1836,7 @@ function Ensure-GitIgnore {
     
     $requiredEntries = @(
         "/.idea",
-        "/.claude/settings.local.json",
-        "/docs/suh-template/"
+        "/.claude/settings.local.json"
     )
     
     # .gitignore가 없으면 생성
@@ -1850,9 +1849,6 @@ function Ensure-GitIgnore {
 
 # Claude AI Settings
 /.claude/settings.local.json
-
-# AI 산출물 (자동 생성, 로컬 전용)
-/docs/suh-template/
 "@
         
         Set-Content -Path ".gitignore" -Value $gitignoreContent -Encoding UTF8
@@ -1896,22 +1892,6 @@ function Ensure-GitIgnore {
     }
     
     Add-Content -Path ".gitignore" -Value $appendContent -Encoding UTF8
-    
-    # docs/suh-template/ 폴더가 이미 Git에 추적 중인 경우 제거
-    if ($entriesToAdd -contains "/docs/suh-template/") {
-        try {
-            git ls-files --error-unmatch docs/suh-template 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                Print-Info "docs/suh-template/ 폴더가 Git에 추적 중입니다. 추적 해제 중..."
-                git rm -r --cached docs/suh-template 2>$null | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Print-Success "docs/suh-template/ 폴더의 Git 추적이 해제되었습니다"
-                }
-            }
-        } catch {
-            # Git 명령 실패 시 무시 (Git 저장소가 아닐 수 있음)
-        }
-    }
 
     Print-Success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
@@ -2291,51 +2271,106 @@ function Offer-IdeToolsInstall {
     Print-SeparatorLine
     Write-Host ""
 
-    # ─── Claude Code 플러그인 설치 ───
+    # ─── Claude Code 플러그인 설치/관리 ───
     if ($claudeAvailable) {
         Print-Step "Claude Code CLI 감지됨"
 
-        $doClaudeInstall = $true
-        if (-not $Force) {
-            Write-Host ""
-            Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-            Write-Host "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
-            Write-Host ""
-            Write-Host "  Y/y - 예, 설치하기 (추천)"
-            Write-Host "  N/n - 아니오, 건너뛰기"
-            Write-Host ""
-
-            if (-not (Ask-YesNo "선택" "Y")) {
-                $doClaudeInstall = $false
-                Print-Info "Claude Code 플러그인 설치 건너뜁니다"
-                Write-Host ""
-                Write-Host "  수동 설치 명령어:"
-                Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-                Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-                Write-Host ""
+        # 현재 설치 상태 확인 (JSON 파싱)
+        $installedScope = ""
+        $installedVersion = ""
+        try {
+            $pluginListJson = & claude plugin list --json 2>$null | Out-String
+            $pluginList = $pluginListJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($pluginList) {
+                $pluginEntry = $pluginList | Where-Object { $_.id -like "cassiiopeia@*" } | Select-Object -First 1
+                if ($pluginEntry) {
+                    $installedScope   = $pluginEntry.scope
+                    $installedVersion = $pluginEntry.version
+                }
             }
-        }
+        } catch { }
 
-        if ($doClaudeInstall) {
-            Print-Step "Claude Code 마켓플레이스 등록 중..."
-            try {
-                $null = & claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1
-                Print-Success "마켓플레이스 등록 완료"
+        if ($installedScope) {
+            # 이미 설치된 경우 → 현재 상태 표시 후 선택 메뉴
+            Print-Info "현재 설치 상태: cassiiopeia v${installedVersion} (scope: ${installedScope})"
+            Write-Host ""
 
-                Print-Step "Claude Code 플러그인 설치 중..."
-                try {
-                    $null = & claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user 2>&1
-                    Print-Success "Claude Code 플러그인 설치 완료 (cassiiopeia)"
-                } catch {
-                    Print-Warning "플러그인 설치 실패. 수동으로 설치해주세요:"
+            if (-not $Force) {
+                Write-Host "어떻게 하시겠습니까?"
+                Write-Host "  1 - 업데이트 (최신 버전으로)"
+                Write-Host "  2 - 재설치 (scope 변경 포함)"
+                Write-Host "  3 - 삭제"
+                Write-Host "  4 - 건너뛰기 (현재 상태 유지)"
+                Write-Host ""
+
+                $choice = Read-Host "선택"
+
+                switch ($choice) {
+                    "1" {
+                        # 업데이트
+                        Print-Step "플러그인 업데이트 중..."
+                        try {
+                            $null = & claude plugin update cassiiopeia@cassiiopeia-marketplace --scope $installedScope 2>&1
+                            Print-Success "업데이트 완료 (scope: ${installedScope})"
+                        } catch {
+                            Print-Warning "업데이트 실패. 수동으로 실행해주세요:"
+                            Write-Host "    claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
+                        }
+                    }
+                    "2" {
+                        # 재설치: 기존 삭제 후 scope 선택하여 재설치
+                        Print-Step "기존 플러그인 삭제 중 (scope: ${installedScope})..."
+                        $null = & claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope $installedScope 2>&1
+
+                        $newScope = Get-ClaudeScope
+                        Invoke-ClaudePluginInstall $newScope
+                    }
+                    "3" {
+                        # 삭제
+                        Print-Step "플러그인 삭제 중 (scope: ${installedScope})..."
+                        try {
+                            $null = & claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope $installedScope 2>&1
+                            Print-Success "플러그인 삭제 완료"
+                        } catch {
+                            Print-Warning "삭제 실패. 수동으로 실행해주세요:"
+                            Write-Host "    claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
+                        }
+                    }
+                    default {
+                        Print-Info "Claude Code 플러그인 변경 없이 건너뜁니다"
+                    }
+                }
+            } else {
+                # FORCE 모드: 업데이트만 수행
+                Print-Step "플러그인 업데이트 중 (FORCE)..."
+                $null = & claude plugin update cassiiopeia@cassiiopeia-marketplace --scope $installedScope 2>&1
+                Print-Success "업데이트 완료 (scope: ${installedScope})"
+            }
+        } else {
+            # 미설치 → scope 선택 후 신규 설치
+            if (-not $Force) {
+                Write-Host ""
+                Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
+                Write-Host "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
+                Write-Host ""
+                Write-Host "  Y/y - 예, 설치하기 (추천)"
+                Write-Host "  N/n - 아니오, 건너뛰기"
+                Write-Host ""
+
+                if (Ask-YesNo "선택" "Y") {
+                    $scope = Get-ClaudeScope
+                    Invoke-ClaudePluginInstall $scope
+                } else {
+                    Print-Info "Claude Code 플러그인 설치 건너뜁니다"
+                    Write-Host ""
+                    Write-Host "  수동 설치 명령어:"
+                    Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
                     Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
                     Write-Host ""
                 }
-            } catch {
-                Print-Warning "마켓플레이스 등록 실패. 수동으로 설치해주세요:"
-                Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-                Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-                Write-Host ""
+            } else {
+                # FORCE 모드: user scope로 바로 설치
+                Invoke-ClaudePluginInstall "user"
             }
         }
     } else {
@@ -2384,6 +2419,43 @@ function Offer-IdeToolsInstall {
                 }
             }
         }
+    }
+}
+
+# scope 선택 헬퍼 (user / project)
+function Get-ClaudeScope {
+    Write-Host ""
+    Write-Host "설치 scope를 선택하세요:"
+    Write-Host "  1 - user    (모든 프로젝트에서 사용, 추천)"
+    Write-Host "  2 - project (현재 프로젝트에서만 사용)"
+    Write-Host ""
+
+    $scopeChoice = Read-Host "선택"
+    if ($scopeChoice -eq "2") { return "project" }
+    return "user"
+}
+
+# 마켓플레이스 등록 + 플러그인 설치 실행
+function Invoke-ClaudePluginInstall {
+    param([string]$Scope)
+
+    Print-Step "Claude Code 마켓플레이스 등록 중..."
+    try {
+        $null = & claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1
+        Print-Success "마켓플레이스 등록 완료"
+    } catch {
+        # 이미 등록된 경우 무시하고 진행
+        Print-Info "마켓플레이스 이미 등록되어 있거나 등록 생략"
+    }
+
+    Print-Step "Claude Code 플러그인 설치 중 (scope: ${Scope})..."
+    try {
+        $null = & claude plugin install cassiiopeia@cassiiopeia-marketplace --scope $Scope 2>&1
+        Print-Success "Claude Code 플러그인 설치 완료 (cassiiopeia, scope: ${Scope})"
+    } catch {
+        Print-Warning "플러그인 설치 실패. 수동으로 설치해주세요:"
+        Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope ${Scope}"
+        Write-Host ""
     }
 }
 

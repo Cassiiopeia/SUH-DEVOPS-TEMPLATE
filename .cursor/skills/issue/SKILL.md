@@ -110,11 +110,10 @@ $ARGUMENTS
 
 ### 5단계: GitHub 이슈 생성
 
-제목이 확정되면 임시 파일에 본문을 저장하고 CLI로 이슈를 생성한다:
+GitHub 이슈 본문(`/tmp/issue_body.md`)에는 **제목 헤딩(`# ...`)과 라벨/담당자 메타 블록을 포함하지 않는다.**
+템플릿 섹션(📝현재 문제점, 🛠️해결 방안 등)만 작성한다.
 
 ```bash
-# 본문을 임시 파일로 저장
-# PAT는 환경변수로 전달
 GITHUB_PAT=$(python3 -m suh_template.cli config-get issue github_pat) \
   python3 -m suh_template.cli create-issue {owner} {repo} "{제목}" /tmp/issue_body.md "{라벨}"
 ```
@@ -131,7 +130,7 @@ python3 -m suh_template.cli create-branch-name "{이슈 제목}" {이슈번호}
 
 **파일 위치**: `.issue/[YYYYMMDD]_#[번호]_[제목].md`
 
-파일 첫 줄에 이슈 제목을 `# ` 헤딩으로 작성한다.
+로컬 파일에만 첫 줄에 이슈 제목을 `# ` 헤딩으로 작성한다 (GitHub 이슈 본문과 별개).
 
 ### 8단계: 다음 작업 선택지 제시
 

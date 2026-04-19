@@ -71,3 +71,45 @@ python3 -m suh_template.cli get-output-path report
 ```
 
 반환된 경로에 파일을 저장한다.
+
+## GitHub 댓글 포스팅 (선택적)
+
+파일 저장 후, GitHub 이슈에 댓글로 보고서를 포스팅할 수 있다. PAT가 설정된 경우에만 시도한다.
+
+### 이슈 번호 자동 감지 순서
+
+1. 현재 작업 디렉토리 경로에서 추출 (worktree 경로 `YYYYMMDD_#숫자_제목` 패턴):
+   ```bash
+   python3 -m suh_template.cli get-issue-number
+   ```
+2. `.issue/` 폴더 파일명에서 추출 (예: `.issue/20260115_#427_제목.md` → 427)
+3. git 브랜치명에서 추출
+4. 위 세 방법 모두 실패 시 사용자에게 이슈 번호 질문
+
+### 포스팅 플로우
+
+```bash
+# 1. PAT 확인
+python3 -m suh_template.cli config-get issue github_pat
+# config_not_found이면 로컬 저장만 하고 종료
+
+# 2. repo 확인
+python3 -m suh_template.cli config-get issue github_repos
+# 또는 git remote origin에서 owner/repo 추출
+
+# 3. 댓글 포스팅
+GITHUB_PAT={pat} python3 -m suh_template.cli add-comment {owner} {repo} {이슈번호} {보고서파일경로}
+```
+
+### 완료 메시지
+
+```
+보고서 저장: docs/suh-template/report/{파일명}.md
+GitHub 댓글: https://github.com/{owner}/{repo}/issues/{번호}#issuecomment-{id}
+```
+
+PAT 미설정 시:
+```
+보고서 저장: docs/suh-template/report/{파일명}.md
+(GitHub PAT 미설정 — 로컬 저장만 완료)
+```

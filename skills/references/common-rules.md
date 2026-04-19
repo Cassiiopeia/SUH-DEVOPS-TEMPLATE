@@ -37,6 +37,34 @@
 
 각 skill은 이전 단계의 결과를 참조하고, 다음 단계를 안내한다.
 
+## GitHub 작업 원칙
+
+GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로 처리한다. `gh` CLI는 사용하지 않는다.
+
+| 작업 | 커맨드 |
+|------|--------|
+| 이슈 생성 | `create-issue <owner> <repo> <title> <body_file> <labels_csv>` |
+| 이슈 조회 | `get-issue <owner> <repo> <issue_number>` |
+| 이슈 수정 | `update-issue <owner> <repo> <issue_number> [--title] [--state] [--labels] [--assignees]` |
+| 댓글 추가 | `add-comment <owner> <repo> <issue_number> <body_file>` |
+| PR 생성 | `create-pr <owner> <repo> <title> <body_file> <head> <base>` |
+| PR 목록 조회 | `list-prs <owner> <repo> [--state open\|closed\|all]` |
+| 브랜치명 계산 | `create-branch-name "<title>" <number>` |
+
+PAT는 항상 환경변수로 전달: `GITHUB_PAT=$(python3 -m suh_template.cli config-get issue github_pat)`
+
+> `gh` CLI는 Windows/Mac 호환성 문제 및 별도 설치 필요로 사용 금지. Python 표준 라이브러리(urllib)만 사용한다.
+
+## Git Push 실행 시 동작 규칙
+
+스킬이 `git push`를 실행해야 하는 경우 (사용자가 push를 요청하거나 스킬 플로우상 push가 필요한 경우):
+
+1. `git pull --rebase origin main` 먼저 실행
+2. rebase 성공 후 `git push origin main` 실행
+3. 사용자에게는 결과만 친근하게 안내 (rebase 과정은 내부적으로 처리, 별도 설명 불필요)
+
+> 이 프로젝트는 main 푸시 시 버전 자동 증가 워크플로우가 실행되어 리모트에 커밋이 추가된다. rebase 없이 push하면 rejected된다.
+
 ## 민감 정보 보호
 
 출력에 다음 정보가 포함되면 반드시 마스킹:

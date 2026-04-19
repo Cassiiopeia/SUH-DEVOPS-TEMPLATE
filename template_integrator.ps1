@@ -30,6 +30,7 @@
 #                            • version     - 버전 관리 시스템만
 #                            • workflows   - GitHub Actions 워크플로우만
 #                            • issues      - 이슈/PR 템플릿만
+#                            • skills      - Agent Skill 설치만 (Claude, Cursor)
 #                            • interactive - 대화형 선택 (기본값)
 #   -Version <VERSION>       초기 버전 설정 (자동 감지, 수동 지정 가능)
 #   -Type <TYPE>             프로젝트 타입 (자동 감지, 수동 지정 가능)
@@ -311,6 +312,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   version     - 버전 관리 시스템만 (version.yml + scripts)
   workflows   - GitHub Actions 워크플로우만
   issues      - 이슈/PR 템플릿만
+  skills      - Agent Skill 설치만 (Claude, Cursor)
   interactive - 대화형 선택 (기본값, 추천)
 
 옵션:
@@ -2119,27 +2121,29 @@ function Start-InteractiveMode {
     Write-Host "  2) 버전 관리 시스템만"
     Write-Host "  3) GitHub Actions 워크플로우만"
     Write-Host "  4) 이슈/PR 템플릿만"
-    Write-Host "  5) 취소"
+    Write-Host "  5) Agent Skill 설치 (Claude, Cursor)"
+    Write-Host "  6) 취소"
     Write-Host ""
 
     # 입력 검증 루프
     while ($true) {
-        $choice = Read-SingleKey "선택 (1-5) "
+        $choice = Read-SingleKey "선택 (1-6) "
 
-        if ($choice -match '^[1-5]$') {
+        if ($choice -match '^[1-6]$') {
             switch ($choice) {
                 "1" { $script:Mode = "full"; break }
                 "2" { $script:Mode = "version"; break }
                 "3" { $script:Mode = "workflows"; break }
                 "4" { $script:Mode = "issues"; break }
-                "5" {
+                "5" { $script:Mode = "skills"; break }
+                "6" {
                     Print-Info "취소되었습니다"
                     exit 0
                 }
             }
             break
         } else {
-            Print-Error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
+            Print-Error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
             Write-Host ""
         }
     }
@@ -2156,37 +2160,37 @@ function Start-Integration {
         Test-BreakingChanges -CurrentVersion $currentTemplateVersion -NewVersion $script:DefaultVersion | Out-Null
     }
 
-    # CLI 모드에서만 자동 감지 및 확인
-    if (-not $script:IsInteractiveMode) {
+    # CLI 모드에서만 자동 감지 및 확인 (skills 모드는 프로젝트 정보 불필요)
+    if (-not $script:IsInteractiveMode -and $Mode -ne "skills") {
         if ([string]::IsNullOrWhiteSpace($script:ProjectType)) {
             $script:ProjectType = Detect-ProjectType
         }
-        
+
         if ([string]::IsNullOrWhiteSpace($script:ProjectVersion)) {
             $script:ProjectVersion = Detect-Version
         }
-        
+
         if ([string]::IsNullOrWhiteSpace($script:DetectedBranch)) {
             $script:DetectedBranch = Detect-DefaultBranch
         }
-        
+
         # CLI 모드에서만 통합 정보 표시
         Print-QuestionHeader "🪐" "통합 정보"
-        
+
         Write-Host "🔭 프로젝트 타입  : $($script:ProjectType)"
         Write-Host "🌙 초기 버전     : v$($script:ProjectVersion)"
         Write-Host "🌿 Default 브랜치 : $($script:DetectedBranch)"
         Write-Host "💫 통합 모드     : $Mode"
         Print-SeparatorLine
         Write-Host ""
-        
+
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         if (-not $Force) {
             Write-Host "이 정보로 통합을 진행하시겠습니까?"
             Write-Host "  Y/y - 예, 계속 진행"
             Write-Host "  N/n - 아니오, 취소"
             Write-Host ""
-            
+
             if (-not (Ask-YesNo "선택" "Y")) {
                 Print-Info "취소되었습니다"
                 exit 0
@@ -2240,6 +2244,17 @@ function Start-Integration {
         "issues" {
             Copy-IssueTemplates
             Copy-DiscussionTemplates
+        }
+        "skills" {
+            # skills 모드: 템플릿 통합 없이 IDE 도구 설치만 진행
+            Offer-IdeToolsInstall
+
+            # 임시 파일 정리 후 간결한 완료 메시지 출력하고 종료
+            if (Test-Path $TEMP_DIR) {
+                Remove-Item -Path $TEMP_DIR -Recurse -Force
+            }
+            Show-Summary
+            return
         }
     }
 
@@ -2429,8 +2444,21 @@ function Show-Summary {
         "issues" {
             Write-Host "  ✅ 이슈/PR/Discussion 템플릿"
         }
+        "skills" {
+            Write-Host "  ✅ Agent Skill 설치 (Claude, Cursor)"
+        }
     }
-    
+
+    # skills 모드: 파일/워크플로우 추가 없으므로 간결하게 종료
+    if ($Mode -eq "skills") {
+        Write-Host ""
+        Write-Host "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host ""
+        Print-SeparatorLine
+        Write-Host ""
+        return
+    }
+
     Write-Host ""
     Write-Host "추가된 파일:"
     Write-Host "  📄 version.yml (버전: $($script:ProjectVersion), 타입: $($script:ProjectType))"
@@ -2509,7 +2537,7 @@ function Main {
     }
     
     # 파라미터 검증
-    $validModes = @("interactive", "full", "version", "workflows", "issues")
+    $validModes = @("interactive", "full", "version", "workflows", "issues", "skills")
     if ($Mode -ne "" -and $Mode -notin $validModes) {
         Print-Error "잘못된 모드: $Mode"
         Write-Host "지원되는 모드: $($validModes -join ', ')"

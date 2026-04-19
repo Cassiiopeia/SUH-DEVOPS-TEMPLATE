@@ -2,12 +2,13 @@
 
 # 🚀 SUH-DEVOPS-TEMPLATE
 
-**완전 자동화된 GitHub 프로젝트 관리 템플릿**
+**완전 자동화된 GitHub 프로젝트 관리 템플릿 + Claude Code Skill 플러그인**
 
 > 개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 자동으로 처리됩니다.
+> GitHub Actions 자동화와 Claude Code용 DevOps Skill 20종을 한 레포에서 제공합니다.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v2.9.8 (2026-04-07)
+## 최신 버전 : v2.9.9 (2026-04-07)
 
 [전체 버전 기록 보기](CHANGELOG.md) 
 
@@ -31,6 +32,8 @@
 | CI/CD 처음부터 설정 | 프로젝트 타입별 워크플로우 자동 구성 |
 | 이슈 템플릿 수동 설정 | 4종 템플릿 자동 설치 |
 | PR Preview 환경 수동 구축 | 댓글 한 줄로 임시 서버 배포 |
+| Claude Code 매번 같은 프롬프트 반복 | `/cassiiopeia:xxx` 20종 Skill로 일관된 작업 수행 |
+| 코드 리뷰·이슈 작성·보고서 수동 작성 | Skill 한 번에 표준 포맷으로 생성 |
 
 ---
 
@@ -53,12 +56,22 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 
 > 대화형 모드로 프로젝트 타입과 버전을 자동 감지합니다.
 
+### Claude Code Skill만 설치
+
+```bash
+claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+```
+
+> `/cassiiopeia:` 입력 시 20종 Skill 자동완성. 자세한 내용은 [docs/SKILLS.md](docs/SKILLS.md)
+
 ---
 
 ## 주요 기능
 
 | 기능 | 설명 | 문서 |
 |------|------|------|
+| **Claude Code Skills** | `/cassiiopeia:xxx` 20종 DevOps/개발 Skill 플러그인 (리뷰·이슈·리팩토링·테스트·보고서 등) | [상세](docs/SKILLS.md) |
 | **버전 자동화** | main 푸시 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
 | **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | Issue/PR 댓글로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
@@ -86,15 +99,39 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 
 ## 자동화 흐름
 
+**GitHub Actions 파이프라인**
+
+```mermaid
+flowchart LR
+    A([main 푸시]) --> B[버전 자동 증가]
+    B --> C[deploy PR 생성]
+    C --> D[AI 체인지로그]
+    D --> E[자동 머지]
+    E --> F[CI/CD 배포]
+    F --> G([완료])
 ```
-main 푸시 → 버전 증가 → deploy PR 생성 → AI 체인지로그 → 자동 머지 → CI/CD 배포
+
+**Claude Code Skill 개발 흐름**
+
+```mermaid
+flowchart LR
+    A([작업 시작]) --> B[/issue<br/>이슈 등록/]
+    B --> C[/init-worktree<br/>worktree 생성/]
+    C --> D[/plan<br/>계획 수립/]
+    D --> E[/implement<br/>구현/]
+    E --> F[/test<br/>테스트/]
+    F --> G[/review<br/>리뷰/]
+    G --> H[/report<br/>보고서/]
+    H --> I([PR 등록])
 ```
+
+> Skill별 상세 흐름(버그/리팩토링/설계 등): [docs/SKILLS.md](docs/SKILLS.md#어떤-skill을-언제-쓸까)
 
 ---
 
-## Claude Code 플러그인
+## Claude Code Skill 플러그인
 
-20개 DevOps 자동화 스킬을 Claude Code에서 바로 사용할 수 있습니다.
+이 레포는 **Claude Code용 Skill 플러그인 마켓플레이스**이기도 합니다. 20개 DevOps/개발 자동화 Skill을 `/cassiiopeia:xxx` 형식으로 바로 호출할 수 있습니다.
 
 ```bash
 # 설치 (2줄)
@@ -102,20 +139,42 @@ claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 
+### 분석형 (코드 수정 없이 분석/계획만)
+
 | 스킬 | 용도 |
 |------|------|
-| `/cassiiopeia:analyze` | 코드 분석 (구현 없이 분석만) |
-| `/cassiiopeia:review` | 코드 리뷰 (버그, 보안, 개선점) |
-| `/cassiiopeia:implement` | 기능 구현 (코드 스타일 자동 감지) |
-| `/cassiiopeia:plan` | 구현 계획 수립 |
-| `/cassiiopeia:test` | 테스트 코드 생성 |
-| `/cassiiopeia:refactor` | 리팩토링 |
-| `/cassiiopeia:troubleshoot` | 체계적 디버깅 |
-| `/cassiiopeia:document` | 문서화 |
-| `/cassiiopeia:report` | 구현 보고서 생성 |
-| `/cassiiopeia:issue` | GitHub 이슈 초안 작성 |
+| `/cassiiopeia:analyze` | 구현 전 현재 코드 상태 분석 및 영향 범위 평가 |
+| `/cassiiopeia:plan` | 요구사항 명확화 및 2가지 이상 접근 방식 비교로 전략 수립 |
+| `/cassiiopeia:design-analyze` | 아키텍처/API/DB/UI 설계 방향 분석 (구현 X) |
+| `/cassiiopeia:refactor-analyze` | Code Smell 탐지 및 Before/After 예시 기반 리팩토링 계획 |
+| `/cassiiopeia:review` | 보안/성능/버그/품질 6관점 리뷰, Critical/Major/Minor 분류 |
+| `/cassiiopeia:troubleshoot` | 가설-검증 방식 근본 원인 분석, Quick Fix/Root Fix 제시 |
 
-> 이 외 `build`, `design`, `design-analyze`, `figma`, `ppt`, `refactor-analyze`, `testcase`, `suh-spring-test`, `init-worktree`, `review` 스킬도 포함
+### 구현형 (실제 코드 작성/수정)
+
+| 스킬 | 용도 |
+|------|------|
+| `/cassiiopeia:implement` | 계획/분석 결과 기반 코드 구현 (프로젝트 스타일 100% 준수) |
+| `/cassiiopeia:design` | 아키텍처/API/DB/UI 설계 + 실제 구현까지 |
+| `/cassiiopeia:refactor` | Extract Method, DRY 등 리팩토링 기법 단계별 적용 |
+| `/cassiiopeia:test` | AAA 패턴 단위/통합/E2E 테스트 코드 작성 |
+| `/cassiiopeia:figma` | Figma CSS를 React/RN/Flutter 반응형 코드로 변환 |
+| `/cassiiopeia:build` | 프로젝트 빌드 실행, 에러 처리, 최적화 제안 |
+| `/cassiiopeia:init-worktree` | Git worktree 생성 + .gitignore 기반 민감 파일 자동 복사 |
+
+### 문서/산출물 생성형
+
+| 스킬 | 용도 |
+|------|------|
+| `/cassiiopeia:document` | 코드 주석/README/API 문서 작성 (기존 스타일 유지) |
+| `/cassiiopeia:issue` | 사용자 설명 → GitHub 이슈 템플릿 형식 md 파일 생성 |
+| `/cassiiopeia:report` | git diff + 이슈 기반 구현 보고서를 .report/에 저장 |
+| `/cassiiopeia:testcase` | 이슈 분석 → 프로젝트 타입별 QA 체크리스트 md 생성 |
+| `/cassiiopeia:ppt` | 트러블슈팅/구현 사례를 5섹션 발표자료 마크다운으로 정리 |
+| `/cassiiopeia:suh-spring-test` | Spring Boot 테스트 샘플 코드 생성 (suh-logger 감지) |
+| `/cassiiopeia:synology-expose` | 시놀로지 NAS 외부 도메인 노출 설정 가이드 |
+
+> 각 Skill의 상세 사용법 및 예시: **[docs/SKILLS.md](docs/SKILLS.md)**
 
 ---
 
@@ -163,6 +222,7 @@ Settings → Actions → General
 
 | 문서 | 설명 |
 |------|------|
+| [Claude Code Skills 가이드](docs/SKILLS.md) | 20개 Skill 각각의 용도, 사용법, 활용 시나리오 |
 | [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 기존 프로젝트에 템플릿 통합 |
 | [버전 관리](docs/VERSION-CONTROL.md) | version.yml, 자동 버전 증가 |
 | [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | CodeRabbit 연동, AI 문서화 |

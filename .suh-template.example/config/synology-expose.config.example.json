@@ -1,0 +1,13 @@
+{
+  "_comment": "이 파일을 .suh-template/config/synology-expose.config.json으로 복사하고 값을 채우세요.",
+  "instances": [
+    {
+      "name": "NAS 이름 (예: 집 NAS)",
+      "ddns": "your-nas.synology.me",
+      "domains": ["example.com"],
+      "email": "your@email.com",
+      "dns_provider": "cloudflare",
+      "default": true
+    }
+  ]
+}

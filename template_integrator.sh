@@ -35,6 +35,7 @@
 #                            • version     - 버전 관리 시스템만
 #                            • workflows   - GitHub Actions 워크플로우만
 #                            • issues      - 이슈/PR 템플릿만
+#                            • skills      - Agent Skill 설치만 (Claude, Cursor)
 #                            • interactive - 대화형 선택 (기본값)
 #   -v, --version VERSION    초기 버전 설정 (자동 감지, 수동 지정 가능)
 #   -t, --type TYPE          프로젝트 타입 (자동 감지, 수동 지정 가능)
@@ -321,6 +322,7 @@ ${BLUE}통합 모드:${NC}
   ${GREEN}version${NC}     - 버전 관리 시스템만 (version.yml + scripts)
   ${GREEN}workflows${NC}   - GitHub Actions 워크플로우만
   ${GREEN}issues${NC}      - 이슈/PR 템플릿만
+  ${GREEN}skills${NC}      - Agent Skill 설치만 (Claude, Cursor)
   ${GREEN}interactive${NC} - 대화형 선택 (기본값, 추천)
 
 ${BLUE}옵션:${NC}
@@ -2166,33 +2168,35 @@ interactive_mode() {
     print_to_user "  2) 버전 관리 시스템만"
     print_to_user "  3) GitHub Actions 워크플로우만"
     print_to_user "  4) 이슈/PR 템플릿만"
-    print_to_user "  5) 취소"
+    print_to_user "  5) Agent Skill 설치 (Claude, Cursor)"
+    print_to_user "  6) 취소"
     print_to_user ""
 
     local choice
     local valid_input=false
 
-    # 입력 검증 루프 - 올바른 값(1-5)이 입력될 때까지 반복
+    # 입력 검증 루프 - 올바른 값(1-6)이 입력될 때까지 반복
     while [ "$valid_input" = false ]; do
-        if safe_read "선택 (1-5): " choice "-n 1"; then
+        if safe_read "선택 (1-6): " choice "-n 1"; then
             print_to_user ""
 
-            # 입력값 검증: 1-5 숫자만 허용
-            if [[ "$choice" =~ ^[1-5]$ ]]; then
+            # 입력값 검증: 1-6 숫자만 허용
+            if [[ "$choice" =~ ^[1-6]$ ]]; then
                 valid_input=true
                 case $choice in
                     1) MODE="full" ;;
                     2) MODE="version" ;;
                     3) MODE="workflows" ;;
                     4) MODE="issues" ;;
-                    5)
+                    5) MODE="skills" ;;
+                    6)
                         print_info "취소되었습니다"
                         exit 0
                         ;;
                 esac
             else
                 # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
-                print_error "잘못된 입력입니다. 1-5 사이의 숫자를 입력해주세요."
+                print_error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
                 print_to_user ""
             fi
         else
@@ -2212,30 +2216,30 @@ execute_integration() {
         check_breaking_changes "$current_template_version" "$DEFAULT_VERSION"
     fi
 
-    # CLI 모드에서만 자동 감지 및 확인 (interactive 모드에서는 이미 감지 완료)
-    if [ "$IS_INTERACTIVE_MODE" = false ]; then
+    # CLI 모드에서만 자동 감지 및 확인 (interactive 모드에서는 이미 감지 완료, skills 모드는 프로젝트 정보 불필요)
+    if [ "$IS_INTERACTIVE_MODE" = false ] && [ "$MODE" != "skills" ]; then
         if [ -z "$PROJECT_TYPE" ]; then
             PROJECT_TYPE=$(detect_project_type)
         fi
-        
+
         if [ -z "$VERSION" ]; then
             VERSION=$(detect_version)
         fi
-        
+
         if [ -z "$DETECTED_BRANCH" ]; then
             DETECTED_BRANCH=$(detect_default_branch)
         fi
-        
+
         # CLI 모드에서만 통합 정보 표시
         print_question_header "🪐" "통합 정보"
-        
+
         print_to_user "🔭 프로젝트 타입  : $PROJECT_TYPE"
         print_to_user "🌙 초기 버전     : v$VERSION"
         print_to_user "🌿 Default 브랜치 : $DETECTED_BRANCH"
         print_to_user "💫 통합 모드     : $MODE"
         print_separator_line
         print_to_user ""
-        
+
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         if [ "$FORCE_MODE" = false ]; then
             if [ "$TTY_AVAILABLE" = true ]; then
@@ -2243,7 +2247,7 @@ execute_integration() {
                 print_to_user "  Y/y - 예, 계속 진행"
                 print_to_user "  N/n - 아니오, 취소"
                 print_to_user ""
-                
+
                 if ! ask_yes_no "선택: " "Y"; then
                     print_info "취소되었습니다"
                     exit 0
@@ -2305,6 +2309,15 @@ execute_integration() {
         issues)
             copy_issue_templates
             copy_discussion_templates
+            ;;
+        skills)
+            # skills 모드: 템플릿 통합 없이 IDE 도구 설치만 진행
+            offer_ide_tools_install
+
+            # 임시 파일 정리 후 간결한 완료 메시지 출력하고 종료
+            rm -rf "$TEMP_DIR"
+            print_summary
+            return 0
             ;;
     esac
 
@@ -2501,8 +2514,21 @@ print_summary() {
         issues)
             echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
             ;;
+        skills)
+            echo "  ✅ Agent Skill 설치 (Claude, Cursor)" >&2
+            ;;
     esac
-    
+
+    # skills 모드: 파일/워크플로우 추가 없으므로 간결하게 종료
+    if [ "$MODE" = "skills" ]; then
+        echo "" >&2
+        echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "" >&2
+        print_separator_line
+        echo "" >&2
+        return
+    fi
+
     echo "" >&2
     echo "추가된 파일:" >&2
     echo "  📄 version.yml (버전: $VERSION, 타입: $PROJECT_TYPE)" >&2

@@ -1,0 +1,13 @@
+{
+  "_comment": "이 파일을 .suh-template/config/issue.config.json으로 복사하고 값을 채우세요. .suh-template/config/는 .gitignore에 의해 보호됩니다.",
+  "github_pat": "ghp_여기에_PAT_토큰_입력",
+  "default_assignee": "GitHub_사용자명",
+  "github_repos": [
+    {
+      "name": "프로젝트 이름",
+      "owner": "GitHub_사용자명_또는_조직명",
+      "repo": "저장소명",
+      "default": true
+    }
+  ]
+}

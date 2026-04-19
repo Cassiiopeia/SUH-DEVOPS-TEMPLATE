@@ -47,15 +47,13 @@ def _request(method: str, url: str, data: dict | None, pat: str) -> Any:
 
 def create_issue(
     owner: str, repo: str, title: str, body: str,
-    labels: list[str], pat: str,
+    labels: list[str], pat: str, assignees: list[str] | None = None,
 ) -> dict:
     """이슈를 생성하고 {number, url, title}을 반환한다."""
-    data = _request(
-        "POST",
-        f"{_API_BASE}/repos/{owner}/{repo}/issues",
-        {"title": title, "body": body, "labels": labels},
-        pat,
-    )
+    payload: dict = {"title": title, "body": body, "labels": labels}
+    if assignees:
+        payload["assignees"] = assignees
+    data = _request("POST", f"{_API_BASE}/repos/{owner}/{repo}/issues", payload, pat)
     return {"number": data["number"], "url": data["html_url"], "title": data["title"]}
 
 

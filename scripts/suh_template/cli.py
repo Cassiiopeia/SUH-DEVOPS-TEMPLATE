@@ -252,8 +252,12 @@ def cmd_create_issue(args: list) -> int:
     owner, repo, title, body_file, labels_csv = args[0], args[1], args[2], args[3], args[4]
     body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
     labels = [l.strip() for l in labels_csv.split(",") if l.strip()] if labels_csv else []
+    # config에서 기본 담당자 자동 로드
+    project_root = _get_project_root()
+    assignee = _config.get_value(project_root, "issue", "default_assignee")
+    assignees = [assignee] if assignee else []
     try:
-        result = _github.create_issue(owner, repo, title, body, labels, pat)
+        result = _github.create_issue(owner, repo, title, body, labels, pat, assignees)
         import json as _json
         print(_json.dumps(result, ensure_ascii=False))
         return 0

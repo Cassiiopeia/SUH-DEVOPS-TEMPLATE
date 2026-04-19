@@ -158,12 +158,22 @@ GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli conf
 PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli create-branch-name "{이슈 제목}" {이슈번호}
 ```
 
-### 7단계: 다음 작업 선택지 제시
+### 7단계: 커밋 템플릿 계산
+
+```bash
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-commit-template "{이슈 제목}" "{이슈 URL}"
+```
+
+### 8단계: 다음 작업 선택지 제시
 
 ```
 이슈 생성 완료: #{번호} — {제목}
 브랜치명: {브랜치명}
 이슈 URL: {url}
+
+📝 커밋 메시지 템플릿:
+{이슈제목} : feat : {변경사항 설명} {이슈URL}
+(작업 완료 후 /commit 으로 자동 커밋하거나 위 형식으로 직접 커밋하세요)
 
 다음 작업을 선택하세요:
 1. 지금 worktree 생성 (../{브랜치명}/)
@@ -173,10 +183,27 @@ PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli create-branch-nam
 ```
 
 선택에 따라:
-- **1 선택**: `git worktree add -b {브랜치명} ../{브랜치명}` 실행
-- **2 선택**: `git checkout -b {브랜치명}` 실행
+- **1 선택**: `git worktree add -b {브랜치명} ../{브랜치명}` 실행 후 이슈 컨텍스트 저장
+- **2 선택**: `git checkout -b {브랜치명}` 실행 후 이슈 컨텍스트 저장
 - **3 선택**: 아무 git 명령도 실행하지 않음. 브랜치명만 출력하고 종료
 - **4 선택**: 브랜치명을 다시 출력하고 종료
+
+**이슈 컨텍스트 저장** (1, 2 선택 시):
+
+```bash
+mkdir -p "$PROJECT_ROOT/.suh-template/context"
+cat > "$PROJECT_ROOT/.suh-template/context/current-issue.json" << EOF
+{
+  "issue_number": {번호},
+  "issue_title": "{이슈 제목}",
+  "issue_url": "{이슈 URL}",
+  "branch_name": "{브랜치명}",
+  "commit_template": "{이슈제목} : feat : {설명} {이슈URL}"
+}
+EOF
+```
+
+`.suh-template/`은 `.gitignore`에 등록되어 있어 커밋되지 않는다.
 
 ## 산출물 저장
 

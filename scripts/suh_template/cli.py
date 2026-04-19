@@ -235,6 +235,16 @@ def cmd_create_branch_name(args: list) -> int:
     return 0
 
 
+def cmd_get_commit_template(args: list) -> int:
+    """get-commit-template <issue_title> <issue_url>"""
+    if len(args) < 2:
+        _err("ERROR", "get-commit-template", "issue_title과 issue_url 인수가 필요합니다.", "missing_argument")
+        return 1
+    issue_title, issue_url = args[0], args[1]
+    print(_branch.get_commit_template(issue_title, issue_url))
+    return 0
+
+
 def _get_pat() -> Optional[str]:
     """환경변수 GITHUB_PAT를 반환한다."""
     return os.environ.get("GITHUB_PAT")
@@ -397,6 +407,7 @@ _COMMANDS = {
     "config-get": cmd_config_get,
     "init-config": cmd_init_config,
     "create-branch-name": cmd_create_branch_name,
+    "get-commit-template": cmd_get_commit_template,
     "create-issue": cmd_create_issue,
     "add-comment": cmd_add_comment,
     "get-issue": cmd_get_issue,

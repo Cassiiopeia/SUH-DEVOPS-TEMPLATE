@@ -606,6 +606,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `suh-spring-test` | Spring 테스트 생성 |
 | `init-worktree` | Git worktree 자동 생성 |
 | `issue` | 이슈 작성 + GitHub 등록 + 브랜치 생성 |
+| `commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 + 커밋 |
 | `github` | GitHub 이슈/PR 조회·댓글·PR 생성 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
 

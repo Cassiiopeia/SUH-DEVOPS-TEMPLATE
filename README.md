@@ -8,7 +8,7 @@
 > GitHub Actions 자동화와 Claude Code용 DevOps Skill 20종을 한 레포에서 제공합니다.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v2.9.9 (2026-04-07)
+## 최신 버전 : v2.9.14 (2026-04-19)
 
 [전체 버전 기록 보기](CHANGELOG.md) 
 

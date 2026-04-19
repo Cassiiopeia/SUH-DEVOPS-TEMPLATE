@@ -37,6 +37,34 @@
 
 각 skill은 이전 단계의 결과를 참조하고, 다음 단계를 안내한다.
 
+## suh_template CLI 실행 규칙
+
+모든 `python3 -m suh_template.cli` 호출 시 반드시 아래 순서를 따른다:
+
+### 1. 프로젝트 루트 확인 (최초 1회)
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+```
+
+### 2. PYTHONPATH 설정
+
+`suh_template` 패키지는 `$PROJECT_ROOT/scripts/` 안에 있다. 모든 호출에 `PYTHONPATH`를 붙인다:
+
+```bash
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli <command> [args]
+```
+
+**나쁜 예 (절대 사용 금지)**:
+```bash
+python3 -m suh_template.cli get-output-path plan   # ❌ PYTHONPATH 없음 → ModuleNotFoundError
+```
+
+**좋은 예**:
+```bash
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path plan   # ✅
+```
+
 ## GitHub 작업 원칙
 
 GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로 처리한다. `gh` CLI는 사용하지 않는다.
@@ -50,8 +78,12 @@ GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로
 | PR 생성 | `create-pr <owner> <repo> <title> <body_file> <head> <base>` |
 | PR 목록 조회 | `list-prs <owner> <repo> [--state open\|closed\|all]` |
 | 브랜치명 계산 | `create-branch-name "<title>" <number>` |
+| 커밋 템플릿 조회 | `get-commit-template "<title>" "<url>"` |
 
-PAT는 항상 환경변수로 전달: `GITHUB_PAT=$(python3 -m suh_template.cli config-get issue github_pat)`
+PAT는 항상 환경변수로 전달:
+```bash
+GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat)
+```
 
 > `gh` CLI는 Windows/Mac 호환성 문제 및 별도 설치 필요로 사용 금지. Python 표준 라이브러리(urllib)만 사용한다.
 
@@ -64,6 +96,42 @@ PAT는 항상 환경변수로 전달: `GITHUB_PAT=$(python3 -m suh_template.cli 
 3. 사용자에게는 결과만 친근하게 안내 (rebase 과정은 내부적으로 처리, 별도 설명 불필요)
 
 > 이 프로젝트는 main 푸시 시 버전 자동 증가 워크플로우가 실행되어 리모트에 커밋이 추가된다. rebase 없이 push하면 rejected된다.
+
+## 커밋 메시지 컨벤션
+
+이 프로젝트의 커밋 메시지 형식은 다음과 같다:
+
+```
+{이슈제목} : {타입} : {변경사항 설명} {이슈URL}
+```
+
+**타입 목록**:
+
+| 타입 | 용도 |
+|------|------|
+| `feat` | 새 기능 추가 |
+| `fix` | 버그 수정 |
+| `refactor` | 리팩토링 (기능 변경 없음) |
+| `docs` | 문서/주석 변경 |
+| `chore` | 빌드, 설정, 기타 |
+| `style` | 코드 스타일 (로직 변경 없음) |
+| `test` | 테스트 추가/수정 |
+
+**예시**:
+```
+⚙️[기능추가][Skills] commit 스킬 신규 생성 : feat : 이슈 컨텍스트 기반 커밋 메시지 자동 생성 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
+```
+
+**규칙**:
+- 이슈 컨텍스트가 있을 때만 이 형식을 사용한다
+- 이슈와 무관한 커밋(hotfix, 설정 변경 등)은 자유 형식 허용
+- 사용자가 `/commit` 스킬을 호출하면 이 형식으로 자동 완성
+- 사용자가 직접 커밋하는 경우 강제하지 않는다
+
+커밋 템플릿 조회:
+```bash
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-commit-template "{이슈제목}" "{이슈URL}"
+```
 
 ## 민감 정보 보호
 

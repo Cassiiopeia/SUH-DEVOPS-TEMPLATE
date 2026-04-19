@@ -72,7 +72,7 @@ description: "PPT Mode - 기술 발표 자료 작성 전문가. 개발 과정에
 
 산출물 md 저장 전:
 ```bash
-python3 -m suh_template.cli get-output-path ppt
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path ppt
 ```
 
 반환된 경로에 파일을 저장한다.

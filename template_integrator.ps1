@@ -1837,8 +1837,7 @@ function Ensure-GitIgnore {
     $requiredEntries = @(
         "/.idea",
         "/.claude/settings.local.json",
-        "/.report",
-        "/.issue"
+        "/docs/suh-template/"
     )
     
     # .gitignore가 없으면 생성
@@ -1852,11 +1851,8 @@ function Ensure-GitIgnore {
 # Claude AI Settings
 /.claude/settings.local.json
 
-# Implementation Reports (자동 생성)
-/.report
-
-# Issue Drafts (자동 생성)
-/.issue
+# AI 산출물 (자동 생성, 로컬 전용)
+/docs/suh-template/
 "@
         
         Set-Content -Path ".gitignore" -Value $gitignoreContent -Encoding UTF8
@@ -1901,31 +1897,15 @@ function Ensure-GitIgnore {
     
     Add-Content -Path ".gitignore" -Value $appendContent -Encoding UTF8
     
-    # .report 폴더가 이미 Git에 추적 중인 경우 제거
-    if ($entriesToAdd -contains "/.report") {
+    # docs/suh-template/ 폴더가 이미 Git에 추적 중인 경우 제거
+    if ($entriesToAdd -contains "/docs/suh-template/") {
         try {
-            git ls-files --error-unmatch .report 2>$null | Out-Null
+            git ls-files --error-unmatch docs/suh-template 2>$null | Out-Null
             if ($LASTEXITCODE -eq 0) {
-                Print-Info ".report 폴더가 Git에 추적 중입니다. 추적 해제 중..."
-                git rm -r --cached .report 2>$null | Out-Null
+                Print-Info "docs/suh-template/ 폴더가 Git에 추적 중입니다. 추적 해제 중..."
+                git rm -r --cached docs/suh-template 2>$null | Out-Null
                 if ($LASTEXITCODE -eq 0) {
-                    Print-Success ".report 폴더의 Git 추적이 해제되었습니다"
-                }
-            }
-        } catch {
-            # Git 명령 실패 시 무시 (Git 저장소가 아닐 수 있음)
-        }
-    }
-
-    # .issue 폴더가 이미 Git에 추적 중인 경우 제거
-    if ($entriesToAdd -contains "/.issue") {
-        try {
-            git ls-files --error-unmatch .issue 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                Print-Info ".issue 폴더가 Git에 추적 중입니다. 추적 해제 중..."
-                git rm -r --cached .issue 2>$null | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Print-Success ".issue 폴더의 Git 추적이 해제되었습니다"
+                    Print-Success "docs/suh-template/ 폴더의 Git 추적이 해제되었습니다"
                 }
             }
         } catch {

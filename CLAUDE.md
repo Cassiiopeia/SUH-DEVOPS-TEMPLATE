@@ -606,6 +606,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `suh-spring-test` | Spring 테스트 생성 |
 | `init-worktree` | Git worktree 자동 생성 |
 | `issue` | 이슈 작성 + GitHub 등록 + 브랜치 생성 |
+| `commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 + 커밋 |
 | `github` | GitHub 이슈/PR 조회·댓글·PR 생성 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
 
@@ -872,3 +873,35 @@ docs/
 **파일명 규칙**:
 - 대문자 + 하이픈 (UPPER-KEBAB-CASE)
 - 예: `PR-PREVIEW.md`, `VERSION-CONTROL.md`
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke office-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke investigate
+- Ship, deploy, push, create PR → invoke ship
+- QA, test the site, find bugs → invoke qa
+- Code review, check my diff → invoke review
+- Update docs after shipping → invoke document-release
+- Weekly retro → invoke retro
+- Design system, brand → invoke design-consultation
+- Visual audit, design polish → invoke design-review
+- Architecture review → invoke plan-eng-review
+- Save progress, save state, save my work → invoke context-save
+- Resume, where was I, pick up where I left off → invoke context-restore
+- Code quality, health check → invoke health
+
+## 기능 구현 워크플로우
+
+새 기능 구현 시 반드시 이 순서로 스킬을 호출한다:
+
+1. `/office-hours` — 문제 정의, 전제 도전, 설계 문서 생성 (gstack)
+2. `/plan-eng-review` — 아키텍처·테스트 계획 검토 (gstack)
+3. `superpowers:brainstorming` — 구현 아이디어 브레인스토밍
+4. `superpowers:writing-plans` — 상세 구현 계획 작성
+5. `superpowers:executing-plans` — 계획 기반 실제 구현
+6. `superpowers:requesting-code-review` — 구현 완료 후 코드 리뷰 요청

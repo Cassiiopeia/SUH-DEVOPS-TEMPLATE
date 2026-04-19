@@ -1,7 +1,6 @@
 /.idea
 /.claude/settings.local.json
-/.report
-/.issue
+/docs/suh-template/
 
 # Python
 __pycache__/

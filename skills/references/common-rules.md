@@ -37,6 +37,34 @@
 
 각 skill은 이전 단계의 결과를 참조하고, 다음 단계를 안내한다.
 
+## suh_template CLI 실행 규칙
+
+모든 `python3 -m suh_template.cli` 호출 시 반드시 아래 순서를 따른다:
+
+### 1. 프로젝트 루트 확인 (최초 1회)
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+```
+
+### 2. PYTHONPATH 설정
+
+`suh_template` 패키지는 `$PROJECT_ROOT/scripts/` 안에 있다. 모든 호출에 `PYTHONPATH`를 붙인다:
+
+```bash
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli <command> [args]
+```
+
+**나쁜 예 (절대 사용 금지)**:
+```bash
+python3 -m suh_template.cli get-output-path plan   # ❌ PYTHONPATH 없음 → ModuleNotFoundError
+```
+
+**좋은 예**:
+```bash
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path plan   # ✅
+```
+
 ## GitHub 작업 원칙
 
 GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로 처리한다. `gh` CLI는 사용하지 않는다.
@@ -51,7 +79,10 @@ GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로
 | PR 목록 조회 | `list-prs <owner> <repo> [--state open\|closed\|all]` |
 | 브랜치명 계산 | `create-branch-name "<title>" <number>` |
 
-PAT는 항상 환경변수로 전달: `GITHUB_PAT=$(python3 -m suh_template.cli config-get issue github_pat)`
+PAT는 항상 환경변수로 전달:
+```bash
+GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat)
+```
 
 > `gh` CLI는 Windows/Mac 호환성 문제 및 별도 설치 필요로 사용 금지. Python 표준 라이브러리(urllib)만 사용한다.
 

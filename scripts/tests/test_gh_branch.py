@@ -52,3 +52,20 @@ def test_get_commit_template():
     assert "기능추가" in result
     assert "https://github.com/owner/repo/issues/1" in result
     assert ": feat :" in result
+
+
+def test_create_branch_name_extreme_number():
+    """이슈 번호가 매우 커서 prefix가 100자에 근접해도 크래시 없이 동작해야 한다."""
+    result = create_branch_name("제목", 10**15, "20260115")
+    assert len(result) <= 100
+    assert not result.endswith("_")
+
+
+def test_normalize_title_empty_string():
+    """빈 문자열 정규화 테스트."""
+    assert normalize_title("") == ""
+
+
+def test_normalize_title_all_special():
+    """특수문자만 있는 문자열 정규화 테스트."""
+    assert normalize_title("!@#$%") == ""

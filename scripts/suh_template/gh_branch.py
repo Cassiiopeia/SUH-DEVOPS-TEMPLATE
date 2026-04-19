@@ -59,6 +59,10 @@ def create_branch_name(
     # 남은 길이에서 제목 길이 계산
     max_title_len = _MAX_BRANCH_LEN - len(prefix)
 
+    # prefix만으로도 제한을 초과하면 prefix만 반환 (트레일 언더스코어 제거)
+    if max_title_len <= 0:
+        return prefix.rstrip("_")
+
     # 제목 정규화 및 길이 제한
     normalized = normalize_title(issue_title)[:max_title_len].rstrip("_")
 

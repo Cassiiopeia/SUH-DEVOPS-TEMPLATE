@@ -4,10 +4,12 @@
 
 ## 저장 전 경로 계산
 
-산출물 md 저장 전 반드시 아래 커맨드를 실행해 경로를 받아라:
+산출물 md 저장 전 반드시 아래 커맨드를 실행해 경로를 받아라.  
+**`PYTHONPATH`는 항상 필수다** (`common-rules.md` → suh_template CLI 실행 규칙 참조):
 
 ```bash
-python3 -m suh_template.cli get-output-path <skill_id>
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path <skill_id>
 ```
 
 반환값 예시:

@@ -2068,12 +2068,8 @@ function Start-InteractiveMode {
     # 프로젝트 감지 및 확인
     Detect-AndConfirmProject
 
-    # 템플릿 다운로드 (Synology 폴더 확인을 위해 미리 다운로드)
+    # 템플릿 다운로드 (모드 선택 전 필요 — 모드 선택 후 Synology 질문에서 사용)
     Download-Template
-
-    # Synology 옵션 질문 (해당 타입에 synology 폴더 있을 때만)
-    $typeDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$($script:ProjectType)"
-    Ask-SynologyOption $typeDir
 
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
 
@@ -2106,6 +2102,12 @@ function Start-InteractiveMode {
             Print-Error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
             Write-Host ""
         }
+    }
+
+    # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
+    if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
+        $typeDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$($script:ProjectType)"
+        Ask-SynologyOption $typeDir
     }
 }
 
@@ -2249,41 +2251,15 @@ function Start-Integration {
 
 function Offer-IdeToolsInstall {
     $claudeAvailable = $null -ne (Get-Command "claude" -ErrorAction SilentlyContinue)
-    $cursorAvailable = $null -ne (Get-Command "cursor" -ErrorAction SilentlyContinue)
 
-    # 둘 다 없으면 안내만 출력
-    if (-not $claudeAvailable -and -not $cursorAvailable) {
-        Write-Host ""
-        Print-SeparatorLine
-        Print-Info "IDE 도구(Skills) 수동 설치 안내"
-        Write-Host ""
-        Write-Host "  Claude Code 사용자:"
-        Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-        Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-        Write-Host ""
-        Write-Host "  Cursor 사용자:"
-        Write-Host "    .cursor\skills\ 폴더에 skills\ 내용을 직접 복사하세요."
-        Write-Host ""
-        return
-    }
-
-    Write-Host ""
-    Print-SeparatorLine
-    Write-Host ""
-
-    # ─── Claude Code 플러그인 설치/관리 ───
+    # ─── 현재 설치 상태 수집 ───
+    $installedScope   = ""
+    $installedVersion = ""
     if ($claudeAvailable) {
-        Print-Step "Claude Code CLI 감지됨"
-
-        # 현재 설치 상태 확인
-        # PS5 호환: ConvertFrom-Json은 배열을 @()로 감싸야 안전하게 파이프라인 처리 가능
-        $installedScope   = ""
-        $installedVersion = ""
         try {
             $pluginListRaw = & claude plugin list --json 2>$null
             if ($pluginListRaw) {
-                $pluginList = $pluginListRaw | Out-String | ConvertFrom-Json
-                # PS5에서는 단일 객체도 올 수 있으므로 @()로 강제 배열화
+                $pluginList  = $pluginListRaw | Out-String | ConvertFrom-Json
                 $pluginArray = @($pluginList)
                 foreach ($entry in $pluginArray) {
                     if ($entry.id -like "cassiiopeia@*") {
@@ -2294,200 +2270,217 @@ function Offer-IdeToolsInstall {
                 }
             }
         } catch { }
+    }
+
+    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
+    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
+    $cursorUserVer  = ""
+    $cursorProjVer  = ""
+    if (Test-Path $cursorUserMeta) {
+        try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { }
+    }
+    if (Test-Path $cursorProjMeta) {
+        try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { }
+    }
+
+    # ─── 통합 상태 표시 ───
+    Write-Host ""
+    Print-SeparatorLine
+    Print-Step "IDE Skills 현재 상태"
+    Write-Host ""
+
+    if ($claudeAvailable) {
+        if ($installedScope) {
+            $cvTag = ""
+            if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { $cvTag = " ✓ 최신버전" }
+            elseif ($script:templateVersion) { $cvTag = " -> 업데이트 가능: v$($script:templateVersion)" }
+            Print-Info "Claude Code  ${installedScope}   v${installedVersion}${cvTag}"
+        } else {
+            Print-Info "Claude Code : 미설치"
+        }
+    } else {
+        Print-Info "Claude Code : CLI 미감지 (수동 설치 필요)"
+    }
+
+    if (-not $cursorUserVer -and -not $cursorProjVer) {
+        Print-Info "Cursor      : 미설치"
+    } else {
+        if ($cursorUserVer) {
+            $utag = ""
+            if ($script:templateVersion -and $cursorUserVer -eq $script:templateVersion) { $utag = " ✓ 최신버전" }
+            elseif ($script:templateVersion) { $utag = " -> 업데이트 가능: v$($script:templateVersion)" }
+            Print-Info "Cursor       user   v${cursorUserVer} (~/.cursor/skills/)${utag}"
+        }
+        if ($cursorProjVer) {
+            $ptag = ""
+            if ($script:templateVersion -and $cursorProjVer -eq $script:templateVersion) { $ptag = " ✓ 최신버전" }
+            elseif ($script:templateVersion) { $ptag = " -> 업데이트 가능: v$($script:templateVersion)" }
+            Print-Info "Cursor       project v${cursorProjVer} (.cursor\skills\)${ptag}"
+        }
+    }
+    Write-Host ""
+
+    # ─── Claude Code 섹션 ───
+    Print-Step "[ Claude Code 플러그인 관리 ]"
+    Write-Host ""
+
+    if ($claudeAvailable) {
 
         if ($installedScope) {
+            # 최신버전 여부 비교
+            $versionTag = ""
+            if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) {
+                $versionTag = " ✓ 최신버전"
+            } elseif ($script:templateVersion) {
+                $versionTag = " -> 업데이트 가능: v$($script:templateVersion)"
+            }
+
             # 이미 설치된 경우 → 현재 상태 표시 후 선택 메뉴
-            Print-Info "현재 설치 상태: cassiiopeia v${installedVersion} (scope: ${installedScope})"
+            Print-Info "현재 설치 상태: cassiiopeia v${installedVersion} (scope: ${installedScope})${versionTag}"
             Write-Host ""
 
             if (-not $Force) {
-                Write-Host "어떻게 하시겠습니까?"
-                Write-Host "  1 - 업데이트 (최신 버전으로)"
-                Write-Host "  2 - 재설치 (scope 변경 포함)"
-                Write-Host "  3 - 삭제  ! 플러그인 데이터(config)도 함께 삭제됩니다"
-                Write-Host "  4 - 건너뛰기 (현재 상태 유지)"
+                $updateLabel = if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { "업데이트 (이미 최신 — 재적용)" } else { "업데이트 (최신 버전으로)" }
+                Write-Host "  1 - $updateLabel"
+                Write-Host "  2 - 재설치 (scope 변경)"
+                Write-Host "  3 - 삭제"
+                Write-Host "      삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
+                Write-Host "                 $env:USERPROFILE\.claude\plugins\data\cassiiopeia@cassiiopeia-marketplace\"
+                Write-Host "  4 - 건너뛰기"
                 Write-Host ""
 
                 $choice = Read-Host "선택"
 
-                # PS5/PS7 모두 동작하는 if/elseif 패턴 사용
                 if ($choice -eq "1") {
                     Print-Step "플러그인 업데이트 중..."
                     $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                     if ($LASTEXITCODE -eq 0) {
                         Print-Success "업데이트 완료 (scope: ${installedScope})"
                     } else {
-                        Print-Warning "업데이트 실패. 수동으로 실행해주세요:"
-                        Write-Host "    claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
+                        Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
                     }
                 } elseif ($choice -eq "2") {
-                    # 재설치: 기존 삭제 + data 제거 → scope 선택 → 신규 설치
                     Print-Step "기존 플러그인 삭제 중 (scope: ${installedScope})..."
                     $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                     Remove-ClaudePluginData
-
                     $newScope = Get-ClaudeScope
                     Invoke-ClaudePluginInstall $newScope
                 } elseif ($choice -eq "3") {
-                    # 삭제 + plugin data(config) 제거
-                    Print-Step "플러그인 삭제 중 (scope: ${installedScope})..."
+                    Print-Step "플러그인 삭제 중..."
+                    Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
+                    Print-Info "             $env:USERPROFILE\.claude\plugins\data\cassiiopeia@cassiiopeia-marketplace\"
                     $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                     if ($LASTEXITCODE -eq 0) {
                         Print-Success "플러그인 uninstall 완료"
                         Remove-ClaudePluginData
                     } else {
-                        Print-Warning "삭제 실패. 수동으로 실행해주세요:"
-                        Write-Host "    claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
+                        Print-Warning "삭제 실패. 수동 실행: claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
                     }
                 } else {
                     Print-Info "Claude Code 플러그인 변경 없이 건너뜁니다"
                 }
             } else {
-                # FORCE 모드: 업데이트만 수행
                 Print-Step "플러그인 업데이트 중 (FORCE)..."
                 $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                 Print-Success "업데이트 완료 (scope: ${installedScope})"
             }
         } else {
-            # 미설치 → scope 선택 후 신규 설치
             if (-not $Force) {
-                Write-Host ""
                 Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
                 Write-Host "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
                 Write-Host ""
                 Write-Host "  Y/y - 예, 설치하기 (추천)"
                 Write-Host "  N/n - 아니오, 건너뛰기"
                 Write-Host ""
-
                 if (Ask-YesNo "선택" "Y") {
                     $scope = Get-ClaudeScope
                     Invoke-ClaudePluginInstall $scope
                 } else {
                     Print-Info "Claude Code 플러그인 설치 건너뜁니다"
-                    Write-Host ""
-                    Write-Host "  수동 설치 명령어:"
-                    Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-                    Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-                    Write-Host ""
+                    Write-Host "  수동 설치: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+                    Write-Host "             claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
                 }
             } else {
-                # FORCE 모드: user scope로 바로 설치
                 Invoke-ClaudePluginInstall "user"
             }
         }
     } else {
-        # Claude Code CLI 없음 → 수동 안내
-        Write-Host ""
-        Write-Host "  Claude Code 사용자라면 다음 명령어로 Skills를 설치하세요:"
-        Write-Host "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-        Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-        Write-Host ""
+        Write-Host "  Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host "                      claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
     }
 
-    # ─── Cursor Skills 수동 복사 (루트 skills/ → .cursor/skills/) ───
-    # Cursor는 마켓플레이스 연동이 없으므로 파일을 직접 복사하고
-    # cursor-skills-meta.json 을 .cursor\skills\ 에 저장해 버전/삭제 관리에 활용한다.
-    $cursorMetaFile  = ".cursor\skills\cursor-skills-meta.json"
-    $cursorInstalled = Test-Path $cursorMetaFile
-    $cursorInstalledVersion = ""
-    if ($cursorInstalled) {
-        try {
-            $metaRaw = Get-Content $cursorMetaFile -Raw -ErrorAction SilentlyContinue
-            if ($metaRaw) {
-                $meta = $metaRaw | ConvertFrom-Json
-                $cursorInstalledVersion = $meta.version
-            }
-        } catch { }
-    }
-
-    # skills 소스 경로 (TEMP_DIR 우선, 없으면 로컬 skills\ 폴더)
-    $skillsSrc = ""
-    $tempSkillsDir = Join-Path $TEMP_DIR "skills"
-    if (Test-Path $tempSkillsDir) {
-        $skillsSrc = $tempSkillsDir
-    } elseif (Test-Path "skills") {
-        $skillsSrc = "skills"
-    }
+    # ─── Cursor 섹션 ───
+    # scope: user = $env:USERPROFILE\.cursor\skills\  /  project = .cursor\skills\
+    $skillsSrcRemote = ""
+    $skillsSrcLocal  = ""
+    $tempSkillsDir   = Join-Path $TEMP_DIR "skills"
+    if (Test-Path $tempSkillsDir) { $skillsSrcRemote = $tempSkillsDir }
+    if (Test-Path "skills")       { $skillsSrcLocal  = "skills" }
 
     Write-Host ""
-    Print-Step "Cursor IDE Skills 관리"
+    Print-Step "[ Cursor Skills 관리 ]"
+    Write-Host ""
 
-    if ($cursorInstalled) {
-        Print-Info "현재 설치 상태: cassiiopeia v${cursorInstalledVersion} (.cursor\skills\)"
-        Write-Host ""
+    $cursorAnyInstalled = $cursorUserVer -or $cursorProjVer
 
+    if ($cursorAnyInstalled) {
         if (-not $Force) {
             Write-Host "어떻게 하시겠습니까?"
-            Write-Host "  1 - 업데이트 (최신 파일로 덮어쓰기)"
-            Write-Host "  2 - 삭제  ! .cursor\skills\ 폴더 전체와 메타데이터가 삭제됩니다"
-            Write-Host "  3 - 건너뛰기 (현재 상태 유지)"
+            Write-Host "  1 - 업데이트 (기존 scope 유지)"
+            Write-Host "  2 - 신규 설치 (다른 scope에 추가)"
+            Write-Host "  3 - 삭제"
+            Write-Host "  4 - 건너뛰기"
             Write-Host ""
 
             $cursorChoice = Read-Host "선택"
 
             if ($cursorChoice -eq "1") {
-                if (-not $skillsSrc) {
-                    Print-Warning "템플릿 소스를 찾을 수 없어 업데이트할 수 없습니다."
+                # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
+                if ($cursorUserVer -and $cursorProjVer) {
+                    $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
+                } elseif ($cursorUserVer) {
+                    $targetScope = "user"
                 } else {
-                    Print-Step "Cursor Skills 업데이트 중..."
-                    Copy-Item -Path "$skillsSrc\*" -Destination ".cursor\skills\" -Recurse -Force -ErrorAction SilentlyContinue
-                    Write-CursorSkillsMeta
-                    Print-Success "Cursor Skills 업데이트 완료"
+                    $targetScope = "project"
                 }
+                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
+                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
+                else { Invoke-CursorSkillsCopy $targetScope $src }
             } elseif ($cursorChoice -eq "2") {
-                Remove-CursorSkills
+                # 신규 설치: scope 자유 선택 (다른 scope에 추가)
+                $targetScope = Get-CursorScope "" ""
+                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
+                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
+                else { Invoke-CursorSkillsCopy $targetScope $src }
+            } elseif ($cursorChoice -eq "3") {
+                Invoke-CursorDelete $cursorUserVer $cursorProjVer
             } else {
                 Print-Info "Cursor Skills 변경 없이 건너뜁니다"
             }
         } else {
-            # FORCE 모드: 소스가 있으면 업데이트
-            if ($skillsSrc) {
-                Copy-Item -Path "$skillsSrc\*" -Destination ".cursor\skills\" -Recurse -Force -ErrorAction SilentlyContinue
-                Write-CursorSkillsMeta
-                Print-Success "Cursor Skills 업데이트 완료 (FORCE)"
-            }
+            $src = if ($skillsSrcRemote) { $skillsSrcRemote } else { $skillsSrcLocal }
+            if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     } else {
-        # 미설치 → 설치 여부 확인
         if (-not $Force) {
-            Write-Host ""
             Write-Host "Cursor IDE Skills를 설치하시겠습니까?"
-            Write-Host "  설치 시 Cursor에서 /analyze, /review 등 20개 스킬 사용 가능"
-            Write-Host "  (Cursor는 마켓플레이스 미지원 - 파일을 .cursor\skills\에 직접 복사)"
+            Write-Host "  /analyze, /review 등 20개 스킬 사용 가능 (마켓플레이스 미지원 — 파일 직접 복사)"
             Write-Host ""
             Write-Host "  Y/y - 예, 설치하기 (추천)"
             Write-Host "  N/n - 아니오, 건너뛰기"
             Write-Host ""
 
             if (Ask-YesNo "선택" "Y") {
-                if (-not $skillsSrc) {
-                    Print-Warning "템플릿 소스를 찾을 수 없습니다. 건너뜁니다."
-                } else {
-                    Print-Step "Cursor Skills 설치 중..."
-                    if (-not (Test-Path ".cursor\skills")) {
-                        New-Item -Path ".cursor\skills" -ItemType Directory -Force | Out-Null
-                    }
-                    try {
-                        Copy-Item -Path "$skillsSrc\*" -Destination ".cursor\skills\" -Recurse -Force -ErrorAction Stop
-                        Write-CursorSkillsMeta
-                        Print-Success "Cursor Skills 설치 완료 (.cursor\skills\)"
-                    } catch {
-                        Print-Warning "Cursor Skills 복사 실패"
-                    }
-                }
+                $targetScope = Get-CursorScope "" ""
+                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
+                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다. 건너뜁니다." }
+                else { Invoke-CursorSkillsCopy $targetScope $src }
             } else {
                 Print-Info "Cursor Skills 설치 건너뜁니다"
             }
         } else {
-            # FORCE 모드
-            if ($skillsSrc) {
-                if (-not (Test-Path ".cursor\skills")) {
-                    New-Item -Path ".cursor\skills" -ItemType Directory -Force | Out-Null
-                }
-                Copy-Item -Path "$skillsSrc\*" -Destination ".cursor\skills\" -Recurse -Force -ErrorAction SilentlyContinue
-                Write-CursorSkillsMeta
-                Print-Success "Cursor Skills 설치 완료 (FORCE)"
-            }
+            $src = if ($skillsSrcRemote) { $skillsSrcRemote } else { $skillsSrcLocal }
+            if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     }
 }
@@ -2540,20 +2533,22 @@ function Remove-ClaudePluginData {
     if (Test-Path $dataDir) {
         Remove-Item -Path $dataDir -Recurse -Force -ErrorAction SilentlyContinue
         Print-Success "플러그인 데이터(config) 삭제 완료"
-    } else {
-        Print-Info "삭제할 플러그인 데이터 없음 (정상)"
     }
+    # data 디렉토리가 없는 경우는 정상 — 별도 메시지 불필요
 }
 
 # ─── Cursor 헬퍼 ────────────────────────────────────────────────
 
-# .cursor\skills\cursor-skills-meta.json 생성/갱신
-# 템플릿 버전·설치 경로를 기록해두어 이후 업데이트·삭제에 활용한다.
+# cursor-skills-meta.json 생성/갱신
+# 인자: $Scope(user|project), $DestDir(설치 경로)
 function Write-CursorSkillsMeta {
-    $version     = if ($script:templateVersion) { $script:templateVersion } else { "unknown" }
-    $installPath = (Get-Location).Path + "\.cursor\skills"
-    $timestamp   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    $metaFile    = ".cursor\skills\cursor-skills-meta.json"
+    param(
+        [string]$Scope   = "project",
+        [string]$DestDir = ".cursor\skills"
+    )
+    $version   = if ($script:templateVersion) { $script:templateVersion } else { "unknown" }
+    $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $metaFile  = Join-Path $DestDir "cursor-skills-meta.json"
 
     # 업데이트 시 installedAt 기존 값 보존
     $installedAt = $timestamp
@@ -2564,17 +2559,19 @@ function Write-CursorSkillsMeta {
         } catch { }
     }
 
-    if (-not (Test-Path ".cursor\skills")) {
-        New-Item -Path ".cursor\skills" -ItemType Directory -Force | Out-Null
+    if (-not (Test-Path $DestDir)) {
+        New-Item -Path $DestDir -ItemType Directory -Force | Out-Null
     }
 
-    # PS5 호환: here-string 으로 JSON 직접 작성 (ConvertTo-Json 줄바꿈 문제 회피)
+    # PS5 호환: here-string으로 JSON 직접 작성
+    $escapedDest = $DestDir -replace '\\', '\\'
     $json = @"
 {
   "name": "cassiiopeia",
   "version": "$version",
+  "scope": "$Scope",
   "source": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
-  "installPath": "$($installPath -replace '\\', '\\')",
+  "installPath": "$escapedDest",
   "installedAt": "$installedAt",
   "lastUpdated": "$timestamp"
 }
@@ -2582,14 +2579,85 @@ function Write-CursorSkillsMeta {
     $json | Set-Content -Path $metaFile -Encoding UTF8
 }
 
-# .cursor\skills\ 전체 삭제 (메타데이터 포함)
-function Remove-CursorSkills {
-    if (Test-Path ".cursor\skills") {
-        Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
-        Print-Success "Cursor Skills 삭제 완료 (.cursor\skills\ 제거)"
-    } else {
-        Print-Info "삭제할 Cursor Skills 없음"
+# Cursor scope 선택 (user / project)
+function Get-CursorScope {
+    param([string]$UserVer, [string]$ProjVer)
+    Write-Host ""
+    Write-Host "설치 scope를 선택하세요:"
+    $uLabel = if ($UserVer) { "  1 - user    (모든 프로젝트 공통, ~\.cursor\skills\)  현재: v${UserVer}" } else { "  1 - user    (모든 프로젝트 공통, ~\.cursor\skills\)" }
+    $pLabel = if ($ProjVer) { "  2 - project (현재 프로젝트 전용, .cursor\skills\)   현재: v${ProjVer}" } else { "  2 - project (현재 프로젝트 전용, .cursor\skills\)" }
+    Write-Host $uLabel
+    Write-Host $pLabel
+    Write-Host ""
+    $scopeChoice = Read-Host "선택"
+    if ($scopeChoice -eq "1") { return "user" }
+    return "project"
+}
+
+# Cursor Skills 실제 복사 실행
+function Invoke-CursorSkillsCopy {
+    param([string]$Scope, [string]$Src)
+    $dest = if ($Scope -eq "user") { Join-Path $env:USERPROFILE ".cursor\skills" } else { ".cursor\skills" }
+    Print-Step "Cursor Skills 복사 중 (scope: ${Scope})..."
+    if (-not (Test-Path $dest)) { New-Item -Path $dest -ItemType Directory -Force | Out-Null }
+    try {
+        Copy-Item -Path "$Src\*" -Destination "$dest\" -Recurse -Force -ErrorAction Stop
+        Write-CursorSkillsMeta $Scope $dest
+        Print-Success "Cursor Skills 완료 (scope: ${Scope}, 경로: ${dest}\)"
+    } catch {
+        Print-Warning "Cursor Skills 복사 실패"
     }
+}
+
+# Cursor Skills 삭제 (scope 선택)
+function Invoke-CursorDelete {
+    param([string]$UserVer, [string]$ProjVer)
+    Write-Host "삭제할 scope를 선택하세요:"
+    if ($UserVer) { Write-Host "  1 - user    (~\.cursor\skills\)  v${UserVer}" }
+    if ($ProjVer) { Write-Host "  2 - project (.cursor\skills\)    v${ProjVer}" }
+    if ($UserVer -and $ProjVer) { Write-Host "  3 - 모두 삭제" }
+    Write-Host "  0 - 취소"
+    Write-Host ""
+    $delChoice = Read-Host "선택"
+
+    $userDest = Join-Path $env:USERPROFILE ".cursor\skills"
+    if ($delChoice -eq "1") {
+        if ($UserVer) {
+            Print-Info "삭제 대상: $userDest (v${UserVer})"
+            Remove-Item -Path $userDest -Recurse -Force -ErrorAction SilentlyContinue
+            Print-Success "user scope Cursor Skills 삭제 완료"
+        } else { Print-Warning "user scope에 설치된 Skills 없음" }
+    } elseif ($delChoice -eq "2") {
+        if ($ProjVer) {
+            Print-Info "삭제 대상: .cursor\skills\ (v${ProjVer})"
+            Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
+            Print-Success "project scope Cursor Skills 삭제 완료"
+        } else { Print-Warning "project scope에 설치된 Skills 없음" }
+    } elseif ($delChoice -eq "3" -and $UserVer -and $ProjVer) {
+        Print-Info "삭제 대상: $userDest (v${UserVer}), .cursor\skills\ (v${ProjVer})"
+        Remove-Item -Path $userDest -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
+        Print-Success "모든 Cursor Skills 삭제 완료"
+    } else {
+        Print-Info "삭제 취소"
+    }
+}
+
+# Cursor Skills 복사 소스 선택
+function Get-CursorSkillsSrc {
+    param([string]$RemoteSrc, [string]$LocalSrc)
+    if ($RemoteSrc -and -not $LocalSrc) { return $RemoteSrc }
+    if (-not $RemoteSrc -and $LocalSrc) { return $LocalSrc }
+    if (-not $RemoteSrc -and -not $LocalSrc) { return "" }
+
+    Write-Host ""
+    Write-Host "설치 소스를 선택하세요:"
+    Write-Host "  1 - 원격 최신 (repo에서 다운로드, 추천)"
+    Write-Host "  2 - 로컬 (현재 디렉토리 skills\ 폴더)"
+    Write-Host ""
+    $srcChoice = Read-Host "선택"
+    if ($srcChoice -eq "2") { return $LocalSrc }
+    return $RemoteSrc
 }
 
 # ===================================================================

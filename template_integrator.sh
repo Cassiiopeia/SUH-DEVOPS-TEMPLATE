@@ -2127,12 +2127,8 @@ interactive_mode() {
     # 프로젝트 감지 및 확인
     detect_and_confirm_project
 
-    # 템플릿 다운로드 (Synology 폴더 확인을 위해 미리 다운로드)
+    # 템플릿 다운로드 (모드 선택 전 필요 — 모드 선택 후 Synology 질문에서 사용)
     download_template
-
-    # Synology 옵션 질문 (해당 타입에 synology 폴더 있을 때만)
-    local type_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$PROJECT_TYPE"
-    ask_synology_option "$type_dir"
 
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
 
@@ -2177,6 +2173,12 @@ interactive_mode() {
             exit 1
         fi
     done
+
+    # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
+    if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
+        local type_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$PROJECT_TYPE"
+        ask_synology_option "$type_dir"
+    fi
 }
 
 # 통합 실행
@@ -2328,57 +2330,83 @@ offer_ide_tools_install() {
         claude_available=true
     fi
 
-    # Cursor는 CLI 감지 대신 cursor-skills-meta.json 존재 여부로 관리
-    # cursor_available 변수 불필요
-
-    # Claude Code도 없고 Cursor meta도 없으면 수동 안내만 출력
-    if [ "$claude_available" = false ] && [ ! -f ".cursor/skills/cursor-skills-meta.json" ]; then
-        echo "" >&2
-        print_separator_line
-        print_info "IDE 도구(Skills) 수동 설치 안내"
-        echo "" >&2
-        echo "  Claude Code 사용자:" >&2
-        echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-        echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-        echo "" >&2
-        echo "  Cursor 사용자:" >&2
-        echo "    .cursor/skills/ 폴더에 skills/ 내용을 직접 복사하세요." >&2
-        echo "" >&2
-        return
-    fi
-
-    echo "" >&2
-    print_separator_line
-    echo "" >&2
-
-    # ─── Claude Code 플러그인 설치/관리 ───
+    # ─── 현재 설치 상태 수집 ───
+    local installed_scope=""
+    local installed_version=""
     if [ "$claude_available" = true ]; then
-        print_step "Claude Code CLI 감지됨"
-
-        # 현재 설치 상태 확인 (JSON 파싱)
-        local installed_scope=""
-        local installed_version=""
         local plugin_json
         plugin_json=$(claude plugin list --json 2>/dev/null || echo "[]")
-        # cassiiopeia 플러그인 항목 추출 (grep -A로 블록 추출)
         local plugin_entry
         plugin_entry=$(echo "$plugin_json" | grep -A5 '"cassiiopeia@' | head -10)
         if [ -n "$plugin_entry" ]; then
             installed_scope=$(echo "$plugin_entry" | grep '"scope"' | sed 's/.*"scope": *"\([^"]*\)".*/\1/')
             installed_version=$(echo "$plugin_entry" | grep '"version"' | sed 's/.*"version": *"\([^"]*\)".*/\1/')
         fi
+    fi
 
+    # ─── 통합 상태 표시 ───
+    echo "" >&2
+    print_separator_line
+    print_step "IDE Skills 현재 상태"
+    echo "" >&2
+
+    # Claude Code 상태
+    if [ "$claude_available" = true ]; then
         if [ -n "$installed_scope" ]; then
-            # 이미 설치된 경우 → 현재 상태 표시 후 선택 메뉴
-            print_info "현재 설치 상태: cassiiopeia v${installed_version} (scope: ${installed_scope})"
-            echo "" >&2
+            local cv_tag=""
+            [ -n "$TEMPLATE_VERSION" ] && [ "$installed_version" = "$TEMPLATE_VERSION" ] && cv_tag=" ✓ 최신버전"
+            [ -n "$TEMPLATE_VERSION" ] && [ "$installed_version" != "$TEMPLATE_VERSION" ] && cv_tag=" → 업데이트 가능: v${TEMPLATE_VERSION}"
+            print_info "Claude Code  ${installed_scope}   v${installed_version}${cv_tag}"
+        else
+            print_info "Claude Code : 미설치"
+        fi
+    else
+        print_info "Claude Code : CLI 미감지 (수동 설치 필요)"
+    fi
+
+    # Cursor 상태 (user/project 각각)
+    local _cur_u_ver="" _cur_p_ver=""
+    local _cur_u_meta="${HOME}/.cursor/skills/cursor-skills-meta.json"
+    local _cur_p_meta=".cursor/skills/cursor-skills-meta.json"
+    [ -f "$_cur_u_meta" ] && _cur_u_ver=$(grep '"version"' "$_cur_u_meta" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+    [ -f "$_cur_p_meta" ] && _cur_p_ver=$(grep '"version"' "$_cur_p_meta" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+
+    if [ -z "$_cur_u_ver" ] && [ -z "$_cur_p_ver" ]; then
+        print_info "Cursor      : 미설치"
+    else
+        if [ -n "$_cur_u_ver" ]; then
+            local utag=""
+            [ -n "$TEMPLATE_VERSION" ] && [ "$_cur_u_ver" = "$TEMPLATE_VERSION" ] && utag=" ✓ 최신버전"
+            [ -n "$TEMPLATE_VERSION" ] && [ "$_cur_u_ver" != "$TEMPLATE_VERSION" ] && utag=" → 업데이트 가능: v${TEMPLATE_VERSION}"
+            print_info "Cursor       user   v${_cur_u_ver} (~/.cursor/skills/)${utag}"
+        fi
+        if [ -n "$_cur_p_ver" ]; then
+            local ptag=""
+            [ -n "$TEMPLATE_VERSION" ] && [ "$_cur_p_ver" = "$TEMPLATE_VERSION" ] && ptag=" ✓ 최신버전"
+            [ -n "$TEMPLATE_VERSION" ] && [ "$_cur_p_ver" != "$TEMPLATE_VERSION" ] && ptag=" → 업데이트 가능: v${TEMPLATE_VERSION}"
+            print_info "Cursor       project v${_cur_p_ver} (.cursor/skills/)${ptag}"
+        fi
+    fi
+    echo "" >&2
+
+    # ─── Claude Code 섹션 ───
+    print_step "[ Claude Code 플러그인 관리 ]"
+    echo "" >&2
+
+    if [ "$claude_available" = true ]; then
+        if [ -n "$installed_scope" ]; then
+            local update_label="업데이트 (최신 버전으로)"
+            if [ -n "$TEMPLATE_VERSION" ] && [ "$installed_version" = "$TEMPLATE_VERSION" ]; then
+                update_label="업데이트 (이미 최신 — 재적용)"
+            fi
 
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "어떻게 하시겠습니까?"
-                print_to_user "  1 - 업데이트 (최신 버전으로)"
-                print_to_user "  2 - 재설치 (scope 변경 포함)"
-                print_to_user "  3 - 삭제  ⚠️  플러그인 데이터(config)도 함께 삭제됩니다"
-                print_to_user "  4 - 건너뛰기 (현재 상태 유지)"
+                print_to_user "  1 - ${update_label}"
+                print_to_user "  2 - 재설치 (scope 변경)"
+                print_to_user "  3 - 삭제"
+                print_to_user "      삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
+                print_to_user "                 ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
+                print_to_user "  4 - 건너뛰기"
                 print_to_user ""
 
                 local choice
@@ -2399,18 +2427,17 @@ offer_ide_tools_install() {
                         fi
                         ;;
                     2)
-                        # 재설치: 기존 삭제 + data 제거 → scope 선택 → 신규 설치
                         print_step "기존 플러그인 삭제 중 (scope: ${installed_scope})..."
                         claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
                         _remove_claude_plugin_data
-
                         local new_scope
                         new_scope=$(_ask_claude_scope)
                         _do_claude_plugin_install "$new_scope"
                         ;;
                     3)
-                        # 삭제 + plugin data(config) 제거
-                        print_step "플러그인 삭제 중 (scope: ${installed_scope})..."
+                        print_step "플러그인 삭제 중..."
+                        print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
+                        print_info "             ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
                         if claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
                             print_success "플러그인 uninstall 완료"
                             _remove_claude_plugin_data
@@ -2424,7 +2451,7 @@ offer_ide_tools_install() {
                         ;;
                 esac
             else
-                # FORCE 모드: 업데이트만 수행
+                # FORCE 모드: 업데이트
                 print_step "플러그인 업데이트 중 (FORCE)..."
                 claude plugin update cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
                 print_success "업데이트 완료 (scope: ${installed_scope})"
@@ -2432,7 +2459,6 @@ offer_ide_tools_install() {
         else
             # 미설치 → scope 선택 후 신규 설치
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user ""
                 print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
                 print_to_user "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
                 print_to_user ""
@@ -2446,58 +2472,65 @@ offer_ide_tools_install() {
                     _do_claude_plugin_install "$scope"
                 else
                     print_info "Claude Code 플러그인 설치 건너뜁니다"
-                    echo "" >&2
-                    echo "  수동 설치 명령어:" >&2
-                    echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-                    echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-                    echo "" >&2
+                    echo "  수동 설치: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+                    echo "             claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
                 fi
             else
-                # FORCE 모드: user scope로 바로 설치
                 _do_claude_plugin_install "user"
             fi
         fi
     else
-        # Claude Code CLI 없음 → 수동 안내
-        echo "" >&2
-        echo "  💡 Claude Code 사용자라면 다음 명령어로 Skills를 설치하세요:" >&2
-        echo "    claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-        echo "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-        echo "" >&2
+        echo "  💡 Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "                         claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
     fi
 
-    # ─── Cursor Skills 수동 복사 (루트 skills/ → .cursor/skills/) ───
-    # Cursor는 마켓플레이스 연동이 없으므로 파일을 직접 복사하고
-    # 메타데이터(cursor-skills-meta.json)를 .cursor/skills/ 에 저장해 관리한다.
-    local cursor_meta_file=".cursor/skills/cursor-skills-meta.json"
-    local cursor_installed=false
-    local cursor_installed_version=""
+    # ─── Cursor 섹션 ───
+    # Cursor는 마켓플레이스 미지원 — 파일 직접 복사로 관리한다.
+    # scope 개념:
+    #   user    = ~/.cursor/skills/      (모든 프로젝트 공통)
+    #   project = ./.cursor/skills/      (현재 프로젝트 전용)
+    local cursor_user_meta="${HOME}/.cursor/skills/cursor-skills-meta.json"
+    local cursor_proj_meta=".cursor/skills/cursor-skills-meta.json"
+    local cursor_user_ver="" cursor_proj_ver=""
+    [ -f "$cursor_user_meta" ] && cursor_user_ver=$(grep '"version"' "$cursor_user_meta" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+    [ -f "$cursor_proj_meta" ] && cursor_proj_ver=$(grep '"version"' "$cursor_proj_meta" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
 
-    if [ -f "$cursor_meta_file" ]; then
-        cursor_installed=true
-        cursor_installed_version=$(grep '"version"' "$cursor_meta_file" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
-    fi
-
-    # skills 소스 경로 (TEMP_DIR 우선, 없으면 로컬 skills/ 폴더)
-    local skills_src=""
-    if [ -d "$TEMP_DIR/skills" ]; then
-        skills_src="$TEMP_DIR/skills"
-    elif [ -d "skills" ]; then
-        skills_src="skills"
-    fi
+    # 스킬 파일 소스 후보
+    local skills_src_remote="" skills_src_local=""
+    [ -d "$TEMP_DIR/skills" ] && skills_src_remote="$TEMP_DIR/skills"
+    [ -d "skills" ]           && skills_src_local="skills"
 
     echo "" >&2
-    print_step "Cursor IDE Skills 관리"
+    print_step "[ Cursor Skills 관리 ]"
+    echo "" >&2
 
-    if [ "$cursor_installed" = true ]; then
-        print_info "현재 설치 상태: cassiiopeia v${cursor_installed_version} (.cursor/skills/)"
+    # 설치 여부 판단 — user/project 각각 독립 처리
+    local cursor_any_installed=false
+    [ -n "$cursor_user_ver" ] && cursor_any_installed=true
+    [ -n "$cursor_proj_ver" ] && cursor_any_installed=true
+
+    if [ "$cursor_any_installed" = true ]; then
+        # 설치된 위치별 상태 표시
+        if [ -n "$cursor_user_ver" ]; then
+            local utag=""
+            [ -n "$TEMPLATE_VERSION" ] && [ "$cursor_user_ver" = "$TEMPLATE_VERSION" ] && utag=" ✓ 최신버전"
+            [ -n "$TEMPLATE_VERSION" ] && [ "$cursor_user_ver" != "$TEMPLATE_VERSION" ] && utag=" → 업데이트 가능: v${TEMPLATE_VERSION}"
+            print_info "  user    v${cursor_user_ver} (~/.cursor/skills/)${utag}"
+        fi
+        if [ -n "$cursor_proj_ver" ]; then
+            local ptag=""
+            [ -n "$TEMPLATE_VERSION" ] && [ "$cursor_proj_ver" = "$TEMPLATE_VERSION" ] && ptag=" ✓ 최신버전"
+            [ -n "$TEMPLATE_VERSION" ] && [ "$cursor_proj_ver" != "$TEMPLATE_VERSION" ] && ptag=" → 업데이트 가능: v${TEMPLATE_VERSION}"
+            print_info "  project v${cursor_proj_ver} (.cursor/skills/)${ptag}"
+        fi
         echo "" >&2
 
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_to_user "어떻게 하시겠습니까?"
-            print_to_user "  1 - 업데이트 (최신 파일로 덮어쓰기)"
-            print_to_user "  2 - 삭제  ⚠️  .cursor/skills/ 폴더 전체와 메타데이터가 삭제됩니다"
-            print_to_user "  3 - 건너뛰기 (현재 상태 유지)"
+            print_to_user "  1 - 업데이트 (기존 scope 유지)"
+            print_to_user "  2 - 신규 설치 (다른 scope에 추가)"
+            print_to_user "  3 - 삭제"
+            print_to_user "  4 - 건너뛰기"
             print_to_user ""
 
             local cursor_choice
@@ -2509,66 +2542,74 @@ offer_ide_tools_install() {
 
             case "$cursor_choice" in
                 1)
-                    if [ -z "$skills_src" ]; then
-                        print_warning "템플릿 소스를 찾을 수 없어 업데이트할 수 없습니다."
+                    # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
+                    local target_scope
+                    if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
+                        target_scope=$(_ask_cursor_scope "$cursor_user_ver" "$cursor_proj_ver")
+                    elif [ -n "$cursor_user_ver" ]; then
+                        target_scope="user"
                     else
-                        print_step "Cursor Skills 업데이트 중..."
-                        cp -r "$skills_src/"* .cursor/skills/ 2>/dev/null
-                        _write_cursor_skills_meta
-                        print_success "Cursor Skills 업데이트 완료"
+                        target_scope="project"
+                    fi
+                    local src
+                    src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+                    if [ -z "$src" ]; then
+                        print_warning "사용 가능한 소스가 없습니다."
+                    else
+                        _do_cursor_skills_copy "$target_scope" "$src"
                     fi
                     ;;
                 2)
-                    _remove_cursor_skills
+                    # 신규 설치: scope 자유 선택 (다른 scope에 추가)
+                    local target_scope
+                    target_scope=$(_ask_cursor_scope "" "")
+                    local src
+                    src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+                    if [ -z "$src" ]; then
+                        print_warning "사용 가능한 소스가 없습니다."
+                    else
+                        _do_cursor_skills_copy "$target_scope" "$src"
+                    fi
+                    ;;
+                3)
+                    _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
                     ;;
                 *)
                     print_info "Cursor Skills 변경 없이 건너뜁니다"
                     ;;
             esac
         else
-            # FORCE 모드: 소스가 있으면 업데이트
-            if [ -n "$skills_src" ]; then
-                cp -r "$skills_src/"* .cursor/skills/ 2>/dev/null
-                _write_cursor_skills_meta
-                print_success "Cursor Skills 업데이트 완료 (FORCE)"
-            fi
+            # FORCE 모드: project scope, 원격 우선
+            local src="${skills_src_remote:-$skills_src_local}"
+            [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     else
-        # 미설치 → 설치 여부 확인
+        # 미설치 → 설치
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user ""
             print_to_user "Cursor IDE Skills를 설치하시겠습니까?"
-            print_to_user "  설치 시 Cursor에서 /analyze, /review 등 20개 스킬 사용 가능"
-            print_to_user "  (Cursor는 마켓플레이스 미지원 - 파일을 .cursor/skills/에 직접 복사)"
+            print_to_user "  /analyze, /review 등 20개 스킬 사용 가능 (마켓플레이스 미지원 — 파일 직접 복사)"
             print_to_user ""
             print_to_user "  Y/y - 예, 설치하기 (추천)"
             print_to_user "  N/n - 아니오, 건너뛰기"
             print_to_user ""
 
             if ask_yes_no "선택: " "Y"; then
-                if [ -z "$skills_src" ]; then
-                    print_warning "템플릿 소스를 찾을 수 없습니다. 건너뜁니다."
+                local target_scope
+                target_scope=$(_ask_cursor_scope "" "")
+                local src
+                src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+                if [ -z "$src" ]; then
+                    print_warning "사용 가능한 소스가 없습니다. 건너뜁니다."
                 else
-                    print_step "Cursor Skills 설치 중..."
-                    mkdir -p .cursor/skills
-                    if cp -r "$skills_src/"* .cursor/skills/ 2>/dev/null; then
-                        _write_cursor_skills_meta
-                        print_success "Cursor Skills 설치 완료 (.cursor/skills/)"
-                    else
-                        print_warning "Cursor Skills 복사 실패"
-                    fi
+                    _do_cursor_skills_copy "$target_scope" "$src"
                 fi
             else
                 print_info "Cursor Skills 설치 건너뜁니다"
             fi
         else
-            # FORCE 모드
-            if [ -n "$skills_src" ]; then
-                mkdir -p .cursor/skills
-                cp -r "$skills_src/"* .cursor/skills/ 2>/dev/null
-                _write_cursor_skills_meta
-                print_success "Cursor Skills 설치 완료 (FORCE)"
-            fi
+            # FORCE 모드: project scope, 원격 우선
+            local src="${skills_src_remote:-$skills_src_local}"
+            [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     fi
 }
@@ -2626,24 +2667,23 @@ _remove_claude_plugin_data() {
     if [ -d "$data_dir" ]; then
         rm -rf "$data_dir" 2>/dev/null
         print_success "플러그인 데이터(config) 삭제 완료"
-    else
-        print_info "삭제할 플러그인 데이터 없음 (정상)"
     fi
+    # data 디렉토리가 없는 경우는 정상 — 별도 메시지 불필요
 }
 
 # ─── Cursor 헬퍼 ────────────────────────────────────────────────
 
-# .cursor/skills/cursor-skills-meta.json 생성/갱신
-# 템플릿 버전·설치 경로를 기록해두어 이후 업데이트·삭제에 활용한다.
+# cursor-skills-meta.json 생성/갱신
+# 인자: $1=scope(user|project, 생략 시 project), $2=설치경로(생략 시 .cursor/skills)
 _write_cursor_skills_meta() {
+    local scope="${1:-project}"
+    local dest_dir="${2:-.cursor/skills}"
     local version="${TEMPLATE_VERSION:-unknown}"
-    local install_path
-    install_path=$(pwd)
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%SZ")
-    local meta_file=".cursor/skills/cursor-skills-meta.json"
+    local meta_file="${dest_dir}/cursor-skills-meta.json"
 
-    # 업데이트 시 installedAt 기존 값 보존 (최초 설치 시각 유지)
+    # 업데이트 시 installedAt 기존 값 보존
     local installed_at="$timestamp"
     if [ -f "$meta_file" ]; then
         local existing
@@ -2651,13 +2691,14 @@ _write_cursor_skills_meta() {
         [ -n "$existing" ] && installed_at="$existing"
     fi
 
-    mkdir -p .cursor/skills
+    mkdir -p "$dest_dir"
     cat > "$meta_file" <<EOF
 {
   "name": "cassiiopeia",
   "version": "${version}",
+  "scope": "${scope}",
   "source": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
-  "installPath": "${install_path}/.cursor/skills",
+  "installPath": "${dest_dir}",
   "installedAt": "${installed_at}",
   "lastUpdated": "${timestamp}"
 }
@@ -2672,6 +2713,155 @@ _remove_cursor_skills() {
     else
         print_info "삭제할 Cursor Skills 없음"
     fi
+}
+
+# Cursor scope 선택 (user / project)
+# 인자: $1=현재 user 버전(없으면 빈 문자열), $2=현재 project 버전
+_ask_cursor_scope() {
+    local user_ver="$1"
+    local proj_ver="$2"
+    print_to_user ""
+    print_to_user "설치 scope를 선택하세요:"
+    if [ -n "$user_ver" ]; then
+        print_to_user "  1 - user    (모든 프로젝트 공통, ~/.cursor/skills/)  현재: v${user_ver}"
+    else
+        print_to_user "  1 - user    (모든 프로젝트 공통, ~/.cursor/skills/)"
+    fi
+    if [ -n "$proj_ver" ]; then
+        print_to_user "  2 - project (현재 프로젝트 전용, .cursor/skills/)   현재: v${proj_ver}"
+    else
+        print_to_user "  2 - project (현재 프로젝트 전용, .cursor/skills/)"
+    fi
+    print_to_user ""
+
+    local scope_choice
+    if [ -c /dev/tty ]; then
+        read -r scope_choice < /dev/tty
+    else
+        read -r scope_choice
+    fi
+
+    case "$scope_choice" in
+        1) echo "user" ;;
+        *) echo "project" ;;
+    esac
+}
+
+# Cursor Skills 실제 복사 실행
+# 인자: $1=scope(user|project), $2=소스경로, $3=force(선택)
+_do_cursor_skills_copy() {
+    local scope="$1"
+    local src="$2"
+    local dest
+    if [ "$scope" = "user" ]; then
+        dest="${HOME}/.cursor/skills"
+    else
+        dest=".cursor/skills"
+    fi
+
+    print_step "Cursor Skills 복사 중 (scope: ${scope})..."
+    mkdir -p "$dest"
+    if cp -r "$src/"* "$dest/" 2>/dev/null; then
+        _write_cursor_skills_meta "$scope" "$dest"
+        print_success "Cursor Skills 완료 (scope: ${scope}, 경로: ${dest}/)"
+    else
+        print_warning "Cursor Skills 복사 실패"
+    fi
+}
+
+# Cursor Skills 삭제 (scope 선택)
+# 인자: $1=현재 user 버전, $2=현재 project 버전
+_ask_cursor_delete() {
+    local user_ver="$1"
+    local proj_ver="$2"
+
+    print_to_user "삭제할 scope를 선택하세요:"
+    [ -n "$user_ver" ]  && print_to_user "  1 - user    (~/.cursor/skills/)  v${user_ver}"
+    [ -n "$proj_ver" ]  && print_to_user "  2 - project (.cursor/skills/)    v${proj_ver}"
+    [ -n "$user_ver" ] && [ -n "$proj_ver" ] && print_to_user "  3 - 모두 삭제"
+    print_to_user "  0 - 취소"
+    print_to_user ""
+
+    local del_choice
+    if [ -c /dev/tty ]; then
+        read -r del_choice < /dev/tty
+    else
+        read -r del_choice
+    fi
+
+    case "$del_choice" in
+        1)
+            if [ -n "$user_ver" ]; then
+                print_info "삭제 대상: ~/.cursor/skills/ (v${user_ver})"
+                rm -rf "${HOME}/.cursor/skills" 2>/dev/null
+                print_success "user scope Cursor Skills 삭제 완료"
+            else
+                print_warning "user scope에 설치된 Skills 없음"
+            fi
+            ;;
+        2)
+            if [ -n "$proj_ver" ]; then
+                print_info "삭제 대상: .cursor/skills/ (v${proj_ver})"
+                rm -rf ".cursor/skills" 2>/dev/null
+                print_success "project scope Cursor Skills 삭제 완료"
+            else
+                print_warning "project scope에 설치된 Skills 없음"
+            fi
+            ;;
+        3)
+            if [ -n "$user_ver" ] && [ -n "$proj_ver" ]; then
+                print_info "삭제 대상: ~/.cursor/skills/ (v${user_ver}), .cursor/skills/ (v${proj_ver})"
+                rm -rf "${HOME}/.cursor/skills" ".cursor/skills" 2>/dev/null
+                print_success "모든 Cursor Skills 삭제 완료"
+            else
+                print_warning "잘못된 선택입니다"
+            fi
+            ;;
+        *)
+            print_info "삭제 취소"
+            ;;
+    esac
+}
+
+# Cursor Skills 복사 소스 선택 (원격/로컬 가용 여부에 따라 메뉴 구성)
+# 인자: $1=원격소스경로, $2=로컬소스경로
+# stdout으로 선택된 경로 반환, 없으면 빈 문자열
+_ask_cursor_skills_src() {
+    local remote_src="$1"
+    local local_src="$2"
+
+    # 선택지가 하나뿐이면 바로 반환
+    if [ -n "$remote_src" ] && [ -z "$local_src" ]; then
+        echo "$remote_src"
+        return
+    fi
+    if [ -z "$remote_src" ] && [ -n "$local_src" ]; then
+        echo "$local_src"
+        return
+    fi
+    if [ -z "$remote_src" ] && [ -z "$local_src" ]; then
+        echo ""
+        return
+    fi
+
+    # 양쪽 다 있을 때만 사용자에게 선택 요청
+    print_to_user ""
+    print_to_user "설치 소스를 선택하세요:"
+    print_to_user "  1 - 원격 최신 (repo에서 다운로드, 추천)"
+    print_to_user "  2 - 로컬 (현재 디렉토리 skills/ 폴더)"
+    print_to_user ""
+
+    local src_choice
+    if [ -c /dev/tty ]; then
+        read -r src_choice < /dev/tty
+    else
+        read -r src_choice
+    fi
+
+    case "$src_choice" in
+        2) echo "$local_src" ;;
+        *) echo "$remote_src" ;;
+    esac
 }
 
 # 완료 요약

@@ -173,15 +173,22 @@ GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli conf
 | `test` | 테스트 추가/수정 |
 
 **예시**:
+
+이슈 제목이 `⚙️[기능추가][Skills] commit 스킬 신규 추가`인 경우, SUH-ISSUE-HELPER가 생성하는 커밋 템플릿은 이모지+태그를 제거한 순수 내용만 사용한다:
+
 ```
-⚙️[기능추가][Skills] commit 스킬 신규 생성 : feat : 이슈 컨텍스트 기반 커밋 메시지 자동 생성 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
+commit 스킬 신규 추가 : feat : 이슈 컨텍스트 기반 커밋 메시지 자동 생성 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
+commit 스킬 신규 추가 : docs : common-rules 커밋 컨벤션 예시 수정 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
+commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
 ```
 
-**규칙**:
+**핵심 규칙**:
+- `{이슈제목}`은 SUH-ISSUE-HELPER가 생성한 커밋 템플릿의 앞부분을 **그대로** 사용한다 — 이모지+태그(`⚙️[기능추가][Skills]`)는 포함하지 않는다
+- `{타입}`은 **이번 커밋의 변경 내용**에 따라 결정한다 — `feat`가 기본값이지만 항상 feat가 아니다
+- 같은 이슈에 여러 커밋을 할 때 타입이 달라질 수 있다 (feat → fix → docs 순서로 커밋 가능)
 - 이슈 컨텍스트가 있을 때만 이 형식을 사용한다
 - 이슈와 무관한 커밋(hotfix, 설정 변경 등)은 자유 형식 허용
 - 사용자가 `/commit` 스킬을 호출하면 이 형식으로 자동 완성
-- 사용자가 직접 커밋하는 경우 강제하지 않는다
 
 커밋 템플릿 조회:
 ```bash

@@ -110,16 +110,19 @@ $ARGUMENTS
 
 ### 4단계: 로컬 파일 먼저 저장
 
-**파일 위치**: `.issue/[YYYYMMDD]_#[번호]_[제목].md`
+`references/doc-output-path.md` 규칙을 따른다.
 
-- 날짜: 오늘 날짜 (YYYYMMDD)
-- 번호: `.issue/` 폴더 내 기존 파일 개수 + 1 (3자리, 예: #001)
-- 파일 첫 줄에 이슈 제목을 `# ` 헤딩으로 작성
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path issue --title "{이슈 제목}"
+```
+
+반환된 경로(`docs/suh-template/issue/YYYYMMDD_번호_제목.md`)에 파일을 저장한다.
 
 파일 저장 후 **반드시 사용자에게 파일 경로를 알리고 내용을 확인받는다**:
 
 ```
-이슈 파일을 생성했습니다: .issue/20260419_#001_제목.md
+이슈 파일을 생성했습니다: docs/suh-template/issue/20260419_222_제목.md
 
 제목: ⚙️[기능추가][Skills] issue 스킬 GitHub API 연동
 라벨: 작업전
@@ -147,7 +150,7 @@ GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli conf
 
 반환 JSON에서 `number`와 `url`을 추출한다.
 
-등록 완료 후 로컬 파일명을 실제 이슈 번호로 업데이트한다 (임시 번호 → 실제 번호).
+반환된 실제 이슈 번호로 로컬 파일을 `get-output-path issue --title "{제목}"` 재호출 없이, 파일명의 번호 부분만 실제 번호로 rename한다.
 
 ### 6단계: 브랜치명 즉시 계산
 
@@ -177,4 +180,4 @@ PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli create-branch-nam
 
 ## 산출물 저장
 
-`.issue/` 폴더에 저장 (Step 4에서 처리). 별도로 `get-output-path`를 호출할 필요 없다.
+`references/doc-output-path.md` 규칙을 따른다. `get-output-path issue` 커맨드로 경로를 받아 `docs/suh-template/issue/` 하위에 저장한다 (Step 4에서 처리).

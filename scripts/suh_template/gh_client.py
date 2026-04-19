@@ -105,6 +105,22 @@ def list_issues(
     ]
 
 
+def list_pulls(
+    owner: str, repo: str, pat: str, state: str = "open",
+) -> list[dict]:
+    """PR 목록을 조회한다."""
+    items = _request(
+        "GET",
+        f"{_API_BASE}/repos/{owner}/{repo}/pulls?state={state}&per_page=50",
+        None,
+        pat,
+    )
+    return [
+        {"number": i["number"], "title": i["title"], "url": i["html_url"], "state": i["state"]}
+        for i in items
+    ]
+
+
 def create_pull_request(
     owner: str, repo: str, title: str, body: str,
     head: str, base: str, pat: str,

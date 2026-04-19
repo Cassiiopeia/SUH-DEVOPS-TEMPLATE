@@ -324,6 +324,31 @@ def cmd_create_pr(args: list) -> int:
         return 1
 
 
+def cmd_list_prs(args: list) -> int:
+    """list-prs <owner> <repo> [--state open|closed|all]"""
+    if len(args) < 2:
+        _err("ERROR", "list-prs", "owner, repo 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "list-prs", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo = args[0], args[1]
+    state = "open"
+    if "--state" in args:
+        idx = args.index("--state")
+        if idx + 1 < len(args):
+            state = args[idx + 1]
+    try:
+        result = _github.list_pulls(owner, repo, pat, state)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "list-prs", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
 # 커맨드 → 핸들러 함수 매핑
 _COMMANDS = {
     "get-output-path": cmd_get_output_path,
@@ -337,6 +362,7 @@ _COMMANDS = {
     "add-comment": cmd_add_comment,
     "get-issue": cmd_get_issue,
     "create-pr": cmd_create_pr,
+    "list-prs": cmd_list_prs,
 }
 
 

@@ -609,6 +609,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 + 커밋 |
 | `github` | GitHub 이슈/PR 조회·댓글·PR 생성 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
+| `changelogfix` | deploy PR automerge 실패 시 릴리스 노트 수동 작성 + PR 머지 |
 
 **버전 동기화**: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 `plugin.json`, `marketplace.json` 버전을 자동 동기화
 

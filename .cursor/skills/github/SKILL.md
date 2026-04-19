@@ -47,6 +47,20 @@ GITHUB_PAT={pat} python3 -m suh_template.cli get-issue {owner} {repo} {이슈번
 URL: https://github.com/owner/repo/issues/427
 ```
 
+### 이슈 수정
+
+제목, 상태(open/closed), 라벨, 담당자 변경 가능:
+
+```bash
+GITHUB_PAT={pat} python3 -m suh_template.cli update-issue {owner} {repo} {이슈번호} \
+  --title "새 제목" \
+  --state closed \
+  --labels "작업중" \
+  --assignees "Cassiiopeia"
+```
+
+변경할 항목만 옵션으로 전달하면 된다. 나머지는 기존 값 유지.
+
 ### 이슈에 댓글 추가
 
 사용자가 댓글 내용을 주면 임시 파일에 저장 후 포스팅한다:

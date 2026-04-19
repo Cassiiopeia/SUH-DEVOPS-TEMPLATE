@@ -287,6 +287,41 @@ def cmd_add_comment(args: list) -> int:
         return 1
 
 
+def cmd_update_issue(args: list) -> int:
+    """update-issue <owner> <repo> <issue_number> [--title <제목>] [--state open|closed] [--labels <csv>] [--assignees <csv>]"""
+    if len(args) < 3:
+        _err("ERROR", "update-issue", "owner, repo, issue_number 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "update-issue", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo, issue_number = args[0], args[1], int(args[2])
+    rest = args[3:]
+
+    def _opt(key: str) -> Optional[str]:
+        if key in rest:
+            idx = rest.index(key)
+            return rest[idx + 1] if idx + 1 < len(rest) else None
+        return None
+
+    title = _opt("--title")
+    state = _opt("--state")
+    labels_csv = _opt("--labels")
+    assignees_csv = _opt("--assignees")
+    labels = [l.strip() for l in labels_csv.split(",") if l.strip()] if labels_csv else None
+    assignees = [a.strip() for a in assignees_csv.split(",") if a.strip()] if assignees_csv else None
+    try:
+        result = _github.update_issue(owner, repo, issue_number, pat,
+                                      title=title, state=state, labels=labels, assignees=assignees)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "update-issue", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
 def cmd_get_issue(args: list) -> int:
     """get-issue <owner> <repo> <issue_number>"""
     if len(args) < 3:
@@ -365,6 +400,7 @@ _COMMANDS = {
     "create-issue": cmd_create_issue,
     "add-comment": cmd_add_comment,
     "get-issue": cmd_get_issue,
+    "update-issue": cmd_update_issue,
     "create-pr": cmd_create_pr,
     "list-prs": cmd_list_prs,
 }

@@ -57,6 +57,28 @@ def create_issue(
     return {"number": data["number"], "url": data["html_url"], "title": data["title"]}
 
 
+def update_issue(
+    owner: str, repo: str, issue_number: int, pat: str,
+    title: str | None = None, body: str | None = None,
+    state: str | None = None, labels: list[str] | None = None,
+    assignees: list[str] | None = None,
+) -> dict:
+    """이슈를 수정하고 {number, url, title}을 반환한다."""
+    payload: dict = {}
+    if title is not None:
+        payload["title"] = title
+    if body is not None:
+        payload["body"] = body
+    if state is not None:
+        payload["state"] = state
+    if labels is not None:
+        payload["labels"] = labels
+    if assignees is not None:
+        payload["assignees"] = assignees
+    data = _request("PATCH", f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}", payload, pat)
+    return {"number": data["number"], "url": data["html_url"], "title": data["title"]}
+
+
 def add_comment(
     owner: str, repo: str, issue_number: int, body: str, pat: str,
 ) -> dict:

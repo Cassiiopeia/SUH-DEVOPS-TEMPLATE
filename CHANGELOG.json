@@ -1,11 +1,29 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-19T14:31:15Z",
-    "currentVersion": "2.9.14",
+    "lastUpdated": "2026-04-19T15:08:03Z",
+    "currentVersion": "2.9.15",
     "projectType": "basic",
-    "totalReleases": 72
+    "totalReleases": 73
   },
   "releases": [
+    {
+      "version": "2.9.15",
+      "project_type": "basic",
+      "date": "2026-04-19",
+      "pr_number": 226,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **기타**\n\n  * 📄[문서][README/Docs] SUH-DEVOPS-TEMPLATE 전체 문서 개편 및 프로젝트 가치 재정의 : chore : 통합 스크립트 docs/suh-template gitignore 제거 + 이슈 파일 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/227\n  * 📄[문서][README/Docs] SUH-DEVOPS-TEMPLATE 전체 문서 개편 및 프로젝트 가치 재정의 : docs : README 재구성·가치 어필 강화, SKILLS.md /commit 스킬 추가 및 개발 사이클 플로우 업데이트 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/227\n  * ⚙️[기능개선][Skills] commit 스킬 superpowers 원칙 준수 개선 : feat : commit 스킬 신규 생성, docs/suh-template 공개 전환, 커밋 컨벤션·민감정보 마스킹 규칙 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/225\n\n> 💡 더 정확한 릴리스 노트를 원한다면 Claude Code에서 `/github` 스킬로 PR 릴리스 노트를 업데이트할 수 있습니다.",
+      "parsed_changes": {
+        "기타": {
+          "title": "기타",
+          "items": [
+            "📄[문서][README/Docs] SUH-DEVOPS-TEMPLATE 전체 문서 개편 및 프로젝트 가치 재정의 : chore : 통합 스크립트 docs/suh-template gitignore 제거 + 이슈 파일 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/227",
+            "📄[문서][README/Docs] SUH-DEVOPS-TEMPLATE 전체 문서 개편 및 프로젝트 가치 재정의 : docs : README 재구성·가치 어필 강화, SKILLS.md /commit 스킬 추가 및 개발 사이클 플로우 업데이트 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/227",
+            "⚙️[기능개선][Skills] commit 스킬 superpowers 원칙 준수 개선 : feat : commit 스킬 신규 생성, docs/suh-template 공개 전환, 커밋 컨벤션·민감정보 마스킹 규칙 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/225"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.14",
       "project_type": "basic",

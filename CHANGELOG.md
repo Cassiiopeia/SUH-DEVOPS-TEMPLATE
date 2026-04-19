@@ -1,7 +1,18 @@
 # Changelog
 
-**현재 버전:** 2.9.14  
-**마지막 업데이트:** 2026-04-19T14:31:15Z  
+**현재 버전:** 2.9.15  
+**마지막 업데이트:** 2026-04-19T15:08:03Z  
+
+---
+
+## [2.9.15] - 2026-04-19
+
+**PR:** #226  
+
+**기타**
+- 📄[문서][README/Docs] SUH-DEVOPS-TEMPLATE 전체 문서 개편 및 프로젝트 가치 재정의 : chore : 통합 스크립트 docs/suh-template gitignore 제거 + 이슈 파일 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/227
+- 📄[문서][README/Docs] SUH-DEVOPS-TEMPLATE 전체 문서 개편 및 프로젝트 가치 재정의 : docs : README 재구성·가치 어필 강화, SKILLS.md /commit 스킬 추가 및 개발 사이클 플로우 업데이트 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/227
+- ⚙️[기능개선][Skills] commit 스킬 superpowers 원칙 준수 개선 : feat : commit 스킬 신규 생성, docs/suh-template 공개 전환, 커밋 컨벤션·민감정보 마스킹 규칙 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/225
 
 ---
 

@@ -1,11 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-19T15:08:03Z",
-    "currentVersion": "2.9.15",
+    "lastUpdated": "2026-04-19T15:29:51Z",
+    "currentVersion": "2.9.18",
     "projectType": "basic",
-    "totalReleases": 73
+    "totalReleases": 74
   },
   "releases": [
+    {
+      "version": "2.9.18",
+      "project_type": "basic",
+      "date": "2026-04-19",
+      "pr_number": 229,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * `deploy` 스킬 추가 — main push 후 deploy PR 자동 생성, 릴리스 노트 즉시 작성으로 CodeRabbit 10분 대기 없이 automerge 진행\n  * `changelogfix` 스킬 추가 — deploy PR automerge 실패 시 PR 재생성으로 워크플로우 재트리거하는 복구용 스킬\n\n* **개선**\n  * `common-rules.md`에 AI 행동 강제 원칙 추가 — 확인 없는 커밋/이슈생성 금지, 이슈 이모지 컨벤션 명문화, 이슈 등록 순서 강제",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "`deploy` 스킬 추가 — main push 후 deploy PR 자동 생성, 릴리스 노트 즉시 작성으로 CodeRabbit 10분 대기 없이 automerge 진행",
+            "`changelogfix` 스킬 추가 — deploy PR automerge 실패 시 PR 재생성으로 워크플로우 재트리거하는 복구용 스킬"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "`common-rules.md`에 AI 행동 강제 원칙 추가 — 확인 없는 커밋/이슈생성 금지, 이슈 이모지 컨벤션 명문화, 이슈 등록 순서 강제"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.15",
       "project_type": "basic",

@@ -88,6 +88,74 @@ GITHUB_PAT={pat} python3 -m suh_template.cli list-prs {owner} {repo}
 # 닫힌 PR 포함: --state closed 또는 --state all
 ```
 
+### PR 릴리스 노트 업데이트 (CodeRabbit 폴백)
+
+deploy PR에 CodeRabbit Summary가 없을 때 Claude Code가 직접 커밋을 분석하여 한국어 릴리스 노트를 작성하고 PR 본문에 업데이트한다.
+
+"릴리스 노트 업데이트해줘", "changelog 폴백", "PR 본문 업데이트" 등의 요청 시 실행.
+
+**절차**:
+
+1. PR 번호 확인 (사용자 입력 또는 최근 deploy PR 자동 조회)
+
+```bash
+GITHUB_PAT={pat} python3 -m suh_template.cli list-prs {owner} {repo} --state open
+```
+
+2. deploy 브랜치 대비 커밋 목록 수집
+
+```bash
+git fetch origin deploy 2>/dev/null || true
+git log origin/deploy..HEAD --pretty=format:"%H %s" | grep -v "\[skip ci\]" | head -60
+```
+
+3. 커밋 메시지를 분석하여 한국어 릴리스 노트 작성
+
+   - `feat:` → 새 기능
+   - `fix:` → 버그 수정
+   - `refactor:` / `perf:` / `style:` → 개선
+   - `docs:` → 문서
+   - 나머지 → 기타
+   - 커밋 메시지를 그대로 쓰지 말고 사용자가 이해하기 쉬운 한국어 문장으로 재작성
+
+4. PR 본문을 다음 형식으로 작성 후 `/tmp/pr_release_notes.md`에 저장:
+
+```markdown
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+
+## Summary by CodeRabbit
+
+## 릴리스 노트
+
+* **새 기능**
+  * (항목)
+
+* **버그 수정**
+  * (항목)
+
+* **개선**
+  * (항목)
+
+* **문서**
+  * (항목)
+
+<!-- end of auto-generated comment: release notes by coderabbit.ai -->
+```
+
+5. PR 본문 업데이트
+
+```bash
+GITHUB_PAT={pat} python3 -m suh_template.cli update-pr-body {owner} {repo} {pr_number} /tmp/pr_release_notes.md
+```
+
+> `update-pr-body` 커맨드가 없는 경우 GitHub API 직접 호출:
+> ```bash
+> BODY=$(cat /tmp/pr_release_notes.md | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+> curl -s -H "Authorization: token {pat}" -H "Content-Type: application/json" \
+>      -X PATCH -d "{\"body\": $BODY}" \
+>      "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
+> ```
+
 ## 오류 처리
 
 | 오류 코드 | 의미 | 대응 |

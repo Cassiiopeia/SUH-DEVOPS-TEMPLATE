@@ -184,9 +184,9 @@ jobs:
           path: pr_body.md
           retention-days: 1
 
-  # Job 1-B: CodeRabbit 폴백 — rate limit 등으로 Summary 없을 때 커밋 분석으로 대체
+  # Job 1-B: CodeRabbit 폴백 — rate limit 등으로 Summary 없을 때 커밋 분석으로 릴리스 노트 자동 생성
   fallback-summary:
-    name: AI 폴백 릴리스 노트 생성
+    name: 커밋 분석으로 릴리스 노트 생성
     runs-on: ubuntu-latest
     needs: detect-and-parse
     if: needs.detect-and-parse.outputs.summary_found == 'false'
@@ -200,45 +200,49 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch || 'main' }}
 
-      - name: 커밋 분석 및 릴리스 노트 생성
+      - name: 커밋 분석으로 릴리스 노트 생성
         id: generate
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
-          VERSION="${{ needs.detect-and-parse.outputs.version }}"
 
-          echo "🤖 CodeRabbit 폴백: 커밋 분석으로 릴리스 노트 생성 중..."
+          echo "🔍 커밋 분석으로 릴리스 노트 생성 중..."
 
-          # deploy 브랜치 대비 변경된 커밋 목록 수집
+          # deploy 브랜치 대비 커밋 목록 수집 ([skip ci] 제외)
           git fetch origin deploy 2>/dev/null || true
-          COMMITS=$(git log origin/deploy..HEAD --pretty=format:"%s" 2>/dev/null | grep -v "\[skip ci\]" | head -50)
+          COMMITS=$(git log origin/deploy..HEAD --pretty=format:"%s" 2>/dev/null | grep -v "\[skip ci\]" | head -60)
 
           if [ -z "$COMMITS" ]; then
-            # deploy 브랜치가 없으면 최근 30개 커밋 사용
             COMMITS=$(git log --pretty=format:"%s" -30 | grep -v "\[skip ci\]")
           fi
 
-          echo "📋 분석할 커밋 수: $(echo "$COMMITS" | wc -l)"
+          COMMIT_COUNT=$(echo "$COMMITS" | wc -l | tr -d ' ')
+          echo "📋 분석할 커밋 수: $COMMIT_COUNT"
 
-          # 커밋 메시지를 카테고리별로 분류
-          FEATURES=""
-          FIXES=""
-          DOCS=""
-          REFACTORS=""
-          CHORES=""
+          # 커밋 메시지를 prefix 기준으로 분류
+          FEAT_ITEMS=""
+          FIX_ITEMS=""
+          REFACTOR_ITEMS=""
+          DOCS_ITEMS=""
+          ETC_ITEMS=""
 
           while IFS= read -r line; do
             [ -z "$line" ] && continue
-            case "$line" in
-              feat:*|"feat("*)   FEATURES="$FEATURES\n  * ${line#feat: }" ;;
-              fix:*|"fix("*)     FIXES="$FIXES\n  * ${line#fix: }" ;;
-              docs:*|"docs("*)   DOCS="$DOCS\n  * ${line#docs: }" ;;
-              refactor:*|"refactor("*) REFACTORS="$REFACTORS\n  * ${line#refactor: }" ;;
-              chore:*|"chore("*) CHORES="$CHORES\n  * ${line#chore: }" ;;
-              *)                 CHORES="$CHORES\n  * $line" ;;
+            # prefix 추출 (feat:, fix:, refactor:, docs:, chore:, style:, test: 등)
+            PREFIX=$(echo "$line" | grep -oE '^(feat|fix|refactor|docs|chore|style|test|perf|ci|build|revert)(\([^)]*\))?:' | head -1)
+            # prefix 이후 메시지 추출
+            MSG=$(echo "$line" | sed 's/^[a-z]*([^)]*): *//' | sed 's/^[a-z]*: *//' | sed 's/^ *//')
+            [ -z "$MSG" ] && MSG="$line"
+
+            case "$PREFIX" in
+              feat*)   FEAT_ITEMS="$FEAT_ITEMS\n  * $MSG" ;;
+              fix*)    FIX_ITEMS="$FIX_ITEMS\n  * $MSG" ;;
+              refactor*|style*|perf*) REFACTOR_ITEMS="$REFACTOR_ITEMS\n  * $MSG" ;;
+              docs*)   DOCS_ITEMS="$DOCS_ITEMS\n  * $MSG" ;;
+              *)       ETC_ITEMS="$ETC_ITEMS\n  * $MSG" ;;
             esac
           done <<< "$COMMITS"
 
-          # CodeRabbit 형식과 동일한 구조로 PR 본문 작성
+          # 릴리스 노트 마크다운 조립
           {
             echo "<!-- This is an auto-generated comment: release notes by coderabbit.ai -->"
             echo ""
@@ -246,47 +250,40 @@ jobs:
             echo ""
             echo "## 릴리스 노트"
             echo ""
-
-            if [ -n "$FEATURES" ]; then
-              echo "* **New Features**"
-              printf "%b\n" "$FEATURES"
+            if [ -n "$FEAT_ITEMS" ]; then
+              echo "* **새 기능**"
+              printf "%b\n" "$FEAT_ITEMS"
               echo ""
             fi
-
-            if [ -n "$FIXES" ]; then
-              echo "* **Bug Fixes**"
-              printf "%b\n" "$FIXES"
+            if [ -n "$FIX_ITEMS" ]; then
+              echo "* **버그 수정**"
+              printf "%b\n" "$FIX_ITEMS"
               echo ""
             fi
-
-            if [ -n "$REFACTORS" ]; then
-              echo "* **Improvements**"
-              printf "%b\n" "$REFACTORS"
+            if [ -n "$REFACTOR_ITEMS" ]; then
+              echo "* **개선**"
+              printf "%b\n" "$REFACTOR_ITEMS"
               echo ""
             fi
-
-            if [ -n "$DOCS" ]; then
-              echo "* **Documentation**"
-              printf "%b\n" "$DOCS"
+            if [ -n "$DOCS_ITEMS" ]; then
+              echo "* **문서**"
+              printf "%b\n" "$DOCS_ITEMS"
               echo ""
             fi
-
-            if [ -n "$CHORES" ]; then
-              echo "* **Chores**"
-              printf "%b\n" "$CHORES"
+            if [ -n "$ETC_ITEMS" ]; then
+              echo "* **기타**"
+              printf "%b\n" "$ETC_ITEMS"
               echo ""
             fi
-
+            echo "> 💡 더 정확한 릴리스 노트를 원한다면 Claude Code에서 \`/github\` 스킬로 PR 릴리스 노트를 업데이트할 수 있습니다."
+            echo ""
             echo "<!-- end of auto-generated comment: release notes by coderabbit.ai -->"
           } > pr_body.md
 
-          echo "✅ 폴백 릴리스 노트 생성 완료"
-          cat pr_body.md
+          echo "✅ 커밋 분석 릴리스 노트 생성 완료"
 
-          # PR 본문에 직접 업데이트
-          PR_BODY_CONTENT=$(cat pr_body.md)
-          ESCAPED=$(echo "$PR_BODY_CONTENT" | jq -Rs .)
-
+          # PR 본문에 업데이트
+          ESCAPED=$(cat pr_body.md | jq -Rs .)
           curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
                -H "Content-Type: application/json" \
                -X PATCH \

@@ -1,6 +1,6 @@
 ---
 name: issue
-description: "Issue Mode - GitHub 이슈 작성 전문가. 사용자의 대략적인 설명을 받아 GitHub 이슈 템플릿에 맞는 제목과 본문을 자동으로 작성하고 GitHub에 즉시 등록한다. 이슈 생성, 버그 리포트, 기능 요청, QA 요청 작성 시 사용. /issue 호출 시 사용."
+description: "Issue Mode - GitHub 이슈 작성 전문가. 사용자의 대략적인 설명을 받아 GitHub 이슈 템플릿에 맞는 제목과 본문을 자동 작성하고 로컬 파일로 저장한다. 사용자 확인 후 GitHub에 등록한다. 이슈 생성, 버그 리포트, 기능 요청, QA 요청 작성 시 사용. /issue 호출 시 사용."
 ---
 
 # Issue Mode
@@ -108,16 +108,34 @@ $ARGUMENTS
 2. 관련 코드를 탐색하여 연관 파일 경로 포함
 3. 템플릿 형식에 맞춰 본문 작성
 
-### 4단계: 제목 확인
+### 4단계: 로컬 파일 먼저 저장
 
-생성한 이슈 제목을 사용자에게 보여주고 수정 여부를 확인한다:
+**파일 위치**: `.issue/[YYYYMMDD]_#[번호]_[제목].md`
+
+- 날짜: 오늘 날짜 (YYYYMMDD)
+- 번호: `.issue/` 폴더 내 기존 파일 개수 + 1 (3자리, 예: #001)
+- 파일 첫 줄에 이슈 제목을 `# ` 헤딩으로 작성
+
+파일 저장 후 **반드시 사용자에게 파일 경로를 알리고 내용을 확인받는다**:
 
 ```
+이슈 파일을 생성했습니다: .issue/20260419_#001_제목.md
+
 제목: ⚙️[기능추가][Skills] issue 스킬 GitHub API 연동
-이 제목으로 이슈를 생성할까요? (수정하려면 원하는 제목을 입력하세요)
+라벨: 작업전
+
+내용을 확인해주세요. GitHub에 등록할까요?
+1. 네, 등록해주세요
+2. 제목을 수정하고 싶어요
+3. 내용을 수정할게요 (파일 직접 수정 후 다시 요청)
+4. 아니요, 로컬 저장만 할게요
 ```
 
-### 5단계: GitHub 이슈 생성
+**사용자 승인 전까지 GitHub API를 절대 호출하지 않는다.**
+
+### 5단계: GitHub 이슈 생성 (사용자 승인 후)
+
+사용자가 등록을 승인한 경우에만 실행한다.
 
 GitHub 이슈 본문(`/tmp/issue_body.md`)에는 **제목 헤딩(`# ...`)과 라벨/담당자 메타 블록을 포함하지 않는다.**
 템플릿 섹션(📝현재 문제점, 🛠️해결 방안 등)만 작성한다.
@@ -129,19 +147,15 @@ GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli conf
 
 반환 JSON에서 `number`와 `url`을 추출한다.
 
+등록 완료 후 로컬 파일명을 실제 이슈 번호로 업데이트한다 (임시 번호 → 실제 번호).
+
 ### 6단계: 브랜치명 즉시 계산
 
 ```bash
 PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli create-branch-name "{이슈 제목}" {이슈번호}
 ```
 
-### 7단계: 로컬 파일 저장
-
-**파일 위치**: `.issue/[YYYYMMDD]_#[번호]_[제목].md`
-
-로컬 파일에만 첫 줄에 이슈 제목을 `# ` 헤딩으로 작성한다 (GitHub 이슈 본문과 별개).
-
-### 8단계: 다음 작업 선택지 제시
+### 7단계: 다음 작업 선택지 제시
 
 ```
 이슈 생성 완료: #{번호} — {제목}
@@ -163,4 +177,4 @@ PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli create-branch-nam
 
 ## 산출물 저장
 
-`.issue/` 폴더에 저장 (Step 7에서 처리). 별도로 `get-output-path`를 호출할 필요 없다.
+`.issue/` 폴더에 저장 (Step 4에서 처리). 별도로 `get-output-path`를 호출할 필요 없다.

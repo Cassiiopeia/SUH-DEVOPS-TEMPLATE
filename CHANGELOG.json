@@ -1,11 +1,50 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-19T15:29:51Z",
-    "currentVersion": "2.9.18",
+    "lastUpdated": "2026-04-19T16:02:28Z",
+    "currentVersion": "2.9.19",
     "projectType": "basic",
-    "totalReleases": 74
+    "totalReleases": 75
   },
   "releases": [
+    {
+      "version": "2.9.19",
+      "project_type": "basic",
+      "date": "2026-04-19",
+      "pr_number": 231,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * deploy, changelogfix 스킬 추가 — main push 후 deploy PR 생성·릴리스 노트 자동 작성·automerge까지 원스텝으로 처리\n  * Cursor Skills user/project scope 분리 설치 지원 (`~/.cursor/skills/` 또는 `.cursor/skills/`)\n  * Cursor Skills 설치 소스 선택 지원 (원격 repo 최신 버전 또는 로컬 `skills/` 폴더)\n\n* **개선**\n  * IDE Skills 통합 상태 표시 개선 — Claude Code·Cursor 각 scope별 설치 버전과 최신 여부를 설치 진입 시 한눈에 표시\n  * 삭제 시 대상 경로(플러그인 data 디렉토리 포함)를 명시적으로 출력\n  * 업데이트 메뉴에서 이미 최신 버전인 경우 \"이미 최신 — 재적용\" 레이블로 구분\n\n* **버그 수정**\n  * Synology 워크플로우 포함 여부 재질문 버그 수정 — Agent Skill 설치(모드 5) 선택 시에도 Synology 질문이 뜨던 문제 해결\n  * `_remove_claude_plugin_data` 불필요한 \"없음(정상)\" 로그 메시지 제거\n\n* **문서**\n  * common-rules 커밋 컨벤션 예시 수정 (이모지+태그 제거)",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "deploy, changelogfix 스킬 추가 — main push 후 deploy PR 생성·릴리스 노트 자동 작성·automerge까지 원스텝으로 처리",
+            "Cursor Skills user/project scope 분리 설치 지원 (`~/.cursor/skills/` 또는 `.cursor/skills/`)",
+            "Cursor Skills 설치 소스 선택 지원 (원격 repo 최신 버전 또는 로컬 `skills/` 폴더)"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "IDE Skills 통합 상태 표시 개선 — Claude Code·Cursor 각 scope별 설치 버전과 최신 여부를 설치 진입 시 한눈에 표시",
+            "삭제 시 대상 경로(플러그인 data 디렉토리 포함)를 명시적으로 출력",
+            "업데이트 메뉴에서 이미 최신 버전인 경우 \"이미 최신 — 재적용\" 레이블로 구분"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Synology 워크플로우 포함 여부 재질문 버그 수정 — Agent Skill 설치(모드 5) 선택 시에도 Synology 질문이 뜨던 문제 해결",
+            "`_remove_claude_plugin_data` 불필요한 \"없음(정상)\" 로그 메시지 제거"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "common-rules 커밋 컨벤션 예시 수정 (이모지+태그 제거)"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.18",
       "project_type": "basic",

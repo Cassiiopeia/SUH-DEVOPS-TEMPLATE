@@ -1,7 +1,30 @@
 # Changelog
 
-**현재 버전:** 2.9.18  
-**마지막 업데이트:** 2026-04-19T15:29:51Z  
+**현재 버전:** 2.9.19  
+**마지막 업데이트:** 2026-04-19T16:02:28Z  
+
+---
+
+## [2.9.19] - 2026-04-19
+
+**PR:** #231  
+
+**새 기능**
+- deploy, changelogfix 스킬 추가 — main push 후 deploy PR 생성·릴리스 노트 자동 작성·automerge까지 원스텝으로 처리
+- Cursor Skills user/project scope 분리 설치 지원 (`~/.cursor/skills/` 또는 `.cursor/skills/`)
+- Cursor Skills 설치 소스 선택 지원 (원격 repo 최신 버전 또는 로컬 `skills/` 폴더)
+
+**개선**
+- IDE Skills 통합 상태 표시 개선 — Claude Code·Cursor 각 scope별 설치 버전과 최신 여부를 설치 진입 시 한눈에 표시
+- 삭제 시 대상 경로(플러그인 data 디렉토리 포함)를 명시적으로 출력
+- 업데이트 메뉴에서 이미 최신 버전인 경우 "이미 최신 — 재적용" 레이블로 구분
+
+**버그 수정**
+- Synology 워크플로우 포함 여부 재질문 버그 수정 — Agent Skill 설치(모드 5) 선택 시에도 Synology 질문이 뜨던 문제 해결
+- `_remove_claude_plugin_data` 불필요한 "없음(정상)" 로그 메시지 제거
+
+**문서**
+- common-rules 커밋 컨벤션 예시 수정 (이모지+태그 제거)
 
 ---
 

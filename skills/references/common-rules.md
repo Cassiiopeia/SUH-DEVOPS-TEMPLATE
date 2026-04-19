@@ -45,6 +45,7 @@ GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로
 |------|--------|
 | 이슈 생성 | `create-issue <owner> <repo> <title> <body_file> <labels_csv>` |
 | 이슈 조회 | `get-issue <owner> <repo> <issue_number>` |
+| 이슈 수정 | `update-issue <owner> <repo> <issue_number> [--title] [--state] [--labels] [--assignees]` |
 | 댓글 추가 | `add-comment <owner> <repo> <issue_number> <body_file>` |
 | PR 생성 | `create-pr <owner> <repo> <title> <body_file> <head> <base>` |
 | PR 목록 조회 | `list-prs <owner> <repo> [--state open\|closed\|all]` |

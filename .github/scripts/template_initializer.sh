@@ -443,7 +443,6 @@ ensure_gitignore() {
     local required_entries=(
         "/.idea"
         "/.claude/settings.local.json"
-        "/docs/suh-template/"
     )
     
     # .gitignore가 없으면 생성
@@ -456,9 +455,6 @@ ensure_gitignore() {
 
 # Claude AI Settings
 /.claude/settings.local.json
-
-# AI 산출물 (자동 생성, 로컬 전용)
-/docs/suh-template/
 EOF
         
         print_success ".gitignore 파일 생성 완료"
@@ -503,16 +499,6 @@ EOF
         print_info "  ✓ $entry"
     done
     
-    # docs/suh-template/ 폴더가 이미 Git에 추적 중인 경우 제거
-    if printf '%s\n' "${entries_to_add[@]}" | grep -q "^/docs/suh-template/$"; then
-        if git ls-files --error-unmatch docs/suh-template >/dev/null 2>&1; then
-            print_info "docs/suh-template/ 폴더가 Git에 추적 중입니다. 추적 해제 중..."
-            if git rm -r --cached docs/suh-template >/dev/null 2>&1; then
-                print_success "docs/suh-template/ 폴더의 Git 추적이 해제되었습니다"
-            fi
-        fi
-    fi
-
     print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
 }
 

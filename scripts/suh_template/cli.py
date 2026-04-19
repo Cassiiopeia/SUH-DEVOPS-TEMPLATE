@@ -31,6 +31,8 @@ from suh_template import issue_number as _issue
 from suh_template import title as _title
 from suh_template import paths as _paths
 from suh_template import config as _config
+from suh_template import gh_branch as _branch
+from suh_template import gh_client as _github
 
 
 def _err(level: str, command: str, message: str, code: str) -> None:
@@ -212,6 +214,116 @@ def cmd_init_config(args: list) -> int:
     return 0
 
 
+def cmd_create_branch_name(args: list) -> int:
+    """create-branch-name <issue_title> <issue_number> [--date YYYYMMDD]"""
+    if len(args) < 2:
+        _err("ERROR", "create-branch-name", "issue_title과 issue_number 인수가 필요합니다.", "missing_argument")
+        return 1
+    issue_title = args[0]
+    try:
+        issue_number = int(args[1])
+    except ValueError:
+        _err("ERROR", "create-branch-name", "issue_number는 정수여야 합니다.", "invalid_argument")
+        return 1
+    # --date 옵션 파싱
+    date_val = None
+    if "--date" in args:
+        idx = args.index("--date")
+        if idx + 1 < len(args):
+            date_val = args[idx + 1]
+    print(_branch.create_branch_name(issue_title, issue_number, date_val))
+    return 0
+
+
+def _get_pat() -> Optional[str]:
+    """환경변수 GITHUB_PAT를 반환한다."""
+    return os.environ.get("GITHUB_PAT")
+
+
+def cmd_create_issue(args: list) -> int:
+    """create-issue <owner> <repo> <title> <body_file> <labels_csv>"""
+    if len(args) < 5:
+        _err("ERROR", "create-issue", "owner, repo, title, body_file, labels_csv 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "create-issue", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo, title, body_file, labels_csv = args[0], args[1], args[2], args[3], args[4]
+    body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
+    labels = [l.strip() for l in labels_csv.split(",") if l.strip()] if labels_csv else []
+    try:
+        result = _github.create_issue(owner, repo, title, body, labels, pat)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "create-issue", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
+def cmd_add_comment(args: list) -> int:
+    """add-comment <owner> <repo> <issue_number> <body_file>"""
+    if len(args) < 4:
+        _err("ERROR", "add-comment", "owner, repo, issue_number, body_file 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "add-comment", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo, issue_number, body_file = args[0], args[1], int(args[2]), args[3]
+    body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
+    try:
+        result = _github.add_comment(owner, repo, issue_number, body, pat)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "add-comment", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
+def cmd_get_issue(args: list) -> int:
+    """get-issue <owner> <repo> <issue_number>"""
+    if len(args) < 3:
+        _err("ERROR", "get-issue", "owner, repo, issue_number 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "get-issue", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo, issue_number = args[0], args[1], int(args[2])
+    try:
+        result = _github.get_issue(owner, repo, issue_number, pat)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "get-issue", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
+def cmd_create_pr(args: list) -> int:
+    """create-pr <owner> <repo> <title> <body_file> <head> <base>"""
+    if len(args) < 6:
+        _err("ERROR", "create-pr", "owner, repo, title, body_file, head, base 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "create-pr", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo, title, body_file, head, base = args[0], args[1], args[2], args[3], args[4], args[5]
+    body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
+    try:
+        result = _github.create_pull_request(owner, repo, title, body, head, base, pat)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "create-pr", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
 # 커맨드 → 핸들러 함수 매핑
 _COMMANDS = {
     "get-output-path": cmd_get_output_path,
@@ -220,6 +332,11 @@ _COMMANDS = {
     "normalize-title": cmd_normalize_title,
     "config-get": cmd_config_get,
     "init-config": cmd_init_config,
+    "create-branch-name": cmd_create_branch_name,
+    "create-issue": cmd_create_issue,
+    "add-comment": cmd_add_comment,
+    "get-issue": cmd_get_issue,
+    "create-pr": cmd_create_pr,
 }
 
 

@@ -45,11 +45,21 @@ def _request(method: str, url: str, data: dict | None, pat: str) -> Any:
         raise GitHubAPIError(e.code, msg) from e
 
 
+def list_labels(owner: str, repo: str, pat: str) -> list[str]:
+    """레포의 라벨 이름 목록을 반환한다."""
+    items = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/labels?per_page=100", None, pat)
+    return [item["name"] for item in items]
+
+
 def create_issue(
     owner: str, repo: str, title: str, body: str,
     labels: list[str], pat: str, assignees: list[str] | None = None,
 ) -> dict:
     """이슈를 생성하고 {number, url, title}을 반환한다."""
+    # 존재하지 않는 라벨은 422를 유발하므로 사전에 필터링
+    if labels:
+        existing = list_labels(owner, repo, pat)
+        labels = [l for l in labels if l in existing]
     payload: dict = {"title": title, "body": body, "labels": labels}
     if assignees:
         payload["assignees"] = assignees

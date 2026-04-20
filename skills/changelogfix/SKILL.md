@@ -40,7 +40,14 @@ $ARGUMENTS
 ### 1단계: 현재 deploy PR 상태 확인
 
 ```bash
-GH_TOKEN=$GITHUB_PAT gh pr list --repo $OWNER/$REPO --base deploy --state open --json number,title,state
+# gh CLI 사용 금지 — suh_template CLI의 list-prs 사용
+EXISTING_PRS=$(GITHUB_PAT=$GITHUB_PAT PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli list-prs $OWNER $REPO --state open)
+PR_NUMBER=$(echo "$EXISTING_PRS" | $PYTHON -c "
+import sys, json
+prs = json.load(sys.stdin)
+deploy_pr = next((p for p in prs if 'Deploy' in p.get('title','')), None)
+print(deploy_pr['number'] if deploy_pr else '')
+" 2>/dev/null)
 ```
 
 - open PR이 있으면 번호 확인
@@ -56,10 +63,11 @@ GH_TOKEN=$GITHUB_PAT gh pr list --repo $OWNER/$REPO --base deploy --state open -
 2. 취소
 ```
 
-확인 후 실행:
+확인 후 실행 (GitHub API 직접 호출로 PR 닫기):
 
 ```bash
-GH_TOKEN=$GITHUB_PAT gh pr close {pr_number} --repo $OWNER/$REPO
+GITHUB_PAT=$GITHUB_PAT PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli update-issue \
+  $OWNER $REPO {pr_number} --state closed
 ```
 
 ### 3단계: 새 deploy PR 생성
@@ -68,13 +76,9 @@ GH_TOKEN=$GITHUB_PAT gh pr close {pr_number} --repo $OWNER/$REPO
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-NEW_PR_NUMBER=$(GH_TOKEN=$GITHUB_PAT gh pr create \
-  --repo $OWNER/$REPO \
-  --base deploy \
-  --head main \
-  --title "$TITLE" \
-  --body "" \
-  --json number -q .number)
+RESULT=$(GITHUB_PAT=$GITHUB_PAT PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli create-pr \
+  $OWNER $REPO "$TITLE" /dev/null main deploy)
+NEW_PR_NUMBER=$(echo "$RESULT" | $PYTHON -c "import sys,json; print(json.load(sys.stdin)['number'])")
 
 echo "✅ PR #$NEW_PR_NUMBER 생성 완료, 릴리스 노트 작성 시작..."
 ```

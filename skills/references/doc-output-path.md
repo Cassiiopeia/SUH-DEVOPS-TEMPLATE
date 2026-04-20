@@ -9,7 +9,13 @@
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path <skill_id>
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
+  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
+else
+  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
+fi
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path <skill_id>
 ```
 
 반환값 예시:

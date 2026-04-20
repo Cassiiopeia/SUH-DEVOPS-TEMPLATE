@@ -80,7 +80,7 @@ Step 1~N: 기법 + Before/After + 테스트 확인
 
 산출물 md 저장 전:
 ```bash
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path refactor-analyze
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path refactor-analyze
 ```
 
 반환된 경로에 파일을 저장한다.

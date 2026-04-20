@@ -19,7 +19,13 @@ deploy PR automerge 실패 시 기존 PR을 닫고 새 PR을 열어 워크플로
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat)
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
+  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
+else
+  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
+fi
+GITHUB_PAT=$(PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat)
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
@@ -137,7 +143,7 @@ EOF
 PR 본문 업데이트:
 
 ```bash
-BODY=$(cat /tmp/pr_release_notes.md | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+BODY=$(cat /tmp/pr_release_notes.md | $PYTHON -c "import sys,json; print(json.dumps(sys.stdin.read()))")
 curl -s -H "Authorization: token $GITHUB_PAT" \
      -H "Content-Type: application/json" \
      -X PATCH -d "{\"body\": $BODY}" \

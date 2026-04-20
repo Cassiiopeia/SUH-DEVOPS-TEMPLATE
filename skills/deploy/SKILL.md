@@ -20,7 +20,13 @@ CodeRabbit 10분 대기 없이 스킬이 직접 릴리스 노트를 작성하므
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat)
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
+  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
+else
+  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
+fi
+GITHUB_PAT=$(PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat)
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
@@ -154,7 +160,7 @@ cat > /tmp/pr_release_notes.md << 'EOF'
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 EOF
 
-BODY=$(cat /tmp/pr_release_notes.md | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+BODY=$(cat /tmp/pr_release_notes.md | $PYTHON -c "import sys,json; print(json.dumps(sys.stdin.read()))")
 curl -s -H "Authorization: token $GITHUB_PAT" \
      -H "Content-Type: application/json" \
      -X PATCH -d "{\"body\": $BODY}" \

@@ -67,7 +67,7 @@ git status
 
 산출물 md 저장 전:
 ```bash
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path report
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path report
 ```
 
 반환된 경로에 파일을 저장한다.
@@ -80,7 +80,7 @@ PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path r
 
 1. 현재 작업 디렉토리 경로에서 추출 (worktree 경로 `YYYYMMDD_#숫자_제목` 패턴):
    ```bash
-   PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-issue-number
+   PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-issue-number
    ```
 2. `.issue/` 폴더 파일명에서 추출 (예: `.issue/20260115_#427_제목.md` → 427)
 3. git 브랜치명에서 추출
@@ -90,15 +90,15 @@ PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path r
 
 ```bash
 # 1. PAT 확인
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat
 # config_not_found이면 로컬 저장만 하고 종료
 
 # 2. repo 확인
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_repos
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_repos
 # 또는 git remote origin에서 owner/repo 추출
 
 # 3. 댓글 포스팅
-GITHUB_PAT={pat} PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli add-comment {owner} {repo} {이슈번호} {보고서파일경로}
+GITHUB_PAT={pat} PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli add-comment {owner} {repo} {이슈번호} {보고서파일경로}
 ```
 
 ### 완료 메시지

@@ -102,22 +102,46 @@
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 ```
 
-### 2. PYTHONPATH 설정
+### 2. PYTHON 변수 설정 (크로스 플랫폼 필수)
 
-`suh_template` 패키지는 `$PROJECT_ROOT/scripts/` 안에 있다. 모든 호출에 `PYTHONPATH`를 붙인다:
+Windows Git Bash에서는 `python3`가 Windows Store 링크로 연결되어 실패할 수 있다.
+반드시 아래 패턴으로 `PYTHON` 변수를 먼저 설정한 후 사용한다:
 
 ```bash
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli <command> [args]
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+```
+
+### 3. SCRIPTS_PATH 자동 탐지 및 PYTHONPATH 설정
+
+`suh_template` 패키지는 이 레포(`$PROJECT_ROOT/scripts/`)에 있거나, 플러그인으로 설치된 경우 Claude 플러그인 캐시에 있다.
+어느 환경에서도 동작하도록 반드시 아래 순서로 `SCRIPTS_PATH`를 탐지한 후 사용한다:
+
+```bash
+# 1) 로컬 scripts/ 우선 (이 레포에서 직접 실행하는 경우)
+# 2) 없으면 Claude 플러그인 캐시에서 탐색 (플러그인으로 설치된 경우)
+if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
+  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
+else
+  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
+fi
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli <command> [args]
 ```
 
 **나쁜 예 (절대 사용 금지)**:
 ```bash
-python3 -m suh_template.cli get-output-path plan   # ❌ PYTHONPATH 없음 → ModuleNotFoundError
+python3 -m suh_template.cli get-output-path plan                      # ❌ PYTHONPATH 없음
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli plan   # ❌ 플러그인 프로젝트에서 실패
 ```
 
 **좋은 예**:
 ```bash
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path plan   # ✅
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
+  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
+else
+  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
+fi
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path plan   # ✅
 ```
 
 ## GitHub 작업 원칙
@@ -137,7 +161,8 @@ GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로
 
 PAT는 항상 환경변수로 전달:
 ```bash
-GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat)
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+GITHUB_PAT=$(PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat)
 ```
 
 > `gh` CLI는 Windows/Mac 호환성 문제 및 별도 설치 필요로 사용 금지. Python 표준 라이브러리(urllib)만 사용한다.
@@ -192,7 +217,8 @@ commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https
 
 커밋 템플릿 조회:
 ```bash
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-commit-template "{이슈제목}" "{이슈URL}"
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-commit-template "{이슈제목}" "{이슈URL}"
 ```
 
 ## 민감 정보 보호

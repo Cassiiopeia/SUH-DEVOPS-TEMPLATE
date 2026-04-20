@@ -246,8 +246,16 @@ def cmd_get_commit_template(args: list) -> int:
 
 
 def _get_pat() -> Optional[str]:
-    """환경변수 GITHUB_PAT를 반환한다."""
-    return os.environ.get("GITHUB_PAT")
+    """GITHUB_PAT를 반환한다. 환경변수 우선, 없으면 config 파일에서 자동 로드."""
+    pat = os.environ.get("GITHUB_PAT")
+    if pat:
+        return pat
+    # 환경변수에 없으면 config 파일에서 폴백 로드
+    project_root = _get_project_root()
+    try:
+        return _config.get_value(project_root, "issue", "github_pat")
+    except Exception:
+        return None
 
 
 def cmd_create_issue(args: list) -> int:

@@ -9,7 +9,8 @@
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-output-path <skill_id>
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli get-output-path <skill_id>
 ```
 
 반환값 예시:

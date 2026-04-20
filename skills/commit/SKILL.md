@@ -29,6 +29,7 @@ $ARGUMENTS
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
 ```
 
 ### 2단계: staged 변경사항 확인
@@ -79,8 +80,8 @@ CONTEXT_FILE="$PROJECT_ROOT/.suh-template/context/current-issue.json"
   REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
   OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
   REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
-  GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli config-get issue github_pat)
-  GITHUB_PAT=$GITHUB_PAT PYTHONPATH="$PROJECT_ROOT/scripts" python3 -m suh_template.cli get-issue "$OWNER" "$REPO" {issue_number}
+  GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli config-get issue github_pat)
+  GITHUB_PAT=$GITHUB_PAT PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli get-issue "$OWNER" "$REPO" {issue_number}
   ```
 - **3 선택**: 커밋 메시지 직접 입력받아 5단계로 진행 (이슈 형식 없이)
 - **4 선택**: 종료

@@ -1,11 +1,37 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-20T11:45:14Z",
-    "currentVersion": "2.9.21",
+    "lastUpdated": "2026-04-20T11:50:06Z",
+    "currentVersion": "2.9.22",
     "projectType": "basic",
-    "totalReleases": 76
+    "totalReleases": 77
   },
   "releases": [
+    {
+      "version": "2.9.22",
+      "project_type": "basic",
+      "date": "2026-04-20",
+      "pr_number": 239,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 플러그인으로 설치된 프로젝트에서 `suh_template` 모듈을 못 찾는 문제 수정 — SCRIPTS_PATH 자동 탐지 로직 추가 (로컬 scripts/ 우선, 없으면 Claude 플러그인 캐시에서 탐색)\n  * `create-issue` 호출 시 존재하지 않는 라벨 전달로 GitHub API 422 에러 발생 문제 수정 — 이슈 생성 전 레포 라벨 목록 사전 조회 및 필터링\n  * `deploy`·`changelogfix` 스킬에서 `gh` CLI 의존성 제거 — `suh_template CLI`의 `list-prs`, `create-pr`, `update-issue`로 전면 교체\n  * `python3` 하드코딩으로 Windows 호환성 깨지는 문제 수정 — PYTHON 변수 폴백 패턴 적용\n  * 플러그인 업데이트 시 `config.json` 소실 문제 수정 — 이전 버전 캐시에서 자동 마이그레이션\n\n* **기타**\n  * 이슈 파일 추가 및 Cursor 메타 파일·임시 다운로드 폴더 gitignore 등록",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "플러그인으로 설치된 프로젝트에서 `suh_template` 모듈을 못 찾는 문제 수정 — SCRIPTS_PATH 자동 탐지 로직 추가 (로컬 scripts/ 우선, 없으면 Claude 플러그인 캐시에서 탐색)",
+            "`create-issue` 호출 시 존재하지 않는 라벨 전달로 GitHub API 422 에러 발생 문제 수정 — 이슈 생성 전 레포 라벨 목록 사전 조회 및 필터링",
+            "`deploy`·`changelogfix` 스킬에서 `gh` CLI 의존성 제거 — `suh_template CLI`의 `list-prs`, `create-pr`, `update-issue`로 전면 교체",
+            "`python3` 하드코딩으로 Windows 호환성 깨지는 문제 수정 — PYTHON 변수 폴백 패턴 적용",
+            "플러그인 업데이트 시 `config.json` 소실 문제 수정 — 이전 버전 캐시에서 자동 마이그레이션"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "이슈 파일 추가 및 Cursor 메타 파일·임시 다운로드 폴더 gitignore 등록"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.21",
       "project_type": "basic",

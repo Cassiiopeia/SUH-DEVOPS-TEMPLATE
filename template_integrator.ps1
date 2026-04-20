@@ -2356,6 +2356,7 @@ function Offer-IdeToolsInstall {
                     $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                     if ($LASTEXITCODE -eq 0) {
                         Print-Success "업데이트 완료 (scope: ${installedScope})"
+                        Invoke-ConfigMigration
                     } else {
                         Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
                     }
@@ -2383,6 +2384,7 @@ function Offer-IdeToolsInstall {
                 Print-Step "플러그인 업데이트 중 (FORCE)..."
                 $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                 Print-Success "업데이트 완료 (scope: ${installedScope})"
+                Invoke-ConfigMigration
             }
         } else {
             if (-not $Force) {
@@ -2520,6 +2522,44 @@ function Invoke-ClaudePluginInstall {
         Print-Warning "플러그인 설치 실패. 수동으로 설치해주세요:"
         Write-Host "    claude plugin install cassiiopeia@cassiiopeia-marketplace --scope ${Scope}"
         Write-Host ""
+    }
+}
+
+# 업데이트 후 새 버전 캐시 폴더에 config.json이 없으면 이전 버전에서 복사
+# Claude Code UI "Update Now" 경로는 install을 거치지 않으므로 이 함수가 두 경로 모두 커버한다.
+function Invoke-ConfigMigration {
+    $cacheBase = Join-Path $env:USERPROFILE ".claude\plugins\cache\cassiiopeia-marketplace\cassiiopeia"
+    if (-not (Test-Path $cacheBase)) { return }
+
+    # semver 내림차순 정렬 → [0]이 최신 버전
+    $versions = Get-ChildItem -Path $cacheBase -Directory |
+        Sort-Object { [Version]($_.Name -replace '[^0-9.]', '') } -Descending
+
+    if ($versions.Count -lt 2) { return }  # 이전 버전 없으면 스킵
+
+    $latestDir  = $versions[0].FullName
+    $olderDirs  = $versions[1..($versions.Count - 1)] | ForEach-Object { $_.FullName }
+
+    $skillsDir = Join-Path $latestDir "skills"
+    if (-not (Test-Path $skillsDir)) { return }
+
+    $migratedCount = 0
+    foreach ($skillDir in Get-ChildItem -Path $skillsDir -Directory) {
+        $destConfig = Join-Path $skillDir.FullName "config.json"
+        if (Test-Path $destConfig) { continue }  # 이미 있으면 스킵
+
+        foreach ($older in $olderDirs) {
+            $srcConfig = Join-Path $older "skills\$($skillDir.Name)\config.json"
+            if (Test-Path $srcConfig) {
+                Copy-Item -Path $srcConfig -Destination $destConfig -ErrorAction SilentlyContinue
+                $migratedCount++
+                break
+            }
+        }
+    }
+
+    if ($migratedCount -gt 0) {
+        Print-Success "config.json 마이그레이션 완료 (${migratedCount}개 skill)"
     }
 }
 

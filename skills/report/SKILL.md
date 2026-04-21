@@ -65,12 +65,9 @@ git status
 
 `references/doc-output-path.md` 규칙을 따른다.
 
-산출물 md 저장 전:
-```bash
-PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path report
-```
-
-반환된 경로에 파일을 저장한다.
+agent가 직접 경로를 계산하여 파일을 저장한다:
+- 형식: `{PROJECT_ROOT}/docs/suh-template/report/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
+- 이슈 번호: 브랜치명 또는 worktree 경로 `YYYYMMDD_#숫자_제목` 패턴에서 추출
 
 ## GitHub 댓글 포스팅 (선택적)
 
@@ -78,27 +75,24 @@ PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path report
 
 ### 이슈 번호 자동 감지 순서
 
-1. 현재 작업 디렉토리 경로에서 추출 (worktree 경로 `YYYYMMDD_#숫자_제목` 패턴):
-   ```bash
-   PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-issue-number
-   ```
+1. 현재 작업 디렉토리 경로에서 `YYYYMMDD_#숫자_제목` 패턴 추출
 2. `.issue/` 폴더 파일명에서 추출 (예: `.issue/20260115_#427_제목.md` → 427)
-3. git 브랜치명에서 추출
+3. git 브랜치명에서 추출 (`git rev-parse --abbrev-ref HEAD`)
 4. 위 세 방법 모두 실패 시 사용자에게 이슈 번호 질문
 
 ### 포스팅 플로우
 
+1. **PAT 확인**: `references/config-rules.md` §2~3 절차로 `skill_id = issue` config에서 `github_pat` 읽기. 파일이 없으면 로컬 저장만 하고 종료.
+
+2. **repo 확인**: config의 `github_repos`에서 `default: true`인 repo 사용, 또는 `git remote get-url origin`에서 `owner`/`repo` 추출.
+
+3. **댓글 포스팅**:
 ```bash
-# 1. PAT 확인
-PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat
-# config_not_found이면 로컬 저장만 하고 종료
-
-# 2. repo 확인
-PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_repos
-# 또는 git remote origin에서 owner/repo 추출
-
-# 3. 댓글 포스팅
-GITHUB_PAT={pat} PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli add-comment {owner} {repo} {이슈번호} {보고서파일경로}
+curl -s -X POST \
+  -H "Authorization: token {github_pat}" \
+  -H "Content-Type: application/json" \
+  -d "{\"body\": \"{보고서 내용}\"}" \
+  "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}/comments"
 ```
 
 ### 완료 메시지

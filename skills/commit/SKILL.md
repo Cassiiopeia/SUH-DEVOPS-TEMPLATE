@@ -29,12 +29,7 @@ $ARGUMENTS
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
-if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
-  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
-else
-  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
-fi```
+```
 
 ### 2단계: staged 변경사항 확인
 
@@ -78,14 +73,17 @@ CONTEXT_FILE="$PROJECT_ROOT/.suh-template/context/current-issue.json"
 
 선택에 따라:
 - **1 선택**: `/issue` 스킬 안내 후 종료. 이슈 생성 후 다시 `/commit` 호출하도록 안내
-- **2 선택**: 이슈 번호 입력받아 아래 커맨드로 제목/URL 조회 후 4단계 진행
+- **2 선택**: 이슈 번호 입력받아 GitHub API로 제목/URL 조회 후 4단계 진행
   ```bash
   # owner/repo 자동 추출
   REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
   OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
   REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
-  GITHUB_PAT=$(PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat)
-  GITHUB_PAT=$GITHUB_PAT PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-issue "$OWNER" "$REPO" {issue_number}
+  ```
+  `references/config-rules.md` §2~3 절차로 `skill_id = issue` config에서 `github_pat` 읽기.
+  ```bash
+  curl -s -H "Authorization: token {github_pat}" \
+    "https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
   ```
 - **3 선택**: 커밋 메시지 직접 입력받아 5단계로 진행 (이슈 형식 없이)
 - **4 선택**: 종료

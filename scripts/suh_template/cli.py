@@ -9,8 +9,14 @@ suh_template CLI 진입점.
     get-issue-number
     get-next-seq <skill_id>
     normalize-title <제목>
-    config-get <skill_id> <key>
-    init-config <skill_id>
+    create-branch-name <issue_title> <issue_number> [--date YYYYMMDD]
+    get-commit-template <issue_title> <issue_url>
+    create-issue <owner> <repo> <title> <body_file> <labels_csv>
+    add-comment <owner> <repo> <issue_number> <body_file>
+    get-issue <owner> <repo> <issue_number>
+    update-issue <owner> <repo> <issue_number> [옵션]
+    create-pr <owner> <repo> <title> <body_file> <head> <base>
+    list-prs <owner> <repo> [--state open|closed|all]
 """
 
 from __future__ import annotations
@@ -30,7 +36,6 @@ from suh_template import SUPPORTED_SKILL_IDS
 from suh_template import issue_number as _issue
 from suh_template import title as _title
 from suh_template import paths as _paths
-from suh_template import config as _config
 from suh_template import gh_branch as _branch
 from suh_template import gh_client as _github
 
@@ -161,58 +166,6 @@ def cmd_normalize_title(args: list) -> int:
     return 0
 
 
-def cmd_config_get(args: list) -> int:
-    """config-get <skill_id> <key>"""
-    if len(args) < 2:
-        _err("ERROR", "config-get", "skill_id와 key 인수가 필요합니다.", "missing_argument")
-        return 1
-    skill_id, key = args[0], args[1]
-    project_root = _get_project_root()
-    value = _config.get_value(project_root, skill_id, key)
-    if value is None:
-        _err("ERROR", "config-get",
-             f".suh-template/config/{skill_id}.config.json 파일이 없거나 키 '{key}'가 없습니다.",
-             "config_not_found")
-        return 1
-    print(value)
-    return 0
-
-
-def cmd_init_config(args: list) -> int:
-    """init-config <skill_id>
-
-    .suh-template.example/config/{skill_id}.config.example.json 경로를 stdout에 출력한다.
-    AI(skill)가 이 파일을 읽어 스키마를 파악하고 대화형 수집 후 config.save()를 호출한다.
-    """
-    if not args:
-        _err("ERROR", "init-config", "skill_id 인수가 필요합니다.", "missing_argument")
-        return 1
-
-    skill_id = args[0]
-    if skill_id not in SUPPORTED_SKILL_IDS:
-        _err("ERROR", "init-config",
-             f"지원하지 않는 skill_id입니다. 지원: {', '.join(SUPPORTED_SKILL_IDS)}",
-             "skill_id_invalid")
-        return 1
-
-    project_root = _get_project_root()
-    if project_root is None:
-        _err("ERROR", "init-config", "git 저장소가 아닙니다.", "git_not_found")
-        return 1
-
-    example_path = (
-        project_root / ".suh-template.example" / "config"
-        / f"{skill_id}.config.example.json"
-    )
-    if not example_path.exists():
-        _err("ERROR", "init-config",
-             f".suh-template.example/config/{skill_id}.config.example.json 파일이 없습니다.",
-             "example_not_found")
-        return 1
-
-    print(str(example_path))
-    return 0
-
 
 def cmd_create_branch_name(args: list) -> int:
     """create-branch-name <issue_title> <issue_number> [--date YYYYMMDD]"""
@@ -270,10 +223,7 @@ def cmd_create_issue(args: list) -> int:
     owner, repo, title, body_file, labels_csv = args[0], args[1], args[2], args[3], args[4]
     body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
     labels = [l.strip() for l in labels_csv.split(",") if l.strip()] if labels_csv else []
-    # config에서 기본 담당자 자동 로드
-    project_root = _get_project_root()
-    assignee = _config.get_value(project_root, "issue", "default_assignee")
-    assignees = [assignee] if assignee else []
+    assignees = []
     try:
         result = _github.create_issue(owner, repo, title, body, labels, pat, assignees)
         import json as _json
@@ -412,8 +362,6 @@ _COMMANDS = {
     "get-issue-number": cmd_get_issue_number,
     "get-next-seq": cmd_get_next_seq,
     "normalize-title": cmd_normalize_title,
-    "config-get": cmd_config_get,
-    "init-config": cmd_init_config,
     "create-branch-name": cmd_create_branch_name,
     "get-commit-template": cmd_get_commit_template,
     "create-issue": cmd_create_issue,

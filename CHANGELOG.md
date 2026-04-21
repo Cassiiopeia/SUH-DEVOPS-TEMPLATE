@@ -1,7 +1,28 @@
 # Changelog
 
-**현재 버전:** 2.9.24  
-**마지막 업데이트:** 2026-04-20T13:49:59Z  
+**현재 버전:** 2.9.26  
+**마지막 업데이트:** 2026-04-21T09:21:41Z  
+
+---
+
+## [2.9.26] - 2026-04-21
+
+**PR:** #248  
+
+**새 기능**
+- skill-creator 스킬 추가 — CREATE / REVIEW / IMPROVE 3가지 모드로 스킬 생성·리뷰·개선 지원 (10개 파일)
+- changelog-deploy 스킬에 skill-creator 통합 및 deploy·changelogfix 병합 지원
+
+**개선**
+- Skills config 처리 방식 전환 — Python CLI 의존 제거, agent가 Read/Write 툴로 직접 config 처리
+- GitHub API 호출을 curl 직접 호출로 전환, OS별 홈디렉토리 감지 표준화
+
+**문서**
+- CLAUDE.md 1058줄 → 339줄 압축, 핵심 정보만 유지
+- common-rules.md에 이슈 MD 파일명 규칙·hotfix 예외·GitHub API 에러 표 추가
+- config-rules.md 신규 추가 — config 경로·스키마·읽기/쓰기 표준 정의
+- 문서 폴더 정리 — .issue/.report 문서를 docs/suh-template로 이동, TMP 파일 정리
+- deploy 스킬 릴리스 노트 작성 기준 추가, common-rules curl ssl-no-revoke 가이드 추가
 
 ---
 

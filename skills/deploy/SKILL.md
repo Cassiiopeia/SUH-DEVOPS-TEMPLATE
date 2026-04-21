@@ -82,19 +82,21 @@ TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY}"
 
 # 기존 open deploy PR이 있으면 재사용
-EXISTING_PR=$(GH_TOKEN=$GITHUB_PAT gh pr list --repo $OWNER/$REPO --base deploy --state open --json number -q '.[0].number' 2>/dev/null)
+EXISTING_PR=$(curl -s \
+  -H "Authorization: token $GITHUB_PAT" \
+  "https://api.github.com/repos/$OWNER/$REPO/pulls?state=open&base=deploy" \
+  | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
 
 if [ -n "$EXISTING_PR" ]; then
   PR_NUMBER=$EXISTING_PR
   echo "기존 deploy PR #$PR_NUMBER 재사용"
 else
-  PR_NUMBER=$(GH_TOKEN=$GITHUB_PAT gh pr create \
-    --repo $OWNER/$REPO \
-    --base deploy \
-    --head main \
-    --title "$TITLE" \
-    --body "" \
-    --json number -q .number)
+  PR_NUMBER=$(curl -s -X POST \
+    -H "Authorization: token $GITHUB_PAT" \
+    -H "Content-Type: application/json" \
+    -d "{\"title\":\"$TITLE\",\"head\":\"main\",\"base\":\"deploy\",\"body\":\"\"}" \
+    "https://api.github.com/repos/$OWNER/$REPO/pulls" \
+    | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
   echo "새 deploy PR #$PR_NUMBER 생성"
 fi
 ```

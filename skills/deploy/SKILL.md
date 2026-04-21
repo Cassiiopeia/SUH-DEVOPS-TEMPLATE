@@ -18,10 +18,12 @@ CodeRabbit 10분 대기 없이 스킬이 직접 릴리스 노트를 작성하므
 
 ## 시작 전
 
+**Config 확인** — `references/config-rules.md` §2~3 절차를 따른다 (`skill_id = issue`).
+
+파일에서 `github_pat`을 추출한다. 파일이 없으면 `/issue` 스킬로 PAT 등록을 먼저 안내한다.
+
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
-GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli config-get issue github_pat)
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
@@ -155,8 +157,8 @@ cat > /tmp/pr_release_notes.md << 'EOF'
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 EOF
 
-BODY=$(cat /tmp/pr_release_notes.md | $PYTHON -c "import sys,json; print(json.dumps(sys.stdin.read()))")
-curl -s -H "Authorization: token $GITHUB_PAT" \
+BODY=$(cat /tmp/pr_release_notes.md | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || cat /tmp/pr_release_notes.md | python -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+curl -s -H "Authorization: token {config에서 읽은 github_pat}" \
      -H "Content-Type: application/json" \
      -X PATCH -d "{\"body\": $BODY}" \
      "https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER"

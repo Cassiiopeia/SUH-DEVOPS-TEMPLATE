@@ -616,6 +616,104 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 ---
 
+## Skills 개발 가이드
+
+### 폴더 구조
+
+```
+skills/
+├── {skill-name}/
+│   └── SKILL.md          # skill 본문 (마크다운)
+└── references/
+    ├── common-rules.md   # 모든 skill 공통 규칙 (절대 규칙, GitHub 원칙, 커밋 컨벤션 등)
+    ├── config-rules.md   # config 파일 읽기/쓰기 표준 (OS별 경로, 탐색 순서)
+    ├── doc-output-path.md
+    ├── project-detection.md
+    ├── code-style-detection.md
+    ├── tech-flutter.md
+    ├── tech-react.md
+    └── tech-spring.md
+```
+
+### Skill 작성 원칙
+
+**1. Python CLI 호출 금지 (config 관련)**
+
+config 읽기/쓰기는 agent가 Read/Write tool로 직접 처리한다.
+`suh_template.cli config-get`, `config.save()` 호출은 절대 사용하지 않는다.
+
+**2. config 경로는 항상 `references/config-rules.md` 참조**
+
+각 skill에서 경로를 직접 기술하지 않는다. 아래 한 줄로 대체:
+```
+references/config-rules.md §2~5 절차를 따른다 (skill_id = {id})
+```
+
+**3. GitHub API는 curl 직접 호출**
+
+`gh` CLI, Python CLI 모두 사용 금지. curl + GitHub REST API 직접 호출.
+PAT는 config 파일에서 읽어온 값을 사용.
+
+**4. OS 호환성 (Windows / macOS 공통)**
+
+- 홈 디렉토리: `echo "$HOME"` 결과 사용. 비어있으면 `$USERPROFILE` 폴백
+- Python 실행: `PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)`
+- 경로 구분자: bash 계열 명령에서는 `/` 사용 (Windows Git Bash 포함)
+
+**5. 공통 규칙 파일 참조 순서**
+
+skill 시작 시 반드시 읽어야 하는 파일:
+1. `references/common-rules.md` — 절대 규칙, GitHub 원칙, 커밋 컨벤션
+2. `references/config-rules.md` — config가 필요한 skill만
+3. 해당 기술 가이드 (`tech-spring.md` 등) — 코드 관련 skill만
+
+### Config 파일 스키마
+
+**issue.config.json** (issue / github / deploy / report / commit 공용):
+```json
+{
+  "github_pat": "ghp_...",
+  "default_assignee": "GitHub사용자명",
+  "github_repos": [
+    { "name": "프로젝트명", "owner": "owner", "repo": "repo", "default": true }
+  ]
+}
+```
+
+**synology-expose.config.json**:
+```json
+{
+  "instances": [
+    {
+      "name": "NAS 이름",
+      "ddns": "my-nas.synology.me",
+      "domains": ["example.com"],
+      "email": "user@example.com",
+      "dns_provider": "cloudflare",
+      "default": true
+    }
+  ]
+}
+```
+
+**저장 위치** (agent가 Write tool로 직접 저장):
+- 로컬: `{PROJECT_ROOT}/.suh-template/config/{skill_id}.config.json`
+- 글로벌: `{HOME}/.suh-template/config/{skill_id}.config.json`
+
+### Agent 구현 시 주의사항
+
+| 상황 | 올바른 처리 |
+|------|------------|
+| config 없음 | 즉시 대화형 수집 — 억지 추론 금지 |
+| 홈 디렉토리 불명확 | `echo "$HOME"` 실행 후 결과로 경로 계산 |
+| repo owner/repo 불명확 | `git remote get-url origin` 으로 추출, 실패 시 config `github_repos` 참조 |
+| GitHub API 실패 (401) | PAT 만료 안내 + `/issue` 스킬에서 재등록 유도 |
+| GitHub API 실패 (404) | 번호/경로 재확인 요청 |
+| config 덮어쓰기 | 반드시 사용자 확인 후 진행 |
+| 이슈 번호 불명확 | 브랜치명 → worktree 경로 → `.suh-template/context/current-issue.json` 순서로 탐색 |
+
+---
+
 ## 트리거 키워드
 
 ### 댓글 기반 트리거

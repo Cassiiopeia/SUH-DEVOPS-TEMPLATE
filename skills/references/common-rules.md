@@ -50,7 +50,7 @@
 - 이모지와 `[` 사이 공백 없음: `⚙️[기능추가]` (O), `⚙️ [기능추가]` (X)
 - `·` 등 구분자 이모지 사용 금지
 - 허용 목록 외 이모지 사용 금지
-- 이슈 파일 저장 위치: `docs/suh-template/issue/` (`get-output-path issue` CLI로 경로 받기)
+- 이슈 파일 저장 위치: `docs/suh-template/issue/` (agent가 직접 경로 계산)
 - `.issue/` 폴더에 저장하는 것 금지
 
 ### 이슈 등록 순서
@@ -94,7 +94,9 @@
 
 ## suh_template CLI 실행 규칙
 
-모든 `python3 -m suh_template.cli` 호출 시 반드시 아래 순서를 따른다:
+`config-get` / `init-config`는 제거되었다 — config는 agent가 Read/Write tool로 직접 처리한다 (`references/config-rules.md` 참조).
+
+그 외 CLI 커맨드 호출 시 반드시 아래 순서를 따른다:
 
 ### 1. 프로젝트 루트 확인 (최초 1회)
 
@@ -119,39 +121,33 @@ PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
 PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli <command> [args]
 ```
 
-**나쁜 예 (절대 사용 금지)**:
-```bash
-python3 -m suh_template.cli get-output-path plan   # ❌ PYTHONPATH 없음, Windows 호환성 없음
-```
-
-**좋은 예**:
-```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
-PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli get-output-path plan   # ✅
-```
+지원 커맨드: `get-output-path`, `get-issue-number`, `get-next-seq`, `normalize-title`, `create-branch-name`, `get-commit-template`, `create-issue`, `add-comment`, `get-issue`, `update-issue`, `create-pr`, `list-prs`
 
 ## GitHub 작업 원칙
 
-GitHub API 관련 작업은 반드시 `python3 -m suh_template.cli` 커맨드로 처리한다. `gh` CLI는 사용하지 않는다.
+GitHub API 작업은 **curl로 직접 호출**한다. `gh` CLI는 사용하지 않는다.
 
-| 작업 | 커맨드 |
-|------|--------|
-| 이슈 생성 | `create-issue <owner> <repo> <title> <body_file> <labels_csv>` |
-| 이슈 조회 | `get-issue <owner> <repo> <issue_number>` |
-| 이슈 수정 | `update-issue <owner> <repo> <issue_number> [--title] [--state] [--labels] [--assignees]` |
-| 댓글 추가 | `add-comment <owner> <repo> <issue_number> <body_file>` |
-| PR 생성 | `create-pr <owner> <repo> <title> <body_file> <head> <base>` |
-| PR 목록 조회 | `list-prs <owner> <repo> [--state open\|closed\|all]` |
-| 브랜치명 계산 | `create-branch-name "<title>" <number>` |
-| 커밋 템플릿 조회 | `get-commit-template "<title>" "<url>"` |
+PAT는 `references/config-rules.md`에 따라 agent가 config 파일에서 직접 읽는다.
 
-PAT는 항상 환경변수로 전달:
+| 작업 | curl 예시 |
+|------|-----------|
+| 이슈 생성 | `POST /repos/{owner}/{repo}/issues` |
+| 이슈 조회 | `GET /repos/{owner}/{repo}/issues/{number}` |
+| 이슈 수정 | `PATCH /repos/{owner}/{repo}/issues/{number}` |
+| 댓글 추가 | `POST /repos/{owner}/{repo}/issues/{number}/comments` |
+| PR 생성 | `POST /repos/{owner}/{repo}/pulls` |
+| PR 목록 조회 | `GET /repos/{owner}/{repo}/pulls?state=open` |
+| PR 본문 수정 | `PATCH /repos/{owner}/{repo}/pulls/{number}` |
+
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
-GITHUB_PAT=$(PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli config-get issue github_pat)
+curl -s -X POST \
+  -H "Authorization: token {github_pat}" \
+  -H "Content-Type: application/json" \
+  -d "{...}" \
+  "https://api.github.com/repos/{owner}/{repo}/issues"
 ```
 
-> `gh` CLI는 Windows/Mac 호환성 문제 및 별도 설치 필요로 사용 금지. Python 표준 라이브러리(urllib)만 사용한다.
+> `gh` CLI는 별도 설치 필요 및 Windows/Mac 환경 차이로 사용 금지.
 
 ## Git Push 실행 시 동작 규칙
 
@@ -201,10 +197,9 @@ commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https
 - 이슈와 무관한 커밋(hotfix, 설정 변경 등)은 자유 형식 허용
 - 사용자가 `/commit` 스킬을 호출하면 이 형식으로 자동 완성
 
-커밋 템플릿 조회:
-```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
-PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli get-commit-template "{이슈제목}" "{이슈URL}"
+커밋 템플릿 계산 (agent가 직접 생성):
+```
+형식: {이슈제목에서 이모지·태그 제거한 순수 내용} : {타입} : {설명} {이슈URL}
 ```
 
 ## 민감 정보 보호

@@ -7,3 +7,7 @@ __pycache__/
 *$py.class
 *.so
 .suh-template/config/issue.config.json
+
+# Cursor 플러그인 로컬 메타 파일
+.cursor/skills/cursor-skills-meta.json
+.template_download_temp/

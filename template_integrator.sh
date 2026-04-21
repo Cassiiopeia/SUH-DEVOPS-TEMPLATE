@@ -2419,8 +2419,21 @@ offer_ide_tools_install() {
                 case "$choice" in
                     1)
                         print_step "플러그인 업데이트 중..."
+                        # 업데이트 전 현재 캐시 경로 저장 (마이그레이션용)
+                        local old_cache_path
+                        old_cache_path=$(find "$HOME/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia" -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)
                         if claude plugin update cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
                             print_success "업데이트 완료 (scope: ${installed_scope})"
+                            # 업데이트 후 새 캐시에 config.json 마이그레이션
+                            local new_cache_path
+                            new_cache_path=$(find "$HOME/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia" -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)
+                            if [ -n "$old_cache_path" ] && [ -n "$new_cache_path" ] && [ "$old_cache_path" != "$new_cache_path" ]; then
+                                if [ -d "$old_cache_path/config" ]; then
+                                    mkdir -p "$new_cache_path/config"
+                                    cp "$old_cache_path/config/"*.json "$new_cache_path/config/" 2>/dev/null && \
+                                        print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"
+                                fi
+                            fi
                         else
                             print_warning "업데이트 실패. 수동으로 실행해주세요:"
                             echo "    claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
@@ -2453,8 +2466,19 @@ offer_ide_tools_install() {
             else
                 # FORCE 모드: 업데이트
                 print_step "플러그인 업데이트 중 (FORCE)..."
+                local old_cache_path_f
+                old_cache_path_f=$(find "$HOME/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia" -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)
                 claude plugin update cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
                 print_success "업데이트 완료 (scope: ${installed_scope})"
+                local new_cache_path_f
+                new_cache_path_f=$(find "$HOME/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia" -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)
+                if [ -n "$old_cache_path_f" ] && [ -n "$new_cache_path_f" ] && [ "$old_cache_path_f" != "$new_cache_path_f" ]; then
+                    if [ -d "$old_cache_path_f/config" ]; then
+                        mkdir -p "$new_cache_path_f/config"
+                        cp "$old_cache_path_f/config/"*.json "$new_cache_path_f/config/" 2>/dev/null && \
+                            print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"
+                    fi
+                fi
             fi
         else
             # 미설치 → scope 선택 후 신규 설치

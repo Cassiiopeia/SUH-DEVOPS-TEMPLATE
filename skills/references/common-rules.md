@@ -127,6 +127,22 @@ PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli <command> [args]
 
 GitHub API 작업은 **curl로 직접 호출**한다. `gh` CLI는 사용하지 않는다.
 
+### Windows 내부망 환경 — SSL 인증서 오류 대응
+
+Windows 환경(특히 내부망/폐쇄망)에서 curl이 SSL 인증서 검증 오류로 실패할 수 있다:
+```
+curl: (35) schannel: next InitializeSecurityContext failed
+```
+
+이 경우 `--ssl-no-revoke` 플래그를 추가한다:
+```bash
+curl -s --ssl-no-revoke -H "Authorization: token {github_pat}" \
+  "https://api.github.com/repos/{owner}/{repo}/issues"
+```
+
+**적용 조건**: curl 실행 후 exit code 35 또는 SSL 관련 오류 메시지가 나올 때만 추가.
+정상 환경에서는 불필요하므로 기본 curl 호출에는 포함하지 않는다.
+
 PAT는 `references/config-rules.md`에 따라 agent가 config 파일에서 직접 읽는다.
 
 | 작업 | curl 예시 |

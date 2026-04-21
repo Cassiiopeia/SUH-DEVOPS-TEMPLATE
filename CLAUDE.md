@@ -2,8 +2,6 @@
 
 완전 자동화된 GitHub 프로젝트 관리 템플릿
 
-> 개발자는 코드만 작성하세요. 버전 관리, 체인지로그, 배포는 자동으로 처리됩니다.
-
 ---
 
 ## 프로젝트 개요
@@ -28,44 +26,33 @@
 ```
 suh-github-template/
 ├── .github/
-│   ├── workflows/                          # GitHub Actions
+│   ├── workflows/
 │   │   ├── PROJECT-TEMPLATE-INITIALIZER.yaml
-│   │   ├── PROJECT-COMMON-*.yaml           # 공통 워크플로우
+│   │   ├── PROJECT-COMMON-*.yaml
 │   │   └── project-types/
-│   │       ├── common/                     # 공통 (복사본)
-│   │       │   └── synology/               # Synology 공통 (선택적)
-│   │       ├── flutter/                    # Flutter 전용
-│   │       │   └── synology/               # Synology 배포 (선택적)
-│   │       ├── spring/                     # Spring 전용
-│   │       │   └── synology/               # Synology/Nexus 배포 (선택적)
-│   │       ├── react/                      # React 전용
-│   │       └── next/                       # Next.js 전용
-│   │
+│   │       ├── common/          # 공통 원본 (+ synology/)
+│   │       ├── flutter/         # Flutter 전용 (+ synology/)
+│   │       ├── spring/          # Spring 전용 (+ synology/)
+│   │       ├── react/
+│   │       └── next/
 │   ├── scripts/
-│   │   ├── version_manager.sh              # 버전 관리 (v3.0)
-│   │   ├── changelog_manager.py            # AI 체인지로그
-│   │   └── template_initializer.sh         # 템플릿 초기화
-│   │
+│   │   ├── version_manager.sh
+│   │   ├── changelog_manager.py
+│   │   └── template_initializer.sh
 │   ├── util/flutter/
-│   │   ├── playstore-wizard/               # Android 배포 설정
-│   │   └── testflight-wizard/              # iOS 배포 설정
-│   │
-│   ├── ISSUE_TEMPLATE/                     # 이슈 템플릿 (4종)
-│   ├── DISCUSSION_TEMPLATE/                # 토론 템플릿
+│   │   ├── playstore-wizard/
+│   │   └── testflight-wizard/
+│   ├── ISSUE_TEMPLATE/
 │   └── PULL_REQUEST_TEMPLATE.md
-│
-├── .claude-plugin/                         # Claude Code 플러그인 매니페스트
-│   ├── plugin.json                         # 플러그인 정보
-│   └── marketplace.json                    # 마켓플레이스 등록 정보
-├── skills/                                 # 플러그인 Skills (20개, 마켓플레이스 전용)
-├── scripts/                                # 플러그인 Scripts (마켓플레이스 전용)
-├── .cursor/skills/                       # Cursor IDE 명령어 (19개)
-├── docs/                                   # 문서
-│
-├── version.yml                             # 중앙 버전 관리
-├── CHANGELOG.md / CHANGELOG.json           # 변경 이력 (자동생성)
-├── template_integrator.sh                  # Linux/macOS 통합
-└── template_integrator.ps1                 # Windows 통합
+├── .claude-plugin/              # 플러그인 매니페스트
+├── skills/                      # 플러그인 Skills (마켓플레이스 전용)
+├── scripts/                     # 플러그인 Scripts (마켓플레이스 전용)
+├── .cursor/skills/
+├── docs/                        # 상세 문서
+├── version.yml
+├── CHANGELOG.md / CHANGELOG.json
+├── template_integrator.sh
+└── template_integrator.ps1
 ```
 
 ---
@@ -76,56 +63,24 @@ suh-github-template/
 ```
 PROJECT-[TYPE]-[FEATURE]-[DETAIL].yaml
 
-TYPE 분류:
-├── TEMPLATE    # 초기화 전용 (일회성)
-├── COMMON      # 모든 프로젝트 공통
-├── FLUTTER     # Flutter 전용
-├── SPRING      # Spring Boot 전용
-├── REACT       # React 전용
-└── NEXT        # Next.js 전용
-
-예시:
-├── PROJECT-TEMPLATE-INITIALIZER.yaml
-├── PROJECT-COMMON-VERSION-CONTROL.yaml
-├── PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml
-└── PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml
+TYPE: TEMPLATE | COMMON | FLUTTER | SPRING | REACT | NEXT
 ```
 
 ### 스크립트 파일
 ```
 snake_case.sh / snake_case.py
-
-예시:
-├── version_manager.sh
-├── changelog_manager.py
-└── template_initializer.sh
-```
-
-### Util 마법사
-```
-.github/util/[platform]/[name]-wizard/
-
-예시:
-├── .github/util/flutter/playstore-wizard/
-└── .github/util/flutter/testflight-wizard/
-
-필수 포함 파일:
-├── version.json          # 버전 정보
-├── version-sync.sh       # HTML 버전 동기화
-├── [name]-wizard.html    # UI
-└── [name]-wizard.js      # 로직
 ```
 
 ---
 
 ## 핵심 워크플로우
 
-### 공통 워크플로우 (루트)
+### 공통 워크플로우
 
 | 파일명 | 트리거 | 기능 |
 |--------|--------|------|
 | `PROJECT-TEMPLATE-INITIALIZER` | 저장소 생성 | 템플릿 초기화 (일회성) |
-| `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` | version.yml 변경 | 플러그인 매니페스트 버전 동기화 (템플릿 전용) |
+| `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` | version.yml 변경 | 플러그인 매니페스트 버전 동기화 |
 | `PROJECT-COMMON-VERSION-CONTROL` | main 푸시 | patch 버전 자동 증가 |
 | `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` | deploy PR | AI 체인지로그 생성 |
 | `PROJECT-COMMON-README-VERSION-UPDATE` | deploy 푸시 | README 버전 동기화 |
@@ -140,31 +95,31 @@ snake_case.sh / snake_case.py
 #### Flutter
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
-| `PROJECT-FLUTTER-CI` | 코드 분석 + 빌드 검증 (PR/main) | 기본 |
-| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 내부 테스트 배포 | 기본 |
-| `PROJECT-FLUTTER-ANDROID-FIREBASE-CICD` | Firebase App Distribution 배포 | 기본 |
-| `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 + Firebase App Distribution | 기본 |
+| `PROJECT-FLUTTER-CI` | 코드 분석 + 빌드 검증 | 기본 |
+| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD` | Play Store 배포 | 기본 |
+| `PROJECT-FLUTTER-ANDROID-FIREBASE-CICD` | Firebase App Distribution | 기본 |
+| `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 | 기본 |
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 | 기본 |
 | `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
-| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Synology NAS APK 배포 | synology/ |
+| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Synology APK 배포 | synology/ |
 
 #### Spring
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
 | `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Synology Docker 배포 | synology/ |
 | `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW` | PR 프리뷰 배포 | synology/ |
-| `PROJECT-SPRING-NEXUS-CI` | Nexus CI (빌드/테스트) | synology/ |
+| `PROJECT-SPRING-NEXUS-CI` | Nexus CI | synology/ |
 | `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | synology/ |
 
-> **참고**: `synology/` 위치의 워크플로우는 `--synology` 옵션으로만 포함됩니다. (타입별 및 공통 synology/ 모두 해당)
+> `synology/` 워크플로우는 `--synology` 옵션으로만 포함됩니다.
 
-#### 공통 Synology (선택적)
-| 파일명 | 트리거 | 기능 | 위치 |
-|--------|--------|------|------|
-| `PROJECT-COMMON-SYNOLOGY-SECRET-FILE-UPLOAD` | main 푸시 | GitHub Secret 파일 Synology 업로드 | common/synology/ |
+#### 공통 Synology
+| 파일명 | 기능 | 위치 |
+|--------|------|------|
+| `PROJECT-COMMON-SYNOLOGY-SECRET-FILE-UPLOAD` | GitHub Secret → Synology 업로드 | common/synology/ |
 
-#### React / Next (각 2개)
+#### React / Next
 | 파일명 | 용도 |
 |--------|------|
 | `PROJECT-REACT-CI` / `PROJECT-NEXT-CI` | 빌드 검증 |
@@ -174,459 +129,110 @@ snake_case.sh / snake_case.py
 
 ## 핵심 스크립트
 
-### version_manager.sh (v3.0)
-
+### version_manager.sh
 ```bash
-# 현재 버전 확인 (모든 파일 상태)
 .github/scripts/version_manager.sh get
-
-# patch 버전 자동 증가 (1.0.0 → 1.0.1)
-.github/scripts/version_manager.sh increment
-
-# 특정 버전으로 설정
+.github/scripts/version_manager.sh increment       # patch +1
 .github/scripts/version_manager.sh set 2.0.0
-
-# 버전 동기화 (충돌 시 높은 버전 우선)
 .github/scripts/version_manager.sh sync
-
-# 버전 형식 검증
-.github/scripts/version_manager.sh validate 1.2.3
-
-# version_code 확인/증가
 .github/scripts/version_manager.sh get-code
 .github/scripts/version_manager.sh increment-code
 ```
 
 ### changelog_manager.py
-
 ```bash
-# CodeRabbit Summary → CHANGELOG.json 업데이트
 python3 .github/scripts/changelog_manager.py update-from-summary
-
-# CHANGELOG.json → CHANGELOG.md 재생성
 python3 .github/scripts/changelog_manager.py generate-md
-
-# 특정 버전 릴리즈 노트 추출
 python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output release_notes.txt
 ```
 
-### template_initializer.sh
+### template_integrator.sh / .ps1
+기존 프로젝트에 템플릿 기능을 추가하는 원격 실행 스크립트. 신규 통합 / 업데이트 / 되돌리기 모드 지원.
+`--synology` / `--no-synology` 옵션으로 Synology 워크플로우 포함 여부 선택.
+선택 값은 `version.yml`의 `metadata.template.options.synology`에 저장.
 
-```bash
-# 새 프로젝트 초기화
-./template_initializer.sh --version 1.0.0 --type spring
-./template_initializer.sh -v 0.0.0 -t flutter
+**초기화/통합 시 복사되지 않는 템플릿 전용 파일**:
 ```
-
-**GitHub 템플릿으로 새 저장소 생성 시** `PROJECT-TEMPLATE-INITIALIZER` 워크플로우가 자동 실행됩니다.
-
-**초기화 시 삭제되는 템플릿 전용 파일**:
-```
-CHANGELOG.md
-CHANGELOG.json
-template_integrator.sh
-template_integrator.ps1
-LICENSE
-CONTRIBUTING.md
-CLAUDE.md
-docs/
-.github/scripts/test/
-.github/workflows/test/
-.claude-plugin/          # 플러그인 매니페스트 (마켓플레이스 전용)
-skills/                  # 플러그인 Skills (마켓플레이스 전용)
-scripts/                 # 플러그인 Scripts (마켓플레이스 전용)
-```
-
-### template_integrator.sh / template_integrator.ps1
-
-기존 프로젝트에 SUH-DEVOPS-TEMPLATE 기능을 추가하는 원격 실행 스크립트
-
-```bash
-# Linux/macOS (원격 실행)
-bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)
-
-# Windows PowerShell (원격 실행)
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
-```
-
-**통합 시 복사되지 않는 템플릿 전용 파일**:
-```
-CONTRIBUTING.md
-CLAUDE.md
-.claude-plugin/          # 플러그인 매니페스트 (마켓플레이스 전용)
-skills/                  # 플러그인 Skills (마켓플레이스 전용)
-scripts/                 # 플러그인 Scripts (마켓플레이스 전용)
-```
-
-**통합 완료 후 IDE 도구 설치**:
-- Claude Code CLI 감지 시: 플러그인 마켓플레이스 자동 설치 제안 (`--scope user`)
-- Cursor CLI 감지 시: `.cursor` 폴더 복사 제안
-- CLI 미감지 시: 수동 설치 명령어 안내
-
-**통합 모드 옵션**:
-| 모드 | 설명 |
-|------|------|
-| 신규 통합 | 기존 프로젝트에 템플릿 추가 |
-| 업데이트 | 최신 템플릿 버전으로 업그레이드 |
-| 되돌리기 | 이전 백업으로 복원 |
-
-**Synology 옵션**:
-| 옵션 | 설명 |
-|------|------|
-| `--synology` / `-Synology` | Synology 워크플로우 포함 |
-| `--no-synology` / `-NoSynology` | Synology 워크플로우 제외 (기본값) |
-
-Synology 워크플로우는 `project-types/{type}/synology/` 폴더에 위치하며, 기본적으로 제외됩니다.
-대화형 모드에서는 해당 폴더가 있을 때만 Y/N 질문이 표시됩니다.
-선택한 옵션은 `version.yml`의 `metadata.template.options.synology`에 저장되어 재통합 시 기억됩니다.
-
----
-
-## Flutter 마법사 도구
-
-### playstore-wizard (Android)
-
-**위치**: `.github/util/flutter/playstore-wizard/`
-
-**6단계 설정 프로세스**:
-1. 프로젝트 경로 + Application ID 입력
-2. Keystore 생성 (alias, password, 인증서 정보)
-3. Service Account JSON 업로드
-4. Play Console 앱 생성 + AAB 빌드
-5. 설정 적용 명령어 실행
-6. GitHub Secrets JSON/TXT 다운로드
-
-**생성되는 Secrets**:
-```
-RELEASE_KEYSTORE_BASE64
-RELEASE_KEYSTORE_PASSWORD
-RELEASE_KEY_ALIAS
-RELEASE_KEY_PASSWORD
-GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64
-```
-
-### testflight-wizard (iOS)
-
-**위치**: `.github/util/flutter/testflight-wizard/`
-
-**9단계 설정 프로세스**:
-1. 프로젝트 경로 입력
-2. Distribution 인증서 (.p12) 업로드
-3. Bundle ID 입력
-4. Provisioning Profile 설정
-5. App Store Connect 앱 등록
-6. 앱 정보 확인 (Team ID 등)
-7. API Key (.p8) 업로드
-8. Fastlane 초기화
-9. GitHub Secrets 다운로드
-
-**생성되는 Secrets**:
-```
-APPLE_CERTIFICATE_BASE64
-APPLE_CERTIFICATE_PASSWORD
-APPLE_PROVISIONING_PROFILE_BASE64
-IOS_PROVISIONING_PROFILE_NAME
-APP_STORE_CONNECT_API_KEY_BASE64
-APP_STORE_CONNECT_API_KEY_ID
-APP_STORE_CONNECT_ISSUER_ID
-APPLE_TEAM_ID
-IOS_BUNDLE_ID
+CLAUDE.md, CONTRIBUTING.md, LICENSE
+CHANGELOG.md, CHANGELOG.json
+template_integrator.sh / .ps1
+docs/, .github/scripts/test/, .github/workflows/test/
+.claude-plugin/, skills/, scripts/
 ```
 
 ---
 
-## 자동화 흐름
+## 트리거 키워드
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      main 브랜치 푸시                        │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-               ┌────────────────────────┐
-               │  VERSION-CONTROL       │
-               │  - patch 버전 +1       │
-               │  - 프로젝트 파일 동기화 │
-               │  - Git 태그 생성       │
-               └───────────┬────────────┘
-                           │
-                           ▼
-               ┌────────────────────────┐
-               │  deploy 브랜치 PR 생성  │
-               └───────────┬────────────┘
-                           │
-                           ▼
-               ┌────────────────────────┐
-               │  CHANGELOG-CONTROL     │
-               │  - CodeRabbit Summary  │
-               │  - CHANGELOG 자동 생성 │
-               │  - PR 자동 머지        │
-               └───────────┬────────────┘
-                           │
-                           ▼
-               ┌────────────────────────┐
-               │  deploy 브랜치 푸시     │
-               └───────────┬────────────┘
-                           │
-            ┌──────────────┼──────────────┐
-            │              │              │
-            ▼              ▼              ▼
-      README 업데이트  타입별 CICD   아티팩트 생성
-```
+### 댓글 기반
+| 키워드 | 워크플로우 | 기능 |
+|--------|-----------|------|
+| `@suh-lab create qa` | QA-ISSUE-CREATION-BOT | QA 이슈 자동 생성 |
+| `@suh-lab build app` | SUH-LAB-APP-BUILD-TRIGGER | Android + iOS 빌드 |
+| `@suh-lab apk build` | SUH-LAB-APP-BUILD-TRIGGER | Android만 빌드 |
+| `@suh-lab ios build` | SUH-LAB-APP-BUILD-TRIGGER | iOS만 빌드 |
 
----
-
-## 버전 관리 규칙
-
-### version.yml 구조
-
-```yaml
-version: "2.4.3"              # 자동 관리 (patch만)
-version_code: 94              # 빌드 번호 (자동 증가)
-project_type: "basic"         # 프로젝트 타입
-
-metadata:
-  last_updated: "2026-01-06 08:23:20"
-  last_updated_by: "username"
-```
-
-### 버전 증가 규칙
-- **patch (자동)**: main 푸시 시 자동 증가 (1.0.0 → 1.0.1)
-- **minor/major (수동)**: version.yml 직접 수정
-
-### 동기화 정책
-- 여러 파일 간 버전 불일치 시 **높은 버전 우선**
-- version.yml ↔ 프로젝트 파일 양방향 동기화
-
----
-
-## 기여 가이드라인
-
-### 새 워크플로우 추가
-
-1. **네이밍 규칙 준수**
-   ```
-   PROJECT-[TYPE]-[FEATURE]-[DETAIL].yaml
-   ```
-
-2. **배치 위치**
-   - **공통 기능 (필수 2곳 - 반드시 동일하게 유지)**:
-     1. `project-types/common/` - **원본 (Source of Truth)**
-     2. `.github/workflows/` 루트 - **템플릿 저장소용 복사본**
-   - 타입별 기능: `project-types/[type]/`만 (루트 복사 불필요)
-
-3. **필수 요소**
-   - `workflow_dispatch` 수동 트리거 포함
-   - `concurrency` 설정으로 중복 실행 방지
-   - `[skip ci]` 커밋 메시지로 무한 루프 방지
-   - **주석 표준 준수**: [WORKFLOW-COMMENT-GUIDELINES.md](docs/WORKFLOW-COMMENT-GUIDELINES.md) 참조
-
-4. **공통 워크플로우 동기화 규칙**
-
-   공통(COMMON) 워크플로우는 두 위치에 **동일하게** 유지해야 합니다:
-
-   | 위치 | 용도 | 필수 |
-   |------|------|------|
-   | `project-types/common/` | `template_integrator`가 복사하는 원본 | ✅ |
-   | `.github/workflows/` (루트) | 템플릿 저장소에서 직접 실행 | ✅ |
-
-   **워크플로우 추가/수정 순서**:
-   1. `project-types/common/`에 먼저 작성 (원본)
-   2. 동일한 파일을 루트 `.github/workflows/`에 복사
-   3. 두 파일의 버전/내용이 동일한지 확인
-
-   > **참고**: 타입별 워크플로우 (flutter, spring 등)는 `project-types/[type]/`에만 존재하면 됨. `template_initializer`와 `template_integrator`가 프로젝트 타입에 따라 해당 폴더에서 복사함.
-
-5. **GitHub 댓글에서 마크다운 표 작성 규칙**
-
-   `actions/github-script`에서 이슈/PR에 댓글을 작성할 때 **마크다운 표(table)**가 포함되면 반드시 `array.join('\n')` 패턴을 사용해야 합니다.
-
-   **✅ 올바른 방법 (array.join 패턴)**:
-   ```javascript
-   const body = [
-     '## 🤖 빌드 완료!',
-     '',
-     '| 항목 | 값 |',
-     '|------|-----|',
-     `| **버전** | \`${version}\` |`,
-     `| **브랜치** | \`${branchName}\` |`,
-     '',
-     '📦 **다운로드 가능합니다.**'
-   ].join('\n');
-   ```
-
-   **❌ 잘못된 방법 (template literal + 들여쓰기)**:
-   ```javascript
-   // 들여쓰기가 마크다운에 포함되어 표가 깨질 수 있음
-   const body = `## 🤖 빌드 완료!
-
-               | 항목 | 값 |
-               |------|-----|
-               | **버전** | \`${version}\` |`;
-   ```
-
-   **이유**:
-   - Template literal 내부의 들여쓰기(공백)가 그대로 마크다운에 포함됨
-   - GitHub 마크다운 렌더러가 표를 올바르게 인식하지 못할 수 있음
-   - `array.join('\n')`은 각 줄을 깔끔하게 연결하여 들여쓰기 문제 방지
-
-### 새 스크립트 추가
-
-1. **위치**: `.github/scripts/`
-2. **명명**: `snake_case.sh` 또는 `snake_case.py`
-3. **권한**: `chmod +x` 실행 권한 설정
-4. **문서화**: README 또는 스크립트 내 주석
-
-### 새 Util 마법사 추가
-
-1. **디렉토리 구조**
-   ```
-   .github/util/[platform]/[name]-wizard/
-   ├── version.json          # 필수
-   ├── version-sync.sh       # 필수
-   ├── [name]-wizard.html    # 필수
-   ├── [name]-wizard.js      # 필수
-   └── templates/            # 선택
-   ```
-
-2. **version.json 형식**
-   ```json
-   {
-     "name": "마법사 이름",
-     "version": "1.0.0",
-     "description": "설명",
-     "lastUpdated": "YYYY-MM-DD"
-   }
-   ```
-
-3. **version-sync.sh**
-   - version.json → HTML 버전 정보 동기화
-   - TEMPLATE-UTIL-VERSION-SYNC 워크플로우가 자동 실행
-
-### Breaking Changes 관리
-
-호환성 문제가 발생하는 변경사항은 반드시 `.github/config/breaking-changes.json`에 등록합니다.
-
-**등록이 필요한 경우**:
-- 이슈 라벨 이름 변경
-- 이슈/PR 템플릿 구조 변경
-- 워크플로우 파일명 변경
-- version.yml 구조 변경
-- 필수 GitHub Secrets 추가/변경
-- 스크립트 인터페이스 변경
-- Skills/플러그인 배포 방식 변경
-- template_integrator 통합 모드/옵션 변경
-
-**등록 형식**:
-```json
-{
-  "버전": {
-    "severity": "critical 또는 warning",
-    "title": "변경사항 제목 (한 줄)",
-    "message": "상세 설명. 영향 범위와 조치 방법 포함."
-  }
-}
-```
-
-**severity 기준**:
-| 레벨 | 기준 | 동작 |
-|------|------|------|
-| `critical` | 수동 조치 필수, 기능 오작동 가능 | Y/N 확인 필수 |
-| `warning` | 알림만, 자동 처리 가능 | 알림 후 진행 |
-
-**예시**:
-```json
-{
-  "2.6.23": {
-    "severity": "critical",
-    "title": "Issue Labels 전면 변경",
-    "message": "이슈 라벨명 변경. 기존 프로젝트는 issue-labels.yml 수동 동기화 필요."
-  }
-}
-```
+### 브랜치 기반
+| 브랜치 | 트리거 | 워크플로우 |
+|--------|--------|-----------|
+| `main` | push | VERSION-CONTROL |
+| `deploy` | PR | CHANGELOG-CONTROL |
+| `deploy` | push | README-UPDATE, CICD |
 
 ---
 
 ## 이슈/PR 템플릿
 
-### 이슈 템플릿 (4종)
+**이슈 템플릿**: `bug_report.md` / `feature_request.md` / `design_request.md` / `qa_request.md`
 
-| 템플릿 | 파일 | 용도 |
-|--------|------|------|
-| 버그 리포트 | `bug_report.md` | 버그 신고 |
-| 기능 요청 | `feature_request.md` | 기능 추가/개선 |
-| 디자인 요청 | `design_request.md` | UI/UX 디자인 |
-| QA 요청 | `qa_request.md` | 테스트 요청 |
-
-### 이슈 라벨 (`.github/config/issue-labels.yml`)
-```yaml
-긴급, 문서, 작업전, 작업중, 담당자확인, 피드백, 작업완료, 보류, 취소
-```
-
-### PR 템플릿
-```markdown
-## 변경 사항
-<!-- 핵심 변경사항 -->
-
-## 테스트
-- [ ] 수동 테스트 완료
-- [ ] 테스트 코드 완료
-```
+**이슈 라벨**: `긴급, 문서, 작업전, 작업중, 담당자확인, 피드백, 작업완료, 보류, 취소`
 
 ---
 
 ## Skills (Claude Code 플러그인)
 
-**플러그인명**: `cassiiopeia` (마켓플레이스 배포)
-**위치**: 루트 `skills/` 폴더 (플러그인 전용, template_integrator로 복사되지 않음)
+**플러그인명**: `cassiiopeia`
 
-**설치 방법**:
 ```bash
 claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 
-**사용법**: `/cassiiopeia:명령어` (예: `/cassiiopeia:analyze`)
-
 | 명령어 | 용도 |
 |--------|------|
-| `analyze` | 코드 분석 (구현 X) |
-| `build` | 빌드 관리 |
-| `design`, `design-analyze` | 설계/디자인 |
-| `document` | 문서화 |
-| `figma` | Figma 연동 |
-| `implement` | 구현 |
+| `analyze` | 코드 분석 |
 | `plan` | 계획 수립 |
-| `ppt` | 프레젠테이션 생성 |
-| `refactor`, `refactor-analyze` | 리팩토링 |
-| `report` | 구현 보고서 생성 + GitHub 댓글 포스팅 |
+| `implement` | 구현 |
 | `review` | 코드 리뷰 |
-| `test`, `testcase` | 테스트 |
+| `refactor` / `refactor-analyze` | 리팩토링 |
+| `test` / `testcase` | 테스트 |
 | `troubleshoot` | 트러블슈팅 |
+| `document` | 문서화 |
+| `design` / `design-analyze` | 설계 |
+| `build` | 빌드 관리 |
+| `figma` | Figma 연동 |
+| `ppt` | 프레젠테이션 |
 | `suh-spring-test` | Spring 테스트 생성 |
-| `init-worktree` | Git worktree 자동 생성 |
-| `issue` | 이슈 작성 + GitHub 등록 + 브랜치 생성 |
-| `commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 + 커밋 |
-| `github` | GitHub 이슈/PR 조회·댓글·PR 생성 |
+| `init-worktree` | Git worktree 생성 |
+| `issue` | 이슈 작성 + GitHub 등록 |
+| `commit` | 이슈 기반 커밋 자동화 |
+| `github` | GitHub 이슈/PR 조회·관리 |
+| `report` | 구현 보고서 생성 |
+| `deploy` | main push → deploy PR → automerge |
+| `changelogfix` | deploy PR automerge 실패 시 재트리거 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
-| `changelogfix` | deploy PR automerge 실패 시 PR 재생성으로 워크플로우 재트리거 |
-| `deploy` | main push → deploy PR 생성 → 릴리스 노트 즉시 작성 → automerge 자동 진행 |
-
-**버전 동기화**: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 `plugin.json`, `marketplace.json` 버전을 자동 동기화
 
 ---
 
 ## Skills 개발 가이드
 
 ### 폴더 구조
-
 ```
 skills/
-├── {skill-name}/
-│   └── SKILL.md          # skill 본문 (마크다운)
+├── {skill-name}/SKILL.md
 └── references/
-    ├── common-rules.md   # 모든 skill 공통 규칙 (절대 규칙, GitHub 원칙, 커밋 컨벤션 등)
-    ├── config-rules.md   # config 파일 읽기/쓰기 표준 (OS별 경로, 탐색 순서)
+    ├── common-rules.md       # 절대 규칙, 커밋 컨벤션
+    ├── config-rules.md       # config 경로·스키마·읽기/쓰기 표준
     ├── doc-output-path.md
     ├── project-detection.md
     ├── code-style-detection.md
@@ -635,373 +241,99 @@ skills/
     └── tech-spring.md
 ```
 
-### Skill 작성 원칙
+### 핵심 원칙
 
-**1. Python CLI 호출 금지 (config 관련)**
+1. **config는 agent가 Read/Write tool로 직접 처리** — `config-get` CLI 호출 금지
+2. **config 경로·스키마는 `references/config-rules.md` 참조** — skill 내 직접 기술 금지
+3. **GitHub API는 curl 직접 호출** — `gh` CLI, Python CLI 모두 금지
+4. **OS 호환성**: Python 실행 시 `PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)` 패턴 사용
+5. **skill 시작 시 필독**: `references/common-rules.md` → (config 필요 시) `references/config-rules.md` → (기술별) `tech-*.md`
 
-config 읽기/쓰기는 agent가 Read/Write tool로 직접 처리한다.
-`suh_template.cli config-get`, `config.save()` 호출은 절대 사용하지 않는다.
+### config 사용 스킬
 
-**2. config 경로는 항상 `references/config-rules.md` 참조**
+| 스킬 | skill_id | 비고 |
+|------|---------|------|
+| `issue`, `commit`, `github`, `deploy`, `report`, `changelogfix` | `issue` | PAT + repos 공유 |
+| `synology-expose` | `synology-expose` | NAS 인스턴스 정보 |
 
-각 skill에서 경로를 직접 기술하지 않는다. 아래 한 줄로 대체:
-```
-references/config-rules.md §2~5 절차를 따른다 (skill_id = {id})
-```
-
-**3. GitHub API는 curl 직접 호출**
-
-`gh` CLI, Python CLI 모두 사용 금지. curl + GitHub REST API 직접 호출.
-PAT는 config 파일에서 읽어온 값을 사용.
-
-**4. OS 호환성 (Windows / macOS 공통)**
-
-- 홈 디렉토리: `echo "$HOME"` 결과 사용. 비어있으면 `$USERPROFILE` 폴백
-- Python 실행: `PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)`
-- 경로 구분자: bash 계열 명령에서는 `/` 사용 (Windows Git Bash 포함)
-
-**5. 공통 규칙 파일 참조 순서**
-
-skill 시작 시 반드시 읽어야 하는 파일:
-1. `references/common-rules.md` — 절대 규칙, GitHub 원칙, 커밋 컨벤션
-2. `references/config-rules.md` — config가 필요한 skill만
-3. 해당 기술 가이드 (`tech-spring.md` 등) — 코드 관련 skill만
-
-### Config 파일 스키마
-
-**issue.config.json** (issue / github / deploy / report / commit 공용):
-```json
-{
-  "github_pat": "ghp_...",
-  "default_assignee": "GitHub사용자명",
-  "github_repos": [
-    { "name": "프로젝트명", "owner": "owner", "repo": "repo", "default": true }
-  ]
-}
-```
-
-**synology-expose.config.json**:
-```json
-{
-  "instances": [
-    {
-      "name": "NAS 이름",
-      "ddns": "my-nas.synology.me",
-      "domains": ["example.com"],
-      "email": "user@example.com",
-      "dns_provider": "cloudflare",
-      "default": true
-    }
-  ]
-}
-```
-
-**저장 위치** (agent가 Write tool로 직접 저장):
-- 로컬: `{PROJECT_ROOT}/.suh-template/config/{skill_id}.config.json`
-- 글로벌: `{HOME}/.suh-template/config/{skill_id}.config.json`
-
-### Agent 구현 시 주의사항
-
-| 상황 | 올바른 처리 |
-|------|------------|
-| config 없음 | 즉시 대화형 수집 — 억지 추론 금지 |
-| 홈 디렉토리 불명확 | `echo "$HOME"` 실행 후 결과로 경로 계산 |
-| repo owner/repo 불명확 | `git remote get-url origin` 으로 추출, 실패 시 config `github_repos` 참조 |
-| GitHub API 실패 (401) | PAT 만료 안내 + `/issue` 스킬에서 재등록 유도 |
-| GitHub API 실패 (404) | 번호/경로 재확인 요청 |
-| config 덮어쓰기 | 반드시 사용자 확인 후 진행 |
-| 이슈 번호 불명확 | 브랜치명 → worktree 경로 → `.suh-template/context/current-issue.json` 순서로 탐색 |
-
----
-
-## 트리거 키워드
-
-### 댓글 기반 트리거
-
-| 키워드 | 워크플로우 | 기능 |
-|--------|-----------|------|
-| `@suh-lab create qa` | QA-ISSUE-CREATION-BOT | QA 이슈 자동 생성 |
-| `@suh-lab build app` | SUH-LAB-APP-BUILD-TRIGGER | Android + iOS 빌드 |
-| `@suh-lab apk build` | SUH-LAB-APP-BUILD-TRIGGER | Android만 빌드 |
-| `@suh-lab ios build` | SUH-LAB-APP-BUILD-TRIGGER | iOS만 빌드 |
-
-### 브랜치 기반 트리거
-
-| 브랜치 | 트리거 | 워크플로우 |
-|--------|--------|-----------|
-| `main` | push | VERSION-CONTROL, FLUTTER-CI |
-| `main` | PR | FLUTTER-CI (코드 분석 + 빌드 검증) |
-| `deploy` | PR | CHANGELOG-CONTROL |
-| `deploy` | push | README-UPDATE, CICD |
-| `test` | push | 테스트 환경 배포 |
-
----
-
-## 필수 GitHub Secrets
-
-### 공통
-```
-_GITHUB_PAT_TOKEN    # PR 자동 머지용 (repo, workflow 권한)
-ENV_FILE (또는 ENV) # .env 파일 내용 (앱 환경변수)
-```
-
-### Synology 서버 접속 (공통)
-> **⚠️ 모든 Synology 관련 워크플로우에서 공통으로 사용하는 키입니다.**
-> Spring CICD, Python CICD, React/Next CICD, Flutter Synology CICD, PR-Preview, Secret 파일 업로드 등
-> 모두 동일한 키를 사용합니다. 새 워크플로우 작성 시 반드시 이 키를 사용하세요.
-```
-SERVER_HOST        # Synology NAS 주소 (IP 또는 도메인)
-SERVER_USER        # SSH 사용자명
-SERVER_PASSWORD    # SSH 비밀번호
-```
-
-### Flutter CI (코드 분석 + 빌드 검증)
-```
-ENV_FILE (또는 ENV) # .env 파일 내용 (선택)
-# ※ CI는 빌드 검증 목적이므로 서명/배포 관련 Secrets 불필요
-```
-
-### Flutter Android (테스트 APK + Firebase App Distribution)
-```
-FIREBASE_SERVICE_ACCOUNT_JSON_BASE64  # Firebase App Distribution (선택 - 없으면 아티팩트만 업로드)
-```
-
-### Flutter Android (CD - Play Store 배포)
-```
-RELEASE_KEYSTORE_BASE64
-RELEASE_KEYSTORE_PASSWORD
-RELEASE_KEY_ALIAS
-RELEASE_KEY_PASSWORD
-GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64
-```
-
-### Flutter Android (CD - Firebase App Distribution 배포)
-```
-RELEASE_KEYSTORE_BASE64
-RELEASE_KEYSTORE_PASSWORD
-RELEASE_KEY_ALIAS
-RELEASE_KEY_PASSWORD
-FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
-```
-
-### Flutter iOS (CD - TestFlight 배포)
-```
-APPLE_CERTIFICATE_BASE64
-APPLE_CERTIFICATE_PASSWORD
-APPLE_PROVISIONING_PROFILE_BASE64
-IOS_PROVISIONING_PROFILE_NAME
-APP_STORE_CONNECT_API_KEY_BASE64
-APP_STORE_CONNECT_API_KEY_ID
-APP_STORE_CONNECT_ISSUER_ID
-APPLE_TEAM_ID
-IOS_BUNDLE_ID
-```
-
-### Spring/Docker
-```
-DOCKER_REGISTRY_URL
-DOCKER_USERNAME
-DOCKER_PASSWORD
-# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
-```
-
-### React/Docker
-```
-DOCKER_REGISTRY_URL
-DOCKER_USERNAME
-DOCKER_PASSWORD
-# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
-```
-
-### Next/Docker
-```
-DOCKER_REGISTRY_URL
-DOCKER_USERNAME
-DOCKER_PASSWORD
-# SERVER_HOST, SERVER_USER, SERVER_PASSWORD → "Synology 서버 접속 (공통)" 참조
-```
-
----
-
-## 문서 가이드
-
-| 문서 | 위치 | 설명 |
-|------|------|------|
-| README.md | 루트 | 메인 문서 (간결하게 유지, ~150줄) |
-| CONTRIBUTING.md | 루트 | 기여 가이드 |
-| CHANGELOG.md | 루트 | 변경 이력 (자동생성) |
-| VERSION-CONTROL.md | docs/ | 버전 관리 시스템 |
-| CHANGELOG-AUTOMATION.md | docs/ | 체인지로그 자동화 |
-| PR-PREVIEW.md | docs/ | PR Preview 시스템 |
-| ISSUE-AUTOMATION.md | docs/ | 이슈 자동화 (Issue Helper, QA 봇) |
-| TEMPLATE-INTEGRATOR.md | docs/ | 통합 스크립트 가이드 |
-| FLUTTER-CICD-OVERVIEW.md | docs/ | Flutter CI/CD 전체 가이드 |
-| FLUTTER-TESTFLIGHT-WIZARD.md | docs/ | iOS 배포 설정 |
-| FLUTTER-PLAYSTORE-WIZARD.md | docs/ | Android 배포 설정 |
-| FLUTTER-TEST-BUILD-TRIGGER.md | docs/ | 테스트 빌드 트리거 |
-| SYNOLOGY-DEPLOYMENT-GUIDE.md | docs/ | Synology NAS 배포 가이드 |
-| TROUBLESHOOTING.md | docs/ | 문제 해결 가이드 |
-| PROJECTS-SYNC.md | docs/ | GitHub Projects 동기화 가이드 |
-| WORKFLOW-COMMENT-GUIDELINES.md | docs/ | 워크플로우 주석 표준 가이드라인 |
-
----
-
-## 문서 관리 규칙
-
-### README.md 유지 원칙
-
-README.md는 **150줄 이하**로 간결하게 유지합니다.
+### suh_template CLI 커맨드
 
 ```
-README.md 구조:
-├── 헤더 (중앙 정렬, 배지)
-├── "왜 이 템플릿인가?" (비교 테이블)
-├── 빠른 시작 (간략)
-├── 주요 기능 (테이블 + docs 링크)
-├── 지원 프로젝트 타입
-├── 댓글 명령어 (@suh-lab)
-├── 설정 (간략)
-├── 문서 링크
-└── 지원/라이선스
+get-output-path     # 출력 파일 경로 계산
+get-issue-number    # 이슈 번호 추출
+get-next-seq        # 다음 시퀀스 번호
+normalize-title     # 제목 정규화
+create-branch-name  # 브랜치명 생성
+get-commit-template # 커밋 템플릿 생성
+create-issue        # GitHub 이슈 생성 (PAT는 GITHUB_PAT 환경변수로 전달)
+add-comment         # 이슈 댓글 추가
+get-issue           # 이슈 조회
+update-issue        # 이슈 수정
+create-pr           # PR 생성
+list-prs            # PR 목록 조회
 ```
 
-**상세 내용은 모두 `docs/` 폴더로 분리**합니다.
+> CLI는 Windows 환경에서 인코딩 불안정 이슈 있음. GitHub API 호출은 curl 직접 사용 권장.
 
-### @suh-lab 명령어 문서화 규칙
+### Agent 주의사항
 
-`@suh-lab` 댓글 명령어는 두 곳에 기록합니다:
-
-| 위치 | 내용 |
+| 상황 | 처리 |
 |------|------|
-| `README.md` | 명령어 요약 테이블 (한눈에 보기) |
-| `docs/[기능].md` | 상세 사용법 및 트러블슈팅 |
+| config 없음 | 대화형 수집 — 억지 추론 금지 |
+| repo owner/repo 불명확 | `git remote get-url origin` 추출 → 실패 시 config `github_repos` 참조 |
+| GitHub API 401 | PAT 만료 안내 + `/issue` 스킬에서 재등록 유도 |
+| `gh` CLI 사용 시도 | 금지 — curl로 대체 |
+| 공통 워크플로우 수정 | `project-types/common/`과 `.github/workflows/` 루트 **두 곳 동일하게** 유지 |
+| GitHub 댓글에 마크다운 표 | `array.join('\n')` 패턴 사용 (template literal 들여쓰기 시 표 깨짐) |
 
-**명령어 추가 시 업데이트 순서**:
-1. 해당 기능의 `docs/[기능].md`에 상세 내용 추가
-2. `README.md`의 "댓글 명령어" 테이블에 요약 추가
-3. `CLAUDE.md`의 "트리거 키워드" 섹션 업데이트
+---
 
-### 워크플로우 변경 시 문서 업데이트
+## 기여 가이드라인 핵심
 
-워크플로우 파일을 수정하면 다음을 확인합니다:
+> 상세 내용: `CONTRIBUTING.md`, `docs/WORKFLOW-COMMENT-GUIDELINES.md`
 
-| 변경 유형 | 업데이트 필요 문서 |
-|----------|-------------------|
-| 새 워크플로우 추가 | CLAUDE.md (핵심 워크플로우), 해당 docs/ |
-| 트리거 조건 변경 | 해당 docs/, CLAUDE.md (트리거 키워드) |
-| 환경변수 추가 | 해당 docs/ |
-| 새 댓글 명령어 | README.md, CLAUDE.md, 해당 docs/ |
+### 워크플로우 추가 시
+- 공통 워크플로우: `project-types/common/` (원본) + `.github/workflows/` 루트 (복사본) **동일 유지**
+- 타입별 워크플로우: `project-types/[type]/`만
+- 필수 요소: `workflow_dispatch`, `concurrency`, `[skip ci]`
 
-### 기능 유형별 문서화 위치
-
-새 기능 추가 시 아래 테이블을 참고하여 관련 문서를 업데이트합니다:
-
-| 기능 유형 | 필수 업데이트 | 선택적 업데이트 |
-|----------|--------------|----------------|
-| 새 워크플로우 | CLAUDE.md (핵심 워크플로우 테이블) | docs/[관련기능].md |
-| 새 스크립트 | CLAUDE.md (핵심 스크립트 섹션) | 스크립트 내 주석 |
-| 새 Util 마법사 | CLAUDE.md (마법사 도구 섹션), README.md (주요 기능) | docs/[PLATFORM]-[NAME]-WIZARD.md |
-| 새 @suh-lab 명령어 | README.md (댓글 명령어), CLAUDE.md (트리거 키워드), docs/[기능].md | - |
-| 새 GitHub Secret | CLAUDE.md (필수 GitHub Secrets) | docs/[관련기능].md |
-| 새 이슈 템플릿 | CLAUDE.md (이슈/PR 템플릿) | - |
-| 새 Skill | CLAUDE.md (Skills), skills/ (루트), .cursor/skills/ | - |
-| 브랜치/트리거 변경 | CLAUDE.md (트리거 키워드) | docs/VERSION-CONTROL.md |
-
-### 컴포넌트별 상세 체크리스트
-
-#### 워크플로우 추가 시
-```markdown
-- [ ] 원본 작성: `project-types/common/` 또는 `project-types/[type]/`
-- [ ] 공통 워크플로우 → `.github/workflows/` 루트에도 동일 복사
-- [ ] CLAUDE.md "핵심 워크플로우" 테이블에 행 추가
-- [ ] 댓글/브랜치 트리거 있으면 → CLAUDE.md "트리거 키워드" 업데이트
-- [ ] 관련 docs/ 문서 업데이트 또는 신규 생성
+### Breaking Changes
+호환성 문제 변경 시 `.github/config/breaking-changes.json`에 등록:
+```json
+{
+  "버전": {
+    "severity": "critical | warning",
+    "title": "제목",
+    "message": "상세 설명 및 조치 방법"
+  }
+}
 ```
 
-#### 스크립트 추가 시
-```markdown
-- [ ] `.github/scripts/`에 `snake_case.sh` 또는 `snake_case.py`로 작성
-- [ ] CLAUDE.md "핵심 스크립트" 섹션에 사용법 예시 추가
-- [ ] 스크립트 상단에 사용법 주석 작성
-```
-
-#### Util 마법사 추가 시
-```markdown
-- [ ] 디렉토리: `.github/util/[platform]/[name]-wizard/`
-- [ ] 필수 파일: `version.json`, `version-sync.sh`, `[name]-wizard.html`, `[name]-wizard.js`
-- [ ] CLAUDE.md "마법사 도구" 섹션에 단계별 프로세스 및 Secrets 추가
-- [ ] README.md "주요 기능" 테이블에 링크 추가
-- [ ] docs/[PLATFORM]-[NAME]-WIZARD.md 상세 가이드 작성
-```
-
-#### @suh-lab 댓글 명령어 추가 시
-```markdown
-- [ ] 워크플로우에 `issue_comment` 트리거 구현
-- [ ] README.md "댓글 명령어" 테이블에 요약 (명령어, 기능, 대상)
-- [ ] CLAUDE.md "트리거 키워드 > 댓글 기반 트리거" 테이블에 추가
-- [ ] docs/[관련기능].md에 상세 사용법, 예시, 트러블슈팅 추가
-```
-
-#### GitHub Secret 추가 시
-```markdown
-- [ ] CLAUDE.md "필수 GitHub Secrets" 해당 섹션에 추가
-- [ ] 관련 docs/ 문서에 Secret 설정 방법 안내
-- [ ] Util 마법사가 생성하는 경우 → 마법사 섹션에도 명시
-```
-
-### 신규 기능 문서화 요약 체크리스트
-
-```markdown
-새 기능 추가 시 (공통):
-- [ ] 해당 기능의 docs/ 문서 생성/업데이트
-- [ ] README.md "주요 기능" 테이블 업데이트 (필요시)
-- [ ] README.md "댓글 명령어" 테이블 업데이트 (필요시)
-- [ ] README.md "문서" 테이블에 링크 추가
-- [ ] CLAUDE.md 관련 섹션 업데이트
-- [ ] 모든 링크 유효성 확인
-```
-
-### docs/ 폴더 네이밍 규칙
-
-```
-docs/
-├── [기능명].md              # 단일 기능 문서
-├── [타입]-[기능].md         # 타입별 기능 (예: FLUTTER-CICD-OVERVIEW.md)
-└── [타입]-[상세]-[기능].md  # 세부 기능 (예: FLUTTER-TESTFLIGHT-WIZARD.md)
-```
-
-**파일명 규칙**:
-- 대문자 + 하이픈 (UPPER-KEBAB-CASE)
-- 예: `PR-PREVIEW.md`, `VERSION-CONTROL.md`
+---
 
 ## Skill routing
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill
-tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
-The skill has specialized workflows that produce better results than ad-hoc answers.
+이 프로젝트에서 사용 가능한 스킬 호출 규칙:
 
-Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
-- Save progress, save state, save my work → invoke context-save
-- Resume, where was I, pick up where I left off → invoke context-restore
-- Code quality, health check → invoke health
+| 요청 유형 | 호출 스킬 |
+|----------|----------|
+| 코드 분석, 현황 파악 | `cassiiopeia:analyze` |
+| 버그, 오류, 원인 파악 | `cassiiopeia:troubleshoot` |
+| 새 기능 설계 | `cassiiopeia:plan` → `cassiiopeia:implement` |
+| 코드 리뷰 | `cassiiopeia:review` |
+| 이슈 작성 | `cassiiopeia:issue` |
+| 커밋 | `cassiiopeia:commit` |
+| 배포 | `cassiiopeia:deploy` |
+| 보고서 | `cassiiopeia:report` |
+| 브레인스토밍 | `superpowers:brainstorming` |
+| 구현 계획 | `superpowers:writing-plans` |
+| 계획 실행 | `superpowers:executing-plans` |
 
 ## 기능 구현 워크플로우
 
-새 기능 구현 시 반드시 이 순서로 스킬을 호출한다:
+새 기능 구현 시 순서:
 
-1. `/office-hours` — 문제 정의, 전제 도전, 설계 문서 생성 (gstack)
-2. `/plan-eng-review` — 아키텍처·테스트 계획 검토 (gstack)
-3. `superpowers:brainstorming` — 구현 아이디어 브레인스토밍
-4. `superpowers:writing-plans` — 상세 구현 계획 작성
-5. `superpowers:executing-plans` — 계획 기반 실제 구현
-6. `superpowers:requesting-code-review` — 구현 완료 후 코드 리뷰 요청
+1. `superpowers:brainstorming` — 설계 및 스펙 확정
+2. `superpowers:writing-plans` — 상세 구현 계획
+3. `superpowers:executing-plans` — 실제 구현
+4. `superpowers:requesting-code-review` — 코드 리뷰 요청

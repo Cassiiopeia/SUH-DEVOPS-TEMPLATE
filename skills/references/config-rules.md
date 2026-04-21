@@ -6,12 +6,11 @@
 
 ## 1. Config 파일 경로 구조
 
-```
-# 로컬 (프로젝트별)
-{PROJECT_ROOT}/.suh-template/config/{skill_id}.config.json
+config 파일은 **글로벌 단일 파일**로만 관리한다. 프로젝트별 로컬 config는 사용하지 않는다.
 
-# 글로벌 (모든 프로젝트 공유)
-{HOME}/.suh-template/config/{skill_id}.config.json
+```
+# 글로벌 (모든 프로젝트 공유) — 유일한 경로
+{HOME}/.suh-template/config/config.json
 ```
 
 `{HOME}`은 OS별로 다르다. 아래 §2에서 확인하는 방법을 따른다.
@@ -39,63 +38,36 @@ echo "$HOME"
 - `/home/...` → Linux
 - 결과가 비어있으면 `echo "$USERPROFILE"` 로 재시도
 
-**글로벌 config 실제 경로 예시:**
+**실제 경로 예시:**
 
 | OS | 실제 경로 |
 |----|-----------|
-| macOS | `/Users/chan4760/.suh-template/config/issue.config.json` |
-| Windows (Git Bash) | `/c/Users/chan4760/.suh-template/config/issue.config.json` |
-| Windows (탐색기 경로) | `C:\Users\chan4760\.suh-template\config\issue.config.json` |
+| macOS | `/Users/chan4760/.suh-template/config/config.json` |
+| Linux | `/home/chan4760/.suh-template/config/config.json` |
+| Windows (Git Bash) | `/c/Users/chan4760/.suh-template/config/config.json` |
 
 > `chan4760` 부분은 `echo "$HOME"` 결과에서 추출한 실제 username으로 대체한다.
 
 ---
 
-## 3. Config 읽기 순서
+## 3. Config 읽기
 
-agent는 Read tool로 다음 순서로 파일을 탐색한다. 먼저 찾은 파일을 사용한다.
+agent는 Read tool로 `{HOME}/.suh-template/config/config.json`을 읽는다.
 
-```
-1순위: {PROJECT_ROOT}/.suh-template/config/{skill_id}.config.json
-2순위: {HOME}/.suh-template/config/{skill_id}.config.json
-        (HOME은 위 §2에서 확인한 실제 경로 사용)
-```
+파일이 없으면 → §5 대화형 수집으로 진행한다.
 
-**예시 (issue config, macOS, username=chan4760):**
-```
-1순위: /Users/chan4760/projects/my-app/.suh-template/config/issue.config.json
-2순위: /Users/chan4760/.suh-template/config/issue.config.json
-```
-
-**예시 (issue config, Windows Git Bash, username=chan4760):**
-```
-1순위: /c/Users/chan4760/projects/my-app/.suh-template/config/issue.config.json
-2순위: /c/Users/chan4760/.suh-template/config/issue.config.json
-```
-
-두 파일 모두 없으면 → §5 대화형 수집으로 진행한다.
+**PAT 우선순위 (레포별 API 호출 시):**
+1. 해당 repo 항목의 `pat` 필드가 non-null이면 사용
+2. `null`이거나 없으면 `global_pat` fallback
 
 ---
 
 ## 4. Config 저장 (쓰기)
 
-수집 완료 후 저장 위치를 사용자에게 선택받는다:
+agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다.
 
-```
-설정을 어디에 저장할까요?
-1. 이 프로젝트에만 (.suh-template/config/) — .gitignore 자동 등록
-2. 모든 프로젝트에서 사용 (~/.suh-template/config/)
-```
-
-agent가 Write tool로 저장한다:
-
-| 선택 | 저장 경로 |
-|------|-----------|
-| 1 (로컬) | `{PROJECT_ROOT}/.suh-template/config/{skill_id}.config.json` |
-| 2 (글로벌) | `{HOME}/.suh-template/config/{skill_id}.config.json` |
-
-**로컬 저장(1번) 선택 시 추가 작업:**
-`{PROJECT_ROOT}/.gitignore`에 `.suh-template/config/` 항목이 없으면 추가한다.
+새 repo 추가 시 기존 파일을 Read로 읽은 뒤 `repos` 배열에 항목을 추가하여 덮어쓴다.
+**기존 내용을 날리지 않도록 반드시 전체 파일을 읽고 수정한다.**
 
 ---
 
@@ -103,7 +75,10 @@ agent가 Write tool로 저장한다:
 
 파일이 없으면 정보를 하나씩 수집한다. **한 번에 여러 개를 묻지 않는다.**
 
-수집할 항목은 skill별로 다르다. 각 skill의 "Config 확인" 섹션을 참조.
+수집 순서:
+1. `global_pat` — GitHub Personal Access Token (repo + workflow 권한)
+2. `default_assignee` — 이슈 기본 담당자 GitHub 사용자명
+3. 첫 번째 repo: `owner`, `repo`, `name` (이 repo를 `default: true`로 설정)
 
 수집 완료 후 §4의 저장 절차를 따른다.
 
@@ -121,20 +96,28 @@ agent가 Write tool로 저장한다:
 
 ## 7. Skill별 Config 스키마
 
-### issue.config.json (`skill_id = issue`)
+### config.json
 
-`issue`, `commit`, `deploy`, `github`, `report` 스킬이 공유한다.
+`issue`, `commit`, `changelog-deploy`, `github`, `report` 스킬이 공유한다.
 
 ```json
 {
-  "github_pat": "ghp_xxxxxxxxxxxxxxxxxxxx",
   "default_assignee": "GitHub_사용자명",
-  "github_repos": [
+  "global_pat": "ghp_xxxxxxxxxxxxxxxxxxxx",
+  "repos": [
     {
       "name": "프로젝트 이름",
       "owner": "GitHub_사용자명_또는_조직명",
       "repo": "저장소명",
+      "pat": null,
       "default": true
+    },
+    {
+      "name": "다른 프로젝트",
+      "owner": "GitHub_사용자명_또는_조직명",
+      "repo": "저장소명",
+      "pat": "ghp_별도PAT_있으면_입력",
+      "default": false
     }
   ]
 }
@@ -142,9 +125,19 @@ agent가 Write tool로 저장한다:
 
 | 필드 | 필수 | 설명 |
 |------|------|------|
-| `github_pat` | ✅ | GitHub Personal Access Token (repo + workflow 권한) |
-| `default_assignee` | ✅ | 이슈 담당자 GitHub 사용자명 |
-| `github_repos` | ✅ | 사용할 저장소 목록. `default: true`인 항목이 기본 선택 |
+| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 |
+| `global_pat` | ✅ | 전체 공용 GitHub PAT (repo + workflow 권한) |
+| `repos` | ✅ | 사용할 저장소 목록 |
+| `repos[].name` | ✅ | 프로젝트 식별 이름 |
+| `repos[].owner` | ✅ | GitHub 사용자명 또는 조직명 |
+| `repos[].repo` | ✅ | 저장소명 |
+| `repos[].pat` | — | 레포별 개별 PAT. `null`이면 `global_pat` 사용 |
+| `repos[].default` | — | `true`인 항목이 기본 선택 repo |
+
+**PAT 결정 로직 (agent 구현 시):**
+```
+effective_pat = repo.pat if repo.pat else config.global_pat
+```
 
 ### synology-expose.config.json (`skill_id = synology-expose`)
 

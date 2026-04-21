@@ -82,9 +82,9 @@ agent가 직접 경로를 계산하여 파일을 저장한다:
 
 ### 포스팅 플로우
 
-1. **PAT 확인**: `references/config-rules.md` §2~3 절차로 `skill_id = issue` config에서 `github_pat` 읽기. 파일이 없으면 로컬 저장만 하고 종료.
+1. **PAT 확인**: `references/config-rules.md` §2~3 절차로 config 읽기. 파일이 없으면 로컬 저장만 하고 종료. 해당 repo의 `pat`(non-null) 또는 `global_pat` 사용.
 
-2. **repo 확인**: config의 `github_repos`에서 `default: true`인 repo 사용, 또는 `git remote get-url origin`에서 `owner`/`repo` 추출.
+2. **repo 확인**: `git remote get-url origin`에서 `owner`/`repo` 추출, 실패 시 config의 `repos`에서 `default: true`인 repo 사용.
 
 3. **댓글 포스팅**:
 ```bash

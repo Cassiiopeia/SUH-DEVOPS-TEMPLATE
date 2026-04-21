@@ -80,7 +80,7 @@ CONTEXT_FILE="$PROJECT_ROOT/.suh-template/context/current-issue.json"
   OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
   REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
   ```
-  `references/config-rules.md` §2~3 절차로 `skill_id = issue` config에서 `github_pat` 읽기.
+  `references/config-rules.md` §2~3 절차로 config 읽기. 선택된 repo의 `pat`이 non-null이면 해당 PAT, 아니면 `global_pat` 사용.
   ```bash
   curl -s -H "Authorization: token {github_pat}" \
     "https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"

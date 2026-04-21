@@ -1,0 +1,21 @@
+{
+  "_comment": "표준 Somansa skill config 템플릿. 사용자별로 다른 값(계정/토큰/경로)은 이 파일에 두고, SKILL.md 본문에 직접 박지 말 것.",
+  "service": {
+    "url": "https://example.somansa.com",
+    "token": "",
+    "user": "",
+    "password": "",
+    "verify_ssl": true
+  },
+  "ssh": {
+    "host": "",
+    "user": "",
+    "pem_path": ""
+  },
+  "projects": {
+    "project-key": {
+      "path": "namespace/repo-name",
+      "aliases": ["short-name", "한글별칭"]
+    }
+  }
+}

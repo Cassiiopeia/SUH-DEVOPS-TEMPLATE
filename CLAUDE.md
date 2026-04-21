@@ -218,9 +218,9 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `commit` | 이슈 기반 커밋 자동화 |
 | `github` | GitHub 이슈/PR 조회·관리 |
 | `report` | 구현 보고서 생성 |
-| `deploy` | main push → deploy PR → automerge |
-| `changelogfix` | deploy PR automerge 실패 시 재트리거 |
+| `changelog-deploy` | main push → deploy PR → automerge / automerge 실패 시 재트리거 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
+| `skill-creator` | skill 생성/리뷰/개선 (CREATE·REVIEW·IMPROVE 3모드) |
 
 ---
 
@@ -253,7 +253,7 @@ skills/
 
 | 스킬 | skill_id | 비고 |
 |------|---------|------|
-| `issue`, `commit`, `github`, `deploy`, `report`, `changelogfix` | `issue` | PAT + repos 공유 |
+| `issue`, `commit`, `github`, `changelog-deploy`, `report` | `issue` | PAT + repos 공유 |
 | `synology-expose` | `synology-expose` | NAS 인스턴스 정보 |
 
 ### suh_template CLI 커맨드
@@ -323,7 +323,7 @@ list-prs            # PR 목록 조회
 | 코드 리뷰 | `cassiiopeia:review` |
 | 이슈 작성 | `cassiiopeia:issue` |
 | 커밋 | `cassiiopeia:commit` |
-| 배포 | `cassiiopeia:deploy` |
+| 배포 / automerge 실패 재트리거 | `cassiiopeia:changelog-deploy` |
 | 보고서 | `cassiiopeia:report` |
 | 브레인스토밍 | `superpowers:brainstorming` |
 | 구현 계획 | `superpowers:writing-plans` |

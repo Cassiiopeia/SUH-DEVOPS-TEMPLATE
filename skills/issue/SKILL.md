@@ -303,27 +303,10 @@ agent가 직접 생성한다:
 ```
 
 선택에 따라:
-- **1 선택**: `git worktree add -b {브랜치명} ../{브랜치명}` 실행 후 이슈 컨텍스트 저장
-- **2 선택**: `git checkout -b {브랜치명}` 실행 후 이슈 컨텍스트 저장
+- **1 선택**: `git worktree add -b {브랜치명} ../{브랜치명}` 실행
+- **2 선택**: `git checkout -b {브랜치명}` 실행
 - **3 선택**: 아무 git 명령도 실행하지 않음. 브랜치명만 출력하고 종료
 - **4 선택**: 브랜치명을 다시 출력하고 종료
-
-**이슈 컨텍스트 저장** (1, 2 선택 시):
-
-```bash
-mkdir -p "$PROJECT_ROOT/.suh-template/context"
-cat > "$PROJECT_ROOT/.suh-template/context/current-issue.json" << EOF
-{
-  "issue_number": {번호},
-  "issue_title": "{이슈 제목}",
-  "issue_url": "{이슈 URL}",
-  "branch_name": "{브랜치명}",
-  "commit_template": "{이슈제목} : feat : {설명} {이슈URL}"
-}
-EOF
-```
-
-`.suh-template/`은 `.gitignore`에 등록되어 있어 커밋되지 않는다.
 
 ## 산출물 저장
 

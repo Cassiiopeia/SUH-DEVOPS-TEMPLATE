@@ -1,11 +1,46 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-22T07:22:22Z",
-    "currentVersion": "3.0.8",
+    "lastUpdated": "2026-04-22T11:21:43Z",
+    "currentVersion": "3.0.14",
     "projectType": "basic",
-    "totalReleases": 83
+    "totalReleases": 84
   },
   "releases": [
+    {
+      "version": "3.0.14",
+      "project_type": "basic",
+      "date": "2026-04-22",
+      "pr_number": 261,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * deploy PR 본문에 릴리스 노트가 먼저 작성된 경우 워크플로우가 덮어쓰지 않도록 보호 기능 추가\n\n* **버그 수정**\n  * 스킬 커밋 메시지 템플릿에 이모지·태그가 포함되던 문제 수정\n\n* **개선**\n  * /commit 스킬이 별도 파일 없이 브랜치명에서 이슈 번호를 자동 추출하도록 구조 단순화\n  * 스킬 간 임시 컨텍스트 파일(.suh-template/context/) 의존성 제거\n\n* **문서**\n  * 커밋 메시지 이모지·태그 금지 규칙 문서화",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "deploy PR 본문에 릴리스 노트가 먼저 작성된 경우 워크플로우가 덮어쓰지 않도록 보호 기능 추가"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "스킬 커밋 메시지 템플릿에 이모지·태그가 포함되던 문제 수정"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "/commit 스킬이 별도 파일 없이 브랜치명에서 이슈 번호를 자동 추출하도록 구조 단순화",
+            "스킬 간 임시 컨텍스트 파일(.suh-template/context/) 의존성 제거"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "커밋 메시지 이모지·태그 금지 규칙 문서화"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.8",
       "project_type": "basic",

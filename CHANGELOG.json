@@ -1,11 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-21T09:21:41Z",
-    "currentVersion": "2.9.26",
+    "lastUpdated": "2026-04-21T09:28:07Z",
+    "currentVersion": "3.0.1",
     "projectType": "basic",
-    "totalReleases": 79
+    "totalReleases": 80
   },
   "releases": [
+    {
+      "version": "3.0.1",
+      "project_type": "basic",
+      "date": "2026-04-21",
+      "pr_number": 249,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * Config 설정 파일이 글로벌 단일 파일 구조로 통합되어 관리가 편리해짐\n  * PAT와 저장소 정보를 하나의 글로벌 설정 파일로 일괄 관리 가능\n\n* **개선**\n  * 프로젝트 문서 전면 개편 및 프로젝트 가치 재정의로 가독성 향상",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "Config 설정 파일이 글로벌 단일 파일 구조로 통합되어 관리가 편리해짐",
+            "PAT와 저장소 정보를 하나의 글로벌 설정 파일로 일괄 관리 가능"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "프로젝트 문서 전면 개편 및 프로젝트 가치 재정의로 가독성 향상"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "2.9.26",
       "project_type": "basic",

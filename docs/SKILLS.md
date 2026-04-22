@@ -24,7 +24,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 ---
 
-## Skill 전체 목록 (24종)
+## Skill 전체 목록 (25종)
 
 용도에 따라 세 그룹으로 나뉩니다:
 
@@ -397,6 +397,21 @@ Spring Boot 프로젝트용 테스트 샘플 코드를 생성합니다. `build.g
 
 ---
 
+### `/cassiiopeia:ssh`
+
+**무엇을 하나요?**
+AWS EC2, 시놀로지 NAS, 일반 Linux 서버 등 **SSH 접근 가능한 모든 서버에 접속**해서 명령을 실행하고 결과를 보고합니다. 비밀번호 인증과 PEM 키 인증을 모두 지원하며, 서버 정보는 `~/.suh-template/config/ssh.config.json`에 저장해두면 이름만 말해도 바로 접속합니다.
+
+**수정되는 것**: 없음 (원격 서버에서 명령 실행 후 결과만 반환)
+**돌려주는 것**: SSH 명령 실행 결과 + 요약 보고
+
+**언제 쓰나요?**
+- "서버 로그 봐줘", "prod 검수해줘", "배포 됐는지 확인해줘"
+- CI/CD 완료 후 서버 상태 자동 검수
+- 여러 서버를 config에 등록해두고 이름으로 선택
+
+---
+
 ### `/cassiiopeia:skill-creator`
 
 **무엇을 하나요?**
@@ -464,6 +479,7 @@ flowchart LR
 | Figma 디자인을 코드로 변환 | `figma` |
 | Spring Boot 테스트 샘플 생성 | `suh-spring-test` |
 | Synology 외부 노출 가이드 | `synology-expose` |
+| 원격 서버 SSH 접속·명령 실행 | `ssh` |
 | 빌드 실행 / 에러 분석 | `build` |
 | 코드 주석 / 문서 작성 | `document` |
 | 배포 PR 생성 + automerge | `changelog-deploy` |

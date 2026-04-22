@@ -1,0 +1,24 @@
+{
+  "instances": [
+    {
+      "name": "집 NAS",
+      "host": "your-nas.synology.me",
+      "port": 2022,
+      "user": "your-username",
+      "auth": "password",
+      "password": "your-password",
+      "key_path": null,
+      "default": true
+    },
+    {
+      "name": "AWS EC2 prod",
+      "host": "ec2-12-34-56-78.compute-1.amazonaws.com",
+      "port": 22,
+      "user": "ec2-user",
+      "auth": "key",
+      "password": null,
+      "key_path": "~/.ssh/my-key.pem",
+      "default": false
+    }
+  ]
+}

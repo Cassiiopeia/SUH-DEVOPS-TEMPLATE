@@ -118,7 +118,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 ---
 
-## Claude Code Skills (24종)
+## Claude Code Skills (25종)
 
 ### 🔄 개발 사이클 자동화
 

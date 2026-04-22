@@ -72,24 +72,43 @@ $ARGUMENTS
 
 ### 1단계: 커밋 상태 확인
 
+아래 명령어를 **각각 별도로** 실행한다. 절대 한 줄로 합치지 않는다.
+
 ```bash
 git status --short
-git log origin/main..HEAD --oneline 2>/dev/null || git log --oneline -5
 ```
 
-- 미커밋 변경사항이 있으면 **즉시 멈추고** 안내:
+```bash
+git fetch origin
+```
+
+```bash
+# deploy 브랜치 대비 미반영 커밋 목록 (이게 핵심 — main→deploy PR이 목적이므로)
+git log origin/deploy..HEAD --oneline 2>/dev/null
+```
+
+```bash
+# 위 결과가 비어 있을 경우 대비용 — main remote 대비도 함께 확인
+git log origin/main..HEAD --oneline 2>/dev/null
+```
+
+**판단 기준**:
+
+- `git status --short` 결과에 미커밋 변경사항이 있으면 **즉시 멈추고** 안내:
   ```
   커밋되지 않은 변경사항이 있습니다. 먼저 커밋 후 다시 실행해주세요.
   /cassiiopeia:commit 으로 커밋할 수 있습니다.
   ```
-- push할 커밋이 없으면 "push할 커밋이 없습니다" 안내 후 종료
+- `git log origin/deploy..HEAD` 결과가 비어 있으면 → `git log origin/main..HEAD` 결과도 확인
+- **두 결과 모두 비어 있을 때만** "deploy할 커밋이 없습니다" 안내 후 종료
+- 둘 중 하나라도 커밋이 있으면 다음 단계 진행
 
 ### 2단계: push 전 확인
 
 push할 커밋 목록을 보여주고 사용자 승인받기:
 
 ```
-📋 push할 커밋:
+📋 push할 커밋 (main → deploy 미반영):
   - {커밋 메시지 1}
   - {커밋 메시지 2}
 

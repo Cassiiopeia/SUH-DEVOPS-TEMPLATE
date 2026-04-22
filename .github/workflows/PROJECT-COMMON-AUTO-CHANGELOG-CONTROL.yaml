@@ -47,17 +47,29 @@ jobs:
       project_type: ${{ steps.get_version.outputs.project_type }}
     steps:
       - name: PR 본문 초기화
+        id: clear_body
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          echo "🗑️ PR #$PR_NUMBER 본문 초기화 중..."
 
-          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
-               -H "Content-Type: application/json" \
-               -X PATCH \
-               -d '{"body": ""}' \
-               "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+          # changelog-deploy가 이미 Summary를 작성했을 수 있으므로 먼저 확인
+          CURRENT_BODY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                              "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                              jq -r '.body // ""')
 
-          echo "✅ PR 본문 초기화 완료"
+          if echo "$CURRENT_BODY" | grep -q "Summary by CodeRabbit"; then
+            echo "✅ 이미 'Summary by CodeRabbit' 감지 — 본문 초기화 건너뜀"
+            echo "$CURRENT_BODY" > pr_body.md
+            echo "already_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "🗑️ PR #$PR_NUMBER 본문 초기화 중..."
+            curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+                 -H "Content-Type: application/json" \
+                 -X PATCH \
+                 -d '{"body": ""}' \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+            echo "✅ PR 본문 초기화 완료"
+            echo "already_found=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: 저장소 체크아웃
         uses: actions/checkout@v5
@@ -124,6 +136,8 @@ jobs:
           echo "✅ PR 제목 변경 완료: $NEW_TITLE"
 
       - name: CodeRabbit Summary 요청
+        # 이미 Summary가 있으면 요청 불필요
+        if: steps.clear_body.outputs.already_found != 'true'
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
 
@@ -139,6 +153,14 @@ jobs:
         id: detect_summary
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          # changelog-deploy가 이미 Summary를 작성한 경우 폴링 생략
+          if [ "${{ steps.clear_body.outputs.already_found }}" = "true" ]; then
+            echo "✅ 초기화 단계에서 이미 Summary 감지 — 폴링 생략"
+            echo "summary_found=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           MAX_ATTEMPTS=120  # 10분 = 120 * 5초
           ATTEMPT=0
 

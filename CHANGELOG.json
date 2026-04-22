@@ -1,11 +1,30 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-21T09:28:07Z",
-    "currentVersion": "3.0.1",
+    "lastUpdated": "2026-04-22T06:46:17Z",
+    "currentVersion": "3.0.3",
     "projectType": "basic",
-    "totalReleases": 80
+    "totalReleases": 81
   },
   "releases": [
+    {
+      "version": "3.0.3",
+      "project_type": "basic",
+      "date": "2026-04-22",
+      "pr_number": 253,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **문서**\n  * Skills 목록이 24종으로 업데이트되어 실제 제공 스킬과 문서가 일치\n  * changelog-deploy, github, skill-creator 스킬 설명 및 사용법 추가\n  * 개발 사이클 흐름도에 배포 단계가 반영되어 전체 워크플로우 파악 가능\n  * changelog-deploy 스킬의 배포 여부 판단 로직 개선",
+      "parsed_changes": {
+        "문서": {
+          "title": "문서",
+          "items": [
+            "Skills 목록이 24종으로 업데이트되어 실제 제공 스킬과 문서가 일치",
+            "changelog-deploy, github, skill-creator 스킬 설명 및 사용법 추가",
+            "개발 사이클 흐름도에 배포 단계가 반영되어 전체 워크플로우 파악 가능",
+            "changelog-deploy 스킬의 배포 여부 판단 로직 개선"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.1",
       "project_type": "basic",

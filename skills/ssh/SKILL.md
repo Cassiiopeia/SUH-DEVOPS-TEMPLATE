@@ -86,29 +86,70 @@ Config 파일 경로: `{HOME}/.suh-template/config/ssh.config.json`
 
 ### Phase 1 — SSH 명령 실행
 
-**비밀번호 인증 (auth=password):**
+`scripts/ssh_connect.py` (paramiko 기반)를 사용한다. sshpass 불필요 — macOS/Linux/Windows 크로스플랫폼 지원.
 
-sshpass: 비밀번호 방식 SSH를 스크립트에서 자동으로 실행하기 위한 도구.
+**Python 실행 경로 확인 (최초 1회):**
 
 ```bash
-# sshpass 없으면: brew install hudochenkov/sshpass/sshpass (macOS) / sudo apt-get install sshpass (Linux)
-sshpass -p '{password}' ssh \
-  -o StrictHostKeyChecking=no \
-  -o PreferredAuthentications=password \
-  -o PubkeyAuthentication=no \
-  -p {port} \
-  {user}@{host} \
-  "{command}"
+# python3 → python 순으로 fallback
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+if [ -z "$PYTHON" ]; then echo "[ERROR] Python이 설치되지 않았습니다."; exit 1; fi
+
+# paramiko 설치 여부 확인 (없으면 설치)
+$PYTHON -c "import paramiko" 2>/dev/null || $PYTHON -m pip install paramiko
+```
+
+**Windows PowerShell (5.x 포함):**
+
+```powershell
+# python3 → python 순서로 fallback (PowerShell 5.x: ?.Source 미지원이므로 if 분기 사용)
+$py3 = Get-Command python3 -ErrorAction SilentlyContinue
+if ($py3) { $PYTHON = $py3.Source }
+else {
+    $py = Get-Command python -ErrorAction SilentlyContinue
+    if ($py) { $PYTHON = $py.Source }
+    else { Write-Error "[ERROR] Python이 설치되지 않았습니다."; exit 1 }
+}
+
+# paramiko 설치 확인
+& $PYTHON -c "import paramiko" 2>$null
+if ($LASTEXITCODE -ne 0) { & $PYTHON -m pip install paramiko }
+```
+
+**스크립트 경로 확인:**
+
+```bash
+# 플러그인 설치 경로에서 스크립트 찾기
+PLUGIN_ROOT=$(cat ~/.claude/plugins/installed.json 2>/dev/null \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('cassiiopeia',{}).get('path',''))" 2>/dev/null)
+SCRIPT_PATH="${PLUGIN_ROOT}/skills/ssh/scripts/ssh_connect.py"
+
+# 없으면 로컬 경로 시도
+[ ! -f "$SCRIPT_PATH" ] && SCRIPT_PATH="$(git rev-parse --show-toplevel)/skills/ssh/scripts/ssh_connect.py"
+```
+
+**비밀번호 인증 (auth=password):**
+
+```bash
+$PYTHON "$SCRIPT_PATH" \
+  --host "{host}" \
+  --port {port} \
+  --user "{user}" \
+  --auth password \
+  --password "{password}" \
+  --command "{command}"
 ```
 
 **PEM 키 인증 (auth=key, AWS EC2 등):**
 
 ```bash
-ssh -i {key_path} \
-  -o StrictHostKeyChecking=no \
-  -p {port} \
-  {user}@{host} \
-  "{command}"
+$PYTHON "$SCRIPT_PATH" \
+  --host "{host}" \
+  --port {port} \
+  --user "{user}" \
+  --auth key \
+  --key-path "{key_path}" \
+  --command "{command}"
 ```
 
 사용자가 실행할 명령을 명시하지 않았으면 목적에 맞는 명령을 agent가 판단해 실행한다.
@@ -141,8 +182,12 @@ wget -q -O - --server-response http://localhost:{port}/{path} 2>&1 | head -5
 
 | 증상 | 원인 | 해결 |
 |------|------|------|
-| `Permission denied, please try again` | sshpass 비밀번호 전달 실패 | `-o PreferredAuthentications=password -o PubkeyAuthentication=no` 옵션 확인 |
+| `[ERROR] paramiko 모듈이 없습니다.` | paramiko 미설치 | `pip install paramiko` 또는 `pip3 install paramiko` |
+| `[ERROR] Python이 설치되지 않았습니다.` | Python 미설치 | python.org에서 설치 (Windows: PATH 추가 필수) |
+| `[ERROR] 인증 실패` | 비밀번호 또는 키 오류 | config의 `password` / `key_path` 값 확인 |
+| `[ERROR] 소켓 오류` | 포트 오류 또는 방화벽 | config `port` 확인, 서버 방화벽 규칙 확인 |
+| `[ERROR] PEM 키 파일을 찾을 수 없습니다` | key_path 경로 오류 | `~` 포함 절대 경로로 입력 (예: `~/.ssh/my-key.pem`) |
 | `command not found` | PATH 미등록 바이너리 | 절대 경로로 실행 (`which`로 먼저 경로 확인) |
-| `Connection refused` | 포트 오류 또는 서비스 미기동 | config `port` 확인 후 재시도 |
 | `sudo: a terminal is required` | 비대화형 SSH에서 sudo 불가 | `echo '{password}' \| sudo -S {command}` 패턴 사용 |
 | `WARNING: UNPROTECTED PRIVATE KEY FILE` | PEM 키 권한 문제 | `chmod 400 {key_path}` 실행 후 재시도 |
+| Windows에서 `?` 기호 오류 (`?.Source`) | PowerShell 5.x Null 조건 연산자 미지원 | `if ($x) { $x.Source }` 패턴으로 대체 |

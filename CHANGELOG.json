@@ -1,11 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-22T12:14:20Z",
-    "currentVersion": "3.0.15",
+    "lastUpdated": "2026-04-22T12:26:33Z",
+    "currentVersion": "3.0.17",
     "projectType": "basic",
-    "totalReleases": 85
+    "totalReleases": 86
   },
   "releases": [
+    {
+      "version": "3.0.17",
+      "project_type": "basic",
+      "date": "2026-04-22",
+      "pr_number": 264,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * macOS/Linux/Windows 모두 지원하는 SSH 접속 기능 추가\n\n* **문서**\n  * ssh 스킬 크로스플랫폼 구현 완료 보고서 추가",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "macOS/Linux/Windows 모두 지원하는 SSH 접속 기능 추가"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "ssh 스킬 크로스플랫폼 구현 완료 보고서 추가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.15",
       "project_type": "basic",

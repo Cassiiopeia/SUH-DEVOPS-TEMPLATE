@@ -329,6 +329,16 @@ list-prs            # PR 목록 조회
 | 구현 계획 | `superpowers:writing-plans` |
 | 계획 실행 | `superpowers:executing-plans` |
 
+## 커밋 컨벤션 필수 규칙
+
+커밋 메시지 앞에 이모지·태그(`🚀[기능개선]`, `⚙️[기능추가]` 등) **절대 포함 금지**.
+이슈 제목에서 이모지+태그를 제거한 순수 내용만 사용한다.
+
+- 올바른 예: `AUTO-CHANGELOG-CONTROL PR 본문 초기화 보호 로직 추가 : feat : ... https://...`
+- 잘못된 예: `🚀[기능개선][ChangeLog] AUTO-CHANGELOG-CONTROL : feat : ...`
+
+report·implement 등 커밋을 직접 실행하는 스킬도 이 규칙을 따른다.
+
 ## 기능 구현 워크플로우
 
 새 기능 구현 시 순서:

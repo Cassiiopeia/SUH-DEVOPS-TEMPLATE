@@ -181,6 +181,8 @@ curl -s \
 - 이슈 번호는 GitHub 등록 전이므로 임시로 `TMP1`, `TMP2`… 를 사용한다 (GitHub 등록 후 실제 번호로 rename)
 - 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
 
+**저장 직전**: `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜**을 따라 작성한 이슈 본문 전체를 검토한다. 민감 정보가 발견되면 마스킹 처리 후 저장한다.
+
 반환된 경로(`docs/suh-template/issue/YYYYMMDD_번호_제목.md`)에 파일을 저장한다.
 
 파일 저장 후 **반드시 사용자에게 파일 경로를 알리고 내용을 확인받는다**:
@@ -279,8 +281,8 @@ agent가 직접 계산한다:
 ### 7단계: 커밋 템플릿 계산
 
 agent가 직접 생성한다:
-- 형식: `{이슈제목} : feat : {설명} {이슈URL}`
-- 예시: `⚙️[기능추가][Skills] issue 스킬 개선 : feat : {설명} https://github.com/.../issues/235`
+- 형식: `{이슈제목에서 이모지·태그 제거한 순수 내용} : feat : {설명} {이슈URL}`
+- 예시: `issue 스킬 개선 : feat : {설명} https://github.com/.../issues/235`
 
 ### 8단계: 다음 작업 선택지 제시
 
@@ -290,7 +292,7 @@ agent가 직접 생성한다:
 이슈 URL: {url}
 
 📝 커밋 메시지 템플릿:
-{이슈제목} : feat : {변경사항 설명} {이슈URL}
+{이슈제목에서 이모지·태그 제거한 순수 내용} : feat : {변경사항 설명} {이슈URL}
 (작업 완료 후 /commit 으로 자동 커밋하거나 위 형식으로 직접 커밋하세요)
 
 다음 작업을 선택하세요:
@@ -301,27 +303,10 @@ agent가 직접 생성한다:
 ```
 
 선택에 따라:
-- **1 선택**: `git worktree add -b {브랜치명} ../{브랜치명}` 실행 후 이슈 컨텍스트 저장
-- **2 선택**: `git checkout -b {브랜치명}` 실행 후 이슈 컨텍스트 저장
+- **1 선택**: `git worktree add -b {브랜치명} ../{브랜치명}` 실행
+- **2 선택**: `git checkout -b {브랜치명}` 실행
 - **3 선택**: 아무 git 명령도 실행하지 않음. 브랜치명만 출력하고 종료
 - **4 선택**: 브랜치명을 다시 출력하고 종료
-
-**이슈 컨텍스트 저장** (1, 2 선택 시):
-
-```bash
-mkdir -p "$PROJECT_ROOT/.suh-template/context"
-cat > "$PROJECT_ROOT/.suh-template/context/current-issue.json" << EOF
-{
-  "issue_number": {번호},
-  "issue_title": "{이슈 제목}",
-  "issue_url": "{이슈 URL}",
-  "branch_name": "{브랜치명}",
-  "commit_template": "{이슈제목} : feat : {설명} {이슈URL}"
-}
-EOF
-```
-
-`.suh-template/`은 `.gitignore`에 등록되어 있어 커밋되지 않는다.
 
 ## 산출물 저장
 

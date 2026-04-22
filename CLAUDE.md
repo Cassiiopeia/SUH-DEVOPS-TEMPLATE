@@ -220,6 +220,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `report` | 구현 보고서 생성 |
 | `changelog-deploy` | main push → deploy PR → automerge / automerge 실패 시 재트리거 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
+| `ssh` | 원격 서버 SSH 접속 및 명령 실행 (AWS EC2, 시놀로지 NAS, Linux 서버 등) |
 | `skill-creator` | skill 생성/리뷰/개선 (CREATE·REVIEW·IMPROVE 3모드) |
 
 ---
@@ -325,6 +326,7 @@ list-prs            # PR 목록 조회
 | 커밋 | `cassiiopeia:commit` |
 | 배포 / automerge 실패 재트리거 | `cassiiopeia:changelog-deploy` |
 | 보고서 | `cassiiopeia:report` |
+| 원격 서버 SSH 접속, 로그/상태 확인 | `cassiiopeia:ssh` |
 | 브레인스토밍 | `superpowers:brainstorming` |
 | 구현 계획 | `superpowers:writing-plans` |
 | 계획 실행 | `superpowers:executing-plans` |

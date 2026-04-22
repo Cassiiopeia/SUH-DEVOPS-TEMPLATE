@@ -1,11 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-22T06:58:45Z",
-    "currentVersion": "3.0.4",
+    "lastUpdated": "2026-04-22T07:22:22Z",
+    "currentVersion": "3.0.8",
     "projectType": "basic",
-    "totalReleases": 82
+    "totalReleases": 83
   },
   "releases": [
+    {
+      "version": "3.0.8",
+      "project_type": "basic",
+      "date": "2026-04-22",
+      "pr_number": 258,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 여러 레포 사용 환경에서 이슈 등록 시 현재 작업 중인 레포를 자동으로 인식하도록 개선\n\n* **버그 수정**\n  * 이슈 본문에 줄바꿈이 포함될 때 내용이 깨지는 문제 해결\n  * 이슈 라벨 '작업 전' 띄어쓰기 오류로 라벨이 중복 생성되는 문제 해결",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "여러 레포 사용 환경에서 이슈 등록 시 현재 작업 중인 레포를 자동으로 인식하도록 개선"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "이슈 본문에 줄바꿈이 포함될 때 내용이 깨지는 문제 해결",
+            "이슈 라벨 '작업 전' 띄어쓰기 오류로 라벨이 중복 생성되는 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.4",
       "project_type": "basic",

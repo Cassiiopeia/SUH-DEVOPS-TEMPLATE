@@ -108,19 +108,22 @@ $ARGUMENTS
 - 남은 단어 중 핵심 명사 2~3개 선택
 - 예: `📄[문서][README] README, SKILLS.md Skills 목록 24종으로 전면 개편` → `README SKILLS 목록`
 
-추출한 키워드로 GitHub Search API를 호출한다:
+추출한 키워드를 URL 인코딩하여 GitHub Search API를 호출한다. 한글 등 비ASCII 문자는 반드시 python3로 인코딩해야 한다:
 
 ```bash
 KEYWORD="{핵심 키워드 2~3개 공백 구분}"
+ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$KEYWORD', safe=''))")
 curl -s \
   -H "Authorization: token {github_pat}" \
-  "https://api.github.com/search/issues?q=is:issue+repo:{owner}/{repo}+in:title+$(echo $KEYWORD | tr ' ' '+')" \
+  "https://api.github.com/search/issues?q=is:issue+repo:{owner}/{repo}+in:title+${ENCODED}&per_page=5" \
   -o /tmp/issue_search.json
 ```
 
-검색 결과(`/tmp/issue_search.json`)의 `items` 배열을 읽고 AI가 직접 판단한다:
+검색 결과는 Read tool로 `/tmp/issue_search.json`을 읽어 `items` 배열을 확인하고 AI가 직접 판단한다.
 
-**판단 기준:**
+**`closed` 이슈 처리**: `state: "closed"`인 이슈는 이미 해결된 것으로 간주하여 중복으로 처리하지 않는다. open 이슈만 동일 판단 대상으로 삼는다.
+
+**판단 기준 (open 이슈에 대해서만):**
 - **사실상 동일**: 해결하려는 문제/목적이 같다고 판단되면 → 즉시 중단
 
   ```
@@ -189,6 +192,39 @@ curl -s \
 ```
 
 **사용자 승인 전까지 GitHub API를 절대 호출하지 않는다.**
+
+### 4-1단계: 최종 중복 확인 (API 호출 직전)
+
+1차 검색 이후 사용자가 파일을 수정하거나 시간이 지나는 동안 동일한 이슈가 생성됐을 수 있다. API 호출 직전에 동일 키워드로 한 번 더 검색한다.
+
+```bash
+ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$KEYWORD', safe=''))")
+curl -s \
+  -H "Authorization: token {github_pat}" \
+  "https://api.github.com/search/issues?q=is:issue+repo:{owner}/{repo}+in:title+${ENCODED}&per_page=5" \
+  -o /tmp/issue_search_final.json
+```
+
+Read tool로 `/tmp/issue_search_final.json`을 읽어 AI가 결과를 판단한다.
+
+**`closed` 이슈는 중복으로 처리하지 않는다.** open 이슈만 대상으로 한다.
+
+- **사실상 동일 open 이슈 발견** → 즉시 중단
+
+  ```
+  🚫 이슈 등록 직전, 동일한 이슈가 발견됐습니다.
+
+  #{number} — {title}
+  {html_url}
+
+  새 이슈 생성을 중단합니다. 기존 이슈에서 작업을 이어가세요.
+  ```
+
+  위 메시지 출력 후 **스킬 종료**.
+
+- **없음 또는 무관** → 다음 단계(API 호출) 진행.
+
+---
 
 ### 5단계: GitHub 이슈 생성 (사용자 승인 후)
 

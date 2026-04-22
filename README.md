@@ -30,7 +30,7 @@
 | 이슈 매번 형식 맞춰 작성 (5분+) | `/cassiiopeia:issue` 한 번에 표준 템플릿 생성 |
 | 커밋 메시지 이슈 URL 수동 복사 | `/cassiiopeia:commit` 이슈 컨텍스트 기반 자동 완성 |
 | PR 설명/보고서 직접 작성 | `/cassiiopeia:report` git diff 분석 후 자동 생성 |
-| 코드 리뷰·분석 매번 프롬프트 입력 | 20종 Skills로 일관된 결과, 매번 재입력 불필요 |
+| 코드 리뷰·분석 매번 프롬프트 입력 | 24종 Skills로 일관된 결과, 매번 재입력 불필요 |
 
 ---
 
@@ -54,6 +54,7 @@ flowchart LR
     H --> I["/cassiiopeia:commit\n이슈 연동 커밋 자동 완성"]
     I --> J["/cassiiopeia:report\n구현 보고서 + GitHub 댓글"]
     J --> K([PR 등록])
+    K --> L["/cassiiopeia:changelog-deploy\nmain push → deploy PR + automerge"]
 ```
 
 > Skills 전체 목록 및 상세 사용법: **[docs/SKILLS.md](docs/SKILLS.md)**
@@ -99,7 +100,7 @@ claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 
-> `/cassiiopeia:` 입력 시 21종 Skills 자동완성 — [설치 가이드](docs/SKILLS.md)
+> `/cassiiopeia:` 입력 시 24종 Skills 자동완성 — [설치 가이드](docs/SKILLS.md)
 
 ---
 
@@ -107,7 +108,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 | 기능 | 설명 | 문서 |
 |------|------|------|
-| **Claude Code Skills** | 이슈·커밋·리뷰·리팩토링·보고서 등 21종 AI DevOps Skills | [상세](docs/SKILLS.md) |
+| **Claude Code Skills** | 이슈·커밋·리뷰·리팩토링·보고서 등 24종 AI DevOps Skills | [상세](docs/SKILLS.md) |
 | **버전 자동화** | main 푸시 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
 | **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | 댓글 한 줄로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
@@ -117,7 +118,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 ---
 
-## Claude Code Skills (21종)
+## Claude Code Skills (24종)
 
 ### 🔄 개발 사이클 자동화
 
@@ -127,6 +128,8 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `/cassiiopeia:init-worktree` | Git worktree 생성 + 민감 파일 자동 복사 |
 | `/cassiiopeia:commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 (superpowers 준수) |
 | `/cassiiopeia:report` | git diff 분석 → 구현 보고서 생성 + GitHub 댓글 자동 포스팅 |
+| `/cassiiopeia:changelog-deploy` | main push → deploy PR 생성 + 릴리스 노트 작성 + automerge |
+| `/cassiiopeia:github` | GitHub 이슈/PR/댓글 독립 조회 및 관리 |
 
 ### 📊 분석형 (코드 수정 없음)
 
@@ -159,6 +162,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `/cassiiopeia:ppt` | 트러블슈팅/구현 사례 → 5섹션 발표자료 |
 | `/cassiiopeia:suh-spring-test` | Spring Boot 테스트 샘플 코드 생성 |
 | `/cassiiopeia:synology-expose` | Synology NAS 외부 도메인 노출 설정 가이드 |
+| `/cassiiopeia:skill-creator` | Skill 생성/리뷰/개선 (CREATE·REVIEW·IMPROVE 3모드) |
 
 ---
 
@@ -220,7 +224,7 @@ Settings → Actions → General
 
 | 문서 | 설명 |
 |------|------|
-| [Claude Code Skills 가이드](docs/SKILLS.md) | 21종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
+| [Claude Code Skills 가이드](docs/SKILLS.md) | 24종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
 | [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 기존 프로젝트에 템플릿 통합 |
 | [버전 관리](docs/VERSION-CONTROL.md) | version.yml, 자동 버전 증가 |
 | [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | CodeRabbit 연동, AI 문서화 |

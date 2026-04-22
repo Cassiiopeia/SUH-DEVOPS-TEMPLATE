@@ -101,6 +101,61 @@ $ARGUMENTS
 
 예시: `⚙️[기능추가][Skills] issue 스킬 GitHub API 연동`
 
+### 2-1단계: 중복 이슈 검색 (파일 저장 전)
+
+이슈 제목에서 핵심 키워드를 추출한다:
+- 이모지, `[...]` 태그, 특수문자, URL을 모두 제거
+- 남은 단어 중 핵심 명사 2~3개 선택
+- 예: `📄[문서][README] README, SKILLS.md Skills 목록 24종으로 전면 개편` → `README SKILLS 목록`
+
+추출한 키워드로 GitHub Search API를 호출한다:
+
+```bash
+KEYWORD="{핵심 키워드 2~3개 공백 구분}"
+curl -s \
+  -H "Authorization: token {github_pat}" \
+  "https://api.github.com/search/issues?q=is:issue+repo:{owner}/{repo}+in:title+$(echo $KEYWORD | tr ' ' '+')" \
+  -o /tmp/issue_search.json
+```
+
+검색 결과(`/tmp/issue_search.json`)의 `items` 배열을 읽고 AI가 직접 판단한다:
+
+**판단 기준:**
+- **사실상 동일**: 해결하려는 문제/목적이 같다고 판단되면 → 즉시 중단
+
+  ```
+  🚫 이미 동일한 이슈가 존재합니다.
+
+  #{number} — {title}
+  {html_url}
+
+  새 이슈 생성을 중단합니다. 기존 이슈에서 작업을 이어가세요.
+  ```
+
+  위 메시지 출력 후 **스킬 종료**. 이후 단계를 진행하지 않는다.
+
+- **유사하지만 다름**: 관련 있지만 범위·목적이 다르다고 판단되면 → 경고 후 사용자 확인
+
+  ```
+  ⚠️ 비슷한 이슈가 있습니다.
+
+  #{number} — {title} ({state})
+  ...
+
+  그래도 새 이슈를 만들까요?
+  1. 네, 새로 만들겠습니다
+  2. 아니요, 취소합니다
+  ```
+
+  2 선택 시 **스킬 종료**.
+  1 선택 시 다음 단계 진행.
+
+- **무관**: 키워드만 겹칠 뿐 다른 문제라고 판단되면 → 그대로 다음 단계 진행.
+
+검색 결과가 비어 있거나(`total_count: 0`) API 오류 발생 시에도 → 그대로 다음 단계 진행.
+
+---
+
 ### 3단계: 코드 탐색 및 본문 작성
 
 1. 프로젝트의 `.github/ISSUE_TEMPLATE/` 해당 템플릿을 Read로 읽어 형식 파악

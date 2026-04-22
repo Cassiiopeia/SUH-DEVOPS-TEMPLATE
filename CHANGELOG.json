@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-22T06:46:17Z",
-    "currentVersion": "3.0.3",
+    "lastUpdated": "2026-04-22T06:58:45Z",
+    "currentVersion": "3.0.4",
     "projectType": "basic",
-    "totalReleases": 81
+    "totalReleases": 82
   },
   "releases": [
+    {
+      "version": "3.0.4",
+      "project_type": "basic",
+      "date": "2026-04-22",
+      "pr_number": 254,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * issue 스킬에서 동일한 이슈가 여러 개 중복 생성되는 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "issue 스킬에서 동일한 이슈가 여러 개 중복 생성되는 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.3",
       "project_type": "basic",

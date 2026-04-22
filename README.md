@@ -7,7 +7,7 @@
 > 이슈 등록부터 커밋, 보고서, 배포까지. 개발자는 코드만 작성하세요.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v3.0.15 (2026-04-22)
+## 최신 버전 : v3.0.17 (2026-04-22)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 
@@ -118,7 +118,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 ---
 
-## Claude Code Skills (24종)
+## Claude Code Skills (25종)
 
 ### 🔄 개발 사이클 자동화
 

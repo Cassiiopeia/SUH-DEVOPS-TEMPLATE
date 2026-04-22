@@ -1,7 +1,7 @@
 # Claude Code Skills 가이드
 
 > **이 레포는 Claude Code용 Skill 플러그인 마켓플레이스 템플릿입니다.**
-> GitHub Actions 자동화 템플릿과 더불어, Claude Code에서 바로 사용할 수 있는 개발/DevOps Skill 24종을 제공합니다.
+> GitHub Actions 자동화 템플릿과 더불어, Claude Code에서 바로 사용할 수 있는 개발/DevOps Skill 25종을 제공합니다.
 
 ---
 

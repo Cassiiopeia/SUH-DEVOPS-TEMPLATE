@@ -56,6 +56,23 @@ agent는 Read tool로 `{HOME}/.suh-template/config/config.json`을 읽는다.
 
 파일이 없으면 → §5 대화형 수집으로 진행한다.
 
+**레포 자동 매칭 (읽기 후 즉시 수행):**
+
+```bash
+git remote get-url origin 2>/dev/null
+```
+
+반환값에서 `owner/repo`를 추출하여 `repos` 배열과 비교한다:
+- `https://github.com/owner/repo` → `owner`, `repo` 추출
+- `git@github.com:owner/repo.git` → `owner`, `repo` 추출
+
+**레포 선택 우선순위:**
+1. git remote URL 매칭 → `repos` 배열 중 `owner`+`repo` 모두 일치하는 항목
+2. 매칭 실패 시 → `default: true`인 항목
+3. 위 둘 다 없으면 → 번호를 매겨 사용자에게 선택
+
+config에 해당 레포가 없는 경우 → 새 레포 추가 여부를 사용자에게 묻고 §4 절차로 추가한다.
+
 **PAT 우선순위 (레포별 API 호출 시):**
 1. 해당 repo 항목의 `pat` 필드가 non-null이면 사용
 2. `null`이거나 없으면 `global_pat` fallback

@@ -42,6 +42,7 @@ echo "$HOME"
 ## 3. Config 읽기
 
 agent는 Read tool로 `{HOME}/.suh-template/config/config.json`을 읽는다.
+(Search·find로 탐색하지 않는다 — 경로가 고정이므로 탐색이 필요 없고, 탐색하면 플러그인 캐시 등 엉뚱한 파일을 잡을 수 있다)
 
 파일이 없으면 → §5 대화형 수집으로 진행한다.
 

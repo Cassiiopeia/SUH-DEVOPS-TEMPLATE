@@ -180,11 +180,17 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 ### 2. PYTHON 변수 설정 (크로스 플랫폼 필수)
 
-Windows Git Bash에서는 `python3`가 Windows Store 링크로 연결되어 실패할 수 있다.
-반드시 아래 패턴으로 `PYTHON` 변수를 먼저 설정한 후 사용한다:
+Windows Git Bash에서는 `python3`가 Windows Store 링크로 연결되어 exit 49로 실패할 수 있다.
+`command -v` 결과를 그대로 쓰지 말고, 실제로 실행 가능한지 검증 후 사용한다:
 
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(
+  for _py in python3 python; do
+    _path=$(command -v "$_py" 2>/dev/null) || continue
+    "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break
+  done
+)
+if [ -z "$PYTHON" ]; then echo "❌ Python을 찾을 수 없습니다."; exit 1; fi
 ```
 
 ### 3. PYTHONPATH 설정
@@ -242,7 +248,7 @@ curl -s -H "Authorization: token {github_pat}" \
 임시 파일 없이 Python urllib로 직접 전송한다:
 
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"

@@ -58,7 +58,7 @@ URL: https://github.com/owner/repo/issues/427
 변경할 항목만 payload dict에 포함하면 된다. 나머지는 기존 값 유지.
 
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"
@@ -78,7 +78,7 @@ EOF
 본문에 한국어·이모지·줄바꿈이 포함될 수 있으므로 Python urllib로 직접 전송한다 (curl 인라인 이스케이프 문제 방지).
 
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"
@@ -100,7 +100,7 @@ EOF
 
 ```bash
 HEAD_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"
@@ -115,8 +115,23 @@ print(json.loads(res.read())["html_url"])
 EOF
 ```
 
-PR 제목은 사용자가 명시하지 않으면 현재 브랜치명의 이슈 제목을 기반으로 자동 생성한다.
+#### PR 제목 규칙 (필수)
+
 브랜치명이 `YYYYMMDD_#번호_제목` 형식이면 번호를 추출해 이슈 API로 제목을 조회한다.
+조회한 이슈 제목에서 **앞에 붙은 이모지와 `[태그]` 형식을 모두 제거**한 순수 텍스트만 PR 제목으로 사용한다.
+
+예) 이슈 제목이 `❗[버그][개발자도구] SSE 서버 로그 스트리밍 연결 즉시 종료 및 구독자 누적 문제`이면
+→ PR 제목: `SSE 서버 로그 스트리밍 연결 즉시 종료 및 구독자 누적 문제`
+
+#### PR 본문 규칙 (필수)
+
+PR 본문에는 반드시 관련 이슈 링크를 포함한다:
+
+```
+- https://github.com/{owner}/{repo}/issues/{이슈번호}
+```
+
+이슈 번호는 브랜치명(`YYYYMMDD_#번호_...`)에서 자동 추출한다.
 
 ### PR 목록 조회
 
@@ -160,7 +175,7 @@ git log origin/deploy..HEAD --pretty=format:"%H %s" | grep -v "\[skip ci\]" | he
 4. 릴리스 노트 본문을 아래 형식으로 작성한 뒤 Python urllib로 직접 PATCH 전송 (임시 파일 불필요):
 
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"

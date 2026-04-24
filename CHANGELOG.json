@@ -1,11 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-24T15:20:20Z",
-    "currentVersion": "3.0.19",
+    "lastUpdated": "2026-04-24T15:37:44Z",
+    "currentVersion": "3.0.21",
     "projectType": "basic",
-    "totalReleases": 88
+    "totalReleases": 89
   },
   "releases": [
+    {
+      "version": "3.0.21",
+      "project_type": "basic",
+      "date": "2026-04-24",
+      "pr_number": 270,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * github skill로 PR 생성 시 제목·본문 자동 규칙 적용 (이모지·태그 제거, 이슈 링크 추가)\n\n* **버그 수정**\n  * Windows 환경에서 Python 실행 오류 해결",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "github skill로 PR 생성 시 제목·본문 자동 규칙 적용 (이모지·태그 제거, 이슈 링크 추가)"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows 환경에서 Python 실행 오류 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.19",
       "project_type": "basic",

@@ -247,7 +247,7 @@ config에서 읽은 PAT(`repos[].pat` 또는 `global_pat`)을 사용해 GitHub A
 **body에 줄바꿈·이모지·한국어가 포함되므로 Python urllib로 직접 전송한다** (curl 인라인 `-d` 및 임시 파일 방식 모두 금지 — Windows/Mac 크로스 플랫폼 안정성 문제):
 
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"

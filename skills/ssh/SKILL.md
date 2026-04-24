@@ -92,7 +92,7 @@ Config 파일 경로: `{HOME}/.suh-template/config/ssh.config.json`
 
 ```bash
 # python3 → python 순으로 fallback
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 if [ -z "$PYTHON" ]; then echo "[ERROR] Python이 설치되지 않았습니다."; exit 1; fi
 
 # paramiko 설치 여부 확인 (없으면 설치)

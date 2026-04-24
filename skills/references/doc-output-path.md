@@ -9,7 +9,7 @@
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
   SCRIPTS_PATH="$PROJECT_ROOT/scripts"
 else

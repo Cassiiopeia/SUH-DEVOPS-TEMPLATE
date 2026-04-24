@@ -92,7 +92,7 @@ agent가 직접 경로를 계산하여 파일을 저장한다:
 
 3. **댓글 포스팅** (보고서 본문에 한국어·이모지·줄바꿈 포함 → Python urllib 직접 전송):
 ```bash
-PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"

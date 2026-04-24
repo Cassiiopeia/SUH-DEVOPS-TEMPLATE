@@ -54,26 +54,44 @@ URL: https://github.com/owner/repo/issues/427
 
 ### 이슈 수정
 
-제목, 상태(open/closed), 라벨, 담당자 변경 가능:
+제목, 상태(open/closed), 라벨, 담당자 변경 가능.
+변경할 항목만 payload dict에 포함하면 된다. 나머지는 기존 값 유지.
 
 ```bash
-curl -s -X PATCH \
-  -H "Authorization: token {github_pat}" \
-  -H "Content-Type: application/json" \
-  -d "{\"title\": \"새 제목\", \"state\": \"closed\", \"labels\": [\"작업중\"], \"assignees\": [\"Cassiiopeia\"]}" \
-  "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}"
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+$PYTHON - <<'EOF'
+import urllib.request, json
+pat = "{github_pat}"
+url = "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}"
+payload = {"title": "새 제목", "state": "closed", "labels": ["작업중"], "assignees": ["Cassiiopeia"]}
+data = json.dumps(payload).encode()
+req = urllib.request.Request(url, data=data, method="PATCH")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["html_url"])
+EOF
 ```
-
-변경할 항목만 JSON body에 포함하면 된다. 나머지는 기존 값 유지.
 
 ### 이슈에 댓글 추가
 
+본문에 한국어·이모지·줄바꿈이 포함될 수 있으므로 Python urllib로 직접 전송한다 (curl 인라인 이스케이프 문제 방지).
+
 ```bash
-curl -s -X POST \
-  -H "Authorization: token {github_pat}" \
-  -H "Content-Type: application/json" \
-  -d "{\"body\": \"{댓글 내용}\"}" \
-  "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}/comments"
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+$PYTHON - <<'EOF'
+import urllib.request, json
+pat = "{github_pat}"
+url = "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}/comments"
+body = """댓글 내용을 여기에 작성
+여러 줄도 가능하고 이모지도 OK"""
+data = json.dumps({"body": body}).encode()
+req = urllib.request.Request(url, data=data, method="POST")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["html_url"])
+EOF
 ```
 
 ### PR 생성
@@ -81,12 +99,20 @@ curl -s -X POST \
 현재 브랜치 이름을 자동 감지하여 PR을 생성한다:
 
 ```bash
-git rev-parse --abbrev-ref HEAD  # head 브랜치 확인
-curl -s -X POST \
-  -H "Authorization: token {github_pat}" \
-  -H "Content-Type: application/json" \
-  -d "{\"title\": \"{제목}\", \"body\": \"{본문}\", \"head\": \"{head}\", \"base\": \"main\"}" \
-  "https://api.github.com/repos/{owner}/{repo}/pulls"
+HEAD_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+$PYTHON - <<'EOF'
+import urllib.request, json
+pat = "{github_pat}"
+url = "https://api.github.com/repos/{owner}/{repo}/pulls"
+payload = {"title": "{제목}", "body": "{본문}", "head": "{head}", "base": "main"}
+data = json.dumps(payload).encode()
+req = urllib.request.Request(url, data=data, method="POST")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["html_url"])
+EOF
 ```
 
 PR 제목은 사용자가 명시하지 않으면 현재 브랜치명의 이슈 제목을 기반으로 자동 생성한다.
@@ -131,10 +157,15 @@ git log origin/deploy..HEAD --pretty=format:"%H %s" | grep -v "\[skip ci\]" | he
    - 나머지 → 기타
    - 커밋 메시지를 그대로 쓰지 말고 사용자가 이해하기 쉬운 한국어 문장으로 재작성
 
-4. PR 본문을 다음 형식으로 작성 후 `/tmp/pr_release_notes.md`에 저장:
+4. 릴리스 노트 본문을 아래 형식으로 작성한 뒤 Python urllib로 직접 PATCH 전송 (임시 파일 불필요):
 
-```markdown
-<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+```bash
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+$PYTHON - <<'EOF'
+import urllib.request, json
+pat = "{github_pat}"
+url = "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
+body = """<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
 
 ## Summary by CodeRabbit
 
@@ -152,17 +183,14 @@ git log origin/deploy..HEAD --pretty=format:"%H %s" | grep -v "\[skip ci\]" | he
 * **문서**
   * (항목)
 
-<!-- end of auto-generated comment: release notes by coderabbit.ai -->
-```
-
-5. PR 본문 업데이트
-
-```bash
-curl -s -X PATCH \
-  -H "Authorization: token {github_pat}" \
-  -H "Content-Type: application/json" \
-  -d "{\"body\": \"{릴리스 노트 본문}\"}" \
-  "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
+<!-- end of auto-generated comment: release notes by coderabbit.ai -->"""
+data = json.dumps({"body": body}).encode()
+req = urllib.request.Request(url, data=data, method="PATCH")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["html_url"])
+EOF
 ```
 
 ## 오류 처리

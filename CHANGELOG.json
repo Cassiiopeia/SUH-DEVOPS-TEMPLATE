@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-22T12:32:56Z",
-    "currentVersion": "3.0.18",
+    "lastUpdated": "2026-04-24T15:20:20Z",
+    "currentVersion": "3.0.19",
     "projectType": "basic",
-    "totalReleases": 87
+    "totalReleases": 88
   },
   "releases": [
+    {
+      "version": "3.0.19",
+      "project_type": "basic",
+      "date": "2026-04-24",
+      "pr_number": 266,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * Windows/macOS 환경에서 GitHub 댓글·이슈·PR 생성 시 한국어·이모지 포함 내용이 전송 실패하던 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows/macOS 환경에서 GitHub 댓글·이슈·PR 생성 시 한국어·이모지 포함 내용이 전송 실패하던 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.18",
       "project_type": "basic",

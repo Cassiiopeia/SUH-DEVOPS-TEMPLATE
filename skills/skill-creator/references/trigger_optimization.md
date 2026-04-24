@@ -42,7 +42,7 @@ python -m scripts.run_loop \
 - **Good**: 실제 사용자가 칠 법한 맥락 포함한 발화. 파일 경로, 업무 배경, 약간의 잡담
 
 예:
-> "우리 팀 gitlab.somansa.com에 있는 git-cm 레포의 !347 MR에서 변경 파일만 좀 보고 싶은데"
+> "우리 팀 gitlab.example.com에 있는 api-server 레포의 !347 MR에서 변경 파일만 좀 보고 싶은데"
 
 ### 사내망 제한
 

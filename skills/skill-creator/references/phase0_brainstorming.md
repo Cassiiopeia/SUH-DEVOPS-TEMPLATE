@@ -142,7 +142,7 @@ Phase 0의 목적은 **무엇을·왜 만들까** 합의. **어떻게 만들까*
 **사용자:** "사내 GitLab에 접근해서 MR 변경 파일 보는 skill 만들어줘"
 
 **Step A — Explore:**
-> "기존 plugins/somansa-tools/skills/ 를 훑어보니 jenkins, pg-query, ssh-remote-execute 가 있네요. GitLab 관련 skill은 없고, 이게 첫 번째인 듯합니다."
+> "기존 skills/ 를 훑어보니 jenkins, pg-query, ssh-remote-execute 가 있네요. GitLab 관련 skill은 없고, 이게 첫 번째인 듯합니다."
 
 **Step B — Scope check:** "적절" 판정 (너무 크지도 작지도 않음) → Step C로.
 

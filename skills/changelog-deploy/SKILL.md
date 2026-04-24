@@ -44,8 +44,9 @@ GITHUB_PAT=$($PYTHON -c "
 import sys, json
 try:
     c = json.load(open('$CONFIG_FILE'))
-    repo_pat = next((r.get('pat') for r in c.get('repos', []) if r.get('repo') == '$REPO' and r.get('pat')), None)
-    print(repo_pat or c.get('global_pat', ''))
+    gh = c.get('github', {})
+    repo_pat = next((r.get('pat') for r in gh.get('repos', []) if r.get('repo') == '$REPO' and r.get('pat')), None)
+    print(repo_pat or gh.get('global_pat', ''))
 except:
     print('')
 " 2>/dev/null)

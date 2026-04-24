@@ -1,6 +1,6 @@
 ---
 name: github
-description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회, 댓글 추가, PR 생성/조회를 직접 수행한다. '/github', '이슈 확인해줘', 'PR 만들어줘', '댓글 달아줘' 등을 언급하면 이 skill을 사용한다."
+description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회, 댓글 추가, PR 생성/조회를 직접 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, GitHub API 호출, 이슈 만들어줘, PR 확인해줘, 브랜치 PR, 이슈 수정, '/github' 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
 ---
 
 # GitHub Mode
@@ -26,7 +26,14 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 git remote get-url origin
 ```
 
-`https://github.com/{owner}/{repo}.git` 또는 `git@github.com:{owner}/{repo}.git` 형식에서 `owner`와 `repo`를 추출한다. 감지 실패 시 config의 `repos` 목록에서 선택하게 한다.
+`https://github.com/{owner}/{repo}.git` 또는 `git@github.com:{owner}/{repo}.git` 형식에서 `owner`와 `repo`를 추출한다.
+
+추출한 `owner/repo`를 config `repos` 배열과 대조한다:
+- 매칭되는 항목이 있으면 → 해당 repo 사용
+- 매칭 실패 시 → config `repos` 목록을 번호로 나열해 사용자가 선택하게 한다
+- **`$ARGUMENTS`에 `owner/repo` 형식이 명시된 경우 → git remote 감지를 건너뛰고 해당 repo를 바로 사용한다**
+
+> 주의: Claude Code의 primary working directory가 작업 대상 레포와 다른 경우(멀티 레포 워크트리 환경) git remote 감지가 오작동할 수 있다. 이 경우 arguments로 대상 레포를 명시하거나 config repos 목록에서 선택한다.
 
 ## 사용자 입력
 
@@ -36,14 +43,24 @@ $ARGUMENTS
 
 ### 이슈 조회
 
-config에서 읽은 PAT(`repos[].pat` 또는 `global_pat`)을 사용해 GitHub API를 직접 호출한다:
-
-```bash
-curl -s -H "Authorization: token {pat}" \
-  "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}"
-```
+config에서 읽은 PAT(`repos[].pat` 또는 `global_pat`)을 사용해 GitHub API를 직접 호출한다.
 
 `#번호` 형식이나 "이슈 427 확인해줘"처럼 번호를 명시하면 해당 이슈를 조회한다.
+
+**Windows Git Bash에서 `curl | python3` 파이프는 Exit code 49 오류가 발생한다. 반드시 파일로 저장 후 파싱한다:**
+
+```bash
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+curl -s -H "Authorization: token {pat}" \
+  "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}" -o /tmp/issue_result.json
+PYTHONIOENCODING=utf-8 $PYTHON - <<'EOF'
+import json
+d = json.load(open("/tmp/issue_result.json", encoding="utf-8"))
+print(f"#{d['number']} — {d['title']}")
+print(f"상태: {d['state']}")
+print(f"URL: {d['html_url']}")
+EOF
+```
 
 출력 예시:
 ```
@@ -96,22 +113,35 @@ EOF
 
 ### PR 생성
 
-현재 브랜치 이름을 자동 감지하여 PR을 생성한다:
+현재 브랜치 이름을 자동 감지하여 PR을 생성한다.
+
+**PR 생성 전 반드시 remote 브랜치 존재 여부를 확인한다 (한글 브랜치명 422 오류 방지):**
 
 ```bash
 HEAD_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git ls-remote --heads origin "$HEAD_BRANCH" | grep -q "$HEAD_BRANCH" || echo "브랜치가 remote에 없습니다. git push 먼저 실행하세요."
+```
+
+`head` 필드는 반드시 `owner:branch` 형식으로 지정한다 (한글 포함 브랜치명의 422 오류 방지):
+
+```bash
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
-$PYTHON - <<'EOF'
+PYTHONIOENCODING=utf-8 $PYTHON - <<'EOF'
 import urllib.request, json
 pat = "{github_pat}"
 url = "https://api.github.com/repos/{owner}/{repo}/pulls"
-payload = {"title": "{제목}", "body": "{본문}", "head": "{head}", "base": "main"}
-data = json.dumps(payload).encode()
+payload = {
+    "title": "{제목}",
+    "body": "{본문}",
+    "head": "{owner}:{head_branch}",
+    "base": "main"
+}
+data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 req = urllib.request.Request(url, data=data, method="POST")
 req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
+req.add_header("Content-Type", "application/json; charset=utf-8")
 res = urllib.request.urlopen(req)
-print(json.loads(res.read())["html_url"])
+print(json.loads(res.read().decode("utf-8"))["html_url"])
 EOF
 ```
 

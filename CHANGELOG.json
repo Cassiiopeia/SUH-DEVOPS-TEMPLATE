@@ -1,11 +1,39 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-24T17:12:03Z",
-    "currentVersion": "3.0.27",
+    "lastUpdated": "2026-04-24T17:21:36Z",
+    "currentVersion": "3.0.28",
     "projectType": "basic",
-    "totalReleases": 93
+    "totalReleases": 94
   },
   "releases": [
+    {
+      "version": "3.0.28",
+      "project_type": "basic",
+      "date": "2026-04-24",
+      "pr_number": 280,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * github 스킬에서 다른 레포 작업 요청 시 현재 레포로 잘못 감지하는 문제 해결\n  * Windows 환경에서 이슈 조회 시 발생하던 Python 파이프 오류 해결\n  * 한글이 포함된 브랜치명으로 PR 생성 시 422 오류 해결\n  * github 스킬이 config 파일을 찾지 못하고 플러그인 캐시를 탐색하던 문제 해결\n\n* **개선**\n  * github 스킬 트리거 키워드 강화 — PR 생성·이슈 댓글 등 GitHub 작업 요청 시 더 정확하게 스킬 호출\n  * 멀티 레포 환경에서 대상 레포를 arguments로 명시하는 흐름 추가\n  * PR 생성 시 remote 브랜치 존재 여부 사전 확인 단계 추가\n  * config 파일 접근 방식 명확화 — Search·find 탐색 대신 Read tool 직접 사용 원칙 문서화",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "github 스킬에서 다른 레포 작업 요청 시 현재 레포로 잘못 감지하는 문제 해결",
+            "Windows 환경에서 이슈 조회 시 발생하던 Python 파이프 오류 해결",
+            "한글이 포함된 브랜치명으로 PR 생성 시 422 오류 해결",
+            "github 스킬이 config 파일을 찾지 못하고 플러그인 캐시를 탐색하던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "github 스킬 트리거 키워드 강화 — PR 생성·이슈 댓글 등 GitHub 작업 요청 시 더 정확하게 스킬 호출",
+            "멀티 레포 환경에서 대상 레포를 arguments로 명시하는 흐름 추가",
+            "PR 생성 시 remote 브랜치 존재 여부 사전 확인 단계 추가",
+            "config 파일 접근 방식 명확화 — Search·find 탐색 대신 Read tool 직접 사용 원칙 문서화"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.27",
       "project_type": "basic",

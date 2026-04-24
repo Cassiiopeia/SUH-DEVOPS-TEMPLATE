@@ -2,6 +2,8 @@
 
 모든 skill의 config 파일 읽기/쓰기는 이 파일의 규칙을 따른다.
 
+**config 접근 순서: `echo "$HOME"` → Read tool로 `{HOME}/.suh-template/config/config.json` 직접 읽기. Search·find·Bash로 탐색 금지.**
+
 ---
 
 ## 1. Config 파일 경로 구조

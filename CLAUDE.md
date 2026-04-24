@@ -231,6 +231,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 skills/
 ├── {skill-name}/SKILL.md
+├── config.json.example       # 전체 config 구조 예시 (모든 skill_id 섹션 포함)
 └── references/
     ├── common-rules.md       # 절대 규칙, 커밋 컨벤션
     ├── config-rules.md       # config 경로·스키마·읽기/쓰기 표준
@@ -250,12 +251,25 @@ skills/
 4. **OS 호환성**: Python 실행 시 `PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)` 패턴 사용
 5. **skill 시작 시 필독**: `references/common-rules.md` → (config 필요 시) `references/config-rules.md` → (기술별) `tech-*.md`
 
-### config 사용 스킬
+### config 구조
 
-| 스킬 | skill_id | 비고 |
-|------|---------|------|
-| `issue`, `commit`, `github`, `changelog-deploy`, `report` | `issue` | PAT + repos 공유 |
+모든 스킬의 config는 **단일 파일** `~/.suh-template/config/config.json` 하나로 관리한다.
+skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
+
+| 스킬 | config 섹션 키 | 비고 |
+|------|--------------|------|
+| `issue`, `commit`, `github`, `changelog-deploy`, `report` | `github` | PAT + repos 공유 |
 | `synology-expose` | `synology-expose` | NAS 인스턴스 정보 |
+| `ssh` | `ssh` | SSH 서버 접속 정보 |
+
+### 새 스킬에 config 추가하는 방법
+
+1. `skill_id`(스킬 폴더명)를 키로 `config.json`에 섹션 추가
+2. `skills/references/config-rules.md` §7에 스키마 문서화
+3. `skills/config.json.example`에 예시 추가
+4. SKILL.md에 `references/config-rules.md §2~3` 참조 명시
+
+**별도 config 파일(`skill-name.config.json` 등)을 새로 만들지 않는다.**
 
 ### suh_template CLI 커맨드
 

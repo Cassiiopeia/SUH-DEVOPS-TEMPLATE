@@ -1,0 +1,58 @@
+{
+  "github": {
+    "default_assignee": "{GitHub_사용자명}",
+    "global_pat": "{ghp_xxxxxxxxxxxxxxxxxxxx}",
+    "repos": [
+      {
+        "name": "{프로젝트 이름}",
+        "owner": "{GitHub_사용자명_또는_조직명}",
+        "repo": "{저장소명}",
+        "pat": null,
+        "default": true
+      },
+      {
+        "name": "{다른 프로젝트}",
+        "owner": "{GitHub_사용자명_또는_조직명}",
+        "repo": "{저장소명}",
+        "pat": "{ghp_별도PAT_있으면_입력}",
+        "default": false
+      }
+    ]
+  },
+  "synology-expose": {
+    "instances": [
+      {
+        "name": "{NAS 식별 이름}",
+        "ddns": "{your-nas.synology.me}",
+        "domains": ["{example.com}"],
+        "email": "{your@email.com}",
+        "dns_provider": "{cloudflare|route53|gabia}",
+        "default": true
+      }
+    ]
+  },
+  "ssh": {
+    "instances": [
+      {
+        "name": "{서버 식별 이름}",
+        "host": "{your-server.example.com}",
+        "port": 22,
+        "user": "{username}",
+        "auth": "key",
+        "key_path": "{~/.ssh/id_rsa}",
+        "password": null,
+        "default": true
+      },
+      {
+        "name": "{다른 서버}",
+        "host": "{192.168.0.1}",
+        "port": 22,
+        "user": "{username}",
+        "auth": "password",
+        "key_path": null,
+        "password": "{password}",
+        "default": false
+      }
+    ]
+  }
+}

@@ -68,7 +68,7 @@ OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
 ```
 
-`references/config-rules.md` §2~3 절차로 `skill_id = issue` config에서 `github_pat` 읽기.
+`references/config-rules.md` §2~3 절차로 config의 `github` 섹션에서 `global_pat` 읽기.
 
 ```bash
 curl -s -H "Authorization: token {github_pat}" \

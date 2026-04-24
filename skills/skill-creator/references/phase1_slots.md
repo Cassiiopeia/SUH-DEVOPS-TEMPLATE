@@ -40,20 +40,20 @@ CREATE 모드 Phase 1에서 사용. 사용자가 이미 준 정보를 추출해 
 ## 예시
 
 **사용자 발화:**
-> "GitLab에 접근해서 MR 정보 가져오는 skill 만들어줘. 우리 사내 gitlab.somansa.com이고, 이런 레포들 있어: platform/git-cm, pf/dlpqueryserver. 내가 MR URL 주면 변경 파일 뽑아주고, 브랜치명 주면 MR도 자동 생성해줘야 해."
+> "GitLab에 접근해서 MR 정보 가져오는 skill 만들어줘. 우리 사내 gitlab.example.com이고, 이런 레포들 있어: platform/git-cm, pf/api-server. 내가 MR URL 주면 변경 파일 뽑아주고, 브랜치명 주면 MR도 자동 생성해줘야 해."
 
 **자동 추출된 슬롯:**
 
 | 슬롯 | 값 |
 |------|-----|
 | purpose | 사내 GitLab에서 MR·브랜치 정보 조회 및 MR 생성 |
-| triggers | "MR 변경파일 알려줘", "이 브랜치로 MR 올려줘", gitlab.somansa.com URL 붙여넣기 |
+| triggers | "MR 변경파일 알려줘", "이 브랜치로 MR 올려줘", gitlab.example.com URL 붙여넣기 |
 | inputs | 레포 alias, MR URL 또는 iid, source 브랜치명 |
 | outputs | JSON(변경파일 리스트), MR 생성 응답 |
 | auto_extract | MR URL → project+iid, 브랜치명 → 제목/타겟/Redmine 이슈번호 |
 | pain_points | (사용자가 언급 안 함 — 질문하지 말고 스킵) |
 
 **사용자에게 제시할 한 줄 요약:**
-> "정리하면 'gitlab.somansa.com에서 MR·브랜치 정보 조회 + MR 자동 생성' 을 하는 skill이고, 'MR URL 붙여넣기' 나 'CM에 브랜치 뭐 있어?' 같은 말에서 호출되는 거 맞나요?"
+> "정리하면 'gitlab.example.com에서 MR·브랜치 정보 조회 + MR 자동 생성' 을 하는 skill이고, 'MR URL 붙여넣기' 나 '레포에 브랜치 뭐 있어?' 같은 말에서 호출되는 거 맞나요?"
 
 여기서 "응"이면 Phase 1 종료 → Phase 3으로 직행 (빈 슬롯 0개).

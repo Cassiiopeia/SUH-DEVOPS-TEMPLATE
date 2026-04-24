@@ -145,12 +145,19 @@ if [ -n "$EXISTING_PR" ]; then
   PR_NUMBER=$EXISTING_PR
   echo "기존 deploy PR #$PR_NUMBER 재사용"
 else
-  PR_NUMBER=$(curl -s -X POST \
-    -H "Authorization: token $GITHUB_PAT" \
-    -H "Content-Type: application/json" \
-    -d "{\"title\":\"$TITLE\",\"head\":\"main\",\"base\":\"deploy\",\"body\":\"\"}" \
-    "https://api.github.com/repos/$OWNER/$REPO/pulls" \
-    | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
+  PR_NUMBER=$($PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$TITLE" <<'EOF'
+import urllib.request, json, sys
+pat, owner, repo, title = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+payload = {"title": title, "head": "main", "base": "deploy", "body": ""}
+data = json.dumps(payload).encode()
+req = urllib.request.Request(url, data=data, method="POST")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["number"])
+EOF
+  )
   echo "새 deploy PR #$PR_NUMBER 생성"
 fi
 
@@ -206,9 +213,11 @@ git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head 
 워크플로우가 파싱하는 형식과 **100% 동일한 구조**로 작성. 카테고리명은 아래 고정값만 사용:
 
 ```bash
-BODY=$($PYTHON -c "
-import json
-body = '''<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+$PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$PR_NUMBER" <<'EOF'
+import urllib.request, json, sys
+pat, owner, repo, pr = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr}"
+body = """<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
 
 ## Summary by CodeRabbit
 
@@ -229,14 +238,14 @@ body = '''<!-- This is an auto-generated comment: release notes by coderabbit.ai
 * **기타**
   * (항목)
 
-<!-- end of auto-generated comment: release notes by coderabbit.ai -->'''
-print(json.dumps(body))
-")
-
-curl -s -H "Authorization: token $GITHUB_PAT" \
-     -H "Content-Type: application/json" \
-     -X PATCH -d "{\"body\": $BODY}" \
-     "https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER"
+<!-- end of auto-generated comment: release notes by coderabbit.ai -->"""
+data = json.dumps({"body": body}).encode()
+req = urllib.request.Request(url, data=data, method="PATCH")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+urllib.request.urlopen(req)
+print("PR 본문 업데이트 완료")
+EOF
 ```
 
 항목이 없는 카테고리는 생략한다.
@@ -299,12 +308,19 @@ curl -s -X PATCH \
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-PR_NUMBER=$(curl -s -X POST \
-  -H "Authorization: token $GITHUB_PAT" \
-  -H "Content-Type: application/json" \
-  -d "{\"title\":\"$TITLE\",\"head\":\"main\",\"base\":\"deploy\",\"body\":\"\"}" \
-  "https://api.github.com/repos/$OWNER/$REPO/pulls" \
-  | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
+PR_NUMBER=$($PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$TITLE" <<'EOF'
+import urllib.request, json, sys
+pat, owner, repo, title = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+payload = {"title": title, "head": "main", "base": "deploy", "body": ""}
+data = json.dumps(payload).encode()
+req = urllib.request.Request(url, data=data, method="POST")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["number"])
+EOF
+)
 
 if [ -z "$PR_NUMBER" ]; then
   echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요."
@@ -326,9 +342,11 @@ git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head 
 ### fix 5단계: PR 본문 업데이트
 
 ```bash
-BODY=$($PYTHON -c "
-import json
-body = '''<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+$PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$PR_NUMBER" <<'EOF'
+import urllib.request, json, sys
+pat, owner, repo, pr = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr}"
+body = """<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
 
 ## Summary by CodeRabbit
 
@@ -349,14 +367,14 @@ body = '''<!-- This is an auto-generated comment: release notes by coderabbit.ai
 * **기타**
   * (항목)
 
-<!-- end of auto-generated comment: release notes by coderabbit.ai -->'''
-print(json.dumps(body))
-")
-
-curl -s -H "Authorization: token $GITHUB_PAT" \
-     -H "Content-Type: application/json" \
-     -X PATCH -d "{\"body\": $BODY}" \
-     "https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER"
+<!-- end of auto-generated comment: release notes by coderabbit.ai -->"""
+data = json.dumps({"body": body}).encode()
+req = urllib.request.Request(url, data=data, method="PATCH")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+urllib.request.urlopen(req)
+print("PR 본문 업데이트 완료")
+EOF
 ```
 
 항목이 없는 카테고리는 생략한다.

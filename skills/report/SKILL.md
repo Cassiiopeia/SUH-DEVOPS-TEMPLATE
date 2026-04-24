@@ -90,13 +90,21 @@ agent가 직접 경로를 계산하여 파일을 저장한다:
 
 2. **repo 확인**: `git remote get-url origin`에서 `owner`/`repo` 추출, 실패 시 config의 `repos`에서 `default: true`인 repo 사용.
 
-3. **댓글 포스팅**:
+3. **댓글 포스팅** (보고서 본문에 한국어·이모지·줄바꿈 포함 → Python urllib 직접 전송):
 ```bash
-curl -s -X POST \
-  -H "Authorization: token {github_pat}" \
-  -H "Content-Type: application/json" \
-  -d "{\"body\": \"{보고서 내용}\"}" \
-  "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}/comments"
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+$PYTHON - <<'EOF'
+import urllib.request, json
+pat = "{github_pat}"
+url = "https://api.github.com/repos/{owner}/{repo}/issues/{이슈번호}/comments"
+body = """{보고서 내용}"""
+data = json.dumps({"body": body}).encode()
+req = urllib.request.Request(url, data=data, method="POST")
+req.add_header("Authorization", f"token {pat}")
+req.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req)
+print(json.loads(res.read())["html_url"])
+EOF
 ```
 
 ### 완료 메시지

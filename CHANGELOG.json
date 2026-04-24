@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-24T15:42:21Z",
-    "currentVersion": "3.0.23",
+    "lastUpdated": "2026-04-24T15:56:07Z",
+    "currentVersion": "3.0.24",
     "projectType": "basic",
-    "totalReleases": 90
+    "totalReleases": 91
   },
   "releases": [
+    {
+      "version": "3.0.24",
+      "project_type": "basic",
+      "date": "2026-04-24",
+      "pr_number": 273,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * Windows 환경에서 배포 시 PR 본문 한글이 깨지는 문제 해결\n  * 배포 스킬의 인증 토큰 읽기 오류 수정",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows 환경에서 배포 시 PR 본문 한글이 깨지는 문제 해결",
+            "배포 스킬의 인증 토큰 읽기 오류 수정"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.23",
       "project_type": "basic",

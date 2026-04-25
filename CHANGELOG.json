@@ -1,11 +1,36 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-25T08:09:09Z",
-    "currentVersion": "3.0.29",
+    "lastUpdated": "2026-04-25T10:42:42Z",
+    "currentVersion": "3.0.32",
     "projectType": "basic",
-    "totalReleases": 95
+    "totalReleases": 96
   },
   "releases": [
+    {
+      "version": "3.0.32",
+      "project_type": "basic",
+      "date": "2026-04-25",
+      "pr_number": 283,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * GitHub 스킬 동작 안정성 개선 (PAT 인식, 레포 자동 감지, 워크트리 환경 대응 등 5건)\n  * config 설정 파일 구조 단일화 및 Git 컨텍스트 확인 방식 표준화\n\n* **문서**\n  * GitHub 스킬 개선 시리즈 구현 보고서 5건 추가\n  * config 통합 및 Git 컨텍스트 프로토콜 보고서 추가\n  * 불필요한 plan 문서 정리",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "GitHub 스킬 동작 안정성 개선 (PAT 인식, 레포 자동 감지, 워크트리 환경 대응 등 5건)",
+            "config 설정 파일 구조 단일화 및 Git 컨텍스트 확인 방식 표준화"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "GitHub 스킬 개선 시리즈 구현 보고서 5건 추가",
+            "config 통합 및 Git 컨텍스트 프로토콜 보고서 추가",
+            "불필요한 plan 문서 정리"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.29",
       "project_type": "basic",

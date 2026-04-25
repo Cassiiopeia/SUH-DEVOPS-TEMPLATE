@@ -1,6 +1,6 @@
 ---
 name: github
-description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회, 댓글 추가, PR 생성/조회를 직접 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, GitHub API 호출, 이슈 만들어줘, PR 확인해줘, 브랜치 PR, 이슈 수정, '/github' 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
+description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회/수정/댓글, PR 생성/조회/릴리스노트, 레포 탐색을 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 바꿔줘, '/github', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
 ---
 
 # GitHub Mode
@@ -238,11 +238,176 @@ print(json.loads(res.read())["html_url"])
 EOF
 ```
 
+---
+
+## explore 모드
+
+GitHub 유저 또는 Organization의 레포 목록과 개별 레포 상세 정보를 조회한다.
+출력 포맷을 strict하게 강제하지 않으며, agent가 데이터를 받아 스스로 판단한다.
+
+"내 레포 보여줘", "레포 목록 탐색해줘", "README 가져와줘", "{레포명} 정보 봐줘", "Org 레포 탐색해줘" 등의 요청 시 실행.
+
+### Phase 0 — Owner 결정
+
+**Python 실행 파일 결정** (OS별 분기):
+
+- **macOS / Linux**:
+  ```bash
+  PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+  ```
+- **Windows (PowerShell)**: `command -v` 미지원. 아래로 대체:
+  ```powershell
+  $PYTHON = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+  ```
+
+**Owner 결정 규칙**:
+
+1. "내 레포", owner 미명시 → PAT 소유자 자동 사용. PAT 소유자는 항상 User 타입이므로 타입 판별 불필요.
+   ```bash
+   curl -s -H "Authorization: token {github_pat}" "https://api.github.com/user" \
+     | $PYTHON -c "import sys,json; print(json.load(sys.stdin).get('login',''))"
+   ```
+   → 이후 `/users/{owner}/repos` 엔드포인트 직접 사용.
+
+2. owner 명시 ("TEAM-ROMROM", "Cassiiopeia" 등) → 해당 owner 사용. **이 경우에만** 타입 판별 실행:
+   ```bash
+   curl -s -H "Authorization: token {github_pat}" "https://api.github.com/users/{owner}" \
+     | $PYTHON -c "import sys,json; print(json.load(sys.stdin).get('type','User'))"
+   # "User" → /users/{owner}/repos
+   # "Organization" → /orgs/{owner}/repos
+   ```
+
+### Phase 1 — 레포 목록 조회
+
+```bash
+# User 타입
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/users/{owner}/repos?per_page=100&sort=updated" \
+  | $PYTHON -c "
+import sys, json
+repos = json.load(sys.stdin)
+if isinstance(repos, dict):
+    print('ERROR:', repos.get('message', ''))
+else:
+    for r in repos:
+        topics = ', '.join(r.get('topics') or [])
+        desc = (r.get('description') or '').replace('|', '-')
+        print(f\"name={r['name']} | desc={desc} | lang={r.get('language') or '?'} | stars={r['stargazers_count']} | updated={r['updated_at'][:10]} | fork={r['fork']} | private={r['private']} | url={r['html_url']} | topics={topics}\")
+"
+
+# Organization 타입
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/orgs/{owner}/repos?per_page=100&sort=updated" \
+  | $PYTHON -c "
+import sys, json
+repos = json.load(sys.stdin)
+if isinstance(repos, dict):
+    print('ERROR:', repos.get('message', ''))
+else:
+    for r in repos:
+        topics = ', '.join(r.get('topics') or [])
+        desc = (r.get('description') or '').replace('|', '-')
+        print(f\"name={r['name']} | desc={desc} | lang={r.get('language') or '?'} | stars={r['stargazers_count']} | updated={r['updated_at'][:10]} | fork={r['fork']} | private={r['private']} | url={r['html_url']} | topics={topics}\")
+"
+```
+
+**필터링**: 사용자가 "fork 제외", "Java만", "stars 높은 순" 등을 요청하면
+별도 API 재호출 없이 위 결과에서 agent가 직접 필터링한다.
+
+### Phase 2 — 단일 레포 상세 조회
+
+특정 레포명이 언급되면 아래 4개 정보를 순서대로 수집한다.
+각 호출은 독립적으로 실행하며, 하나가 실패해도 나머지는 계속 진행한다.
+
+**2-1. 기본 메타정보**
+
+```bash
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/repos/{owner}/{repo}" \
+  | $PYTHON -c "
+import sys, json
+r = json.load(sys.stdin)
+if r.get('message'):
+    print('ERROR:', r['message'])
+else:
+    print('name:', r['name'])
+    print('description:', r.get('description') or '')
+    print('language:', r.get('language') or '?')
+    print('stars:', r['stargazers_count'], '| forks:', r['forks_count'])
+    print('open_issues:', r['open_issues_count'])
+    print('default_branch:', r['default_branch'])
+    print('created_at:', r['created_at'][:10], '| updated_at:', r['updated_at'][:10])
+    print('topics:', ', '.join(r.get('topics') or []))
+    print('url:', r['html_url'])
+"
+```
+
+**2-2. README**
+
+```bash
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/repos/{owner}/{repo}/readme" \
+  | $PYTHON -c "
+import sys, json, base64
+r = json.load(sys.stdin)
+if r.get('message') == 'Not Found':
+    print('README: 없음')
+elif r.get('message'):
+    print('ERROR:', r['message'])
+else:
+    content = base64.b64decode(r['content']).decode('utf-8', errors='replace')
+    print(content)
+"
+```
+
+**2-3. 언어 구성**
+
+```bash
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/repos/{owner}/{repo}/languages" \
+  | $PYTHON -c "
+import sys, json
+data = json.load(sys.stdin)
+if isinstance(data, dict) and data.get('message'):
+    print('ERROR:', data['message'])
+else:
+    total = sum(data.values()) or 1
+    for lang, bytes_count in sorted(data.items(), key=lambda x: -x[1]):
+        pct = round(bytes_count / total * 100, 1)
+        print(f'{lang}: {pct}%')
+"
+```
+
+**2-4. 최근 커밋 10개**
+
+```bash
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/repos/{owner}/{repo}/commits?per_page=10" \
+  | $PYTHON -c "
+import sys, json
+data = json.load(sys.stdin)
+if isinstance(data, dict):
+    print('ERROR:', data.get('message', ''))
+else:
+    for c in data:
+        sha = c['sha'][:7]
+        msg = c['commit']['message'].splitlines()[0]
+        author = c['commit']['author']['name']
+        date = c['commit']['author']['date'][:10]
+        print(f'{sha} | {date} | {author} | {msg}')
+"
+```
+
+---
+
 ## 오류 처리
 
 | 오류 코드 | 의미 | 대응 |
 |-----------|------|------|
 | `missing_pat` | GITHUB_PAT 미설정 | `/issue` 스킬로 PAT 등록 안내 |
 | `github_api_401` | PAT 인증 실패 | PAT 갱신 안내 |
-| `github_api_404` | 이슈/PR 없음 | 번호 재확인 요청 |
+| `github_api_403` | 권한 없음 (private 레포 등) | 접근 불가 안내, 나머지 진행 |
+| `github_api_404` | 이슈/PR/레포/README 없음 | 해당 항목 "없음"으로 표시, 나머지 진행 |
 | `github_api_422` | 이미 PR 존재 등 | API 오류 메시지 그대로 안내 |
+| API rate limit | 요청 한도 초과 | `X-RateLimit-Remaining: 0` 감지 시 안내 |
+| curl 네트워크 오류 | 연결 실패 | exit code 확인 후 재시도 1회, 실패 시 안내 |

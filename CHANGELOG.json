@@ -1,11 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-04-24T17:21:36Z",
-    "currentVersion": "3.0.28",
+    "lastUpdated": "2026-04-25T08:09:09Z",
+    "currentVersion": "3.0.29",
     "projectType": "basic",
-    "totalReleases": 94
+    "totalReleases": 95
   },
   "releases": [
+    {
+      "version": "3.0.29",
+      "project_type": "basic",
+      "date": "2026-04-25",
+      "pr_number": 282,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * GitHub 스킬에서 레포 탐색(explore) 기능 추가 — 내 레포 목록, Org 레포 목록, 단일 레포 상세(README·언어 구성·최근 커밋) 조회 가능\n\n* **개선**\n  * GitHub 스킬 트리거 발화 확장 — 레포 탐색 관련 요청에도 스킬이 정확히 호출되도록 개선",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "GitHub 스킬에서 레포 탐색(explore) 기능 추가 — 내 레포 목록, Org 레포 목록, 단일 레포 상세(README·언어 구성·최근 커밋) 조회 가능"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "GitHub 스킬 트리거 발화 확장 — 레포 탐색 관련 요청에도 스킬이 정확히 호출되도록 개선"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.28",
       "project_type": "basic",

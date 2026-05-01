@@ -347,6 +347,7 @@ commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https
 |------|-----------|
 | API Key / PAT / Token | `{API_KEY}`, `{PAT}`, `{TOKEN}` |
 | Password / Secret | `{PASSWORD}`, `{SECRET}` |
+| DB 유저명 / 계정명 | `{DB_USERNAME}`, `{ADMIN_ID}` |
 | 서버 주소 | `{SERVER_HOST}` |
 | 개인정보 | `{EMAIL}`, `{PHONE}` |
 
@@ -354,7 +355,7 @@ commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https
 
 - 에러 로그에 토큰/키가 포함된 경우 반드시 마스킹 후 기재
 - 재현 방법에 실제 서버 정보 대신 `{SERVER_HOST}` 등 플레이스홀더 사용
-- 스크린샷/로그 인용 시 민감 값은 `***` 또는 플레이스홀더로 대체
+- 스크린샷/로그 인용 시 민감 값은 플레이스홀더로 대체 (`***` 같은 익명 별표 금지 — 종류를 알 수 없어 의미 전달 불가)
 
 ### 파일 저장 직전 자체검토 프로토콜
 
@@ -365,7 +366,7 @@ commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https
 | 항목 | 위험 예시 | 안전 예시 |
 |------|-----------|-----------|
 | 비밀번호 실제값 | `password: abc123`, `비번: qwer1234` | `password: {PASSWORD}` |
-| ID/계정 실제값 | `admin / mypassword`, `아이디: hong123` | `{ADMIN_ID} / {PASSWORD}` |
+| ID/계정/DB유저명 실제값 | `admin/mypassword`, `아이디: hong123`, `username: kimchi` | `{ADMIN_ID}/{PASSWORD}`, `{DB_USERNAME}` |
 | API Key / Token 실제값 | `sk-abc123xyz`, `AIza...` | `{API_KEY}` |
 | GitHub PAT 실제값 | `ghp_abc123...` (실제 유효한 긴 문자열) | `{PAT}` |
 | DB 접속 정보 실제값 | `mysql://user:pass@192.168.0.1` | `mysql://{DB_USER}:{DB_PASS}@{DB_HOST}` |
@@ -373,9 +374,11 @@ commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https
 
 **판단 기준**:
 - `${{ secrets.XXX }}` 형태 — **안전** (키 이름이며 실제값 아님)
-- `ghp_xxxx` 형태 — **안전** (플레이스홀더)
+- `{DB_USERNAME}`, `{PASSWORD}` 형태 — **안전** (명명된 플레이스홀더)
 - `ghp_ru0dCYe...` 처럼 실제로 유효해 보이는 긴 문자열 — **위험**
 - `password: admin123` 처럼 실제 값이 평문 노출 — **위험**
+- `username: kimchi`, `user: hong123` 처럼 실제 계정명 노출 — **위험**
+- `********` 같은 익명 별표 — **금지** (플레이스홀더로 교체할 것)
 
 **처리 방식**:
 1. 위험 항목 발견 시 → 해당 값을 플레이스홀더로 교체 후 저장

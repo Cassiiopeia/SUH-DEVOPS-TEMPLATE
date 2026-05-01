@@ -75,4 +75,6 @@ description: "PPT Mode - 기술 발표 자료 작성 전문가. 개발 과정에
 PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path ppt
 ```
 
+파일 저장 전 `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜**을 따라 작성한 내용 전체를 검토한다. 민감 정보 발견 시 플레이스홀더로 교체 후 저장한다.
+
 반환된 경로에 파일을 저장한다.

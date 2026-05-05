@@ -81,27 +81,69 @@ python -X utf8 init_worktree_temp_{timestamp}.py
 
 ### 4단계: 민감 파일 복사
 
-Worktree 생성 성공 후 `.gitignore`를 분석하여 민감 파일을 동적으로 복사한다.
+Worktree 생성 성공 후 **Claude가 직접** 아래 절차를 실행하여 민감 파일을 복사한다.
 
-**복사 대상 식별** (`.gitignore`에서):
+#### 4-1. 소스/대상 경로 확정
 
-| 카테고리 | 패턴 |
-|---------|------|
-| Firebase | `google-services.json`, `GoogleService-Info.plist` |
-| 서명 키 | `key.properties`, `*.jks`, `*.p12`, `*.p8`, `*.mobileprovision` |
-| 빌드 설정 | `Secrets.xcconfig`, 민감한 `*.xcconfig` |
-| 환경 변수 | `*.env` |
-| IDE 로컬 | `settings.local.json` |
+- **소스(원본) 루트**: 현재 작업 중인 프로젝트 루트 (`git rev-parse --show-toplevel`로 확인)
+- **대상(워크트리) 루트**: 3단계에서 확인한 `WORKTREE_PATH`
 
-**복사 규칙**:
-- 실제 존재하는 파일만 복사
-- 디렉토리 구조 유지 (`android/app/google-services.json` → `worktree/android/app/google-services.json`)
+#### 4-2. .gitignore에서 복사 후보 추출
 
-**절대 복사 금지**:
-- `build/`, `target/`, `.gradle/` (빌드 산출물)
-- `node_modules/`, `Pods/`, `.dart_tool/` (의존성)
-- `.report/`, `.run/`, `.idea/` (캐시)
-- `*.log`, `*.class`, `*.pyc` (임시 파일)
+소스 루트의 `.gitignore`를 읽어 **"단순 경로/파일명"** 패턴만 후보로 추린다.
+
+**포함 기준** (아래 조건을 모두 만족):
+- `!`(negation) 접두어 없음
+- 주석(`#`) 라인 아님
+- 빈 줄 아님
+- 패턴이 `**` glob을 포함하지 않는 단순 경로 또는 단순 확장자(`*.yml` 수준)
+
+**즉시 제외 키워드** (패턴에 아래 문자열이 포함되면 스킵):
+```
+build/  target/  .gradle  node_modules  Pods/  .dart_tool
+Generated  generate  .last_build_id  .framework  .flx  .zip
+DerivedData  XCBuildData  .class  .pyc  .log  .symbols  .map.json
+.pub-cache  .pub/  migrate_working_dir  .history  .svn  .swiftpm
+bin/  out/  dist/  nbproject  .sts4-cache  .springBeans
+```
+
+#### 4-3. 실제 존재 파일 탐색
+
+후보 패턴 각각에 대해 소스 루트에서 실제 파일 존재 여부 확인:
+
+```bash
+# 단순 경로 패턴 (예: android/key.properties)
+ls [소스_루트]/[패턴]
+
+# 와일드카드 패턴 (예: *.env, src/main/resources/application-*.yml)
+find [소스_루트] -name "[패턴파일명부분]" \
+  -not -path "*/build/*" \
+  -not -path "*/target/*" \
+  -not -path "*/.gradle/*" \
+  -not -path "*/node_modules/*" \
+  -not -path "*/Pods/*" \
+  -not -path "*/.dart_tool/*" \
+  -not -path "*/*-Worktree/*" \
+  -type f -size -1M
+```
+
+> `-size -1M`: 1MB 초과 파일은 민감 설정 파일이 아닐 가능성 높으므로 제외
+
+#### 4-4. 경로 계산 및 복사 실행
+
+탐색된 각 파일에 대해:
+
+1. **상대 경로 계산**: `절대경로` → 소스 루트 기준 상대경로
+2. **대상 경로** = `대상_루트` + `상대경로`
+3. **복사**:
+```bash
+mkdir -p [대상_파일의_부모_디렉토리]
+cp [소스_절대경로] [대상_절대경로]
+```
+
+#### 4-5. 복사 결과 검증
+
+각 파일 복사 후 대상 경로 존재 확인. 결과를 `✅` / `❌`로 표시.
 
 ### 5단계: 결과 출력
 

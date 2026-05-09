@@ -1,13 +1,13 @@
-# Claude Code Skills 가이드
+# Agent Skills 가이드
 
-> **이 레포는 Claude Code용 Skill 플러그인 마켓플레이스 템플릿입니다.**
-> GitHub Actions 자동화 템플릿과 더불어, Claude Code에서 바로 사용할 수 있는 개발/DevOps Skill 25종을 제공합니다.
+> **이 레포는 Claude Code, Cursor, Gemini CLI, Codex CLI에서 사용할 수 있는 Agent Skill 패키지입니다.**
+> GitHub Actions 자동화 템플릿과 더불어, 개발/DevOps Skill 25종을 제공합니다.
 
 ---
 
 ## Skill이 뭔가요?
 
-Claude Code에서 `/cassiiopeia:xxx` 형태로 호출하는 **전문가 모드**입니다. 각 Skill은 특정 작업(예: 코드 리뷰, 이슈 작성, 리팩토링)에 특화된 지침과 출력 포맷을 가지고 있어서, 일반 대화보다 훨씬 일관된 결과를 얻을 수 있습니다.
+Skill은 특정 작업(예: 코드 리뷰, 이슈 작성, 리팩토링)에 특화된 지침과 출력 포맷을 가진 **전문가 모드**입니다. Claude Code에서는 `/cassiiopeia:xxx` 형태로 호출하고, Gemini CLI와 Codex CLI에서는 루트 bootstrap 문서가 `skills/` 폴더를 읽도록 안내합니다.
 
 예를 들어 `/cassiiopeia:review`를 실행하면 Claude가 단순히 "코드 좀 봐줘"에 답하는 게 아니라, **보안/성능/버그/품질/아키텍처/테스트 6가지 관점**으로 나눠서 **Critical/Major/Minor 우선순위**로 정리된 리뷰를 돌려줍니다.
 
@@ -15,12 +15,68 @@ Claude Code에서 `/cassiiopeia:xxx` 형태로 호출하는 **전문가 모드**
 
 ## 설치
 
+### Claude Code
+
 ```bash
 claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 
 설치 후 Claude Code에서 `/cassiiopeia:` 까지 입력하면 사용 가능한 Skill 목록이 자동완성됩니다.
+
+### Cursor
+
+`template_integrator`의 `skills` 모드를 사용하면 `skills/`가 Cursor용 경로로 복사됩니다.
+
+```bash
+# macOS / Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode skills
+```
+
+```powershell
+# Windows PowerShell
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
+```
+
+대화형 메뉴에서 `Agent Skill 설치`를 선택한 뒤 Cursor scope를 고르면 됩니다.
+
+### Gemini CLI
+
+Gemini CLI는 extension으로 설치합니다.
+
+```bash
+gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
+```
+
+업데이트:
+
+```bash
+gemini extensions update cassiiopeia
+```
+
+설치 후 Gemini는 루트 `gemini-extension.json`의 `contextFileName`에 따라 `GEMINI.md`를 읽고, `skills/{skill-name}/SKILL.md`를 참조합니다.
+
+### Codex CLI
+
+Codex는 공식 plugin marketplace 등록을 전제로 하지 않습니다. native skills discovery 경로에 이 레포의 `skills/`를 연결합니다.
+
+macOS / Linux:
+
+```bash
+git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia
+mkdir -p ~/.agents/skills
+ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
+```
+
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$env:USERPROFILE\.codex\cassiiopeia"
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
+cmd /c mklink /J "%USERPROFILE%\.agents\skills\cassiiopeia" "%USERPROFILE%\.codex\cassiiopeia\skills"
+```
+
+Codex에서는 slash command UI가 아니라 `AGENTS.md`와 설치된 `skills/`를 통해 관련 `SKILL.md`를 읽는 방식으로 사용합니다.
 
 ---
 
@@ -490,6 +546,8 @@ flowchart LR
 
 ## 참고
 
-- 플러그인 소스: 이 레포의 `skills/` 폴더 (마켓플레이스 전용, `template_integrator`로는 복사되지 않음)
-- 플러그인 매니페스트: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
+- Skill 원본: 이 레포의 `skills/` 폴더 (Claude/Gemini/Codex/Cursor 공통 원본)
+- Claude Code 매니페스트: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
+- Gemini CLI 매니페스트: `gemini-extension.json`, `GEMINI.md`
+- Codex CLI bootstrap/metadata: `AGENTS.md`, `.codex-plugin/plugin.json`
 - 버전 동기화: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 자동 반영

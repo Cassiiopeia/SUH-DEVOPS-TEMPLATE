@@ -30,7 +30,7 @@
 #                            • version     - 버전 관리 시스템만
 #                            • workflows   - GitHub Actions 워크플로우만
 #                            • issues      - 이슈/PR 템플릿만
-#                            • skills      - Agent Skill 설치만 (Claude, Cursor)
+#                            • skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
 #                            • interactive - 대화형 선택 (기본값)
 #   -Version <VERSION>       초기 버전 설정 (자동 감지, 수동 지정 가능)
 #   -Type <TYPE>             프로젝트 타입 (자동 감지, 수동 지정 가능)
@@ -312,7 +312,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   version     - 버전 관리 시스템만 (version.yml + scripts)
   workflows   - GitHub Actions 워크플로우만
   issues      - 이슈/PR 템플릿만
-  skills      - Agent Skill 설치만 (Claude, Cursor)
+  skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
   interactive - 대화형 선택 (기본값, 추천)
 
 옵션:
@@ -739,7 +739,10 @@ function Download-Template {
     Print-Info "템플릿 내부 문서 제외 중..."
     $docsToRemove = @(
         "CONTRIBUTING.md",
-        "CLAUDE.md"
+        "CLAUDE.md",
+        "AGENTS.md",
+        "GEMINI.md",
+        "gemini-extension.json"
     )
     
     foreach ($doc in $docsToRemove) {
@@ -753,6 +756,8 @@ function Download-Template {
     Print-Info "플러그인 전용 파일 제외 중..."
     $pluginItemsToRemove = @(
         ".claude-plugin",   # Claude Code 플러그인 매니페스트
+        ".codex-plugin",    # Codex 플러그인 메타데이터
+        ".cursor",          # Cursor 스킬 복사본
         "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
     )
     # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (Offer-IdeToolsInstall에서 사용 후 정리)
@@ -2077,7 +2082,7 @@ function Start-InteractiveMode {
     Write-Host "  2) 버전 관리 시스템만"
     Write-Host "  3) GitHub Actions 워크플로우만"
     Write-Host "  4) 이슈/PR 템플릿만"
-    Write-Host "  5) Agent Skill 설치 (Claude, Cursor)"
+    Write-Host "  5) Agent Skill 설치 (Claude, Cursor, Gemini, Codex)"
     Write-Host "  6) 취소"
     Write-Host ""
 
@@ -2247,6 +2252,8 @@ function Start-Integration {
 # IDE 도구(Skills) 설치 제안
 # Claude Code: 플러그인 마켓플레이스 자동 설치
 # Cursor: skills/ → .cursor/skills/ 복사
+# Gemini CLI: extension install/update
+# Codex CLI: ~/.agents/skills native discovery junction
 # ===================================================================
 
 function Offer-IdeToolsInstall {
@@ -2317,6 +2324,19 @@ function Offer-IdeToolsInstall {
             elseif ($script:templateVersion) { $ptag = " -> 업데이트 가능: v$($script:templateVersion)" }
             Print-Info "Cursor       project v${cursorProjVer} (.cursor\skills\)${ptag}"
         }
+    }
+
+    if (Get-Command "gemini" -ErrorAction SilentlyContinue) {
+        Print-Info "Gemini CLI  : CLI 감지 (extension 설치 가능)"
+    } else {
+        Print-Info "Gemini CLI  : CLI 미감지 (수동 설치 필요)"
+    }
+
+    $codexTarget = Join-Path $env:USERPROFILE ".agents\skills\cassiiopeia"
+    if (Test-Path $codexTarget) {
+        Print-Info "Codex CLI   : native skills 경로 감지 ($codexTarget)"
+    } else {
+        Print-Info "Codex CLI   : native skills 미설치 ($codexTarget)"
     }
     Write-Host ""
 
@@ -2485,6 +2505,9 @@ function Offer-IdeToolsInstall {
             if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     }
+
+    Invoke-GeminiExtensionManage
+    Invoke-CodexSkillsManage
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -2700,6 +2723,127 @@ function Get-CursorSkillsSrc {
     return $RemoteSrc
 }
 
+# ─── Gemini CLI 헬퍼 ────────────────────────────────────────────
+
+function Invoke-GeminiExtensionManage {
+    Write-Host ""
+    Print-Step "[ Gemini CLI Extension 관리 ]"
+    Write-Host ""
+
+    $gemini = Get-Command "gemini" -ErrorAction SilentlyContinue
+    if (-not $gemini) {
+        Print-Warning "gemini CLI가 감지되지 않았습니다. 수동 설치 명령:"
+        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        return
+    }
+
+    if (-not $Force) {
+        Write-Host "Gemini CLI extension을 설치/업데이트하시겠습니까?"
+        Write-Host "  Y/y - 예, 설치 또는 업데이트"
+        Write-Host "  N/n - 아니오, 건너뛰기"
+        Write-Host ""
+        if (-not (Ask-YesNo "선택" "Y")) {
+            Print-Info "Gemini CLI extension 변경 없이 건너뜁니다"
+            return
+        }
+    }
+
+    Print-Step "Gemini CLI extension 업데이트 중..."
+    $null = & gemini extensions update cassiiopeia 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Print-Success "Gemini CLI extension 업데이트 완료"
+        return
+    }
+
+    Print-Step "Gemini CLI extension 설치 중..."
+    $null = & gemini extensions install "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Print-Success "Gemini CLI extension 설치 완료"
+    } else {
+        Print-Warning "Gemini CLI extension 설치 실패. 수동으로 설치해주세요:"
+        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    }
+}
+
+# ─── Codex CLI 헬퍼 ─────────────────────────────────────────────
+
+function Invoke-CodexSkillsManage {
+    Write-Host ""
+    Print-Step "[ Codex CLI Native Skills 관리 ]"
+    Write-Host ""
+
+    $installDir = Join-Path $env:USERPROFILE ".codex\cassiiopeia"
+    $skillsDir  = Join-Path $installDir "skills"
+    $targetDir  = Join-Path $env:USERPROFILE ".agents\skills"
+    $target     = Join-Path $targetDir "cassiiopeia"
+
+    if (-not $Force) {
+        Write-Host "Codex native skills를 설치/업데이트하시겠습니까?"
+        Write-Host "  설치 경로: $target"
+        Write-Host "  Y/y - 예, 설치 또는 업데이트"
+        Write-Host "  N/n - 아니오, 건너뛰기"
+        Write-Host ""
+        if (-not (Ask-YesNo "선택" "Y")) {
+            Print-Info "Codex native skills 변경 없이 건너뜁니다"
+            return
+        }
+    }
+
+    if (-not (Get-Command "git" -ErrorAction SilentlyContinue)) {
+        Print-Warning "git이 없어 Codex native skills를 자동 설치할 수 없습니다."
+        Write-Host "    git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git `"$installDir`""
+        Write-Host "    New-Item -ItemType Directory -Force -Path `"$targetDir`""
+        Write-Host "    cmd /c mklink /J `"%USERPROFILE%\.agents\skills\cassiiopeia`" `"%USERPROFILE%\.codex\cassiiopeia\skills`""
+        return
+    }
+
+    if (Test-Path (Join-Path $installDir ".git")) {
+        Print-Step "Codex skills 저장소 업데이트 중..."
+        $null = & git -C $installDir pull --ff-only 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Print-Warning "기존 저장소 업데이트 실패. 수동 확인 필요: $installDir"
+        }
+    } elseif (Test-Path $installDir) {
+        Print-Warning "설치 경로가 이미 존재하지만 git 저장소가 아닙니다: $installDir"
+        return
+    } else {
+        Print-Step "Codex skills 저장소 clone 중..."
+        $null = & git clone "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git" $installDir 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Print-Warning "Codex skills 저장소 clone 실패"
+            return
+        }
+    }
+
+    if (-not (Test-Path $skillsDir)) {
+        Print-Warning "skills 디렉토리를 찾을 수 없습니다: $skillsDir"
+        return
+    }
+
+    if (-not (Test-Path $targetDir)) {
+        New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+    }
+
+    if (Test-Path $target) {
+        $item = Get-Item $target -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            Remove-Item -Path $target -Force
+        } else {
+            Print-Warning "대상 경로가 이미 존재하고 junction/symlink가 아닙니다: $target"
+            Print-Warning "기존 경로를 보존하기 위해 자동 덮어쓰기를 중단합니다."
+            return
+        }
+    }
+
+    $null = & cmd /c mklink /J "$target" "$skillsDir" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Print-Success "Codex native skills 설치 완료 ($target -> $skillsDir)"
+    } else {
+        Print-Warning "junction 생성 실패. 수동으로 실행해주세요:"
+        Write-Host "    cmd /c mklink /J `"$target`" `"$skillsDir`""
+    }
+}
+
 # ===================================================================
 # 완료 요약
 # ===================================================================
@@ -2738,7 +2882,7 @@ function Show-Summary {
             Write-Host "  ✅ 이슈/PR/Discussion 템플릿"
         }
         "skills" {
-            Write-Host "  ✅ Agent Skill 설치 (Claude, Cursor)"
+            Write-Host "  ✅ Agent Skill 설치 (Claude, Cursor, Gemini, Codex)"
         }
     }
 
@@ -2866,4 +3010,3 @@ function Main {
 
 # 스크립트 실행
 Main
-

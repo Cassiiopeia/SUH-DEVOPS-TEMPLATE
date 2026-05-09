@@ -394,6 +394,22 @@ cleanup_template_files() {
         echo "  ✓ CLAUDE.md 삭제"
     fi
 
+    # Agent bootstrap 파일 삭제 (스킬 패키지 전용 문서)
+    if [ -f "AGENTS.md" ]; then
+        rm -f AGENTS.md
+        echo "  ✓ AGENTS.md 삭제"
+    fi
+
+    if [ -f "GEMINI.md" ]; then
+        rm -f GEMINI.md
+        echo "  ✓ GEMINI.md 삭제"
+    fi
+
+    if [ -f "gemini-extension.json" ]; then
+        rm -f gemini-extension.json
+        echo "  ✓ gemini-extension.json 삭제"
+    fi
+
     # 테스트 폴더들 삭제
     if [ -d ".github/scripts/test" ]; then
         rm -rf .github/scripts/test
@@ -415,6 +431,16 @@ cleanup_template_files() {
     if [ -d ".claude-plugin" ]; then
         rm -rf .claude-plugin
         echo "  ✓ .claude-plugin 폴더 삭제 (플러그인 매니페스트)"
+    fi
+
+    if [ -d ".codex-plugin" ]; then
+        rm -rf .codex-plugin
+        echo "  ✓ .codex-plugin 폴더 삭제 (플러그인 매니페스트)"
+    fi
+
+    if [ -d ".cursor" ]; then
+        rm -rf .cursor
+        echo "  ✓ .cursor 폴더 삭제 (IDE 스킬 복사본)"
     fi
 
     if [ -d "skills" ]; then
@@ -656,4 +682,3 @@ main() {
 
 # 스크립트 실행
 main "$@"
-

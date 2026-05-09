@@ -35,7 +35,7 @@
 #                            • version     - 버전 관리 시스템만
 #                            • workflows   - GitHub Actions 워크플로우만
 #                            • issues      - 이슈/PR 템플릿만
-#                            • skills      - Agent Skill 설치만 (Claude, Cursor)
+#                            • skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
 #                            • interactive - 대화형 선택 (기본값)
 #   -v, --version VERSION    초기 버전 설정 (자동 감지, 수동 지정 가능)
 #   -t, --type TYPE          프로젝트 타입 (자동 감지, 수동 지정 가능)
@@ -322,7 +322,7 @@ ${BLUE}통합 모드:${NC}
   ${GREEN}version${NC}     - 버전 관리 시스템만 (version.yml + scripts)
   ${GREEN}workflows${NC}   - GitHub Actions 워크플로우만
   ${GREEN}issues${NC}      - 이슈/PR 템플릿만
-  ${GREEN}skills${NC}      - Agent Skill 설치만 (Claude, Cursor)
+  ${GREEN}skills${NC}      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
   ${GREEN}interactive${NC} - 대화형 선택 (기본값, 추천)
 
 ${BLUE}옵션:${NC}
@@ -871,6 +871,9 @@ download_template() {
     local docs_to_remove=(
         "CONTRIBUTING.md"
         "CLAUDE.md"
+        "AGENTS.md"
+        "GEMINI.md"
+        "gemini-extension.json"
     )
     
     for doc in "${docs_to_remove[@]}"; do
@@ -883,6 +886,8 @@ download_template() {
     print_info "플러그인 전용 파일 제외 중..."
     local plugin_items_to_remove=(
         ".claude-plugin"    # Claude Code 플러그인 매니페스트
+        ".codex-plugin"     # Codex 플러그인 메타데이터
+        ".cursor"           # Cursor 스킬 복사본
         "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
     )
     # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (offer_ide_tools_install에서 사용 후 정리)
@@ -2136,7 +2141,7 @@ interactive_mode() {
     print_to_user "  2) 버전 관리 시스템만"
     print_to_user "  3) GitHub Actions 워크플로우만"
     print_to_user "  4) 이슈/PR 템플릿만"
-    print_to_user "  5) Agent Skill 설치 (Claude, Cursor)"
+    print_to_user "  5) Agent Skill 설치 (Claude, Cursor, Gemini, Codex)"
     print_to_user "  6) 취소"
     print_to_user ""
 
@@ -2320,6 +2325,8 @@ execute_integration() {
 # IDE 도구(Skills) 설치 제안
 # Claude Code: 플러그인 마켓플레이스 자동 설치
 # Cursor: skills/ → .cursor/skills/ 복사
+# Gemini CLI: extension install/update
+# Codex CLI: ~/.agents/skills native discovery symlink
 # ===================================================================
 
 offer_ide_tools_install() {
@@ -2386,6 +2393,19 @@ offer_ide_tools_install() {
             [ -n "$TEMPLATE_VERSION" ] && [ "$_cur_p_ver" != "$TEMPLATE_VERSION" ] && ptag=" → 업데이트 가능: v${TEMPLATE_VERSION}"
             print_info "Cursor       project v${_cur_p_ver} (.cursor/skills/)${ptag}"
         fi
+    fi
+
+    if command -v gemini &> /dev/null; then
+        print_info "Gemini CLI  : CLI 감지 (extension 설치 가능)"
+    else
+        print_info "Gemini CLI  : CLI 미감지 (수동 설치 필요)"
+    fi
+
+    local codex_target="${HOME}/.agents/skills/cassiiopeia"
+    if [ -L "$codex_target" ] || [ -d "$codex_target" ]; then
+        print_info "Codex CLI   : native skills 경로 감지 (${codex_target})"
+    else
+        print_info "Codex CLI   : native skills 미설치 (${codex_target})"
     fi
     echo "" >&2
 
@@ -2636,6 +2656,12 @@ offer_ide_tools_install() {
             [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     fi
+
+    # ─── Gemini CLI 섹션 ───
+    _manage_gemini_extension
+
+    # ─── Codex CLI 섹션 ───
+    _manage_codex_skills
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -2888,6 +2914,109 @@ _ask_cursor_skills_src() {
     esac
 }
 
+# ─── Gemini CLI 헬퍼 ────────────────────────────────────────────
+
+_manage_gemini_extension() {
+    echo "" >&2
+    print_step "[ Gemini CLI Extension 관리 ]"
+    echo "" >&2
+
+    if ! command -v gemini &> /dev/null; then
+        print_warning "gemini CLI가 감지되지 않았습니다. 수동 설치 명령:"
+        echo "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        return
+    fi
+
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        print_to_user "Gemini CLI extension을 설치/업데이트하시겠습니까?"
+        print_to_user "  Y/y - 예, 설치 또는 업데이트"
+        print_to_user "  N/n - 아니오, 건너뛰기"
+        print_to_user ""
+        if ! ask_yes_no "선택: " "Y"; then
+            print_info "Gemini CLI extension 변경 없이 건너뜁니다"
+            return
+        fi
+    fi
+
+    print_step "Gemini CLI extension 업데이트 중..."
+    if gemini extensions update cassiiopeia 2>/dev/null; then
+        print_success "Gemini CLI extension 업데이트 완료"
+        return
+    fi
+
+    print_step "Gemini CLI extension 설치 중..."
+    if gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+        print_success "Gemini CLI extension 설치 완료"
+    else
+        print_warning "Gemini CLI extension 설치 실패. 수동으로 실행해주세요:"
+        echo "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+    fi
+}
+
+# ─── Codex CLI 헬퍼 ─────────────────────────────────────────────
+
+_manage_codex_skills() {
+    echo "" >&2
+    print_step "[ Codex CLI Native Skills 관리 ]"
+    echo "" >&2
+
+    local install_dir="${HOME}/.codex/cassiiopeia"
+    local skills_dir="${install_dir}/skills"
+    local target_dir="${HOME}/.agents/skills"
+    local target="${target_dir}/cassiiopeia"
+
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        print_to_user "Codex native skills를 설치/업데이트하시겠습니까?"
+        print_to_user "  설치 경로: ${target}"
+        print_to_user "  Y/y - 예, 설치 또는 업데이트"
+        print_to_user "  N/n - 아니오, 건너뛰기"
+        print_to_user ""
+        if ! ask_yes_no "선택: " "Y"; then
+            print_info "Codex native skills 변경 없이 건너뜁니다"
+            return
+        fi
+    fi
+
+    if ! command -v git &> /dev/null; then
+        print_warning "git이 없어 Codex native skills를 자동 설치할 수 없습니다."
+        echo "    git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ${install_dir}" >&2
+        echo "    mkdir -p ${target_dir}" >&2
+        echo "    ln -s ${skills_dir} ${target}" >&2
+        return
+    fi
+
+    if [ -d "${install_dir}/.git" ]; then
+        print_step "Codex skills 저장소 업데이트 중..."
+        git -C "$install_dir" pull --ff-only 2>/dev/null || print_warning "기존 저장소 업데이트 실패. 수동 확인 필요: ${install_dir}"
+    elif [ -e "$install_dir" ]; then
+        print_warning "설치 경로가 이미 존재하지만 git 저장소가 아닙니다: ${install_dir}"
+        return
+    else
+        print_step "Codex skills 저장소 clone 중..."
+        git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$install_dir" 2>/dev/null || {
+            print_warning "Codex skills 저장소 clone 실패"
+            return
+        }
+    fi
+
+    if [ ! -d "$skills_dir" ]; then
+        print_warning "skills 디렉토리를 찾을 수 없습니다: ${skills_dir}"
+        return
+    fi
+
+    mkdir -p "$target_dir"
+    if [ -L "$target" ]; then
+        rm -f "$target"
+    elif [ -e "$target" ]; then
+        print_warning "대상 경로가 이미 존재하고 symlink가 아닙니다: ${target}"
+        print_warning "기존 경로를 보존하기 위해 자동 덮어쓰기를 중단합니다."
+        return
+    fi
+
+    ln -s "$skills_dir" "$target"
+    print_success "Codex native skills 설치 완료 (${target} -> ${skills_dir})"
+}
+
 # 완료 요약
 print_summary() {
     echo "" >&2
@@ -2929,7 +3058,7 @@ print_summary() {
             echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
             ;;
         skills)
-            echo "  ✅ Agent Skill 설치 (Claude, Cursor)" >&2
+            echo "  ✅ Agent Skill 설치 (Claude, Cursor, Gemini, Codex)" >&2
             ;;
     esac
 
@@ -3092,4 +3221,3 @@ main() {
 
 # 스크립트 실행
 main "$@"
-

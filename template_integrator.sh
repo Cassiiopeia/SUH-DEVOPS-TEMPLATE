@@ -2966,27 +2966,23 @@ _manage_codex_skills() {
     if command -v codex &> /dev/null; then
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_to_user "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
-            print_to_user "  1차 설치: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-            print_to_user "  마법사가 native skills fallback도 함께 준비합니다"
+            print_to_user "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+            print_to_user "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
             print_to_user "  Y/y - 예, 등록 또는 업데이트"
-            print_to_user "  N/n - 아니오, fallback native skills 설치로 진행"
+            print_to_user "  N/n - 아니오, 건너뜁니다"
             print_to_user ""
             if ask_yes_no "선택: " "Y"; then
                 _do_codex_marketplace_register
-                _do_codex_native_skills_fallback "auto"
                 return
             fi
         else
             _do_codex_marketplace_register
-            _do_codex_native_skills_fallback "auto"
             return
         fi
     else
-        print_warning "codex CLI가 감지되지 않았습니다. fallback native skills 설치로 진행합니다."
-        echo "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        print_warning "codex CLI가 감지되지 않았습니다."
+        print_info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
     fi
-
-    _do_codex_native_skills_fallback
 }
 
 _do_codex_marketplace_register() {

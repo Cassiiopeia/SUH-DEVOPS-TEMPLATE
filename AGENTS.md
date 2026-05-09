@@ -31,18 +31,16 @@ Common routing:
 
 ## Codex Installation Model
 
-Codex support is primarily via plugin marketplace source registration:
+**Method 1 (recommended):** Plugin marketplace source registration:
 
 ```bash
 codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 ```
 
-After registering the marketplace, open `/plugins` in Codex, search for
-`cassiiopeia`, and manage it if needed. The template integrator also prepares
-the native skill discovery fallback so wizard installs do not require manual
-`/plugins` interaction.
+After registering, open `/plugins` in Codex and verify the `cassiiopeia` entry.
 
-Fallback for Codex environments without plugin marketplace support:
+**Method 2 (fallback):** Direct clone + symlink for immediate activation without
+marketplace:
 
 ```bash
 git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia

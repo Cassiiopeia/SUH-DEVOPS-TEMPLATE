@@ -2778,27 +2778,23 @@ function Invoke-CodexSkillsManage {
     if (Get-Command "codex" -ErrorAction SilentlyContinue) {
         if (-not $Force) {
             Write-Host "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
-            Write-Host "  1차 설치: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-            Write-Host "  마법사가 native skills fallback도 함께 준비합니다"
+            Write-Host "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+            Write-Host "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
             Write-Host "  Y/y - 예, 등록 또는 업데이트"
-            Write-Host "  N/n - 아니오, fallback native skills 설치로 진행"
+            Write-Host "  N/n - 아니오, 건너뜁니다"
             Write-Host ""
             if (Ask-YesNo "선택" "Y") {
                 Invoke-CodexMarketplaceRegister
-                Invoke-CodexNativeSkillsFallback "auto"
                 return
             }
         } else {
             Invoke-CodexMarketplaceRegister
-            Invoke-CodexNativeSkillsFallback "auto"
             return
         }
     } else {
-        Print-Warning "codex CLI가 감지되지 않았습니다. fallback native skills 설치로 진행합니다."
-        Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Print-Warning "codex CLI가 감지되지 않았습니다."
+        Print-Info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
     }
-
-    Invoke-CodexNativeSkillsFallback
 }
 
 function Invoke-CodexMarketplaceRegister {

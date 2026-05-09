@@ -58,7 +58,9 @@ gemini extensions update cassiiopeia
 
 ### Codex CLI
 
-Codex는 plugin marketplace source로 이 레포를 등록합니다. 이 방식은 OpenAI 공식 marketplace 등재가 아니라, 사용자가 직접 신뢰한 GitHub repo를 marketplace source로 추가하는 흐름입니다.
+Codex는 plugin marketplace source로 이 레포를 등록합니다. OpenAI 공식 marketplace 등재가 아니라, 사용자가 직접 신뢰한 GitHub repo를 marketplace source로 추가하는 흐름입니다.
+
+**방법 1 (기본):** Plugin marketplace 등록
 
 macOS / Linux:
 
@@ -72,7 +74,7 @@ codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode skills
 ```
 
-마법사는 Codex marketplace를 등록하고, 현재 Codex CLI에서 즉시 설치를 보장하는 명령이 없을 경우 native skills fallback도 자동 준비합니다. `/plugins`는 설치 확인/관리용으로 사용할 수 있습니다.
+마법사는 Codex marketplace를 등록합니다. 등록 후 `/plugins`에서 `cassiiopeia` 항목을 확인하세요.
 
 업데이트:
 
@@ -80,7 +82,9 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 codex plugin marketplace upgrade cassiiopeia
 ```
 
-Fallback: Codex plugin marketplace를 사용할 수 없거나 즉시 활성화가 확인되지 않는 환경에서는 native skills discovery 경로에 이 레포의 `skills/`를 연결합니다.
+**방법 2 (Fallback):** git clone + symlink로 즉시 활성화
+
+marketplace 명령이 없거나 즉시 사용이 필요한 환경에서 사용합니다.
 
 macOS / Linux:
 
@@ -90,7 +94,7 @@ mkdir -p ~/.agents/skills
 ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
 ```
 
-Windows PowerShell fallback:
+Windows PowerShell:
 
 ```powershell
 git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$env:USERPROFILE\.codex\cassiiopeia"

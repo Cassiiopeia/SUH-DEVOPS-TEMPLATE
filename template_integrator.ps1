@@ -757,6 +757,7 @@ function Download-Template {
     $pluginItemsToRemove = @(
         ".claude-plugin",   # Claude Code 플러그인 매니페스트
         ".codex-plugin",    # Codex 플러그인 메타데이터
+        ".agents",          # Codex 마켓플레이스 메타데이터
         ".cursor",          # Cursor 스킬 복사본
         "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
     )
@@ -2253,7 +2254,7 @@ function Start-Integration {
 # Claude Code: 플러그인 마켓플레이스 자동 설치
 # Cursor: skills/ → .cursor/skills/ 복사
 # Gemini CLI: extension install/update
-# Codex CLI: ~/.agents/skills native discovery junction
+# Codex CLI: plugin marketplace registration, fallback to ~/.agents/skills native discovery junction
 # ===================================================================
 
 function Offer-IdeToolsInstall {
@@ -2333,10 +2334,12 @@ function Offer-IdeToolsInstall {
     }
 
     $codexTarget = Join-Path $env:USERPROFILE ".agents\skills\cassiiopeia"
-    if (Test-Path $codexTarget) {
-        Print-Info "Codex CLI   : native skills 경로 감지 ($codexTarget)"
+    if (Get-Command "codex" -ErrorAction SilentlyContinue) {
+        Print-Info "Codex CLI   : CLI 감지 (plugin marketplace 등록 가능)"
+    } elseif (Test-Path $codexTarget) {
+        Print-Info "Codex CLI   : fallback native skills 경로 감지 ($codexTarget)"
     } else {
-        Print-Info "Codex CLI   : native skills 미설치 ($codexTarget)"
+        Print-Info "Codex CLI   : CLI 미감지 (fallback native skills 설치 가능)"
     }
     Write-Host ""
 
@@ -2769,7 +2772,53 @@ function Invoke-GeminiExtensionManage {
 
 function Invoke-CodexSkillsManage {
     Write-Host ""
-    Print-Step "[ Codex CLI Native Skills 관리 ]"
+    Print-Step "[ Codex CLI Plugin 관리 ]"
+    Write-Host ""
+
+    if (Get-Command "codex" -ErrorAction SilentlyContinue) {
+        if (-not $Force) {
+            Write-Host "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
+            Write-Host "  1차 설치: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+            Write-Host "  마법사가 native skills fallback도 함께 준비합니다"
+            Write-Host "  Y/y - 예, 등록 또는 업데이트"
+            Write-Host "  N/n - 아니오, fallback native skills 설치로 진행"
+            Write-Host ""
+            if (Ask-YesNo "선택" "Y") {
+                Invoke-CodexMarketplaceRegister
+                Invoke-CodexNativeSkillsFallback "auto"
+                return
+            }
+        } else {
+            Invoke-CodexMarketplaceRegister
+            Invoke-CodexNativeSkillsFallback "auto"
+            return
+        }
+    } else {
+        Print-Warning "codex CLI가 감지되지 않았습니다. fallback native skills 설치로 진행합니다."
+        Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    }
+
+    Invoke-CodexNativeSkillsFallback
+}
+
+function Invoke-CodexMarketplaceRegister {
+    Print-Step "Codex plugin marketplace 등록 중..."
+    $null = & codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Print-Success "Codex marketplace 등록 완료"
+    } else {
+        Print-Info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
+    }
+
+    Print-Step "Codex plugin marketplace 업데이트 중..."
+    $null = & codex plugin marketplace upgrade cassiiopeia 2>$null
+    Print-Success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+}
+
+function Invoke-CodexNativeSkillsFallback {
+    param([string]$Mode = "interactive")
+
+    Print-Step "[ Codex CLI Native Skills fallback 관리 ]"
     Write-Host ""
 
     $installDir = Join-Path $env:USERPROFILE ".codex\cassiiopeia"
@@ -2777,14 +2826,14 @@ function Invoke-CodexSkillsManage {
     $targetDir  = Join-Path $env:USERPROFILE ".agents\skills"
     $target     = Join-Path $targetDir "cassiiopeia"
 
-    if (-not $Force) {
-        Write-Host "Codex native skills를 설치/업데이트하시겠습니까?"
+    if ($Mode -ne "auto" -and -not $Force) {
+        Write-Host "Codex native skills fallback을 설치/업데이트하시겠습니까?"
         Write-Host "  설치 경로: $target"
         Write-Host "  Y/y - 예, 설치 또는 업데이트"
         Write-Host "  N/n - 아니오, 건너뛰기"
         Write-Host ""
         if (-not (Ask-YesNo "선택" "Y")) {
-            Print-Info "Codex native skills 변경 없이 건너뜁니다"
+            Print-Info "Codex native skills fallback 변경 없이 건너뜁니다"
             return
         }
     }

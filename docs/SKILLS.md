@@ -7,7 +7,7 @@
 
 ## Skill이 뭔가요?
 
-Skill은 특정 작업(예: 코드 리뷰, 이슈 작성, 리팩토링)에 특화된 지침과 출력 포맷을 가진 **전문가 모드**입니다. Claude Code에서는 `/cassiiopeia:xxx` 형태로 호출하고, Gemini CLI와 Codex CLI에서는 루트 bootstrap 문서가 `skills/` 폴더를 읽도록 안내합니다.
+Skill은 특정 작업(예: 코드 리뷰, 이슈 작성, 리팩토링)에 특화된 지침과 출력 포맷을 가진 **전문가 모드**입니다. Claude Code에서는 `/cassiiopeia:xxx` 형태로 호출하고, Gemini CLI는 extension, Codex CLI는 plugin marketplace를 통해 이 레포의 `skills/`를 읽습니다.
 
 예를 들어 `/cassiiopeia:review`를 실행하면 Claude가 단순히 "코드 좀 봐줘"에 답하는 게 아니라, **보안/성능/버그/품질/아키텍처/테스트 6가지 관점**으로 나눠서 **Critical/Major/Minor 우선순위**로 정리된 리뷰를 돌려줍니다.
 
@@ -58,7 +58,29 @@ gemini extensions update cassiiopeia
 
 ### Codex CLI
 
-Codex는 공식 plugin marketplace 등록을 전제로 하지 않습니다. native skills discovery 경로에 이 레포의 `skills/`를 연결합니다.
+Codex는 plugin marketplace source로 이 레포를 등록합니다. 이 방식은 OpenAI 공식 marketplace 등재가 아니라, 사용자가 직접 신뢰한 GitHub repo를 marketplace source로 추가하는 흐름입니다.
+
+macOS / Linux:
+
+```bash
+codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+```
+
+마법사 설치:
+
+```bash
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode skills
+```
+
+마법사는 Codex marketplace를 등록하고, 현재 Codex CLI에서 즉시 설치를 보장하는 명령이 없을 경우 native skills fallback도 자동 준비합니다. `/plugins`는 설치 확인/관리용으로 사용할 수 있습니다.
+
+업데이트:
+
+```bash
+codex plugin marketplace upgrade cassiiopeia
+```
+
+Fallback: Codex plugin marketplace를 사용할 수 없거나 즉시 활성화가 확인되지 않는 환경에서는 native skills discovery 경로에 이 레포의 `skills/`를 연결합니다.
 
 macOS / Linux:
 
@@ -68,7 +90,7 @@ mkdir -p ~/.agents/skills
 ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
 ```
 
-Windows PowerShell:
+Windows PowerShell fallback:
 
 ```powershell
 git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$env:USERPROFILE\.codex\cassiiopeia"
@@ -549,5 +571,5 @@ flowchart LR
 - Skill 원본: 이 레포의 `skills/` 폴더 (Claude/Gemini/Codex/Cursor 공통 원본)
 - Claude Code 매니페스트: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 - Gemini CLI 매니페스트: `gemini-extension.json`, `GEMINI.md`
-- Codex CLI bootstrap/metadata: `AGENTS.md`, `.codex-plugin/plugin.json`
+- Codex CLI marketplace/bootstrap/metadata: `.agents/plugins/marketplace.json`, `AGENTS.md`, `.codex-plugin/plugin.json`
 - 버전 동기화: `version.yml` 변경 시 `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` 워크플로우가 자동 반영

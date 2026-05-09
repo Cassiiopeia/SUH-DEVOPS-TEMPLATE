@@ -2,12 +2,12 @@
 
 # 🚀 SUH-DEVOPS-TEMPLATE
 
-**GitHub Actions 자동화 + Claude Code AI Skills — 개발 사이클 전체를 자동화하는 DevOps 템플릿**
+**GitHub Actions 자동화 + Agent AI Skills — 개발 사이클 전체를 자동화하는 DevOps 템플릿**
 
 > 이슈 등록부터 커밋, 보고서, 배포까지. 개발자는 코드만 작성하세요.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v3.0.36 (2026-05-05)
+## 최신 버전 : v3.0.37 (2026-05-08)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 
@@ -20,7 +20,7 @@
 이 프로젝트는 두 축으로 개발 워크플로우를 자동화합니다.
 
 **① GitHub Actions** — main 푸시 한 번으로 버전 관리, 체인지로그, CI/CD 배포까지 자동 처리  
-**② Claude Code Skills** — `/issue`, `/commit`, `/report` 등 AI가 이슈 작성부터 커밋 메시지, 구현 보고서까지 대신 생성
+**② Agent Skills** — `/issue`, `/commit`, `/report` 등 AI가 이슈 작성부터 커밋 메시지, 구현 보고서까지 대신 생성
 
 | 기존 방식 | SUH-DEVOPS-TEMPLATE |
 |----------|---------------------|
@@ -36,7 +36,7 @@
 
 ## AI 개발 사이클
 
-Claude Code Skills가 개발 사이클 전체를 커버합니다.
+Agent Skills가 개발 사이클 전체를 커버합니다.
 
 ```mermaid
 flowchart LR
@@ -93,14 +93,39 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
 ```
 
-### Claude Code Skills만 설치
+### Agent Skills만 설치
 
 ```bash
+# Claude Code
 claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 
-> `/cassiiopeia:` 입력 시 25종 Skills 자동완성 — [설치 가이드](docs/SKILLS.md)
+```bash
+# Gemini CLI
+gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
+```
+
+```bash
+# Codex CLI (macOS / Linux)
+git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia
+mkdir -p ~/.agents/skills
+ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
+```
+
+```powershell
+# Codex CLI (Windows PowerShell)
+git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$env:USERPROFILE\.codex\cassiiopeia"
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
+cmd /c mklink /J "%USERPROFILE%\.agents\skills\cassiiopeia" "%USERPROFILE%\.codex\cassiiopeia\skills"
+```
+
+```bash
+# Cursor / 전체 Agent Skills 설치 메뉴
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode skills
+```
+
+> Claude Code는 `/cassiiopeia:` 자동완성, Gemini/Codex는 bootstrap 문서를 통해 `skills/`를 읽는 방식입니다. 자세한 설치 방식은 [Skills 가이드](docs/SKILLS.md)를 확인하세요.
 
 ---
 
@@ -108,7 +133,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 | 기능 | 설명 | 문서 |
 |------|------|------|
-| **Claude Code Skills** | 이슈·커밋·리뷰·리팩토링·보고서 등 25종 AI DevOps Skills | [상세](docs/SKILLS.md) |
+| **Agent Skills** | Claude Code, Cursor, Gemini CLI, Codex CLI에서 쓰는 25종 AI DevOps Skills | [상세](docs/SKILLS.md) |
 | **버전 자동화** | main 푸시 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
 | **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | 댓글 한 줄로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
@@ -118,7 +143,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 
 ---
 
-## Claude Code Skills (25종)
+## Agent Skills (25종)
 
 ### 🔄 개발 사이클 자동화
 
@@ -225,7 +250,7 @@ Settings → Actions → General
 
 | 문서 | 설명 |
 |------|------|
-| [Claude Code Skills 가이드](docs/SKILLS.md) | 25종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
+| [Agent Skills 가이드](docs/SKILLS.md) | 25종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
 | [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 기존 프로젝트에 템플릿 통합 |
 | [버전 관리](docs/VERSION-CONTROL.md) | version.yml, 자동 버전 증가 |
 | [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | CodeRabbit 연동, AI 문서화 |

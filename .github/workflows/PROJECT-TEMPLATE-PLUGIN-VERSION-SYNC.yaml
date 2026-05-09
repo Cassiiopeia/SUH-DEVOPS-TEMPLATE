@@ -9,6 +9,8 @@
 # version.yml의 버전이 변경되면 다음 파일들을 자동 동기화합니다:
 # - .claude-plugin/plugin.json
 # - .claude-plugin/marketplace.json
+# - .codex-plugin/plugin.json
+# - gemini-extension.json
 #
 # 트리거: deploy 브랜치 push 시
 # (VERSION-CONTROL이 GITHUB_TOKEN으로 version.yml을 변경하면
@@ -94,12 +96,48 @@ jobs:
 
           echo "✅ marketplace.json 버전 동기화: $VERSION"
 
+      - name: Codex plugin.json 버전 동기화
+        run: |
+          CODEX_PLUGIN_FILE=".codex-plugin/plugin.json"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          if [ ! -f "$CODEX_PLUGIN_FILE" ]; then
+            echo "⚠️ $CODEX_PLUGIN_FILE 파일이 없습니다. 건너뜁니다."
+            exit 0
+          fi
+
+          if command -v jq &> /dev/null; then
+            jq --arg v "$VERSION" '.version = $v' "$CODEX_PLUGIN_FILE" > tmp.json && mv tmp.json "$CODEX_PLUGIN_FILE"
+          else
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$CODEX_PLUGIN_FILE"
+          fi
+
+          echo "✅ Codex plugin.json 버전 동기화: $VERSION"
+
+      - name: Gemini extension 버전 동기화
+        run: |
+          GEMINI_EXTENSION_FILE="gemini-extension.json"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          if [ ! -f "$GEMINI_EXTENSION_FILE" ]; then
+            echo "⚠️ $GEMINI_EXTENSION_FILE 파일이 없습니다. 건너뜁니다."
+            exit 0
+          fi
+
+          if command -v jq &> /dev/null; then
+            jq --arg v "$VERSION" '.version = $v' "$GEMINI_EXTENSION_FILE" > tmp.json && mv tmp.json "$GEMINI_EXTENSION_FILE"
+          else
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$GEMINI_EXTENSION_FILE"
+          fi
+
+          echo "✅ Gemini extension 버전 동기화: $VERSION"
+
       - name: 변경사항 커밋
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          git add .claude-plugin/plugin.json .claude-plugin/marketplace.json
+          git add .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json gemini-extension.json
 
           if git diff --staged --quiet; then
             echo "ℹ️ 플러그인 버전이 이미 동기화되어 있습니다."

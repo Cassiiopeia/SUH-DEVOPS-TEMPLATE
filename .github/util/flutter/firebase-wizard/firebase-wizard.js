@@ -377,6 +377,105 @@ showStep = function (step) {
 };
 
 // ============================================
+// Custom Secrets
+// ============================================
+const TEXT_EXTS = ['.txt', '.env', '.json', '.yaml', '.yml', '.md', '.properties', '.xml', '.ini', '.conf', '.cfg'];
+
+function detectSecretType(filename) {
+    const lower = (filename || '').toLowerCase();
+    return TEXT_EXTS.some(ext => lower.endsWith(ext)) ? 'text' : 'binary';
+}
+
+function suggestSecretKey(filename, type) {
+    const base = (filename || '').replace(/\.[^.]+$/, '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+    return type === 'binary' ? `${base}_BASE64` : base;
+}
+
+function addCustomSecret() {
+    state.customSecrets.push({ key: '', value: '', fileName: '', type: 'text' });
+    saveState();
+    renderCustomSecrets();
+}
+
+function removeCustomSecret(index) {
+    state.customSecrets.splice(index, 1);
+    saveState();
+    renderCustomSecrets();
+}
+
+function updateCustomSecretKey(index, value) {
+    state.customSecrets[index].key = value;
+    saveState();
+}
+
+function updateCustomSecretValue(index, value) {
+    state.customSecrets[index].value = value;
+    state.customSecrets[index].type = 'text';
+    state.customSecrets[index].fileName = '';
+    saveState();
+}
+
+async function handleCustomSecretFile(index, event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const type = detectSecretType(file.name);
+    let value;
+    if (type === 'text') {
+        value = await fileToText(file);
+    } else {
+        value = await fileToBase64(file);
+    }
+    state.customSecrets[index].value = value;
+    state.customSecrets[index].fileName = file.name;
+    state.customSecrets[index].type = type;
+    if (!state.customSecrets[index].key) {
+        state.customSecrets[index].key = suggestSecretKey(file.name, type);
+    }
+    saveState();
+    renderCustomSecrets();
+    showToast(`✅ ${file.name} (${type})`);
+}
+
+function renderCustomSecrets() {
+    const container = document.getElementById('customSecretsContent');
+    if (!container) return;
+    if (state.customSecrets.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 italic">추가된 항목이 없습니다.</p>';
+        return;
+    }
+    container.innerHTML = state.customSecrets.map((s, i) => `
+        <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 mb-3">
+            <div class="flex items-center gap-2 mb-2">
+                <input type="text" placeholder="SECRET_KEY_NAME" value="${(s.key || '').replace(/"/g, '&quot;')}"
+                    class="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono"
+                    oninput="updateCustomSecretKey(${i}, this.value)">
+                <span class="text-xs px-2 py-1 rounded ${s.type === 'binary' ? 'bg-purple-600/30 text-purple-300' : 'bg-blue-600/30 text-blue-300'}">${s.type}</span>
+                <button class="text-red-400 hover:text-red-300 text-sm" onclick="removeCustomSecret(${i})">✕</button>
+            </div>
+            <div class="flex gap-2">
+                <input type="file" id="csFile${i}" class="hidden" onchange="handleCustomSecretFile(${i}, event)">
+                <button class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs" onclick="document.getElementById('csFile${i}').click()">
+                    ${s.fileName ? `📎 ${s.fileName}` : '📁 파일 선택'}
+                </button>
+                <span class="text-xs text-slate-500 self-center">또는</span>
+                <input type="text" placeholder="값 직접 입력" value="${s.fileName ? '' : (s.value || '').replace(/"/g, '&quot;').substring(0, 100)}"
+                    class="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono"
+                    oninput="updateCustomSecretValue(${i}, this.value)">
+            </div>
+        </div>
+    `).join('');
+}
+
+// Step 4 진입 시 custom secrets도 렌더 (Task 10 wrap)
+const _showStepCustom = showStep;
+showStep = function (step) {
+    _showStepCustom(step);
+    if (step === 4) {
+        renderCustomSecrets();
+    }
+};
+
+// ============================================
 // Init
 // ============================================
 window.addEventListener('DOMContentLoaded', () => {

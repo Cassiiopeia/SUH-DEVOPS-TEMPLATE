@@ -267,6 +267,116 @@ showStep = function (step) {
 };
 
 // ============================================
+// Step 4: File uploads
+// ============================================
+async function handleServiceAccountUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.json')) {
+        showToast('⚠️ .json 파일만 업로드 가능합니다');
+        return;
+    }
+    try {
+        const text = await fileToText(file);
+        const parsed = JSON.parse(text);
+        if (!parsed.client_email || !parsed.private_key) {
+            showToast('⚠️ Service Account JSON 형식이 아닐 수 있습니다 (client_email/private_key 누락)');
+        }
+        const b64 = btoa(unescape(encodeURIComponent(text)));
+        state.serviceAccountBase64 = b64;
+        state.serviceAccountFileName = file.name;
+
+        document.getElementById('saUploadText').textContent = `✅ ${file.name} (${(file.size/1024).toFixed(1)}KB)`;
+        const info = document.getElementById('saInfo');
+        info.style.display = 'block';
+        info.textContent = `client_email: ${parsed.client_email || '(누락)'}`;
+        const preview = document.getElementById('saPreview');
+        preview.classList.remove('hidden');
+        document.getElementById('saPreviewText').textContent = b64.substring(0, 100) + '...';
+        saveState();
+        showToast('✅ Service Account 업로드 완료');
+    } catch (e) {
+        showToast('❌ JSON 파싱 실패: ' + e.message);
+    }
+}
+
+async function handleGoogleServicesUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.json')) {
+        showToast('⚠️ .json 파일만 업로드 가능합니다');
+        return;
+    }
+    try {
+        const text = await fileToText(file);
+        JSON.parse(text); // 형식 검증
+        state.googleServicesJson = text;
+        state.googleServicesFileName = file.name;
+        document.getElementById('gsUploadText').textContent = `✅ ${file.name} (${(file.size/1024).toFixed(1)}KB)`;
+        const info = document.getElementById('gsInfo');
+        info.style.display = 'block';
+        info.textContent = `${file.size} bytes`;
+        saveState();
+        showToast('✅ google-services.json 업로드 완료');
+    } catch (e) {
+        showToast('❌ JSON 파싱 실패: ' + e.message);
+    }
+}
+
+function setupDragAndDrop() {
+    const targets = [
+        { drop: 'saUpload', input: 'saInput', handler: handleServiceAccountUpload },
+        { drop: 'gsUpload', input: 'gsInput', handler: handleGoogleServicesUpload }
+    ];
+    targets.forEach(({ drop, input, handler }) => {
+        const el = document.getElementById(drop);
+        if (!el) return;
+        ['dragenter', 'dragover'].forEach(evt => el.addEventListener(evt, e => { e.preventDefault(); el.classList.add('dragover'); }));
+        ['dragleave', 'drop'].forEach(evt => el.addEventListener(evt, e => { e.preventDefault(); el.classList.remove('dragover'); }));
+        el.addEventListener('drop', e => {
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                const inp = document.getElementById(input);
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                inp.files = dt.files;
+                handler({ target: inp });
+            }
+        });
+    });
+}
+
+function onStep4Next() {
+    if (!state.serviceAccountBase64) {
+        showToast('⚠️ Service Account JSON을 업로드해주세요');
+        return;
+    }
+    nextStep();
+}
+
+// Step 4 진입 시 setup — showStep 함수 wrap (Step 3 wrap 위에 다시 wrap)
+const _showStepStep4 = showStep;
+showStep = function (step) {
+    _showStepStep4(step);
+    if (step === 4) {
+        if (state.serviceAccountFileName) {
+            const t = document.getElementById('saUploadText');
+            if (t) t.textContent = `✅ ${state.serviceAccountFileName} (복원됨)`;
+            const preview = document.getElementById('saPreview');
+            if (preview && state.serviceAccountBase64) {
+                preview.classList.remove('hidden');
+                document.getElementById('saPreviewText').textContent = state.serviceAccountBase64.substring(0, 100) + '...';
+            }
+        }
+        if (state.googleServicesFileName) {
+            const t = document.getElementById('gsUploadText');
+            if (t) t.textContent = `✅ ${state.googleServicesFileName} (복원됨)`;
+        }
+        setupDragAndDrop();
+    }
+};
+
+// ============================================
 // Init
 // ============================================
 window.addEventListener('DOMContentLoaded', () => {

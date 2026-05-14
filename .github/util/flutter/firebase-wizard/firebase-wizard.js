@@ -198,6 +198,75 @@ function resetWizard() {
 }
 
 // ============================================
+// Step 3: APP_ID / TESTER_GROUP / OS Tab
+// ============================================
+function shellEscape(s) {
+    return (s || '').replace(/"/g, '\\"');
+}
+
+function updateSetupCommands() {
+    const path = state.projectPath || '.';
+    const appId = shellEscape(state.firebaseAppId);
+    const tester = shellEscape(state.firebaseTesterGroup);
+
+    const bashCmd = `./firebase-wizard-setup.sh --project-path ${path} --app-id "${appId}" --tester-group "${tester}"`;
+    const psPath = (path === '.') ? '.' : path.replace(/\//g, '\\');
+    const psCmd = `.\\firebase-wizard-setup.ps1 -ProjectPath ${psPath} -AppId "${appId}" -TesterGroup "${tester}"`;
+
+    const bashEl = document.getElementById('cmdBashCode');
+    const psEl = document.getElementById('cmdPsCode');
+    if (bashEl) bashEl.textContent = bashCmd;
+    if (psEl) psEl.textContent = psCmd;
+}
+
+function selectOsTab(which) {
+    const bash = document.getElementById('osCmdBash');
+    const ps = document.getElementById('osCmdPs');
+    const tabBash = document.getElementById('osTabBash');
+    const tabPs = document.getElementById('osTabPs');
+    if (which === 'bash') {
+        bash.classList.remove('hidden');
+        ps.classList.add('hidden');
+        tabBash.classList.add('bg-firebase-primary', 'text-slate-900');
+        tabPs.classList.remove('bg-firebase-primary', 'text-slate-900');
+    } else {
+        ps.classList.remove('hidden');
+        bash.classList.add('hidden');
+        tabPs.classList.add('bg-firebase-primary', 'text-slate-900');
+        tabBash.classList.remove('bg-firebase-primary', 'text-slate-900');
+    }
+}
+
+function onFirebaseAppIdChange(v) { state.firebaseAppId = v.trim(); updateSetupCommands(); saveState(); }
+function onFirebaseTesterGroupChange(v) { state.firebaseTesterGroup = v.trim(); updateSetupCommands(); saveState(); }
+function onProjectPathChange(v) { state.projectPath = v.trim() || '.'; updateSetupCommands(); saveState(); }
+
+function onStep3Next() {
+    if (!state.firebaseAppId) { showToast('⚠️ FIREBASE_APP_ID를 입력해주세요'); return; }
+    if (!state.firebaseTesterGroup) { showToast('⚠️ FIREBASE_TESTER_GROUP을 입력해주세요'); return; }
+    nextStep();
+}
+
+// Step 진입 시 초기화 — showStep 함수 wrap
+const _origShowStep = showStep;
+showStep = function (step) {
+    _origShowStep(step);
+    if (step === 3) {
+        const inputs = {
+            firebaseAppIdInput: state.firebaseAppId,
+            firebaseTesterGroupInput: state.firebaseTesterGroup,
+            projectPathInput: state.projectPath || '.'
+        };
+        Object.keys(inputs).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = inputs[id];
+        });
+        updateSetupCommands();
+        selectOsTab(state.detectedOS === 'windows' ? 'ps' : 'bash');
+    }
+};
+
+// ============================================
 // Init
 // ============================================
 window.addEventListener('DOMContentLoaded', () => {

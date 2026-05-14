@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase App Distribution 배포 마법사</title>
+    <script type="application/json" id="versionJson">
+{
+  "name": "Firebase App Distribution Setup Wizard",
+  "version": "1.0.0",
+  "description": "Flutter Android 앱을 Firebase App Distribution에 배포하기 위한 설정 마법사",
+  "lastUpdated": "2026-05-15",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-05-15",
+      "changes": [
+        "초기 릴리즈",
+        "5단계 마법사 (Console 가이드 → SA 발급 → 앱 정보 → 파일 업로드 → Secrets 등록)",
+        "Service Account JSON base64 자동 변환",
+        "Custom Secrets 섹션 (사용자 정의 secret 동적 추가)",
+        "JSON/TXT/ZIP 산출물 다운로드",
+        "워크플로우 placeholder 안전 치환 setup 스크립트 (bash/PowerShell)"
+      ]
+    }
+  ],
+  "compatibility": {
+    "flutter": ">=3.0.0",
+    "android_sdk": ">=33",
+    "firebase_app_distribution": "GA"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}
+
+    </script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard Variable', 'Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'sans-serif']
+                    },
+                    colors: {
+                        firebase: {
+                            primary: '#FFA000',
+                            accent: '#FFCA28',
+                            dark: '#FF6F00'
+                        },
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            text: '#e2e8f0',
+                            muted: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0f172a; color: #e2e8f0; font-family: 'Pretendard Variable', sans-serif; }
+        .file-upload { border: 2px dashed #475569; border-radius: 0.75rem; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .file-upload:hover { border-color: #FFA000; background: rgba(255, 160, 0, 0.05); }
+        .file-upload.dragover { border-color: #FFA000; background: rgba(255, 160, 0, 0.1); }
+        .file-upload .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .step-indicator { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; }
+        .step-dot { width: 2.25rem; height: 2.25rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .step-dot.active { background: #FFA000; color: #0f172a; }
+        .step-dot.completed { background: #22c55e; color: #0f172a; }
+        .step-dot.pending { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+        .step-line { width: 2rem; height: 2px; background: #334155; }
+        .step-line.completed { background: #22c55e; }
+        .skip-btn { color: #94a3b8; font-size: 0.875rem; cursor: pointer; padding: 0.5rem 1rem; }
+        .skip-btn:hover { color: #FFA000; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #334155; padding: 0.75rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- 헤더 -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold mb-3">
+                🔥 <span class="bg-gradient-to-r from-firebase-primary to-firebase-accent bg-clip-text text-transparent">Firebase App Distribution 배포 마법사</span>
+            </h1>
+            <p class="text-slate-400 mb-3">Flutter Android 테스트 빌드를 Firebase로 자동 배포하는 5단계 설정</p>
+            <a href="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" target="_blank" rel="noopener"
+               class="text-xs text-slate-500 hover:text-slate-300">
+               SUH-DEVOPS-TEMPLATE GitHub →
+            </a>
+        </header>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator" id="stepIndicator">
+            <div class="step-dot active" data-step="1" onclick="goToStep(1)">1</div>
+            <div class="step-line"></div>
+            <div class="step-dot pending" data-step="2" onclick="goToStep(2)">2</div>
+            <div class="step-line"></div>
+            <div class="step-dot pending" data-step="3" onclick="goToStep(3)">3</div>
+            <div class="step-line"></div>
+            <div class="step-dot pending" data-step="4" onclick="goToStep(4)">4</div>
+            <div class="step-line"></div>
+            <div class="step-dot pending" data-step="5" onclick="goToStep(5)">5</div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- Step 1: Firebase Console 가이드 -->
+        <!-- ========================================== -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content fade-in" data-step="1">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">1</span>
+                Firebase Console 설정
+            </h2>
+            <p class="text-sm text-slate-400 mb-6">[Step 1 본문 — Task 6에서 작성]</p>
+            <div class="flex justify-end mt-8">
+                <button class="px-6 py-2.5 bg-gradient-to-r from-firebase-primary to-firebase-accent text-slate-900 hover:opacity-90 rounded-lg font-medium transition" onclick="nextStep()">
+                    다음: Service Account →
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="2">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">2</span>
+                Service Account 발급 + 권한 부여
+            </h2>
+            <p class="text-sm text-slate-400 mb-6">[Step 2 본문 — Task 7에서 작성]</p>
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-gradient-to-r from-firebase-primary to-firebase-accent text-slate-900 hover:opacity-90 rounded-lg font-medium transition" onclick="nextStep()">다음: 앱 정보 →</button>
+            </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="3">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">3</span>
+                앱 정보 입력
+            </h2>
+            <p class="text-sm text-slate-400 mb-6">[Step 3 본문 — Task 8에서 작성]</p>
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-gradient-to-r from-firebase-primary to-firebase-accent text-slate-900 hover:opacity-90 rounded-lg font-medium transition" onclick="nextStep()">다음: 파일 업로드 →</button>
+            </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="4">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">4</span>
+                파일 업로드 + 변환
+            </h2>
+            <p class="text-sm text-slate-400 mb-6">[Step 4 본문 — Task 9, Task 10에서 작성]</p>
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-gradient-to-r from-firebase-primary to-firebase-accent text-slate-900 hover:opacity-90 rounded-lg font-medium transition" onclick="nextStep()">다음: Secrets 등록 →</button>
+            </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="card bg-slate-800 rounded-xl shadow-xl p-6 mb-6 step-content hidden" data-step="5">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">5</span>
+                GitHub Secrets 등록 + 다운로드
+            </h2>
+            <p class="text-sm text-slate-400 mb-6">[Step 5 본문 — Task 11에서 작성]</p>
+            <div class="flex justify-between mt-8">
+                <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
+                <button class="px-6 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition" onclick="resetWizard()">처음부터 다시</button>
+            </div>
+        </div>
+
+        <footer class="text-center text-xs text-slate-500 mt-8">
+            Made with 🔥 Firebase | <a href="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" target="_blank" class="hover:text-slate-300">View on GitHub →</a>
+        </footer>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- JS -->
+    <script src="firebase-wizard.js"></script>
+</body>
+</html>

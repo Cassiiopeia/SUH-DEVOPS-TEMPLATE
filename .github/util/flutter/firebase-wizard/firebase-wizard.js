@@ -476,6 +476,194 @@ showStep = function (step) {
 };
 
 // ============================================
+// Step 5: Secrets table + Export
+// ============================================
+function getDateString() {
+    const d = new Date();
+    return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function buildSecretsArray() {
+    const list = [];
+    if (state.serviceAccountBase64) {
+        list.push({ key: 'FIREBASE_SERVICE_ACCOUNT_JSON_BASE64', value: state.serviceAccountBase64, source: 'Service Account JSON', type: 'binary' });
+    }
+    if (state.googleServicesJson) {
+        list.push({ key: 'GOOGLE_SERVICES_JSON', value: state.googleServicesJson, source: 'google-services.json', type: 'text' });
+    }
+    state.customSecrets.forEach(s => {
+        if (s.key && s.value) {
+            list.push({ key: s.key, value: s.value, source: s.fileName || '직접 입력', type: s.type });
+        }
+    });
+    return list;
+}
+
+function renderSecretsTable() {
+    const tbody = document.getElementById('secretsTableBody');
+    if (!tbody) return;
+    const list = buildSecretsArray();
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-3 text-center text-slate-500 italic">등록할 Secret이 없습니다. Step 4를 먼저 완료해주세요.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(s => `
+        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+            <td class="py-2 px-2 font-mono text-yellow-400">${s.key}</td>
+            <td class="py-2 px-2 text-slate-400">${s.source}</td>
+            <td class="py-2 px-2 text-slate-400">${(s.value.length / 1024).toFixed(1)} KB</td>
+            <td class="py-2 px-2 text-right">
+                <button class="px-3 py-1 bg-firebase-primary text-slate-900 rounded text-xs hover:opacity-90" onclick="copySecretValue('${s.key.replace(/'/g, "\\'")}')">복사</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function copySecretValue(key) {
+    const list = buildSecretsArray();
+    const item = list.find(x => x.key === key);
+    if (!item) { showToast('⚠️ 항목을 찾을 수 없습니다'); return; }
+    copyToClipboard(item.value);
+    showToast(`✅ ${key} 복사됨`);
+}
+
+function onRepoOwnerChange(v) {
+    state.repoOwner = v.trim();
+    saveState();
+    updateSecretsPageLink();
+}
+
+function onRepoNameChange(v) {
+    state.repoName = v.trim();
+    saveState();
+    updateSecretsPageLink();
+}
+
+function updateSecretsPageLink() {
+    const link = document.getElementById('secretsPageLink');
+    if (!link) return;
+    if (state.repoOwner && state.repoName) {
+        link.href = `https://github.com/${state.repoOwner}/${state.repoName}/settings/secrets/actions`;
+    } else {
+        link.href = 'https://github.com';
+    }
+}
+
+function exportJson() {
+    const list = buildSecretsArray();
+    if (list.length === 0) { showToast('⚠️ 등록할 Secret이 없습니다'); return; }
+    const out = {};
+    list.forEach(s => { out[s.key] = s.value; });
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    triggerDownload(blob, `firebase-secrets-${(state.firebaseAppId || 'app').slice(0,12)}-${getDateString()}.json`);
+    showToast('✅ JSON 다운로드');
+}
+
+function exportTxt() {
+    const list = buildSecretsArray();
+    if (list.length === 0) { showToast('⚠️ 등록할 Secret이 없습니다'); return; }
+    const lines = list.map(s => `=== ${s.key} ===\n${s.value}\n`);
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    triggerDownload(blob, `firebase-secrets-${(state.firebaseAppId || 'app').slice(0,12)}-${getDateString()}.txt`);
+    showToast('✅ TXT 다운로드');
+}
+
+async function exportZip() {
+    const list = buildSecretsArray();
+    if (list.length === 0) { showToast('⚠️ 등록할 Secret이 없습니다'); return; }
+    if (typeof JSZip === 'undefined') { showToast('❌ JSZip 라이브러리 로드 실패'); return; }
+
+    const zip = new JSZip();
+    const folder = zip.folder('github-secrets');
+    list.forEach(s => folder.file(`${s.key}.txt`, s.value));
+
+    // setup 스크립트 — GitHub raw에서 fetch 시도, 실패 시 README 안내만
+    const wizardBaseUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/flutter/firebase-wizard';
+    try {
+        const [shResp, ps1Resp] = await Promise.all([
+            fetch(`${wizardBaseUrl}/firebase-wizard-setup.sh`).then(r => r.ok ? r.text() : null).catch(() => null),
+            fetch(`${wizardBaseUrl}/firebase-wizard-setup.ps1`).then(r => r.ok ? r.text() : null).catch(() => null)
+        ]);
+        if (shResp) zip.file('firebase-wizard-setup.sh', shResp);
+        if (ps1Resp) zip.file('firebase-wizard-setup.ps1', ps1Resp);
+    } catch (e) {
+        console.warn('setup 스크립트 fetch 실패:', e);
+    }
+
+    const readme = `# Firebase App Distribution Secrets 패키지
+
+생성 시각: ${new Date().toISOString()}
+앱 ID: ${state.firebaseAppId || '(미입력)'}
+테스터 그룹: ${state.firebaseTesterGroup || '(미입력)'}
+
+## 폴더 구조
+
+- github-secrets/         GitHub Repository Secrets에 등록할 값 파일들
+- firebase-wizard-setup.sh   워크플로우 placeholder 안전 치환 (bash)
+- firebase-wizard-setup.ps1  동일 동작 (PowerShell)
+
+## 등록 절차
+
+1. https://github.com/<owner>/<repo>/settings/secrets/actions 접속
+2. github-secrets/ 폴더의 각 파일명을 Secret 이름으로 사용
+3. 파일 내용을 Secret 값으로 붙여넣기
+
+## setup 스크립트 실행 (워크플로우 placeholder 치환)
+
+### macOS / Linux
+\`\`\`bash
+chmod +x firebase-wizard-setup.sh
+./firebase-wizard-setup.sh \\
+  --project-path /path/to/project \\
+  --app-id "${state.firebaseAppId}" \\
+  --tester-group "${state.firebaseTesterGroup}"
+\`\`\`
+
+### Windows (PowerShell)
+\`\`\`powershell
+.\\firebase-wizard-setup.ps1 \`
+  -ProjectPath C:\\path\\to\\project \`
+  -AppId "${state.firebaseAppId}" \`
+  -TesterGroup "${state.firebaseTesterGroup}"
+\`\`\`
+
+## 옵션
+
+- --dry-run / -DryRun           실제 변경 없이 미리보기
+- --non-interactive / -NonInteractive  충돌 시 자동 SKIP
+- --no-backup / -NoBackup       백업 파일 생성 비활성화
+`;
+    zip.file('README.md', readme);
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    triggerDownload(blob, `firebase-setup-${(state.firebaseAppId || 'app').slice(0,12)}-${getDateString()}.zip`);
+    showToast('✅ ZIP 다운로드');
+}
+
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Step 5 진입 시 렌더 (Task 11 wrap)
+const _showStepStep5 = showStep;
+showStep = function (step) {
+    _showStepStep5(step);
+    if (step === 5) {
+        const r1 = document.getElementById('repoOwnerInput'); if (r1) r1.value = state.repoOwner || '';
+        const r2 = document.getElementById('repoNameInput'); if (r2) r2.value = state.repoName || '';
+        renderSecretsTable();
+        updateSecretsPageLink();
+    }
+};
+
+// ============================================
 // Init
 // ============================================
 window.addEventListener('DOMContentLoaded', () => {

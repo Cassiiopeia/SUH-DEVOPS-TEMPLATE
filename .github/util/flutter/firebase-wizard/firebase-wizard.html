@@ -382,7 +382,56 @@
                 <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">5</span>
                 GitHub Secrets 등록 + 다운로드
             </h2>
-            <p class="text-sm text-slate-400 mb-6">[Step 5 본문 — Task 11에서 작성]</p>
+
+            <div class="bg-firebase-primary/10 border border-firebase-primary/30 rounded-lg p-4 mb-6">
+                <p class="text-sm text-firebase-accent">
+                    🚀 <strong>거의 다 왔습니다!</strong> 아래 Secret들을 GitHub Repository Secrets에 등록하고, Step 3의 setup 명령을 실행하면 끝입니다.
+                </p>
+            </div>
+
+            <!-- Repo 정보 입력 (선택) -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <input type="text" id="repoOwnerInput" placeholder="GitHub owner (예: Cassiiopeia)" value=""
+                    class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-sm font-mono"
+                    oninput="onRepoOwnerChange(this.value)">
+                <input type="text" id="repoNameInput" placeholder="레포 이름 (예: my-flutter-app)" value=""
+                    class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-sm font-mono"
+                    oninput="onRepoNameChange(this.value)">
+            </div>
+            <div class="mb-6">
+                <a id="secretsPageLink" href="https://github.com" target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">
+                    🔐 GitHub Secrets 페이지 열기
+                </a>
+                <p class="text-xs text-slate-500 mt-1">owner/repo를 입력하면 정확한 Secrets 페이지로 이동합니다. 입력값은 어디에도 저장·전송되지 않습니다.</p>
+            </div>
+
+            <!-- Secrets 매핑표 -->
+            <div class="mb-6">
+                <h3 class="text-base font-semibold mb-3 text-slate-200">🔑 등록할 GitHub Secrets</h3>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="text-left py-2 px-2">Secret 이름</th>
+                            <th class="text-left py-2 px-2">출처</th>
+                            <th class="text-left py-2 px-2">크기</th>
+                            <th class="text-right py-2 px-2">동작</th>
+                        </tr>
+                    </thead>
+                    <tbody id="secretsTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- 다운로드 버튼 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">📥 산출물 다운로드</p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs" onclick="exportJson()">📋 JSON</button>
+                    <button class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs" onclick="exportTxt()">📝 TXT</button>
+                    <button class="px-4 py-2 bg-firebase-primary text-slate-900 hover:opacity-90 rounded text-xs font-bold" onclick="exportZip()">📦 ZIP (setup 스크립트 포함, 권장)</button>
+                </div>
+            </div>
+
             <div class="flex justify-between mt-8">
                 <button class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition" onclick="prevStep()">← 이전</button>
                 <button class="px-6 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition" onclick="resetWizard()">처음부터 다시</button>

@@ -118,8 +118,64 @@
                 <span class="w-8 h-8 bg-firebase-primary rounded-lg flex items-center justify-center text-sm text-slate-900">1</span>
                 Firebase Console 설정
             </h2>
-            <p class="text-sm text-slate-400 mb-6">[Step 1 본문 — Task 6에서 작성]</p>
-            <div class="flex justify-end mt-8">
+
+            <div class="bg-firebase-primary/10 border border-firebase-primary/30 rounded-lg p-4 mb-6">
+                <p class="text-sm text-firebase-accent">
+                    🔥 <strong>이 단계의 목표:</strong> Firebase 프로젝트에 Android 앱을 등록하고 App Distribution을 활성화한 뒤, 테스터 그룹을 만들어 둡니다.
+                </p>
+            </div>
+
+            <div class="mb-4">
+                <a href="https://console.firebase.google.com" target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-firebase-primary hover:bg-firebase-dark text-slate-900 rounded-lg text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                    Firebase Console 열기
+                </a>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+                    <p class="text-sm font-medium text-firebase-accent mb-2">1) 프로젝트 생성 또는 선택</p>
+                    <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                        <li>"프로젝트 추가" 또는 기존 프로젝트 선택</li>
+                        <li>프로젝트 이름 입력 → 약관 동의 → "계속"</li>
+                        <li>Google Analytics는 선택 사항 (켜도 무방)</li>
+                    </ol>
+                </div>
+
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+                    <p class="text-sm font-medium text-firebase-accent mb-2">2) Android 앱 등록</p>
+                    <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                        <li>프로젝트 개요 → Android 아이콘 클릭</li>
+                        <li>Android 패키지 이름 (예: <code class="text-yellow-400">com.example.app</code>)</li>
+                        <li>SHA-1 인증서 지문 입력 (선택)</li>
+                        <li><strong class="text-green-400">google-services.json</strong> 다운로드 → Step 4에서 업로드</li>
+                        <li>등록 후 좌측 하단 "톱니바퀴 → 프로젝트 설정"에서 <strong class="text-yellow-400">앱 ID</strong> (예: <code>1:905...:android:abc</code>) 복사 → Step 3에서 사용</li>
+                    </ol>
+                </div>
+
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+                    <p class="text-sm font-medium text-firebase-accent mb-2">3) App Distribution 활성화</p>
+                    <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                        <li>좌측 메뉴 → "출시 및 모니터링" → "App Distribution"</li>
+                        <li>"시작하기" 클릭 → 활성화 완료</li>
+                    </ol>
+                </div>
+
+                <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+                    <p class="text-sm font-medium text-firebase-accent mb-2">4) 테스터 그룹 생성</p>
+                    <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
+                        <li>App Distribution → 상단 탭 "테스터 및 그룹"</li>
+                        <li>"새 그룹" 클릭 → 그룹명 입력 (예: <code class="text-yellow-400">romrom</code>) → Step 3에서 사용</li>
+                        <li>그룹에 테스터 이메일 추가</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-8">
+                <span class="skip-btn" onclick="nextStep()">이미 다 했어요 →</span>
                 <button class="px-6 py-2.5 bg-gradient-to-r from-firebase-primary to-firebase-accent text-slate-900 hover:opacity-90 rounded-lg font-medium transition" onclick="nextStep()">
                     다음: Service Account →
                 </button>

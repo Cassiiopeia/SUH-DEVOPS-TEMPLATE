@@ -22,7 +22,7 @@
 # FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: Firebase 서비스 계정 JSON (base64)
 #
 # 📝 환경 설정 (선택):
-# ENV_FILE: .env 파일 내용
+# ENV_FILE 또는 ENV: .env 파일 내용 (둘 중 하나, ENV_FILE 우선)
 # GOOGLE_SERVICES_JSON: Firebase google-services.json
 #
 # ===================================================================
@@ -92,8 +92,10 @@ jobs:
         run: git pull origin deploy
 
       - name: Create .env file
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE || secrets.ENV }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
+          printf '%s\n' "$ENV_CONTENT" > .env
           echo ".env file created"
 
       - name: Set up Flutter
@@ -221,8 +223,10 @@ jobs:
 
       # .env 파일 생성 (보안을 위해 아티팩트가 아닌 시크릿에서 생성)
       - name: Create .env file
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE || secrets.ENV }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
+          printf '%s\n' "$ENV_CONTENT" > .env
           echo "✅ .env 파일 생성됨 (크기: $(wc -c < .env) bytes)"
 
       # Release Keystore 설정

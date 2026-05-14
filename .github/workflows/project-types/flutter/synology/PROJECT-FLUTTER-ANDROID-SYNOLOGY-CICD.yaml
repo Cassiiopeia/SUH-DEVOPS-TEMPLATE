@@ -8,7 +8,7 @@
 # ===================================================================
 # 🔑 필수 GitHub Secrets
 # ===================================================================
-# ENV_FILE: .env 파일 내용
+# ENV_FILE 또는 ENV: .env 파일 내용 (둘 중 하나, ENV_FILE 우선)
 # RELEASE_KEYSTORE_BASE64: 서명용 keystore (base64)
 # RELEASE_KEYSTORE_PASSWORD: keystore 비밀번호
 # RELEASE_KEY_ALIAS: key alias
@@ -72,8 +72,10 @@ jobs:
 
       # .env 파일 생성
       - name: Create .env file from GitHub Secret
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE || secrets.ENV }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
+          printf '%s\n' "$ENV_CONTENT" > .env
           echo ".env file created"
           ls -la
 

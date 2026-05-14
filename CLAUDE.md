@@ -41,7 +41,8 @@ suh-github-template/
 │   │   └── template_initializer.sh
 │   ├── util/flutter/
 │   │   ├── playstore-wizard/
-│   │   └── testflight-wizard/
+│   │   ├── testflight-wizard/
+│   │   └── firebase-wizard/
 │   ├── ISSUE_TEMPLATE/
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── .claude-plugin/              # 플러그인 매니페스트

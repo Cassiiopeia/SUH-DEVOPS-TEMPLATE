@@ -25,6 +25,9 @@
 # ENV_FILE 또는 ENV: .env 파일 내용 (둘 중 하나, ENV_FILE 우선)
 # GOOGLE_SERVICES_JSON: Firebase google-services.json
 #
+# 🪄 빠른 설정: .github/util/flutter/firebase-wizard/firebase-wizard.html을
+#    브라우저에서 열어 5단계 마법사로 Firebase 배포를 자동 설정할 수 있습니다.
+#
 # ===================================================================
 #
 # 🔧 프로젝트별 설정 (env 섹션에서 수정)

@@ -53,7 +53,8 @@ $KeyPattern = '^(?<indent>\s*)(?<key>FIREBASE_APP_ID|FIREBASE_TESTER_GROUP)(?<se
 
 function Strip-Quotes {
     param([string]$Raw)
-    $v = $Raw.Trim()
+    # CRLF 안전: trailing \r 먼저 제거
+    $v = $Raw.TrimEnd("`r").Trim()
     if (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'"))) {
         $v = $v.Substring(1, $v.Length - 2)
     }

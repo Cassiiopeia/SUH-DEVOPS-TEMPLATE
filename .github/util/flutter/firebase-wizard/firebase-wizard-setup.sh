@@ -118,6 +118,8 @@ process_file() {
             local key="${BASH_REMATCH[2]}"
             local sep="${BASH_REMATCH[3]}"
             local raw_value="${BASH_REMATCH[4]}"
+            # CRLF 안전: trailing \r 먼저 제거
+            raw_value="${raw_value%$'\r'}"
             # 따옴표·공백 제거
             local stripped="$raw_value"
             stripped="${stripped#\"}"; stripped="${stripped%\"}"

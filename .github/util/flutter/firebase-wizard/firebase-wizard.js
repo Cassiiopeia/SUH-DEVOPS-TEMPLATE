@@ -75,6 +75,28 @@ function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
 function getInputValue(id) { const el = document.getElementById(id); return el ? el.value : ''; }
 
+// HTML escape for innerHTML interpolation (text content)
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Escape for use inside JS string in inline onclick="fn('...')"
+function escapeJsString(s) {
+    return String(s == null ? '' : s)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/</g, '\\x3C')
+        .replace(/>/g, '\\x3E')
+        .replace(/&/g, '\\x26')
+        .replace(/\r?\n/g, '\\n');
+}
+
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -443,27 +465,34 @@ function renderCustomSecrets() {
         container.innerHTML = '<p class="text-xs text-slate-500 italic">추가된 항목이 없습니다.</p>';
         return;
     }
-    container.innerHTML = state.customSecrets.map((s, i) => `
+    container.innerHTML = state.customSecrets.map((s, i) => {
+        const safeKey = escapeHtml(s.key || '');
+        const safeType = escapeHtml(s.type || 'text');
+        const safeFileName = escapeHtml(s.fileName || '');
+        const safeValuePreview = s.fileName ? '' : escapeHtml((s.value || '').substring(0, 100));
+        const typeBadgeClass = s.type === 'binary' ? 'bg-purple-600/30 text-purple-300' : 'bg-blue-600/30 text-blue-300';
+        return `
         <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 mb-3">
             <div class="flex items-center gap-2 mb-2">
-                <input type="text" placeholder="SECRET_KEY_NAME" value="${(s.key || '').replace(/"/g, '&quot;')}"
+                <input type="text" placeholder="SECRET_KEY_NAME" value="${safeKey}"
                     class="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono"
                     oninput="updateCustomSecretKey(${i}, this.value)">
-                <span class="text-xs px-2 py-1 rounded ${s.type === 'binary' ? 'bg-purple-600/30 text-purple-300' : 'bg-blue-600/30 text-blue-300'}">${s.type}</span>
+                <span class="text-xs px-2 py-1 rounded ${typeBadgeClass}">${safeType}</span>
                 <button class="text-red-400 hover:text-red-300 text-sm" onclick="removeCustomSecret(${i})">✕</button>
             </div>
             <div class="flex gap-2">
                 <input type="file" id="csFile${i}" class="hidden" onchange="handleCustomSecretFile(${i}, event)">
                 <button class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs" onclick="document.getElementById('csFile${i}').click()">
-                    ${s.fileName ? `📎 ${s.fileName}` : '📁 파일 선택'}
+                    ${safeFileName ? `📎 ${safeFileName}` : '📁 파일 선택'}
                 </button>
                 <span class="text-xs text-slate-500 self-center">또는</span>
-                <input type="text" placeholder="값 직접 입력" value="${s.fileName ? '' : (s.value || '').replace(/"/g, '&quot;').substring(0, 100)}"
+                <input type="text" placeholder="값 직접 입력" value="${safeValuePreview}"
                     class="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono"
                     oninput="updateCustomSecretValue(${i}, this.value)">
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Step 4 진입 시 custom secrets도 렌더 (Task 10 wrap)
@@ -507,16 +536,21 @@ function renderSecretsTable() {
         tbody.innerHTML = '<tr><td colspan="4" class="py-3 text-center text-slate-500 italic">등록할 Secret이 없습니다. Step 4를 먼저 완료해주세요.</td></tr>';
         return;
     }
-    tbody.innerHTML = list.map(s => `
+    tbody.innerHTML = list.map(s => {
+        const safeKey = escapeHtml(s.key);
+        const safeSource = escapeHtml(s.source);
+        const safeJsKey = escapeJsString(s.key);
+        return `
         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
-            <td class="py-2 px-2 font-mono text-yellow-400">${s.key}</td>
-            <td class="py-2 px-2 text-slate-400">${s.source}</td>
+            <td class="py-2 px-2 font-mono text-yellow-400">${safeKey}</td>
+            <td class="py-2 px-2 text-slate-400">${safeSource}</td>
             <td class="py-2 px-2 text-slate-400">${(s.value.length / 1024).toFixed(1)} KB</td>
             <td class="py-2 px-2 text-right">
-                <button class="px-3 py-1 bg-firebase-primary text-slate-900 rounded text-xs hover:opacity-90" onclick="copySecretValue('${s.key.replace(/'/g, "\\'")}')">복사</button>
+                <button class="px-3 py-1 bg-firebase-primary text-slate-900 rounded text-xs hover:opacity-90" onclick="copySecretValue('${safeJsKey}')">복사</button>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function copySecretValue(key) {

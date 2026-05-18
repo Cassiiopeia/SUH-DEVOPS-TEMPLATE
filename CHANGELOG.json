@@ -1,11 +1,49 @@
 {
   "metadata": {
-    "lastUpdated": "2026-05-14T07:44:59Z",
-    "currentVersion": "3.0.42",
+    "lastUpdated": "2026-05-18T15:29:33Z",
+    "currentVersion": "3.0.48",
     "projectType": "basic",
-    "totalReleases": 101
+    "totalReleases": 102
   },
   "releases": [
+    {
+      "version": "3.0.48",
+      "project_type": "basic",
+      "date": "2026-05-18",
+      "pr_number": 298,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리즈 노트\n\n* **New Features**\n  * Firebase App Distribution 배포 설정 마법사(5단계 웹 UI) 추가\n  * GitHub Actions Secret 관리 기능 확장\n  * Codex 플러그인 마켓플레이스 지원 추가\n\n* **Bug Fixes**\n  * 테스트케이스 스킬 MD 파일 저장 경로 수정\n\n* **Documentation**\n  * Firebase 설정 마법사 사용 안내 업데이트\n  * Codex 플러그인 설치 가이드 추가\n\n* **Chores**\n  * 버전 업데이트 (3.0.42 → 3.0.48)\n  * 스킬 문서 경로 규칙 통일\n\n[![Review Change Stack](https://storage.googleapis.com/coderabbit_public_assets/review-stack-in-coderabbit-ui.svg)](https://app.coderabbit.ai/change-stack/Cassiiopeia/SUH-DEVOPS-TEMPLATE/pull/298?utm_source=github_walkthrough&utm_medium=github&utm_campaign=change_stack)",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "Firebase App Distribution 배포 설정 마법사(5단계 웹 UI) 추가",
+            "GitHub Actions Secret 관리 기능 확장",
+            "Codex 플러그인 마켓플레이스 지원 추가"
+          ]
+        },
+        "bug_fixes": {
+          "title": "Bug Fixes",
+          "items": [
+            "테스트케이스 스킬 MD 파일 저장 경로 수정"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "Firebase 설정 마법사 사용 안내 업데이트",
+            "Codex 플러그인 설치 가이드 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "버전 업데이트 (3.0.42 → 3.0.48)",
+            "스킬 문서 경로 규칙 통일"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.42",
       "project_type": "basic",

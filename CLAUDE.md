@@ -217,7 +217,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `init-worktree` | Git worktree 생성 |
 | `issue` | 이슈 작성 + GitHub 등록 |
 | `commit` | 이슈 기반 커밋 자동화 |
-| `github` | GitHub 이슈/PR 조회·관리 |
+| `github` | GitHub 이슈/PR 조회·관리·Actions Secret 업데이트 |
 | `report` | 구현 보고서 생성 |
 | `changelog-deploy` | main push → deploy PR → automerge / automerge 실패 시 재트리거 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |

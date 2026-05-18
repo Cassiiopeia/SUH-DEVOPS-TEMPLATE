@@ -7,7 +7,7 @@
 > 이슈 등록부터 커밋, 보고서, 배포까지. 개발자는 코드만 작성하세요.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v3.0.41 (2026-05-09)
+## 최신 버전 : v3.0.42 (2026-05-14)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 
@@ -108,24 +108,19 @@ gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
 
 ```bash
 # Codex CLI (macOS / Linux)
-git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia
-mkdir -p ~/.agents/skills
-ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
+codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 ```
 
-```powershell
-# Codex CLI (Windows PowerShell)
-git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$env:USERPROFILE\.codex\cassiiopeia"
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
-cmd /c mklink /J "%USERPROFILE%\.agents\skills\cassiiopeia" "%USERPROFILE%\.codex\cassiiopeia\skills"
-```
+`template_integrator --mode skills` 마법사는 Codex marketplace를 등록한 뒤 native skills fallback도 자동 준비합니다. `/plugins`는 설치 확인/관리용으로만 사용하면 됩니다.
+
+Codex plugin marketplace를 사용할 수 없는 환경에서는 [Skills 가이드](docs/SKILLS.md)의 fallback 설치 방식을 사용하세요.
 
 ```bash
 # Cursor / 전체 Agent Skills 설치 메뉴
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode skills
 ```
 
-> Claude Code는 `/cassiiopeia:` 자동완성, Gemini/Codex는 bootstrap 문서를 통해 `skills/`를 읽는 방식입니다. 자세한 설치 방식은 [Skills 가이드](docs/SKILLS.md)를 확인하세요.
+> Claude Code는 `/cassiiopeia:` 자동완성, Gemini는 extension, Codex는 plugin marketplace를 우선 사용합니다. 자세한 설치 방식은 [Skills 가이드](docs/SKILLS.md)를 확인하세요.
 
 ---
 
@@ -139,6 +134,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 | **PR Preview** | 댓글 한 줄로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
 | **이슈 자동화** | 브랜치명/커밋 메시지 자동 제안, QA 이슈 생성 | [상세](docs/ISSUE-AUTOMATION.md) |
 | **Flutter CI/CD** | iOS TestFlight + Android Play Store 자동 배포 | [상세](docs/FLUTTER-CICD-OVERVIEW.md) |
+| **배포 설정 마법사** | Play Store / TestFlight / Firebase App Distribution 5단계 HTML 마법사 | `.github/util/flutter/{playstore,testflight,firebase}-wizard/` |
 | **Synology 배포** | Docker 기반 NAS 무중단 배포 | [상세](docs/SYNOLOGY-DEPLOYMENT-GUIDE.md) |
 
 ---

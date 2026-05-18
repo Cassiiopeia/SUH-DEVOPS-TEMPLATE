@@ -1,6 +1,6 @@
 ---
 name: github
-description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회/수정/댓글, PR 생성/조회/릴리스노트, 레포 탐색을 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 바꿔줘, '/github', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
+description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회/수정/댓글, PR 생성/조회/릴리스노트, 레포 탐색, GitHub Actions Secret 관리를 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 바꿔줘, '/github', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘, secret 업데이트해줘, Actions secret 등록해줘, 환경변수 secret 올려줘, BACKEND_ENV_FILE 업데이트 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
 ---
 
 # GitHub Mode
@@ -397,6 +397,107 @@ else:
         print(f'{sha} | {date} | {author} | {msg}')
 "
 ```
+
+---
+
+## GitHub Actions Secret 관리
+
+GitHub 레포의 Actions Secret을 조회·생성·업데이트한다.
+
+**트리거 예시**: "BACKEND_ENV_FILE secret 업데이트해줘", "secret 바꿔줘", "환경변수 secret 올려줘", "Actions secret 등록해줘"
+
+### 자동 탐색 절차
+
+사용자가 secret 이름이나 값을 명시하지 않아도 스킬이 먼저 탐색한다:
+
+**1단계 — secret 이름 결정**
+
+- `$ARGUMENTS`에 이름이 명시된 경우 → 그대로 사용
+- 미명시 시 → 현재 레포의 secrets 목록 조회 후 번호로 선택지 제시
+
+```bash
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+curl -s -H "Authorization: token {github_pat}" \
+  "https://api.github.com/repos/{owner}/{repo}/actions/secrets" -o /tmp/secrets_list.json
+PYTHONIOENCODING=utf-8 $PYTHON - <<'EOF'
+import json
+d = json.load(open("/tmp/secrets_list.json", encoding="utf-8"))
+if d.get("message"):
+    print("ERROR:", d["message"])
+else:
+    for i, s in enumerate(d.get("secrets", []), 1):
+        print(f"{i}. {s['name']} (updated: {s['updated_at'][:10]})")
+EOF
+```
+
+**2단계 — secret 값 결정**
+
+- `$ARGUMENTS`에 값이 명시된 경우 → 그대로 사용
+- 미명시 시 → 프로젝트 루트와 서브디렉터리에서 `.env` 파일 자동 탐색:
+
+```bash
+find "$PROJECT_ROOT" -maxdepth 3 -name ".env" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null
+```
+
+  - `.env` 파일 발견 시 → 내용을 보여주고 "이 내용으로 업데이트할까요?" 확인
+  - `.env` 없음 → 직접 입력 요청
+
+> **주의**: `.env` 내용에 민감 정보가 포함될 수 있으므로, 사용자에게 내용을 보여주고 반드시 확인 후 진행한다.
+
+### Secret 업데이트 실행
+
+PyNaCl로 GitHub public key 암호화 후 PUT. PyNaCl 미설치 시 자동 설치.
+
+```bash
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+
+# PyNaCl 설치 확인 및 자동 설치
+$PYTHON -c "import nacl" 2>/dev/null || $PYTHON -m pip install PyNaCl -q
+
+$PYTHON - <<'EOF'
+import urllib.request, json, base64
+from nacl import encoding, public
+
+pat = "{github_pat}"
+owner = "{owner}"
+repo = "{repo}"
+secret_name = "{secret_name}"
+secret_value = """{secret_value}"""  # 멀티라인 .env 내용도 OK
+
+# 1. GitHub public key 조회
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/public-key"
+)
+req.add_header("Authorization", f"token {pat}")
+pk_data = json.loads(urllib.request.urlopen(req).read())
+key_id = pk_data["key_id"]
+
+# 2. LibSodium sealed box 암호화
+pub_key = public.PublicKey(pk_data["key"].encode(), encoding.Base64Encoder())
+encrypted = public.SealedBox(pub_key).encrypt(secret_value.encode())
+encrypted_b64 = base64.b64encode(encrypted).decode()
+
+# 3. Secret PUT
+payload = json.dumps({"encrypted_value": encrypted_b64, "key_id": key_id}).encode()
+req2 = urllib.request.Request(
+    f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{secret_name}",
+    data=payload, method="PUT"
+)
+req2.add_header("Authorization", f"token {pat}")
+req2.add_header("Content-Type", "application/json")
+res = urllib.request.urlopen(req2)
+print(f"✅ {secret_name} 업데이트 완료 (status: {res.status})")
+EOF
+```
+
+### 오류 대응
+
+| 오류 | 원인 | 대응 |
+|------|------|------|
+| `403` on secrets API | PAT에 `repo` scope 없음 | PAT 재발급 시 `repo` 전체 체크 안내 |
+| `404` on secrets list | private 레포 권한 없음 | 권한 확인 안내 |
+| `nacl` import 오류 | PyNaCl 설치 실패 | `pip install PyNaCl --user` 수동 실행 안내 |
+| `.env` 내용에 특수문자 | Python heredoc 이스케이프 | `secret_value` 변수를 파일로 분리해 `open()` 읽기로 대체 |
 
 ---
 

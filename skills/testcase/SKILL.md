@@ -49,8 +49,10 @@ description: "Testcase Generator - QA 테스트케이스 작성 전문가. GitHu
 
 ## 출력 규칙
 
-**반드시 MD 파일 생성**: `testcase-[이슈번호]-[설명].md` (프로젝트 루트)
+**반드시 MD 파일 생성**: `{PROJECT_ROOT}/docs/suh-template/testcase/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 
+- 이슈번호 없으면 순번(`001`, `002`…) 자동 사용
+- 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
 - GitHub 이슈 댓글에 바로 붙여넣기 가능한 형식
 - 체크리스트 중심, 장황한 설명 지양
 - 보안 관련 테스트 (권한, 인증) 자동 포함
@@ -60,6 +62,6 @@ description: "Testcase Generator - QA 테스트케이스 작성 전문가. GitHu
 
 ```
 ✅ 테스트케이스 생성 완료!
-📄 파일: testcase-[번호]-[설명].md
+📄 파일: docs/suh-template/testcase/YYYYMMDD_[번호]_[설명].md
 → GitHub 이슈 댓글에 붙여넣기: 파일 열기 → 전체 복사 → 댓글란 붙여넣기
 ```

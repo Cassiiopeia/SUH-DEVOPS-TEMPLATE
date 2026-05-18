@@ -10,6 +10,7 @@
 # - .claude-plugin/plugin.json
 # - .claude-plugin/marketplace.json
 # - .codex-plugin/plugin.json
+# - .agents/plugins/marketplace.json (Codex marketplace source metadata, no version field)
 # - gemini-extension.json
 #
 # 트리거: deploy 브랜치 push 시

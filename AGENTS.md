@@ -31,7 +31,16 @@ Common routing:
 
 ## Codex Installation Model
 
-Codex support is primarily via native skill discovery:
+**Method 1 (recommended):** Plugin marketplace source registration:
+
+```bash
+codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+```
+
+After registering, open `/plugins` in Codex and verify the `cassiiopeia` entry.
+
+**Method 2 (fallback):** Direct clone + symlink for immediate activation without
+marketplace:
 
 ```bash
 git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia
@@ -39,9 +48,8 @@ mkdir -p ~/.agents/skills
 ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
 ```
 
-The `.codex-plugin/` directory is future-facing metadata and is not the primary
-installation path unless this repository is available in a Codex plugin
-marketplace.
+Codex reads `.agents/plugins/marketplace.json` to discover the marketplace entry
+and `.codex-plugin/plugin.json` to load the plugin metadata.
 
 ## Repository Safety
 
@@ -51,6 +59,7 @@ belong here, but should be removed from generated projects by the initializer:
 - `AGENTS.md`
 - `GEMINI.md`
 - `gemini-extension.json`
+- `.agents/`
 - `.claude-plugin/`
 - `.codex-plugin/`
 - `.cursor/`

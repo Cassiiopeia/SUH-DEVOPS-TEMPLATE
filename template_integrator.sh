@@ -887,6 +887,7 @@ download_template() {
     local plugin_items_to_remove=(
         ".claude-plugin"    # Claude Code 플러그인 매니페스트
         ".codex-plugin"     # Codex 플러그인 메타데이터
+        ".agents"           # Codex 마켓플레이스 메타데이터
         ".cursor"           # Cursor 스킬 복사본
         "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
     )
@@ -2326,7 +2327,7 @@ execute_integration() {
 # Claude Code: 플러그인 마켓플레이스 자동 설치
 # Cursor: skills/ → .cursor/skills/ 복사
 # Gemini CLI: extension install/update
-# Codex CLI: ~/.agents/skills native discovery symlink
+# Codex CLI: plugin marketplace registration, fallback to ~/.agents/skills native discovery symlink
 # ===================================================================
 
 offer_ide_tools_install() {
@@ -2402,10 +2403,12 @@ offer_ide_tools_install() {
     fi
 
     local codex_target="${HOME}/.agents/skills/cassiiopeia"
-    if [ -L "$codex_target" ] || [ -d "$codex_target" ]; then
-        print_info "Codex CLI   : native skills 경로 감지 (${codex_target})"
+    if command -v codex &> /dev/null; then
+        print_info "Codex CLI   : CLI 감지 (plugin marketplace 등록 가능)"
+    elif [ -L "$codex_target" ] || [ -d "$codex_target" ]; then
+        print_info "Codex CLI   : fallback native skills 경로 감지 (${codex_target})"
     else
-        print_info "Codex CLI   : native skills 미설치 (${codex_target})"
+        print_info "Codex CLI   : CLI 미감지 (fallback native skills 설치 가능)"
     fi
     echo "" >&2
 
@@ -2957,7 +2960,47 @@ _manage_gemini_extension() {
 
 _manage_codex_skills() {
     echo "" >&2
-    print_step "[ Codex CLI Native Skills 관리 ]"
+    print_step "[ Codex CLI Plugin 관리 ]"
+    echo "" >&2
+
+    if command -v codex &> /dev/null; then
+        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+            print_to_user "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
+            print_to_user "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+            print_to_user "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
+            print_to_user "  Y/y - 예, 등록 또는 업데이트"
+            print_to_user "  N/n - 아니오, 건너뜁니다"
+            print_to_user ""
+            if ask_yes_no "선택: " "Y"; then
+                _do_codex_marketplace_register
+                return
+            fi
+        else
+            _do_codex_marketplace_register
+            return
+        fi
+    else
+        print_warning "codex CLI가 감지되지 않았습니다."
+        print_info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    fi
+}
+
+_do_codex_marketplace_register() {
+    print_step "Codex plugin marketplace 등록 중..."
+    if codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+        print_success "Codex marketplace 등록 완료"
+    else
+        print_info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
+    fi
+
+    print_step "Codex plugin marketplace 업데이트 중..."
+    codex plugin marketplace upgrade cassiiopeia 2>/dev/null || true
+    print_success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+}
+
+_do_codex_native_skills_fallback() {
+    local mode="${1:-interactive}"
+    print_step "[ Codex CLI Native Skills fallback 관리 ]"
     echo "" >&2
 
     local install_dir="${HOME}/.codex/cassiiopeia"
@@ -2965,14 +3008,14 @@ _manage_codex_skills() {
     local target_dir="${HOME}/.agents/skills"
     local target="${target_dir}/cassiiopeia"
 
-    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "Codex native skills를 설치/업데이트하시겠습니까?"
+    if [ "$mode" != "auto" ] && [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        print_to_user "Codex native skills fallback을 설치/업데이트하시겠습니까?"
         print_to_user "  설치 경로: ${target}"
         print_to_user "  Y/y - 예, 설치 또는 업데이트"
         print_to_user "  N/n - 아니오, 건너뛰기"
         print_to_user ""
         if ! ask_yes_no "선택: " "Y"; then
-            print_info "Codex native skills 변경 없이 건너뜁니다"
+            print_info "Codex native skills fallback 변경 없이 건너뜁니다"
             return
         fi
     fi

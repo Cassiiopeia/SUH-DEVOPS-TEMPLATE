@@ -1,0 +1,26 @@
+{
+  "name": "Firebase App Distribution Setup Wizard",
+  "version": "1.0.0",
+  "description": "Flutter Android 앱을 Firebase App Distribution에 배포하기 위한 설정 마법사",
+  "lastUpdated": "2026-05-15",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-05-15",
+      "changes": [
+        "초기 릴리즈",
+        "5단계 마법사 (Console 가이드 → SA 발급 → 앱 정보 → 파일 업로드 → Secrets 등록)",
+        "Service Account JSON base64 자동 변환",
+        "Custom Secrets 섹션 (사용자 정의 secret 동적 추가)",
+        "JSON/TXT/ZIP 산출물 다운로드",
+        "워크플로우 placeholder 안전 치환 setup 스크립트 (bash/PowerShell)"
+      ]
+    }
+  ],
+  "compatibility": {
+    "flutter": ">=3.0.0",
+    "android_sdk": ">=33",
+    "firebase_app_distribution": "GA"
+  },
+  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}

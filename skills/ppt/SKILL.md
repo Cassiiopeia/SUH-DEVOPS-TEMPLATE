@@ -68,13 +68,9 @@ description: "PPT Mode - 기술 발표 자료 작성 전문가. 개발 과정에
 
 ## 산출물 저장
 
-`references/doc-output-path.md` 규칙을 따른다.
+**산출물 저장 경로**: `{PROJECT_ROOT}/docs/suh-template/ppt/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 
-산출물 md 저장 전:
-```bash
-PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path ppt
-```
+- 이슈번호 없으면 순번(`001`, `002`…) 자동 사용
+- 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
 
 파일 저장 전 `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜**을 따라 작성한 내용 전체를 검토한다. 민감 정보 발견 시 플레이스홀더로 교체 후 저장한다.
-
-반환된 경로에 파일을 저장한다.

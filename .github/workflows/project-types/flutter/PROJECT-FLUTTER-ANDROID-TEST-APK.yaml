@@ -38,6 +38,9 @@
 # 🔥 Firebase App Distribution (선택):
 # FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: Firebase 서비스 계정 JSON (base64)
 #
+# 🪄 빠른 설정: .github/util/flutter/firebase-wizard/firebase-wizard.html을
+#    브라우저에서 열어 5단계 마법사로 Firebase 배포를 자동 설정할 수 있습니다.
+#
 # ===================================================================
 
 name: PROJECT-Flutter-Android-Test-APK

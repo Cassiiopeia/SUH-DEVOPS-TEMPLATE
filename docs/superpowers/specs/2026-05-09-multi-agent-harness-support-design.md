@@ -48,9 +48,16 @@ a root `GEMINI.md` context file. Users install it with:
 gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
 ```
 
-Codex CLI will be supported primarily through native skill discovery, not the
-official Codex plugin marketplace. Users install it by cloning the repository and
-linking the shared `skills/` directory into `~/.agents/skills/cassiiopeia`.
+Codex CLI will be supported primarily through user-registered plugin marketplace
+sources, not OpenAI official marketplace publication. Users register this
+repository as a marketplace source:
+
+```bash
+codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+```
+
+The installer wizard should also prepare the native skill discovery fallback so
+users do not need to manually install through `/plugins`.
 
 macOS/Linux:
 
@@ -68,8 +75,8 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
 cmd /c mklink /J "%USERPROFILE%\.agents\skills\cassiiopeia" "%USERPROFILE%\.codex\cassiiopeia\skills"
 ```
 
-A `.codex-plugin/plugin.json` file may be added as optional metadata for future
-Codex plugin or app support, but the design must not depend on official Codex
+`.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json` provide Codex
+marketplace and plugin metadata. The design must not depend on official Codex
 marketplace publication.
 
 ## Repository Layout
@@ -148,16 +155,17 @@ It should include:
 - A requirement to inspect relevant local skills before acting.
 - A statement that Codex does not rely on a slash-command skill UI for this
   repository.
-- A note that Codex installation is primarily via `~/.agents/skills`.
+- A note that Codex installation is primarily via plugin marketplace source
+  registration, with `~/.agents/skills` as a fallback.
 - A mapping from tasks to skills.
 - Repository-specific safety rules for template initializer and integrator
   changes.
 
 ### `.codex-plugin/plugin.json`
 
-This is optional future-facing metadata. It should be present but should not be
-documented as the primary Codex installation path until the repository is
-available through a Codex plugin marketplace.
+This is Codex plugin metadata. It should be paired with
+`.agents/plugins/marketplace.json` so users can register this repository as a
+Codex plugin marketplace source.
 
 Expected minimal shape:
 
@@ -187,6 +195,7 @@ GEMINI.md
 gemini-extension.json
 .claude-plugin/
 .codex-plugin/
+.agents/
 .cursor/
 skills/
 ```
@@ -209,12 +218,16 @@ The scripts should support:
 - Cursor: existing copy flow to user or project `.cursor/skills`.
 - Gemini CLI: run `gemini extensions install` or `gemini extensions update`
   when the `gemini` command is available, otherwise print the manual command.
-- Codex CLI: clone or update the repository under a stable local directory and
-  create a symlink or junction from `~/.agents/skills/cassiiopeia` to the cloned
-  repository's `skills/` directory.
+- Codex CLI: register the repository with `codex plugin marketplace add
+  Cassiiopeia/SUH-DEVOPS-TEMPLATE`, then prepare the native skills fallback
+  automatically so wizard users do not need manual `/plugins` installation. If
+  the Codex plugin marketplace command is unavailable, clone or update the
+  repository under a stable local directory and create a symlink or junction
+  from `~/.agents/skills/cassiiopeia` to the cloned repository's `skills/`
+  directory.
 
-Codex installation should not require `codex` to be installed because the native
-skill discovery path can be prepared independently.
+Codex plugin marketplace registration requires the `codex` CLI. The native skill
+discovery fallback should remain available when `codex` is not installed.
 
 The interactive flow should show detected installation status where possible and
 let the user install, update, reinstall, or remove each harness installation.
@@ -230,6 +243,7 @@ template version into every harness metadata file:
 - `.claude-plugin/plugin.json`
 - `.claude-plugin/marketplace.json`
 - `.codex-plugin/plugin.json`
+- `.agents/plugins/marketplace.json`
 - `gemini-extension.json`
 - `.cursor/skills/cursor-skills-meta.json`, if the Cursor copy remains
   committed

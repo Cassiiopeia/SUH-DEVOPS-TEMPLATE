@@ -438,6 +438,11 @@ cleanup_template_files() {
         echo "  ✓ .codex-plugin 폴더 삭제 (플러그인 매니페스트)"
     fi
 
+    if [ -d ".agents" ]; then
+        rm -rf .agents
+        echo "  ✓ .agents 폴더 삭제 (Codex 마켓플레이스 메타데이터)"
+    fi
+
     if [ -d ".cursor" ]; then
         rm -rf .cursor
         echo "  ✓ .cursor 폴더 삭제 (IDE 스킬 복사본)"
@@ -608,6 +613,7 @@ print_summary() {
     echo "  ✅ CHANGELOG 파일 삭제"
     echo "  ✅ LICENSE, CONTRIBUTING.md 삭제"
     echo "  ✅ 테스트 폴더 삭제"
+    echo "  ✅ Agent/플러그인 배포 메타데이터 삭제"
     echo "  ✅ .gitignore 생성/업데이트"
     echo "  ✅ README.md 초기화"
     echo "  ✅ 이슈 템플릿 assignee 변경"

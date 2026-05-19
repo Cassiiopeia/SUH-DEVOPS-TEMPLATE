@@ -7,7 +7,7 @@
 > 이슈 등록부터 커밋, 보고서, 배포까지. 개발자는 코드만 작성하세요.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v3.0.42 (2026-05-14)
+## 최신 버전 : v3.0.48 (2026-05-18)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 
@@ -27,9 +27,9 @@
 | 버전 수동 관리, 태그 직접 생성 | main 푸시 시 patch 버전 자동 증가 + 태그 생성 |
 | 체인지로그 직접 작성 (30분+) | CodeRabbit AI가 PR마다 자동 생성 |
 | CI/CD 처음부터 설정 | 프로젝트 타입별 워크플로우 즉시 구성 |
-| 이슈 매번 형식 맞춰 작성 (5분+) | `/cassiiopeia:issue` 한 번에 표준 템플릿 생성 |
-| 커밋 메시지 이슈 URL 수동 복사 | `/cassiiopeia:commit` 이슈 컨텍스트 기반 자동 완성 |
-| PR 설명/보고서 직접 작성 | `/cassiiopeia:report` git diff 분석 후 자동 생성 |
+| 이슈 매번 형식 맞춰 작성 (5분+) | `/cassiiopeia:suh-issue` 한 번에 표준 템플릿 생성 |
+| 커밋 메시지 이슈 URL 수동 복사 | `/cassiiopeia:suh-commit` 이슈 컨텍스트 기반 자동 완성 |
+| PR 설명/보고서 직접 작성 | `/cassiiopeia:suh-report` git diff 분석 후 자동 생성 |
 | 코드 리뷰·분석 매번 프롬프트 입력 | 25종 Skills로 일관된 결과, 매번 재입력 불필요 |
 
 ---
@@ -39,22 +39,24 @@
 Agent Skills가 개발 사이클 전체를 커버합니다.
 
 ```mermaid
-flowchart LR
-    A([작업 시작]) --> B["/cassiiopeia:issue\n이슈 등록 + GitHub 자동 생성"]
-    B --> C["/cassiiopeia:init-worktree\nworktree + 민감파일 자동 복사"]
+flowchart TD
+    A([작업 시작]) --> B["/cassiiopeia:suh-issue\n이슈 등록 + GitHub 자동 생성"]
+    B --> C["/cassiiopeia:suh-init-worktree\nworktree + 민감파일 자동 복사"]
     C --> D{작업 유형}
 
-    D -->|새 기능| E1["/cassiiopeia:plan\n전략 수립"]
-    D -->|버그| E2["/cassiiopeia:troubleshoot\n원인 분석"]
-    D -->|리팩토링| E3["/cassiiopeia:refactor-analyze\nSmell 탐지"]
+    D -->|새 기능| E1["/cassiiopeia:suh-plan\n전략 수립"]
+    D -->|버그| E2["/cassiiopeia:suh-troubleshoot\n원인 분석"]
+    D -->|리팩토링| E3["/cassiiopeia:suh-refactor-analyze\nSmell 탐지"]
 
-    E1 & E2 & E3 --> F["/cassiiopeia:implement\n구현"]
-    F --> G["/cassiiopeia:test\n테스트"]
-    G --> H["/cassiiopeia:review\n셀프 리뷰"]
-    H --> I["/cassiiopeia:commit\n이슈 연동 커밋 자동 완성"]
-    I --> J["/cassiiopeia:report\n구현 보고서 + GitHub 댓글"]
+    E1 --> F["/cassiiopeia:suh-implement\n구현"]
+    E2 --> F
+    E3 --> F
+    F --> G["/cassiiopeia:suh-test\n테스트"]
+    G --> H["/cassiiopeia:suh-review\n셀프 리뷰"]
+    H --> I["/cassiiopeia:suh-commit\n이슈 연동 커밋 자동 완성"]
+    I --> J["/cassiiopeia:suh-report\n구현 보고서 + GitHub 댓글"]
     J --> K([PR 등록])
-    K --> L["/cassiiopeia:changelog-deploy\nmain push → deploy PR + automerge"]
+    K --> L["/cassiiopeia:suh-changelog-deploy\nmain push → deploy PR + automerge"]
 ```
 
 > Skills 전체 목록 및 상세 사용법: **[docs/SKILLS.md](docs/SKILLS.md)**
@@ -64,7 +66,7 @@ flowchart LR
 ## GitHub Actions 자동화 파이프라인
 
 ```mermaid
-flowchart LR
+flowchart TD
     A([main 푸시]) --> B[버전 자동 증가\npatch +1 + 태그]
     B --> C[deploy PR 자동 생성]
     C --> D[AI 체인지로그\nCodeRabbit 분석]
@@ -145,46 +147,46 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 
 | 스킬 | 용도 |
 |------|------|
-| `/cassiiopeia:issue` | 설명 한 줄 → GitHub 이슈 템플릿 자동 작성 + 등록 |
-| `/cassiiopeia:init-worktree` | Git worktree 생성 + 민감 파일 자동 복사 |
-| `/cassiiopeia:commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 (superpowers 준수) |
-| `/cassiiopeia:report` | git diff 분석 → 구현 보고서 생성 + GitHub 댓글 자동 포스팅 |
-| `/cassiiopeia:changelog-deploy` | main push → deploy PR 생성 + 릴리스 노트 작성 + automerge |
-| `/cassiiopeia:github` | GitHub 이슈/PR/댓글 독립 조회 및 관리 |
+| `/cassiiopeia:suh-issue` | 설명 한 줄 → GitHub 이슈 템플릿 자동 작성 + 등록 |
+| `/cassiiopeia:suh-init-worktree` | Git worktree 생성 + 민감 파일 자동 복사 |
+| `/cassiiopeia:suh-commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 (superpowers 준수) |
+| `/cassiiopeia:suh-report` | git diff 분석 → 구현 보고서 생성 + GitHub 댓글 자동 포스팅 |
+| `/cassiiopeia:suh-changelog-deploy` | main push → deploy PR 생성 + 릴리스 노트 작성 + automerge |
+| `/cassiiopeia:suh-github` | GitHub 이슈/PR/댓글 독립 조회 및 관리 |
 
 ### 📊 분석형 (코드 수정 없음)
 
 | 스킬 | 용도 |
 |------|------|
-| `/cassiiopeia:analyze` | 구현 전 현재 코드 상태 분석 및 영향 범위 평가 |
-| `/cassiiopeia:plan` | 요구사항 명확화 + 2가지 이상 접근 방식 비교로 전략 수립 |
-| `/cassiiopeia:design-analyze` | 아키텍처/API/DB/UI 설계 분석 (구현 X) |
-| `/cassiiopeia:refactor-analyze` | Code Smell 탐지 + Before/After 기반 리팩토링 계획 |
-| `/cassiiopeia:review` | 보안/성능/버그/품질 6관점 리뷰, Critical/Major/Minor 분류 |
-| `/cassiiopeia:troubleshoot` | 가설-검증 방식 근본 원인 분석, Quick Fix/Root Fix 제시 |
+| `/cassiiopeia:suh-analyze` | 구현 전 현재 코드 상태 분석 및 영향 범위 평가 |
+| `/cassiiopeia:suh-plan` | 요구사항 명확화 + 2가지 이상 접근 방식 비교로 전략 수립 |
+| `/cassiiopeia:suh-design-analyze` | 아키텍처/API/DB/UI 설계 분석 (구현 X) |
+| `/cassiiopeia:suh-refactor-analyze` | Code Smell 탐지 + Before/After 기반 리팩토링 계획 |
+| `/cassiiopeia:suh-review` | 보안/성능/버그/품질 6관점 리뷰, Critical/Major/Minor 분류 |
+| `/cassiiopeia:suh-troubleshoot` | 가설-검증 방식 근본 원인 분석, Quick Fix/Root Fix 제시 |
 
 ### 🔧 구현형 (실제 코드 작성)
 
 | 스킬 | 용도 |
 |------|------|
-| `/cassiiopeia:implement` | 계획/분석 결과 기반 코드 구현 (기존 스타일 100% 준수) |
-| `/cassiiopeia:design` | 아키텍처/API/DB/UI 설계 + 구현까지 |
-| `/cassiiopeia:refactor` | Extract Method, DRY 등 리팩토링 기법 단계별 적용 |
-| `/cassiiopeia:test` | AAA 패턴 단위/통합/E2E 테스트 코드 작성 |
-| `/cassiiopeia:figma` | Figma CSS → React/RN/Flutter 반응형 코드 변환 |
-| `/cassiiopeia:build` | 프로젝트 빌드 실행, 에러 분석, 최적화 제안 |
+| `/cassiiopeia:suh-implement` | 계획/분석 결과 기반 코드 구현 (기존 스타일 100% 준수) |
+| `/cassiiopeia:suh-design` | 아키텍처/API/DB/UI 설계 + 구현까지 |
+| `/cassiiopeia:suh-refactor` | Extract Method, DRY 등 리팩토링 기법 단계별 적용 |
+| `/cassiiopeia:suh-test` | AAA 패턴 단위/통합/E2E 테스트 코드 작성 |
+| `/cassiiopeia:suh-figma` | Figma CSS → React/RN/Flutter 반응형 코드 변환 |
+| `/cassiiopeia:suh-build` | 프로젝트 빌드 실행, 에러 분석, 최적화 제안 |
 
 ### 📝 문서/산출물 생성형
 
 | 스킬 | 용도 |
 |------|------|
-| `/cassiiopeia:document` | 코드 주석/README/API 문서 작성 |
-| `/cassiiopeia:testcase` | 이슈 분석 → QA 체크리스트 생성 |
-| `/cassiiopeia:ppt` | 트러블슈팅/구현 사례 → 5섹션 발표자료 |
+| `/cassiiopeia:suh-document` | 코드 주석/README/API 문서 작성 |
+| `/cassiiopeia:suh-testcase` | 이슈 분석 → QA 체크리스트 생성 |
+| `/cassiiopeia:suh-ppt` | 트러블슈팅/구현 사례 → 5섹션 발표자료 |
 | `/cassiiopeia:suh-spring-test` | Spring Boot 테스트 샘플 코드 생성 |
-| `/cassiiopeia:synology-expose` | Synology NAS 외부 도메인 노출 설정 가이드 |
-| `/cassiiopeia:ssh` | 원격 서버 SSH 접속·명령 실행 (AWS EC2, 시놀로지 NAS, Linux 등 범용) |
-| `/cassiiopeia:skill-creator` | Skill 생성/리뷰/개선 (CREATE·REVIEW·IMPROVE 3모드) |
+| `/cassiiopeia:suh-synology-expose` | Synology NAS 외부 도메인 노출 설정 가이드 |
+| `/cassiiopeia:suh-ssh` | 원격 서버 SSH 접속·명령 실행 (AWS EC2, 시놀로지 NAS, Linux 등 범용) |
+| `/cassiiopeia:suh-skill-creator` | Skill 생성/리뷰/개선 (CREATE·REVIEW·IMPROVE 3모드) |
 
 ---
 

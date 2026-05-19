@@ -39,7 +39,7 @@
 Agent Skills가 개발 사이클 전체를 커버합니다.
 
 ```mermaid
-flowchart LR
+flowchart TD
     A([작업 시작]) --> B["/cassiiopeia:suh-issue\n이슈 등록 + GitHub 자동 생성"]
     B --> C["/cassiiopeia:suh-init-worktree\nworktree + 민감파일 자동 복사"]
     C --> D{작업 유형}
@@ -48,7 +48,9 @@ flowchart LR
     D -->|버그| E2["/cassiiopeia:suh-troubleshoot\n원인 분석"]
     D -->|리팩토링| E3["/cassiiopeia:suh-refactor-analyze\nSmell 탐지"]
 
-    E1 & E2 & E3 --> F["/cassiiopeia:suh-implement\n구현"]
+    E1 --> F["/cassiiopeia:suh-implement\n구현"]
+    E2 --> F
+    E3 --> F
     F --> G["/cassiiopeia:suh-test\n테스트"]
     G --> H["/cassiiopeia:suh-review\n셀프 리뷰"]
     H --> I["/cassiiopeia:suh-commit\n이슈 연동 커밋 자동 완성"]
@@ -64,7 +66,7 @@ flowchart LR
 ## GitHub Actions 자동화 파이프라인
 
 ```mermaid
-flowchart LR
+flowchart TD
     A([main 푸시]) --> B[버전 자동 증가\npatch +1 + 태그]
     B --> C[deploy PR 자동 생성]
     C --> D[AI 체인지로그\nCodeRabbit 분석]

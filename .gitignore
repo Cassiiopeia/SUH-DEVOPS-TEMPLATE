@@ -11,3 +11,6 @@ __pycache__/
 # Cursor 플러그인 로컬 메타 파일
 .cursor/skills/cursor-skills-meta.json
 .template_download_temp/
+
+# Windows NUL 디바이스 파일
+nul

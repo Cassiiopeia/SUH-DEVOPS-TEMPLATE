@@ -369,7 +369,9 @@ name: PROJECT-iOS-TestFlight-Deploy
 
 | 파일 | 타입 | 상태 |
 |------|------|------|
-| SPRING-SYNOLOGY-CICD | D | ✅ |
+| SPRING-SYNOLOGY-SIMPLE-CICD | D | ✅ |
+| SPRING-SYNOLOGY-NONSTOP-TRAEFIK-CICD | D | ✅ |
+| SPRING-SYNOLOGY-NONSTOP-NGINX-CICD | D | ✅ |
 | PR-PREVIEW | E | ✅ |
 | NEXUS-CI | B | ✅ |
 | NEXUS-PUBLISH | B | ✅ |

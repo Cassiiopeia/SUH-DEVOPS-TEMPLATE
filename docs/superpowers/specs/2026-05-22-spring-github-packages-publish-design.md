@@ -40,6 +40,8 @@ Java 라이브러리(Spring 모듈)를 **GitHub Packages**(Maven repo)에 자동
 | Publish task | `publishMavenPublicationToGitHubPackagesRepository` (단일 타겟) |
 | 기존 Nexus 워크플로우 | 유지 |
 | 워크플로우 주석 | Java 라이브러리 모듈 배포 전용 CICD 명시 |
+| 주석 가이드라인 타입 | **Type A** (Secrets 없음, GITHUB_TOKEN만 사용 — 🔑 섹션 생략) |
+| 주석 가이드라인 준수 | `docs/WORKFLOW-COMMENT-GUIDELINES.md` 전체 준수 (67자 구분선, GITHUB_TOKEN 미언급, 표준 아이콘만) |
 
 ---
 
@@ -62,43 +64,42 @@ Java 라이브러리(Spring 모듈)를 **GitHub Packages**(Maven repo)에 자동
 
 ### 5.1 파일 헤더 (주석)
 
+> **준수 가이드라인**: `docs/WORKFLOW-COMMENT-GUIDELINES.md` Type A (Secrets 없음 — GITHUB_TOKEN만 사용).
+>
+> 핵심 규칙 준수:
+> - 67자 구분선 사용
+> - `GITHUB_TOKEN` 명시 금지 (자동 제공이라 문서화 불필요)
+> - 🔑 필수 Secrets 섹션 **생략** (Type A는 Secrets 섹션 없음)
+> - 표준 아이콘만 사용 (⚠️ 🛠️ 💡)
+
 ```yaml
 # ===================================================================
 # Spring GitHub Packages 라이브러리 배포 워크플로우
 # ===================================================================
-# 용도: Java 라이브러리 모듈을 GitHub Packages(Maven repo)에 배포한다.
-#       Nexus 없이 GitHub만으로 의존성 호스팅이 가능하다.
 #
-# ⚠️ 이 워크플로우는 Java 라이브러리 모듈 배포 전용 CICD다.
-#    Spring Boot 애플리케이션 배포가 아니다.
+# Java 라이브러리 모듈을 GitHub Packages(Maven repo)에 자동 배포합니다.
+# Nexus 없이 GitHub만으로 의존성 호스팅이 가능합니다.
 #
-# 🔑 필수 GitHub Secrets
+# ⚠️ Java 라이브러리 모듈 배포 전용 CICD입니다.
+#    Spring Boot 애플리케이션 배포가 아닙니다.
+#
 # ===================================================================
-# GITHUB_TOKEN: Actions 자동 제공 (별도 설정 불필요)
-#               permissions.packages: write 선언만 필요
-# ===================================================================
-#
-# 📋 build.gradle 요구사항
+# 🛠️ build.gradle 요구사항
 # ===================================================================
 # publishing.repositories.maven 블록에 GitHub Packages 항목 추가:
 #
-#   publishing {
-#     repositories {
-#       maven {
-#         name = "GitHubPackages"
-#         url = uri("https://maven.pkg.github.com/${System.getenv('GITHUB_REPOSITORY')}")
-#         credentials {
-#           username = System.getenv("GITHUB_ACTOR")
-#           password = System.getenv("GITHUB_TOKEN")
-#         }
-#       }
+#   maven {
+#     name = "GitHubPackages"
+#     url = uri("https://maven.pkg.github.com/${System.getenv('GITHUB_REPOSITORY')}")
+#     credentials {
+#       username = System.getenv("GITHUB_ACTOR")
+#       password = System.getenv("GITHUB_TOKEN")
 #     }
 #   }
 #
-# 💰 Free 계정 제한
-# ===================================================================
-# - Public repo: 무제한 무료
-# - Private repo: 월 500MB 저장 + 1GB 전송 (초과 시 과금)
+# 💡 Free 계정 제한 (Private repo 기준):
+#   - 월 500MB 저장 + 1GB 전송 무료
+#   - Public repo는 무제한 무료
 # ===================================================================
 ```
 
@@ -150,7 +151,34 @@ permissions:
 ### 5.7 전체 YAML (최종 안)
 
 ```yaml
-# (헤더 주석 — 5.1 참조)
+# ===================================================================
+# Spring GitHub Packages 라이브러리 배포 워크플로우
+# ===================================================================
+#
+# Java 라이브러리 모듈을 GitHub Packages(Maven repo)에 자동 배포합니다.
+# Nexus 없이 GitHub만으로 의존성 호스팅이 가능합니다.
+#
+# ⚠️ Java 라이브러리 모듈 배포 전용 CICD입니다.
+#    Spring Boot 애플리케이션 배포가 아닙니다.
+#
+# ===================================================================
+# 🛠️ build.gradle 요구사항
+# ===================================================================
+# publishing.repositories.maven 블록에 GitHub Packages 항목 추가:
+#
+#   maven {
+#     name = "GitHubPackages"
+#     url = uri("https://maven.pkg.github.com/${System.getenv('GITHUB_REPOSITORY')}")
+#     credentials {
+#       username = System.getenv("GITHUB_ACTOR")
+#       password = System.getenv("GITHUB_TOKEN")
+#     }
+#   }
+#
+# 💡 Free 계정 제한 (Private repo 기준):
+#   - 월 500MB 저장 + 1GB 전송 무료
+#   - Public repo는 무제한 무료
+# ===================================================================
 
 name: PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH
 
@@ -286,4 +314,19 @@ Spring 표 마지막에 1행 추가:
 
 1. `.github/workflows/project-types/spring/PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH.yml` 신규 생성
 2. `CLAUDE.md` Spring 표 업데이트 (1행 추가)
-3. (선택) `docs/` 하위에 사용 가이드 추가 — writing-plans 단계에서 판단
+3. `docs/WORKFLOW-COMMENT-GUIDELINES.md` §10 파일별 적용 현황 표에 신규 워크플로우 1행 추가 (Type A, 상태 ✅)
+4. (선택) `docs/` 하위에 사용 가이드 추가 — writing-plans 단계에서 판단
+
+---
+
+## 11. 주석 가이드라인 자체 검증 결과
+
+`docs/WORKFLOW-COMMENT-GUIDELINES.md` §11 체크리스트 대조:
+
+- [x] 67자 구분선 사용
+- [x] GITHUB_TOKEN 언급 없음
+- [x] Secrets는 1줄 형식 — Type A이므로 Secrets 섹션 자체 없음
+- [x] 선택 항목에만 `(선택)` 표시 — 선택 항목 없음
+- [x] 아이콘 용도에 맞게 사용 (⚠️ 🛠️ 💡 모두 표준)
+- [x] 환경변수는 1줄 형식 — env 섹션 없음
+- [x] Type 분류 명시 (Type A)

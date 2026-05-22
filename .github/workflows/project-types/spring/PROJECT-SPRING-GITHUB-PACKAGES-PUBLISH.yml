@@ -1,0 +1,85 @@
+# ===================================================================
+# Spring GitHub Packages 라이브러리 배포 워크플로우
+# ===================================================================
+#
+# Java 라이브러리 모듈을 GitHub Packages(Maven repo)에 자동 배포합니다.
+# Nexus 없이 GitHub만으로 의존성 호스팅이 가능합니다.
+#
+# ⚠️ Java 라이브러리 모듈 배포 전용 CICD입니다.
+#    Spring Boot 애플리케이션 배포가 아닙니다.
+#
+# ===================================================================
+# 🛠️ build.gradle 요구사항
+# ===================================================================
+# publishing.repositories.maven 블록에 GitHub Packages 항목 추가:
+#
+#   maven {
+#     name = "GitHubPackages"
+#     url = uri("https://maven.pkg.github.com/${System.getenv('GITHUB_REPOSITORY')}")
+#     credentials {
+#       username = System.getenv("GITHUB_ACTOR")
+#       password = System.getenv("GITHUB_TOKEN")
+#     }
+#   }
+#
+# 💡 Free 계정 제한 (Private repo 기준):
+#   - 월 500MB 저장 + 1GB 전송 무료
+#   - Public repo는 무제한 무료
+# ===================================================================
+
+name: PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH
+
+on:
+  push:
+    branches: ["deploy"]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+concurrency:
+  group: github-packages-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            VERSION=${TAG_NAME#v}
+            echo "🏷️ 태그에서 버전 추출: $VERSION"
+          else
+            chmod +x .github/scripts/version_manager.sh
+            VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+            echo "📄 version.yml에서 버전 추출: $VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version $VERSION"
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          echo "🚀 Publishing version $VERSION to GitHub Packages"
+          ./gradlew publishMavenPublicationToGitHubPackagesRepository -Pversion=$VERSION

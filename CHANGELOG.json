@@ -1,11 +1,48 @@
 {
   "metadata": {
-    "lastUpdated": "2026-05-19T00:12:09Z",
-    "currentVersion": "3.0.49",
+    "lastUpdated": "2026-05-22T08:33:43Z",
+    "currentVersion": "3.0.55",
     "projectType": "basic",
-    "totalReleases": 103
+    "totalReleases": 104
   },
   "releases": [
+    {
+      "version": "3.0.55",
+      "project_type": "basic",
+      "date": "2026-05-22",
+      "pr_number": 303,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * Spring Boot 무중단 배포 옵션 추가 (Traefik / Nginx 방식 선택 가능)\n\n* **개선**\n  * 배포 자동화 도구 안정성 향상\n\n* **문서**\n  * 무중단 배포 가이드 문서 추가\n  * Java 라이브러리 GitHub Packages 배포 설계 문서 추가\n  * 멀티 프로젝트 타입 지원 작업 문서 추가\n  * 스킬 명칭 정리 산출물 정리\n\n* **기타**\n  * Windows 환경 임시 파일 무시 처리",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "Spring Boot 무중단 배포 옵션 추가 (Traefik / Nginx 방식 선택 가능)"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "배포 자동화 도구 안정성 향상"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "무중단 배포 가이드 문서 추가",
+            "Java 라이브러리 GitHub Packages 배포 설계 문서 추가",
+            "멀티 프로젝트 타입 지원 작업 문서 추가",
+            "스킬 명칭 정리 산출물 정리"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "Windows 환경 임시 파일 무시 처리"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.49",
       "project_type": "basic",

@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2026-05-22T08:33:43Z",
-    "currentVersion": "3.0.55",
+    "lastUpdated": "2026-05-24T00:54:11Z",
+    "currentVersion": "3.0.57",
     "projectType": "basic",
-    "totalReleases": 104
+    "totalReleases": 105
   },
   "releases": [
+    {
+      "version": "3.0.57",
+      "project_type": "basic",
+      "date": "2026-05-24",
+      "pr_number": 304,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * worktree 생성 시 로컬 설정 파일(.env, 키 파일, 인증 파일 등) 자동 복사 기능 추가\n  * Spring 프로젝트를 GitHub Packages(Maven)에 자동 배포하는 CI/CD 워크플로우 추가",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "worktree 생성 시 로컬 설정 파일(.env, 키 파일, 인증 파일 등) 자동 복사 기능 추가",
+            "Spring 프로젝트를 GitHub Packages(Maven)에 자동 배포하는 CI/CD 워크플로우 추가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.55",
       "project_type": "basic",

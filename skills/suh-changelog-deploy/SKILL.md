@@ -154,19 +154,14 @@ if [ -n "$EXISTING_PR" ]; then
   PR_NUMBER=$EXISTING_PR
   echo "기존 deploy PR #$PR_NUMBER 재사용"
 else
-  PR_NUMBER=$($PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$TITLE" <<'EOF'
-import urllib.request, json, sys
-pat, owner, repo, title = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
-payload = {"title": title, "head": "main", "base": "deploy", "body": ""}
-data = json.dumps(payload).encode()
-req = urllib.request.Request(url, data=data, method="POST")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-res = urllib.request.urlopen(req)
-print(json.loads(res.read())["number"])
-EOF
-  )
+  # 인라인 Python 금지 — 재사용 스크립트 cli.py의 create-pr 호출.
+  # body는 빈값이므로 존재하지 않는 경로("")를 넘기면 cli.py가 빈 본문으로 처리한다.
+  # 출력 JSON({"number":..,"url":..})에서 number 추출. (stdin pipe 대신 환경변수로 파싱 — Windows 안전)
+  cd "$PROJECT_ROOT/scripts"
+  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+    create-pr "$OWNER" "$REPO" "$TITLE" "" "main" "deploy")
+  PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+  cd "$PROJECT_ROOT"
   echo "새 deploy PR #$PR_NUMBER 생성"
 fi
 
@@ -231,6 +226,8 @@ git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head 
 ### 6단계: PR 본문 업데이트
 
 워크플로우가 파싱하는 형식과 **100% 동일한 구조**로 작성. 카테고리명은 아래 고정값만 사용:
+
+> **표준 전환 보류 (이슈 #305)**: PR **본문 PATCH**는 `cli.py`에 아직 `update-pr` 서브커맨드가 없어 인라인 Python을 유지한다. 단 인자는 `sys.argv`(환경변수에 준함)로 전달하고 `/tmp`·`curl|python`을 쓰지 않아 크로스플랫폼 안전하다. `cli.py`에 `update-pr`이 추가되면 호출로 전환한다.
 
 ```bash
 $PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$PR_NUMBER" <<'EOF'
@@ -328,22 +325,15 @@ curl -s -X PATCH \
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-PR_NUMBER=$($PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$TITLE" <<'EOF'
-import urllib.request, json, sys
-pat, owner, repo, title = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
-payload = {"title": title, "head": "main", "base": "deploy", "body": ""}
-data = json.dumps(payload).encode()
-req = urllib.request.Request(url, data=data, method="POST")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-res = urllib.request.urlopen(req)
-print(json.loads(res.read())["number"])
-EOF
-)
+# 인라인 Python 금지 — 재사용 스크립트 cli.py의 create-pr 호출 (deploy 모드 4단계와 동일 패턴).
+cd "$PROJECT_ROOT/scripts"
+CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  create-pr "$OWNER" "$REPO" "$TITLE" "" "main" "deploy")
+PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+cd "$PROJECT_ROOT"
 
 if [ -z "$PR_NUMBER" ]; then
-  echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요."
+  echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요. ($CREATE_OUT)"
   exit 1
 fi
 echo "✅ PR #$PR_NUMBER 생성 완료, 릴리스 노트 작성 시작..."
@@ -366,6 +356,8 @@ git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head 
 릴리스 노트 초안이 완성되면 **즉시 fix 5단계로 넘어간다.**
 
 ### fix 5단계: PR 본문 업데이트
+
+> **표준 전환 보류 (이슈 #305)**: PR 본문 PATCH는 `cli.py`에 `update-pr` 서브커맨드가 없어 인라인 Python 유지. 인자는 `sys.argv` 전달, `/tmp`·`curl|python` 미사용으로 크로스플랫폼 안전. `update-pr` 추가 시 전환.
 
 ```bash
 $PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$PR_NUMBER" <<'EOF'

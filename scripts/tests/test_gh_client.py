@@ -22,8 +22,10 @@ def _mock_response(data, status: int = 200):
 
 
 def test_create_issue_success():
-    resp = _mock_response({"number": 42, "html_url": "https://github.com/o/r/issues/42", "title": "테스트"})
-    with patch("urllib.request.urlopen", return_value=resp):
+    # create_issue는 list_labels(GET) → 이슈 생성(POST) 순으로 _request를 2번 호출한다.
+    labels_resp = _mock_response([{"name": "작업전"}])
+    issue_resp = _mock_response({"number": 42, "html_url": "https://github.com/o/r/issues/42", "title": "테스트"})
+    with patch("suh_template.gh_client._opener.open", side_effect=[labels_resp, issue_resp]):
         result = create_issue("owner", "repo", "테스트", "본문", ["작업전"], "ghp_fake")
     assert result["number"] == 42
     assert result["url"] == "https://github.com/o/r/issues/42"
@@ -31,7 +33,7 @@ def test_create_issue_success():
 
 def test_create_issue_auth_error():
     import urllib.error
-    with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
+    with patch("suh_template.gh_client._opener.open", side_effect=urllib.error.HTTPError(
         url=None, code=401, msg="Unauthorized", hdrs=None, fp=BytesIO(b'{"message":"Bad credentials"}')
     )):
         try:
@@ -43,7 +45,7 @@ def test_create_issue_auth_error():
 
 def test_add_comment_success():
     resp = _mock_response({"id": 99, "html_url": "https://github.com/o/r/issues/1#issuecomment-99"})
-    with patch("urllib.request.urlopen", return_value=resp):
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
         result = add_comment("owner", "repo", 1, "댓글 내용", "ghp_fake")
     assert result["id"] == 99
     assert "url" in result
@@ -51,7 +53,7 @@ def test_add_comment_success():
 
 def test_add_comment_not_found():
     import urllib.error
-    with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
+    with patch("suh_template.gh_client._opener.open", side_effect=urllib.error.HTTPError(
         url=None, code=404, msg="Not Found", hdrs=None, fp=BytesIO(b'{"message":"Not Found"}')
     )):
         try:
@@ -63,7 +65,7 @@ def test_add_comment_not_found():
 
 def test_get_issue_success():
     resp = _mock_response({"number": 5, "title": "제목", "html_url": "https://...", "state": "open", "body": "본문"})
-    with patch("urllib.request.urlopen", return_value=resp):
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
         result = get_issue("owner", "repo", 5, "ghp_fake")
     assert result["number"] == 5
     assert result["state"] == "open"
@@ -71,7 +73,7 @@ def test_get_issue_success():
 
 def test_get_issue_not_found():
     import urllib.error
-    with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
+    with patch("suh_template.gh_client._opener.open", side_effect=urllib.error.HTTPError(
         url=None, code=404, msg="Not Found", hdrs=None, fp=BytesIO(b'{"message":"Not Found"}')
     )):
         try:
@@ -83,7 +85,7 @@ def test_get_issue_not_found():
 
 def test_list_issues_success():
     resp = _mock_response([{"number": 1, "title": "이슈1", "html_url": "https://...", "state": "open"}])
-    with patch("urllib.request.urlopen", return_value=resp):
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
         result = list_issues("owner", "repo", "ghp_fake")
     assert len(result) == 1
     assert result[0]["number"] == 1
@@ -91,7 +93,7 @@ def test_list_issues_success():
 
 def test_create_pull_request_success():
     resp = _mock_response({"number": 10, "html_url": "https://github.com/o/r/pull/10"})
-    with patch("urllib.request.urlopen", return_value=resp):
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
         result = create_pull_request("owner", "repo", "PR 제목", "본문", "feature-branch", "main", "ghp_fake")
     assert result["number"] == 10
     assert result["url"] == "https://github.com/o/r/pull/10"
@@ -99,7 +101,7 @@ def test_create_pull_request_success():
 
 def test_create_pull_request_already_exists():
     import urllib.error
-    with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
+    with patch("suh_template.gh_client._opener.open", side_effect=urllib.error.HTTPError(
         url=None, code=422, msg="Unprocessable Entity",
         hdrs=None, fp=BytesIO(b'{"message":"A pull request already exists"}')
     )):

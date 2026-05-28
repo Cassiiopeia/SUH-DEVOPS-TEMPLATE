@@ -38,6 +38,7 @@ from suh_template import title as _title
 from suh_template import paths as _paths
 from suh_template import gh_branch as _branch
 from suh_template import gh_client as _github
+from suh_template import config as _config
 
 
 def _err(level: str, command: str, message: str, code: str) -> None:
@@ -356,6 +357,102 @@ def cmd_list_prs(args: list) -> int:
         return 1
 
 
+def _emit(payload: dict) -> int:
+    """JSON을 stdout에 출력하고 0을 반환한다."""
+    import json as _json
+    print(_json.dumps(payload, ensure_ascii=False))
+    return 0
+
+
+def cmd_actions(args: list) -> int:
+    """actions <show-run|joblog|list-failed|resolve-pr|resolve-branch> <owner> <repo> [인자]
+
+    출력은 언제나 JSON. 성공 시 {"ok": true, ...데이터..., "next": "다음 서브커맨드 힌트"}.
+    입력 해석(URL→ID, PR→run 추적)은 호출자(agent) 책임. 여기서는 명확한 인자만 받는다.
+    """
+    if len(args) < 3:
+        return _emit({
+            "ok": False,
+            "error": "사용법: actions <sub> <owner> <repo> [인자]",
+            "subcommands": ["show-run RUN_ID", "joblog JOB_ID", "list-failed [--limit N]",
+                            "resolve-pr PR_NUM", "resolve-branch BRANCH [--limit N]"],
+        })
+
+    sub, owner, repo = args[0], args[1], args[2]
+    rest = args[3:]
+
+    pat = _get_pat()
+    if not pat:
+        return _emit({"ok": False, "error": "GITHUB_PAT 미설정", "code": "missing_pat"})
+
+    def _opt_int(key: str, default: int) -> int:
+        if key in rest:
+            idx = rest.index(key)
+            if idx + 1 < len(rest):
+                try:
+                    return int(rest[idx + 1])
+                except ValueError:
+                    pass
+        return default
+
+    try:
+        if sub == "show-run":
+            if not rest:
+                return _emit({"ok": False, "error": "RUN_ID 필요"})
+            run_id = int(rest[0])
+            data = _github.get_run(owner, repo, run_id, pat)
+            data["ok"] = True
+            if data.get("failed_job_ids"):
+                data["next"] = f"actions joblog {owner} {repo} {data['failed_job_ids'][0]}"
+            else:
+                data["next"] = None
+            return _emit(data)
+
+        if sub == "joblog":
+            if not rest:
+                return _emit({"ok": False, "error": "JOB_ID 필요"})
+            job_id = int(rest[0])
+            grep = rest[rest.index("--grep") + 1] if "--grep" in rest and rest.index("--grep") + 1 < len(rest) else "error"
+            tail = _opt_int("--tail", 30)
+            data = _github.get_job_log(owner, repo, job_id, pat, grep=grep, tail=tail)
+            data["ok"] = True
+            data["next"] = None
+            return _emit(data)
+
+        if sub == "list-failed":
+            limit = _opt_int("--limit", 10)
+            runs = _github.list_failed_runs(owner, repo, pat, limit=limit)
+            nxt = f"actions show-run {owner} {repo} {runs[0]['run_id']}" if runs else None
+            return _emit({"ok": True, "count": len(runs), "runs": runs, "next": nxt})
+
+        if sub == "resolve-pr":
+            if not rest:
+                return _emit({"ok": False, "error": "PR_NUM 필요"})
+            pr_number = int(rest[0])
+            data = _github.resolve_pr_runs(owner, repo, pr_number, pat)
+            data["ok"] = True
+            failed = [r for r in data["runs"] if r["conclusion"] == "failure"]
+            data["next"] = f"actions show-run {owner} {repo} {failed[0]['run_id']}" if failed else None
+            return _emit(data)
+
+        if sub == "resolve-branch":
+            if not rest:
+                return _emit({"ok": False, "error": "BRANCH 필요"})
+            branch = rest[0]
+            limit = _opt_int("--limit", 10)
+            runs = _github.resolve_branch_runs(owner, repo, branch, pat, limit=limit)
+            failed = [r for r in runs if r["conclusion"] == "failure"]
+            nxt = f"actions show-run {owner} {repo} {failed[0]['run_id']}" if failed else None
+            return _emit({"ok": True, "branch": branch, "count": len(runs), "runs": runs, "next": nxt})
+
+        return _emit({"ok": False, "error": f"알 수 없는 actions 서브커맨드: {sub}"})
+
+    except _github.GitHubAPIError as e:
+        return _emit({"ok": False, "error": str(e), "code": f"github_api_{e.status_code}"})
+    except ValueError as e:
+        return _emit({"ok": False, "error": f"인자 형식 오류: {e}"})
+
+
 # 커맨드 → 핸들러 함수 매핑
 _COMMANDS = {
     "get-output-path": cmd_get_output_path,
@@ -370,6 +467,7 @@ _COMMANDS = {
     "update-issue": cmd_update_issue,
     "create-pr": cmd_create_pr,
     "list-prs": cmd_list_prs,
+    "actions": cmd_actions,
 }
 
 

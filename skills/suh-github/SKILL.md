@@ -240,6 +240,80 @@ EOF
 
 ---
 
+## GitHub Actions 로그 조회
+
+GitHub Actions의 run/job 상태와 **실패 로그**를 조회한다. 빌드 실패 원인 진단에 사용한다.
+
+**트리거 예시**: "빌드 실패 확인해줘", "Actions 로그 봐줘", "이 PR 왜 빌드 실패?", run/job/PR URL 붙여넣기, "main 빌드 됐어?"
+
+### 핵심 원리
+
+- 모든 로직은 재사용 스크립트 `scripts/suh_template/cli.py`의 `actions` 서브커맨드에 있다. **인라인 Python 작성 금지.**
+- **입력 해석은 agent(너)의 책임**이다. 사용자가 주는 URL·PR번호·브랜치명·빈 입력을 보고 아래 라우팅 표에 따라 적절한 서브커맨드와 인자를 결정한다.
+- cli.py는 **명확한 인자만** 받는다 (URL을 파싱하지 않는다). 출력은 **언제나 JSON**이며 `ok`·데이터·`next`(이어서 호출할 다음 서브커맨드 힌트) 필드를 담는다.
+- `next` 필드가 비어있지 않으면 그 값을 그대로 다음 명령으로 실행해 체인을 잇는다 (예: `show-run`의 `next` → `joblog` 호출).
+
+### agent 입력 라우팅 (필수)
+
+사용자 입력을 다음 규칙으로 서브커맨드에 매핑한다. owner/repo는 시작 절차에서 결정한 값을 쓴다.
+
+| 사용자 입력 | 추출 | 서브커맨드 |
+|------------|------|-----------|
+| `.../actions/runs/{run_id}` | run_id | `actions show-run {owner} {repo} {run_id}` |
+| `.../actions/runs/{run_id}/job/{job_id}` | job_id | `actions joblog {owner} {repo} {job_id}` |
+| `.../actions/runs/{run_id}/attempts/{n}` | run_id | `actions show-run {owner} {repo} {run_id}` |
+| 순수 숫자 (예: `26554093214`) | 그 숫자=run_id | `actions show-run {owner} {repo} {숫자}` |
+| `.../pull/{pr}` 또는 "PR 883" | pr | `actions resolve-pr {owner} {repo} {pr}` |
+| 브랜치명 또는 "main 빌드" | branch | `actions resolve-branch {owner} {repo} {branch}` |
+| `.../actions` (전체 페이지) / 빈 입력 / "빌드 실패했어" | 없음 | `actions list-failed {owner} {repo}` |
+| `.../actions/workflows/{file}.yaml` | 없음 | `actions list-failed {owner} {repo}` (결과에서 해당 워크플로명 필터) |
+
+**전형적 진단 흐름**:
+1. 입력에 run_id 없음(PR/브랜치/빈입력) → `resolve-pr`·`resolve-branch`·`list-failed`로 실패 run 찾기
+2. 실패 run의 `next`(=`show-run ...`) 실행 → 실패 job_id + 실패 step 확인
+3. `show-run`의 `next`(=`joblog ...`) 실행 → 실제 에러 로그 라인 확인
+4. 로그 라인을 읽고 사용자에게 원인 진단 제시
+
+### 서브커맨드 호출법
+
+PAT는 `GITHUB_PAT` 환경변수로 전달한다. `PYTHONIOENCODING=utf-8` 필수(한글 출력 보호).
+
+```bash
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+cd "$PROJECT_ROOT/scripts"
+export GITHUB_PAT="{pat}"
+
+# run 메타 + job 목록 + 실패 step
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli actions show-run {owner} {repo} {run_id}
+
+# 실패 job 로그 (error 라인 필터, Azure redirect 자동 처리)
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli actions joblog {owner} {repo} {job_id}
+#   --grep ".dart"  : 특정 키워드 라인만 (기본 "error")
+#   --tail 30       : 매칭 라인 끝 N개 (기본 30)
+
+# 최근 실패 run 목록
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli actions list-failed {owner} {repo} --limit 10
+
+# PR → 연결된 run 추적
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli actions resolve-pr {owner} {repo} {pr_number}
+
+# 브랜치 → 최근 run 목록
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli actions resolve-branch {owner} {repo} "{branch}" --limit 10
+```
+
+> **Windows 주의**: `cd "$PROJECT_ROOT/scripts"` 후 `-m suh_template.cli`로 실행한다. `/tmp`·`curl|python` stdin pipe·heredoc 보간은 사용하지 않는다 (Windows Git Bash에서 깨짐). 인자는 모두 명령행/환경변수로 전달한다.
+
+### 출력 예시
+
+```json
+{"run_id": 26554093214, "name": "프로젝트 빌드 테스트", "conclusion": "failure",
+ "jobs": [{"job_id": 78222159478, "name": "프로젝트 빌드 테스트", "conclusion": "failure", "failed_steps": ["코드 분석 실행"]}],
+ "failed_job_ids": [78222159478],
+ "ok": true, "next": "actions joblog TEAM-ROMROM RomRom-FE 78222159478"}
+```
+
+---
+
 ## explore 모드
 
 GitHub 유저 또는 Organization의 레포 목록과 개별 레포 상세 정보를 조회한다.

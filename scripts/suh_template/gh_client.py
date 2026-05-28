@@ -178,6 +178,47 @@ def list_pulls(
     ]
 
 
+def search_issues(
+    owner: str, repo: str, keyword: str, pat: str, per_page: int = 5,
+) -> list[dict]:
+    """레포 내 제목에 keyword가 포함된 이슈를 검색한다 (중복 이슈 판단용)."""
+    q = urllib.parse.quote(f"is:issue repo:{owner}/{repo} in:title {keyword}", safe="")
+    data = _request(
+        "GET", f"{_API_BASE}/search/issues?q={q}&per_page={per_page}", None, pat
+    )
+    items = data.get("items", []) if isinstance(data, dict) else []
+    return [
+        {
+            "number": i["number"],
+            "title": i["title"],
+            "url": i["html_url"],
+            "state": i["state"],
+        }
+        for i in items
+    ]
+
+
+def update_pull_request(
+    owner: str, repo: str, pr_number: int, pat: str,
+    title: str | None = None, body: str | None = None,
+    state: str | None = None, base: str | None = None,
+) -> dict:
+    """PR을 수정하고 {number, url}을 반환한다. PR 본문(릴리스 노트) 업데이트 등에 사용."""
+    payload: dict = {}
+    if title is not None:
+        payload["title"] = title
+    if body is not None:
+        payload["body"] = body
+    if state is not None:
+        payload["state"] = state
+    if base is not None:
+        payload["base"] = base
+    data = _request(
+        "PATCH", f"{_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}", payload, pat
+    )
+    return {"number": data["number"], "url": data["html_url"]}
+
+
 def create_pull_request(
     owner: str, repo: str, title: str, body: str,
     head: str, base: str, pat: str,

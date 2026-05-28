@@ -123,37 +123,18 @@ $ARGUMENTS
 
 `references/common-rules.md` §"PYTHON 변수 설정 (크로스 플랫폼 필수)"의 PYTHON 검출 패턴을 사용한다 (Windows의 `python3` Store stub 회피).
 
-agent는 코드블럭의 `{owner}`, `{repo}`, `{github_pat}` 자리를 실행 전 실제 값으로 치환한다. KEYWORD는 따옴표·줄바꿈 등 특수문자가 들어갈 수 있으므로 환경변수로 전달하여 shell injection을 방지한다:
-
-> **표준 전환 보류 (이슈 #305)**: 이슈 검색은 `cli.py`에 아직 `search-issues` 서브커맨드가 없어 인라인 Python을 유지한다. 단 이 블록은 이미 표준 핵심을 준수한다 — KEYWORD를 **환경변수로 전달**(injection 방지), 결과를 **stdout JSON**으로 출력(`/tmp`·디스크 미경유). `cli.py`에 `search-issues`가 추가되면 호출로 전환한다.
+**인라인 Python 작성 금지.** 재사용 스크립트 `scripts/suh_template/cli.py`의 `search-issues`를 호출한다. keyword는 마지막 인자로 그대로 넘기며(공백 포함 가능, 따옴표로 감쌈), cli.py가 내부에서 URL 인코딩한다. PAT는 `GITHUB_PAT` 환경변수로 넘긴다.
 
 ```bash
-PYTHON=$(
-  for _py in python3 python; do
-    _path=$(command -v "$_py" 2>/dev/null) || continue
-    "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break
-  done
-)
-if [ -z "$PYTHON" ]; then echo "❌ Python을 찾을 수 없습니다."; exit 1; fi
-
-KEYWORD="{핵심 키워드 2~3개 공백 구분}" "$PYTHON" - <<'EOF'
-import os, urllib.request, urllib.parse, urllib.error, json
-keyword = os.environ["KEYWORD"]
-encoded = urllib.parse.quote(keyword, safe='')
-url = f"https://api.github.com/search/issues?q=is:issue+repo:{owner}/{repo}+in:title+{encoded}&per_page=5"
-req = urllib.request.Request(url)
-req.add_header("Authorization", "token {github_pat}")
-try:
-    res = urllib.request.urlopen(req)
-    print(json.dumps(json.loads(res.read()), ensure_ascii=False))
-except urllib.error.HTTPError as e:
-    print(json.dumps({"error": e.code, "msg": e.reason}))
-except Exception as e:
-    print(json.dumps({"error": "exception", "msg": str(e)}))
-EOF
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="{github_pat}" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  search-issues {owner} {repo} "{핵심 키워드 2~3개 공백 구분}"
 ```
 
-검색 결과는 stdout에 JSON 형태로 출력된다. agent가 `total_count`와 `items` 배열을 직접 파싱하여 판단한다 (디스크 파일 경유 X — Windows/Mac 공통 동작 보장). stdout 파싱 실패 또는 `error` 키 존재 시 → 중복 검색을 건너뛰고 경고 후 다음 단계로 진행한다.
+출력은 JSON: `{"count": N, "items": [{"number","title","url","state"}, ...]}`. agent가 `items`를 직접 파싱해 판단한다. `[ERROR]`가 stderr에 찍히면 중복 검색을 건너뛰고 경고 후 다음 단계로 진행한다.
+
+> **Windows 주의**: `cd "$PROJECT_ROOT/scripts"` 후 `-m suh_template.cli`로 실행한다. heredoc·`/tmp`·`curl|python` 미사용.
 
 **`closed` 이슈 처리**: `state: "closed"`인 이슈는 이미 해결된 것으로 간주하여 중복으로 처리하지 않는다. open 이슈만 동일 판단 대상으로 삼는다.
 
@@ -233,27 +214,15 @@ EOF
 
 1차 검색 이후 사용자가 파일을 수정하거나 시간이 지나는 동안 동일한 이슈가 생성됐을 수 있다. API 호출 직전에 동일 키워드로 한 번 더 검색한다.
 
-2-1단계와 동일 패턴(PYTHON 검출 + urllib heredoc, KEYWORD 환경변수 전달, HTTPError try/except)을 사용한다. agent는 `{owner}`, `{repo}`, `{github_pat}`를 실행 전 실제 값으로 치환한다.
+2-1단계와 동일하게 `cli.py`의 `search-issues`를 호출한다 (인라인 Python 금지). agent는 `{owner}`, `{repo}`, `{github_pat}`를 실행 전 실제 값으로 치환한다.
 
 ```bash
-KEYWORD="{핵심 키워드 2~3개 공백 구분}" "$PYTHON" - <<'EOF'
-import os, urllib.request, urllib.parse, urllib.error, json
-keyword = os.environ["KEYWORD"]
-encoded = urllib.parse.quote(keyword, safe='')
-url = f"https://api.github.com/search/issues?q=is:issue+repo:{owner}/{repo}+in:title+{encoded}&per_page=5"
-req = urllib.request.Request(url)
-req.add_header("Authorization", "token {github_pat}")
-try:
-    res = urllib.request.urlopen(req)
-    print(json.dumps(json.loads(res.read()), ensure_ascii=False))
-except urllib.error.HTTPError as e:
-    print(json.dumps({"error": e.code, "msg": e.reason}))
-except Exception as e:
-    print(json.dumps({"error": "exception", "msg": str(e)}))
-EOF
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="{github_pat}" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  search-issues {owner} {repo} "{핵심 키워드 2~3개 공백 구분}"
 ```
 
-stdout JSON 결과를 agent가 직접 파싱하여 결과를 판단한다 (`$PYTHON`은 2-1단계에서 이미 검출된 변수를 재사용하지만, 새 세션이라면 §2-1단계의 PYTHON 검출 블록 재실행). stdout 파싱 실패 또는 `error` 키 존재 시 → 최종 중복 확인을 건너뛰고 경고 후 다음 단계로 진행한다.
+출력 JSON(`{"count","items"}`)을 agent가 직접 파싱한다. `[ERROR]`가 stderr에 찍히면 최종 중복 확인을 건너뛰고 경고 후 다음 단계로 진행한다.
 
 **`closed` 이슈는 중복으로 처리하지 않는다.** open 이슈만 대상으로 한다.
 

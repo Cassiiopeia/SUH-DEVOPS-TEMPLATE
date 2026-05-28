@@ -357,6 +357,59 @@ def cmd_list_prs(args: list) -> int:
         return 1
 
 
+def cmd_search_issues(args: list) -> int:
+    """search-issues <owner> <repo> <keyword...>"""
+    if len(args) < 3:
+        _err("ERROR", "search-issues", "owner, repo, keyword 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "search-issues", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo = args[0], args[1]
+    keyword = " ".join(args[2:])
+    try:
+        result = _github.search_issues(owner, repo, keyword, pat)
+        import json as _json
+        print(_json.dumps({"count": len(result), "items": result}, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "search-issues", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
+def cmd_update_pr(args: list) -> int:
+    """update-pr <owner> <repo> <pr_number> <body_file> [--title <제목>] [--state open|closed]"""
+    if len(args) < 4:
+        _err("ERROR", "update-pr", "owner, repo, pr_number, body_file 인수가 필요합니다.", "missing_argument")
+        return 1
+    pat = _get_pat()
+    if not pat:
+        _err("ERROR", "update-pr", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
+        return 1
+    owner, repo, pr_number, body_file = args[0], args[1], int(args[2]), args[3]
+    rest = args[4:]
+    body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else None
+
+    def _opt(key: str) -> Optional[str]:
+        if key in rest:
+            idx = rest.index(key)
+            return rest[idx + 1] if idx + 1 < len(rest) else None
+        return None
+
+    title = _opt("--title")
+    state = _opt("--state")
+    try:
+        result = _github.update_pull_request(owner, repo, pr_number, pat,
+                                             title=title, body=body, state=state)
+        import json as _json
+        print(_json.dumps(result, ensure_ascii=False))
+        return 0
+    except _github.GitHubAPIError as e:
+        _err("ERROR", "update-pr", str(e), f"github_api_{e.status_code}")
+        return 1
+
+
 def _emit(payload: dict) -> int:
     """JSON을 stdout에 출력하고 0을 반환한다."""
     import json as _json
@@ -467,6 +520,8 @@ _COMMANDS = {
     "update-issue": cmd_update_issue,
     "create-pr": cmd_create_pr,
     "list-prs": cmd_list_prs,
+    "search-issues": cmd_search_issues,
+    "update-pr": cmd_update_pr,
     "actions": cmd_actions,
 }
 

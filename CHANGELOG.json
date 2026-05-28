@@ -1,11 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-05-24T00:54:11Z",
-    "currentVersion": "3.0.57",
+    "lastUpdated": "2026-05-28T05:26:13Z",
+    "currentVersion": "3.0.59",
     "projectType": "basic",
-    "totalReleases": 105
+    "totalReleases": 106
   },
   "releases": [
+    {
+      "version": "3.0.59",
+      "project_type": "basic",
+      "date": "2026-05-28",
+      "pr_number": 306,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * GitHub Actions 실행 로그를 바로 조회할 수 있습니다\n\n* **개선**\n  * 스킬의 GitHub 연동 동작이 더 안정적으로 바뀌었습니다\n  * Windows와 macOS 양쪽에서 더 안정적으로 실행됩니다\n\n* **문서**\n  * 스킬 이름을 정리해 호출 오류가 발생하던 문제를 해결했습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "GitHub Actions 실행 로그를 바로 조회할 수 있습니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "스킬의 GitHub 연동 동작이 더 안정적으로 바뀌었습니다",
+            "Windows와 macOS 양쪽에서 더 안정적으로 실행됩니다"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "스킬 이름을 정리해 호출 오류가 발생하던 문제를 해결했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.57",
       "project_type": "basic",

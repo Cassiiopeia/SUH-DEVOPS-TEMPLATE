@@ -250,7 +250,7 @@ claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 ```
 
-설치 후 `/cassiiopeia:analyze`, `/cassiiopeia:review` 등으로 사용합니다.
+설치 후 `/cassiiopeia:suh-analyze`, `/cassiiopeia:suh-review` 등으로 사용합니다.
 
 ### Cursor IDE Skills 설치
 

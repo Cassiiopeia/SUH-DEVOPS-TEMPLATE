@@ -2507,7 +2507,7 @@ offer_ide_tools_install() {
             # 미설치 → scope 선택 후 신규 설치
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
                 print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-                print_to_user "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
+                print_to_user "  설치 시 /cassiiopeia:suh-analyze, /cassiiopeia:suh-review 등 19+ 스킬 사용 가능"
                 print_to_user ""
                 print_to_user "  Y/y - 예, 설치하기 (추천)"
                 print_to_user "  N/n - 아니오, 건너뛰기"

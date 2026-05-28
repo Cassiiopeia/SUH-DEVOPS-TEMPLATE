@@ -2412,7 +2412,7 @@ function Offer-IdeToolsInstall {
         } else {
             if (-not $Force) {
                 Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-                Write-Host "  설치 시 /cassiiopeia:analyze, /cassiiopeia:review 등 19+ 스킬 사용 가능"
+                Write-Host "  설치 시 /cassiiopeia:suh-analyze, /cassiiopeia:suh-review 등 19+ 스킬 사용 가능"
                 Write-Host ""
                 Write-Host "  Y/y - 예, 설치하기 (추천)"
                 Write-Host "  N/n - 아니오, 건너뛰기"

@@ -106,7 +106,7 @@ git log origin/main..HEAD --oneline 2>/dev/null
 - `git status --short` 결과에 미커밋 변경사항이 있으면 **즉시 멈추고** 안내:
   ```
   커밋되지 않은 변경사항이 있습니다. 먼저 커밋 후 다시 실행해주세요.
-  /cassiiopeia:commit 으로 커밋할 수 있습니다.
+  /cassiiopeia:suh-commit 으로 커밋할 수 있습니다.
   ```
 - `git log origin/deploy..HEAD` 결과가 비어 있으면 → `git log origin/main..HEAD` 결과도 확인
 - **두 결과 모두 비어 있을 때만** "deploy할 커밋이 없습니다" 안내 후 종료
@@ -154,19 +154,14 @@ if [ -n "$EXISTING_PR" ]; then
   PR_NUMBER=$EXISTING_PR
   echo "기존 deploy PR #$PR_NUMBER 재사용"
 else
-  PR_NUMBER=$($PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$TITLE" <<'EOF'
-import urllib.request, json, sys
-pat, owner, repo, title = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
-payload = {"title": title, "head": "main", "base": "deploy", "body": ""}
-data = json.dumps(payload).encode()
-req = urllib.request.Request(url, data=data, method="POST")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-res = urllib.request.urlopen(req)
-print(json.loads(res.read())["number"])
-EOF
-  )
+  # 인라인 Python 금지 — 재사용 스크립트 cli.py의 create-pr 호출.
+  # body는 빈값이므로 존재하지 않는 경로("")를 넘기면 cli.py가 빈 본문으로 처리한다.
+  # 출력 JSON({"number":..,"url":..})에서 number 추출. (stdin pipe 대신 환경변수로 파싱 — Windows 안전)
+  cd "$PROJECT_ROOT/scripts"
+  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+    create-pr "$OWNER" "$REPO" "$TITLE" "" "main" "deploy")
+  PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+  cd "$PROJECT_ROOT"
   echo "새 deploy PR #$PR_NUMBER 생성"
 fi
 
@@ -232,12 +227,12 @@ git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head 
 
 워크플로우가 파싱하는 형식과 **100% 동일한 구조**로 작성. 카테고리명은 아래 고정값만 사용:
 
-```bash
-$PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$PR_NUMBER" <<'EOF'
-import urllib.request, json, sys
-pat, owner, repo, pr = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr}"
-body = """<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+**인라인 Python 작성 금지.** 릴리스 노트 본문을 임시 `.md` 파일에 저장한 뒤 `cli.py`의 `update-pr`을 `body_file`로 호출한다 (줄바꿈·이모지 안전 보존). 본문은 워크플로우가 파싱하는 아래 고정 구조를 100% 따른다.
+
+릴리스 노트 파일 작성 (Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장):
+
+```
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
 
 ## Summary by CodeRabbit
 
@@ -258,17 +253,20 @@ body = """<!-- This is an auto-generated comment: release notes by coderabbit.ai
 * **기타**
   * (항목)
 
-<!-- end of auto-generated comment: release notes by coderabbit.ai -->"""
-data = json.dumps({"body": body}).encode()
-req = urllib.request.Request(url, data=data, method="PATCH")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-urllib.request.urlopen(req)
-print("PR 본문 업데이트 완료")
-EOF
+<!-- end of auto-generated comment: release notes by coderabbit.ai -->
 ```
 
-항목이 없는 카테고리는 생략한다.
+항목이 없는 카테고리는 생략한다. 그 후 update-pr 호출:
+
+```bash
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
+rm -f _release_notes.md
+cd "$PROJECT_ROOT"
+```
+
+출력 JSON(`{"number","url"}`)으로 업데이트 성공을 확인한다.
 
 ### 7단계: 결과 안내
 
@@ -328,22 +326,15 @@ curl -s -X PATCH \
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-PR_NUMBER=$($PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$TITLE" <<'EOF'
-import urllib.request, json, sys
-pat, owner, repo, title = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
-payload = {"title": title, "head": "main", "base": "deploy", "body": ""}
-data = json.dumps(payload).encode()
-req = urllib.request.Request(url, data=data, method="POST")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-res = urllib.request.urlopen(req)
-print(json.loads(res.read())["number"])
-EOF
-)
+# 인라인 Python 금지 — 재사용 스크립트 cli.py의 create-pr 호출 (deploy 모드 4단계와 동일 패턴).
+cd "$PROJECT_ROOT/scripts"
+CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  create-pr "$OWNER" "$REPO" "$TITLE" "" "main" "deploy")
+PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+cd "$PROJECT_ROOT"
 
 if [ -z "$PR_NUMBER" ]; then
-  echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요."
+  echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요. ($CREATE_OUT)"
   exit 1
 fi
 echo "✅ PR #$PR_NUMBER 생성 완료, 릴리스 노트 작성 시작..."
@@ -367,43 +358,19 @@ git log origin/deploy..HEAD --pretty=format:"%s" | grep -v "\[skip ci\]" | head 
 
 ### fix 5단계: PR 본문 업데이트
 
+**인라인 Python 작성 금지.** deploy 6단계와 동일하게 릴리스 노트를 임시 `.md`에 저장 후 `cli.py`의 `update-pr`을 `body_file`로 호출한다. 본문 구조는 deploy 6단계와 100% 동일(워크플로우 파싱 형식).
+
+릴리스 노트 파일 작성 (Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`) — 구조는 deploy 6단계 참조. 그 후:
+
 ```bash
-$PYTHON - "$GITHUB_PAT" "$OWNER" "$REPO" "$PR_NUMBER" <<'EOF'
-import urllib.request, json, sys
-pat, owner, repo, pr = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr}"
-body = """<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
-
-## Summary by CodeRabbit
-
-## 릴리스 노트
-
-* **새 기능**
-  * (항목)
-
-* **버그 수정**
-  * (항목)
-
-* **개선**
-  * (항목)
-
-* **문서**
-  * (항목)
-
-* **기타**
-  * (항목)
-
-<!-- end of auto-generated comment: release notes by coderabbit.ai -->"""
-data = json.dumps({"body": body}).encode()
-req = urllib.request.Request(url, data=data, method="PATCH")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-urllib.request.urlopen(req)
-print("PR 본문 업데이트 완료")
-EOF
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
+rm -f _release_notes.md
+cd "$PROJECT_ROOT"
 ```
 
-항목이 없는 카테고리는 생략한다.
+출력 JSON(`{"number","url"}`)으로 업데이트 성공을 확인한다. 항목이 없는 카테고리는 생략한다.
 
 ### fix 6단계: 결과 안내
 

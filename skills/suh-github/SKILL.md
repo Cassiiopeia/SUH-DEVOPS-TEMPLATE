@@ -1,6 +1,6 @@
 ---
-name: github
-description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회/수정/댓글, PR 생성/조회/릴리스노트, 레포 탐색, GitHub Actions Secret 관리를 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 바꿔줘, '/github', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘, secret 업데이트해줘, Actions secret 등록해줘, 환경변수 secret 올려줘, BACKEND_ENV_FILE 업데이트 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
+name: suh-github
+description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회/수정/댓글, PR 생성/조회/릴리스노트, 레포 탐색, GitHub Actions Secret 관리를 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 바꿔줘, '/suh-github', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘, secret 업데이트해줘, Actions secret 등록해줘, 환경변수 secret 올려줘, BACKEND_ENV_FILE 업데이트 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
 ---
 
 # GitHub Mode

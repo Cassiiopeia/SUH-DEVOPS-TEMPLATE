@@ -528,6 +528,119 @@ def cmd_actions(args: list) -> int:
         return _emit({"ok": False, "error": f"인자 형식 오류: {e}"})
 
 
+def cmd_deploy_status(args: list) -> int:
+    """deploy-status <owner> <repo> [--pr N] [--base deploy]
+
+    deploy PR의 머지/CodeRabbit 본문/워크플로우/브랜치 상태를 한 번에 조회하고
+    verdict로 판정해 종합 JSON을 반환한다. 출력은 언제나 JSON.
+    """
+    if len(args) < 2:
+        return _emit({"ok": False, "error": "사용법: deploy-status <owner> <repo> [--pr N] [--base deploy]"})
+
+    owner, repo = args[0], args[1]
+    rest = args[2:]
+
+    base = "deploy"
+    if "--base" in rest:
+        i = rest.index("--base")
+        if i + 1 < len(rest):
+            base = rest[i + 1]
+
+    pr_number = None
+    if "--pr" in rest:
+        i = rest.index("--pr")
+        if i + 1 < len(rest):
+            try:
+                pr_number = int(rest[i + 1])
+            except ValueError:
+                return _emit({"ok": False, "error": "--pr 값이 정수가 아님"})
+
+    pat = _get_pat(owner, repo)
+    if not pat:
+        return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
+
+    try:
+        # 1) PR 상세 — --pr 있으면 직접, 없으면 base로 open PR 탐색
+        if pr_number is not None:
+            pr = _github.get_pull_detail(owner, repo, pr_number, pat)
+        else:
+            pr = _github.find_open_pr_by_base(owner, repo, base, pat)
+
+        branch_head = _github.get_branch_head(owner, repo, base, pat)
+        deploy_branch = {"name": base, "head_sha": branch_head}
+
+        # PR이 없으면 no_pr — deploy 브랜치 head만 단서로 제공
+        if pr is None:
+            return _emit({
+                "ok": True,
+                "pr": None,
+                "workflow": None,
+                "deploy_branch": deploy_branch,
+                "verdict": "no_pr",
+                "summary": f"base={base}로 들어오는 open PR이 없습니다. 이미 머지됐거나 아직 생성 전입니다.",
+                "next": None,
+            })
+
+        # 2) 워크플로우 run — PR head_sha에 연결된 AUTO-CHANGELOG-CONTROL run 식별
+        workflow = None
+        try:
+            run_data = _github.resolve_pr_runs(owner, repo, pr["number"], pat)
+            for r in run_data.get("runs", []):
+                if "AUTO-CHANGELOG-CONTROL" in (r.get("name") or ""):
+                    workflow = {
+                        "name": r.get("name"),
+                        "status": r.get("status"),
+                        "conclusion": r.get("conclusion"),
+                        "run_url": r.get("url"),
+                    }
+                    break
+        except _github.GitHubAPIError:
+            workflow = None  # run 조회 실패는 치명적이지 않음 — workflow=null로 둔다
+
+        has_summary = "Summary by CodeRabbit" in pr.get("body", "")
+        pr_out = {
+            "number": pr["number"],
+            "state": pr["state"],
+            "merged": pr["merged"],
+            "mergeable_state": pr["mergeable_state"],
+            "has_coderabbit_summary": has_summary,
+            "head_sha": pr["head_sha"],
+            "url": pr["url"],
+        }
+
+        # 3) verdict 판정 (우선순위: merged → conflict → workflow_failed → missing_summary → waiting)
+        next_hint = f"deploy-status {owner} {repo} --pr {pr['number']}"
+        if pr["merged"]:
+            verdict = "merged"
+            summary = f"PR #{pr['number']} automerge 완료. 배포가 진행됩니다."
+            next_hint = None
+        elif pr["mergeable_state"] in ("dirty", "blocked", "behind"):
+            verdict = "conflict"
+            summary = f"PR #{pr['number']} mergeable_state={pr['mergeable_state']} — 충돌/차단 상태입니다. 수동 확인이 필요합니다."
+        elif workflow and workflow["conclusion"] == "failure":
+            verdict = "workflow_failed"
+            summary = "AUTO-CHANGELOG-CONTROL 워크플로우가 실패했습니다. run을 확인하고 fix 모드로 재시도하세요."
+        elif not has_summary:
+            verdict = "missing_coderabbit_summary"
+            summary = f"PR #{pr['number']} 본문에 'Summary by CodeRabbit'이 없습니다. 본문이 초기화된 것으로 보입니다 — fix 모드로 재작성하세요."
+        else:
+            verdict = "waiting_for_automerge"
+            summary = f"PR #{pr['number']} open·{pr['mergeable_state']}, CodeRabbit 본문 있음 — automerge 대기 중. 약 90초 후 재확인하세요."
+
+        return _emit({
+            "ok": True,
+            "pr": pr_out,
+            "workflow": workflow,
+            "deploy_branch": deploy_branch,
+            "verdict": verdict,
+            "summary": summary,
+            "next": next_hint,
+        })
+
+    except _github.GitHubAPIError as e:
+        return _emit({"ok": False, "error": str(e), "code": f"github_api_{e.status_code}"})
+
+
 # 커맨드 → 핸들러 함수 매핑
 _COMMANDS = {
     "get-output-path": cmd_get_output_path,
@@ -545,6 +658,7 @@ _COMMANDS = {
     "search-issues": cmd_search_issues,
     "update-pr": cmd_update_pr,
     "actions": cmd_actions,
+    "deploy-status": cmd_deploy_status,
 }
 
 

@@ -70,3 +70,67 @@ def test_add_comment_missing_pat(tmp_path):
     )
     assert code == 1
     assert "missing_pat" in stderr
+
+
+import json as _json
+from unittest.mock import patch
+
+
+def _call_deploy_status(pr_detail, runs, branch_head, args_rest, capsys):
+    """cmd_deploy_status를 gh_client mock으로 호출하고 출력 JSON을 파싱해 반환한다."""
+    from suh_template import suh_command
+    with patch.object(suh_command, "_get_pat", return_value="ghp_fake"), \
+         patch.object(suh_command._github, "find_open_pr_by_base", return_value=pr_detail), \
+         patch.object(suh_command._github, "get_pull_detail", return_value=pr_detail), \
+         patch.object(suh_command._github, "resolve_pr_runs", return_value={"runs": runs}), \
+         patch.object(suh_command._github, "get_branch_head", return_value=branch_head):
+        suh_command.cmd_deploy_status(["owner", "repo", *args_rest])
+    out = capsys.readouterr().out.strip()
+    return _json.loads(out)
+
+
+def test_deploy_status_merged(capsys):
+    pr = {"number": 740, "state": "closed", "merged": True, "mergeable_state": None,
+          "body": "## Summary by CodeRabbit", "head_sha": "abc", "url": "u"}
+    result = _call_deploy_status(pr, [], "abc", ["--pr", "740"], capsys)
+    assert result["ok"] is True
+    assert result["verdict"] == "merged"
+
+
+def test_deploy_status_waiting(capsys):
+    pr = {"number": 740, "state": "open", "merged": False, "mergeable_state": "clean",
+          "body": "## Summary by CodeRabbit", "head_sha": "abc", "url": "u"}
+    runs = [{"name": "AUTO-CHANGELOG-CONTROL", "status": "in_progress",
+             "conclusion": None, "url": "ru"}]
+    result = _call_deploy_status(pr, runs, "old", ["--pr", "740"], capsys)
+    assert result["verdict"] == "waiting_for_automerge"
+    assert result["workflow"]["name"] == "AUTO-CHANGELOG-CONTROL"
+
+
+def test_deploy_status_missing_summary(capsys):
+    pr = {"number": 740, "state": "open", "merged": False, "mergeable_state": "clean",
+          "body": "본문이 초기화됨", "head_sha": "abc", "url": "u"}
+    result = _call_deploy_status(pr, [], "old", ["--pr", "740"], capsys)
+    assert result["verdict"] == "missing_coderabbit_summary"
+
+
+def test_deploy_status_workflow_failed(capsys):
+    pr = {"number": 740, "state": "open", "merged": False, "mergeable_state": "clean",
+          "body": "## Summary by CodeRabbit", "head_sha": "abc", "url": "u"}
+    runs = [{"name": "AUTO-CHANGELOG-CONTROL", "status": "completed",
+             "conclusion": "failure", "url": "ru"}]
+    result = _call_deploy_status(pr, runs, "old", ["--pr", "740"], capsys)
+    assert result["verdict"] == "workflow_failed"
+
+
+def test_deploy_status_conflict(capsys):
+    pr = {"number": 740, "state": "open", "merged": False, "mergeable_state": "dirty",
+          "body": "## Summary by CodeRabbit", "head_sha": "abc", "url": "u"}
+    result = _call_deploy_status(pr, [], "old", ["--pr", "740"], capsys)
+    assert result["verdict"] == "conflict"
+
+
+def test_deploy_status_no_pr(capsys):
+    result = _call_deploy_status(None, [], "head", [], capsys)
+    assert result["verdict"] == "no_pr"
+    assert result["pr"] is None

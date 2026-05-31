@@ -283,7 +283,34 @@ fi
 
 출력 JSON(`{"number","url"}`)으로 성공을 확인한다.
 
-### 7단계: 결과 안내
+### 7단계: automerge 검증 (deploy-status)
+
+PR 생성 직후, **`/tmp`에 즉석 Python을 만들지 말고** 아래 재사용 커맨드 한 번으로 상태를 확인한다. owner/repo/PR번호만 주면 PR 머지·CodeRabbit 본문·워크플로우 run·deploy HEAD를 한 번에 조회해 `verdict`로 판정한 JSON을 반환한다.
+
+```bash
+# ⚠️ Bash stateless — 5개 변수를 [시작 전]에서 구한 실제 값으로 채운다. PR_NUMBER는 6단계에서 구한 값.
+GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."; PR_NUMBER="..."
+
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
+  deploy-status "$OWNER" "$REPO" --pr "$PR_NUMBER"
+cd "$PROJECT_ROOT"
+```
+
+반환 JSON의 `verdict`를 보고 라우팅한다:
+
+| verdict | 의미 | 행동 |
+|---------|------|------|
+| `merged` | automerge 완료 | 8단계 결과 안내, 종료 |
+| `waiting_for_automerge` | 정상 대기 중 | **sleep 금지.** `ScheduleWakeup`으로 ~90초 후 `next` 힌트(`deploy-status ... --pr N`)를 재호출해 재확인 |
+| `missing_coderabbit_summary` | 본문 초기화됨(레이스컨디션) | fix 모드로 재실행 |
+| `workflow_failed` | 워크플로우 실패 | `workflow.run_url` 안내 + fix 모드로 재실행 |
+| `conflict` | 머지 충돌/차단 | 사용자에게 충돌 상태 안내, 수동 확인 요청 |
+| `no_pr` | open deploy PR 없음 | `deploy_branch.head_sha`로 이미 머지됐는지 확인 후 안내 |
+
+> **재확인 시 sleep을 쓰지 않는다.** Claude Code Bash는 `sleep 120`을 차단한다. 대기가 필요하면 `ScheduleWakeup(delaySeconds=90)`으로 자기 페이스를 잡고, 깨어나면 `next` 힌트의 `deploy-status` 커맨드를 다시 호출한다.
+
+### 8단계: 결과 안내
 
 ```
 ✅ 완료!
@@ -303,20 +330,25 @@ CHANGELOG 업데이트 후 deploy 브랜치 automerge가 자동 진행됩니다.
 
 ## fix 모드 (automerge 실패 시 재트리거)
 
-### fix 1단계: 현재 deploy PR 상태 확인
+### fix 1단계: 현재 deploy PR 상태 확인 (deploy-status)
+
+curl 즉석 파싱 대신 deploy-status로 현재 상태를 종합 조회한다. `--pr` 없이 호출하면 open deploy PR을 자동 탐색한다.
 
 ```bash
-# ⚠️ Bash stateless — fix 모드도 [시작 전]에서 5개 변수를 먼저 구한 뒤 각 블록에 실제 값을 채운다.
+# ⚠️ Bash stateless — 5개 변수를 실제 값으로 채운다.
 GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."
 
-EXISTING_PR=$(curl -s \
-  -H "Authorization: token $GITHUB_PAT" \
-  "https://api.github.com/repos/$OWNER/$REPO/pulls?state=open&base=deploy" \
-  | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
+  deploy-status "$OWNER" "$REPO"
+cd "$PROJECT_ROOT"
 ```
 
-- open PR이 있으면 번호 확인
-- PR이 없으면 → fix 3단계(새 PR 생성)로 바로 이동
+반환 JSON의 `verdict`로 분기한다:
+
+- `no_pr` → open PR 없음. fix 3단계(새 PR 생성)로 이동
+- `merged` → 이미 머지됨. 재시도 불필요, 사용자에게 안내 후 종료
+- 그 외(`waiting_for_automerge`/`missing_coderabbit_summary`/`workflow_failed`/`conflict`) → `pr.number`를 EXISTING_PR로 기억하고 fix 2단계(기존 PR 닫기)로 진행
 
 ### fix 2단계: 기존 PR 닫기 (사용자 확인 후)
 
@@ -403,6 +435,7 @@ echo "✅ PR #$PR_NUMBER 생성 완료 (릴리스 노트 본문 포함)"
 
 ## 주의사항
 
+- **PR 생성/재시도 후 반드시 `deploy-status` 커맨드로 검증한다.** PR 상태·automerge·워크플로우 확인용 Python을 `/tmp`에 즉석 생성하지 않는다 — `deploy-status`가 그 모든 것을 JSON으로 반환한다.
 - **PR은 릴리스 노트를 본문에 담아 생성한다** (deploy 6단계 / fix 5단계). PR이 처음부터 `Summary by CodeRabbit`을 담고 있어 워크플로우가 본문 초기화를 건너뛴다. 빈 본문으로 먼저 만든 뒤 나중에 본문을 채우면 레이스컨디션으로 노트가 사라진다.
 - 그래도 워크플로우가 본문을 지워버린 정황이 보이면 fix 모드로 재실행한다.
 - deploy PR이 이미 있으면 닫지 않고 재사용한다 — 새로 열면 워크플로우가 다시 트리거되어 본문이 초기화될 수 있다.

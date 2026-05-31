@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-05-31T13:24:59Z",
-    "currentVersion": "3.0.70",
+    "lastUpdated": "2026-05-31T13:28:55Z",
+    "currentVersion": "3.0.71",
     "projectType": "basic",
-    "totalReleases": 110
+    "totalReleases": 111
   },
   "releases": [
+    {
+      "version": "3.0.71",
+      "project_type": "basic",
+      "date": "2026-05-31",
+      "pr_number": 318,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 배포 완료 확인이 더 빠르게 이뤄지도록 개선되었습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "배포 완료 확인이 더 빠르게 이뤄지도록 개선되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.70",
       "project_type": "basic",

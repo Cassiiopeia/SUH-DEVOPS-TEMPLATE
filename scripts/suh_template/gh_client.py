@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import subprocess
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -18,6 +21,11 @@ class GitHubAPIError(Exception):
         super().__init__(f"GitHub API {status_code}: {message}")
         self.status_code = status_code
         self.message = message
+
+
+class PyNaClMissingError(Exception):
+    """Actions Secret 암호화에 필요한 PyNaCl을 사용할 수 없을 때 발생."""
+    code = "pynacl_missing"
 
 
 class _StripAuthRedirect(urllib.request.HTTPRedirectHandler):
@@ -60,6 +68,8 @@ def _request(method: str, url: str, data: dict | None, pat: str, raw: bool = Fal
     try:
         with _opener.open(req) as resp:
             content = resp.read()
+            if not content:
+                return {} if not raw else ""
             if raw:
                 return content.decode("utf-8", "replace")
             return json.loads(content.decode())
@@ -130,7 +140,7 @@ def add_comment(
 
 
 def get_issue(owner: str, repo: str, issue_number: int, pat: str) -> dict:
-    """이슈를 조회하고 {number, title, url, state, body}를 반환한다."""
+    """이슈를 조회하고 agent 판단에 필요한 요약 필드를 반환한다."""
     data = _request(
         "GET",
         f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}",
@@ -143,7 +153,30 @@ def get_issue(owner: str, repo: str, issue_number: int, pat: str) -> dict:
         "url": data["html_url"],
         "state": data["state"],
         "body": data.get("body", ""),
+        "labels": [item["name"] for item in data.get("labels", [])],
+        "assignees": [item["login"] for item in data.get("assignees", [])],
+        "created_at": data.get("created_at"),
+        "updated_at": data.get("updated_at"),
+        "comments_count": data.get("comments", 0),
     }
+
+
+def get_issue_comments(owner: str, repo: str, issue_number: int, pat: str) -> list[dict]:
+    """이슈 댓글 목록을 agent가 바로 읽기 쉬운 형태로 반환한다."""
+    items = _request(
+        "GET",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/comments?per_page=100",
+        None,
+        pat,
+    )
+    return [
+        {
+            "author": (item.get("user") or {}).get("login"),
+            "body": item.get("body", ""),
+            "created_at": item.get("created_at"),
+        }
+        for item in items
+    ]
 
 
 def list_issues(
@@ -160,6 +193,150 @@ def list_issues(
         {"number": i["number"], "title": i["title"], "url": i["html_url"], "state": i["state"]}
         for i in items
     ]
+
+
+# --- Repository exploration ---
+
+def get_user_type(owner: str, pat: str) -> str:
+    """GitHub owner 타입을 user/org 중 하나로 반환한다."""
+    data = _request("GET", f"{_API_BASE}/users/{owner}", None, pat)
+    return "org" if data.get("type") == "Organization" else "user"
+
+
+def list_repos(owner: str, repo_type: str, pat: str) -> list[dict]:
+    """사용자 또는 조직의 레포 목록을 반환한다."""
+    endpoint = "orgs" if repo_type == "org" else "users"
+    items = _request("GET", f"{_API_BASE}/{endpoint}/{owner}/repos?per_page=100&sort=updated", None, pat)
+    return [
+        {
+            "name": item["name"],
+            "desc": item.get("description"),
+            "lang": item.get("language"),
+            "stars": item.get("stargazers_count", 0),
+            "updated": item.get("updated_at"),
+            "fork": item.get("fork", False),
+            "private": item.get("private", False),
+            "url": item.get("html_url"),
+            "topics": item.get("topics", []),
+        }
+        for item in items
+    ]
+
+
+def get_repo_detail(owner: str, repo: str, pat: str) -> dict:
+    """레포 상세 정보를 반환한다."""
+    data = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}", None, pat)
+    return {
+        "name": data["name"],
+        "desc": data.get("description"),
+        "lang": data.get("language"),
+        "stars": data.get("stargazers_count", 0),
+        "forks": data.get("forks_count", 0),
+        "open_issues": data.get("open_issues_count", 0),
+        "default_branch": data.get("default_branch"),
+        "created_at": data.get("created_at"),
+        "updated_at": data.get("updated_at"),
+        "topics": data.get("topics", []),
+        "url": data.get("html_url"),
+    }
+
+
+def get_readme(owner: str, repo: str, pat: str) -> dict:
+    """README 내용을 base64 디코딩해 반환한다. 없으면 content=None."""
+    try:
+        data = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/readme", None, pat)
+    except GitHubAPIError as e:
+        if e.status_code == 404:
+            return {"content": None}
+        raise
+    content = data.get("content")
+    if not content:
+        return {"content": None}
+    if data.get("encoding") == "base64":
+        decoded = base64.b64decode(content).decode("utf-8", "replace")
+        return {"content": decoded}
+    return {"content": content}
+
+
+def get_languages(owner: str, repo: str, pat: str) -> list[dict]:
+    """언어별 비율을 내림차순으로 반환한다."""
+    data = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/languages", None, pat)
+    total = sum(data.values())
+    if total <= 0:
+        return []
+    return [
+        {"lang": lang, "percent": round((size / total) * 100, 1)}
+        for lang, size in sorted(data.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+
+def list_commits(owner: str, repo: str, pat: str, limit: int = 10) -> list[dict]:
+    """최근 커밋 목록을 반환한다."""
+    limit = max(1, min(limit, 100))
+    items = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/commits?per_page={limit}", None, pat)
+    commits = []
+    for item in items:
+        commit = item.get("commit") or {}
+        author = commit.get("author") or {}
+        message = (commit.get("message") or "").splitlines()[0]
+        commits.append({
+            "sha": item.get("sha", "")[:7],
+            "date": author.get("date"),
+            "author": author.get("name"),
+            "msg": message,
+        })
+    return commits
+
+
+# --- Actions Secrets ---
+
+def list_secrets(owner: str, repo: str, pat: str) -> list[dict]:
+    """Actions Secret 목록을 반환한다."""
+    data = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/actions/secrets?per_page=100", None, pat)
+    return [
+        {"name": item["name"], "updated_at": item.get("updated_at")}
+        for item in data.get("secrets", [])
+    ]
+
+
+def _load_nacl_public():
+    """PyNaCl을 로드한다. 없으면 한 번 설치를 시도한다."""
+    try:
+        from nacl import encoding, public
+        return encoding, public
+    except ImportError:
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "PyNaCl", "-q"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            from nacl import encoding, public
+            return encoding, public
+        except Exception as e:
+            raise PyNaClMissingError("PyNaCl을 사용할 수 없습니다. 수동 설치: pip install PyNaCl") from e
+
+
+def _encrypt_secret(public_key: str, value: str) -> str:
+    encoding, public = _load_nacl_public()
+    public_key_obj = public.PublicKey(public_key.encode("utf-8"), encoding.Base64Encoder())
+    sealed_box = public.SealedBox(public_key_obj)
+    encrypted = sealed_box.encrypt(value.encode("utf-8"))
+    return base64.b64encode(encrypted).decode("utf-8")
+
+
+def set_secret(owner: str, repo: str, name: str, value: str, pat: str) -> dict:
+    """Actions Secret을 암호화해 생성 또는 갱신한다."""
+    key = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/actions/secrets/public-key", None, pat)
+    encrypted_value = _encrypt_secret(key["key"], value)
+    _request(
+        "PUT",
+        f"{_API_BASE}/repos/{owner}/{repo}/actions/secrets/{urllib.parse.quote(name, safe='')}",
+        {"encrypted_value": encrypted_value, "key_id": key["key_id"]},
+        pat,
+    )
+    return {"name": name, "status": "updated"}
 
 
 def list_pulls(
@@ -193,6 +370,7 @@ def search_issues(
             "title": i["title"],
             "url": i["html_url"],
             "state": i["state"],
+            "labels": [label["name"] for label in i.get("labels", [])],
         }
         for i in items
     ]

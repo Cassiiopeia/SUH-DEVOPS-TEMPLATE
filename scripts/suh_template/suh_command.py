@@ -25,13 +25,16 @@ PAT(GitHub 토큰)는 직접 넘기지 않아도 된다:
     get-commit-template <issue_title> <issue_url>
     create-issue <owner> <repo> <title> <body_file> <labels_csv>
     add-comment <owner> <repo> <issue_number> <body_file>
-    get-issue <owner> <repo> <issue_number>
+    get-issue <owner> <repo> <issue_number> [--with-comments]
+    get-issues <owner> <repo> <issue_number...>
     update-issue <owner> <repo> <issue_number> [옵션]
     create-pr <owner> <repo> <title> <body_file> <head> <base>
     list-prs <owner> <repo> [--state open|closed|all]
     search-issues <owner> <repo> <keyword...>
     update-pr <owner> <repo> <pr_number> <body_file> [옵션]
     actions <show-run|joblog|list-failed|resolve-pr|resolve-branch> <owner> <repo> [인자]
+    explore <list-repos|repo-detail|readme|languages|commits> <owner> [repo] [인자]
+    secrets <list|set> <owner> <repo> [인자]
 """
 
 from __future__ import annotations
@@ -314,23 +317,67 @@ def cmd_update_issue(args: list) -> int:
 
 
 def cmd_get_issue(args: list) -> int:
-    """get-issue <owner> <repo> <issue_number>"""
+    """get-issue <owner> <repo> <issue_number> [--with-comments]"""
     if len(args) < 3:
-        _err("ERROR", "get-issue", "owner, repo, issue_number 인수가 필요합니다.", "missing_argument")
-        return 1
-    owner, repo, issue_number = args[0], args[1], int(args[2])
+        return _emit({"ok": False, "error": "사용법: get-issue <owner> <repo> <issue_number> [--with-comments]"})
+    owner, repo = args[0], args[1]
+    try:
+        issue_number = int(args[2])
+    except ValueError:
+        return _emit({"ok": False, "error": "issue_number는 정수여야 합니다.", "code": "invalid_argument"})
+    with_comments = "--with-comments" in args[3:]
     pat = _get_pat(owner, repo)
     if not pat:
-        _err("ERROR", "get-issue", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
-        return 1
+        return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
     try:
-        result = _github.get_issue(owner, repo, issue_number, pat)
-        import json as _json
-        print(_json.dumps(result, ensure_ascii=False))
-        return 0
+        issue = _github.get_issue(owner, repo, issue_number, pat)
+        payload = {
+            "ok": True,
+            "issue": issue,
+            "comments": _github.get_issue_comments(owner, repo, issue_number, pat) if with_comments else None,
+            "summary": f"#{issue['number']} {issue['state']} — {issue['title']}",
+            "next": None,
+            # 기존 get-issue 소비자가 top-level title/url을 읽어도 동작하도록 유지한다.
+            "number": issue["number"],
+            "title": issue["title"],
+            "url": issue["url"],
+            "html_url": issue["url"],
+            "state": issue["state"],
+            "body": issue.get("body", ""),
+        }
+        return _emit(payload)
     except _github.GitHubAPIError as e:
-        _err("ERROR", "get-issue", str(e), f"github_api_{e.status_code}")
-        return 1
+        return _emit({"ok": False, "error": str(e), "code": f"github_api_{e.status_code}"})
+
+
+def cmd_get_issues(args: list) -> int:
+    """get-issues <owner> <repo> <issue_number...>"""
+    if len(args) < 3:
+        return _emit({"ok": False, "error": "사용법: get-issues <owner> <repo> <issue_number...>"})
+    owner, repo = args[0], args[1]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
+
+    issues = []
+    for raw_number in args[2:]:
+        try:
+            number = int(raw_number)
+        except ValueError:
+            issues.append({"number": raw_number, "error": "issue_number는 정수여야 합니다.", "code": "invalid_argument"})
+            continue
+        try:
+            issues.append(_github.get_issue(owner, repo, number, pat))
+        except _github.GitHubAPIError as e:
+            issues.append({"number": number, "error": str(e), "code": f"github_api_{e.status_code}"})
+
+    return _emit({
+        "ok": True,
+        "count": len(issues),
+        "issues": issues,
+        "summary": f"{len(issues)}개 이슈 조회 완료",
+        "next": None,
+    })
 
 
 def cmd_create_pr(args: list) -> int:
@@ -641,6 +688,174 @@ def cmd_deploy_status(args: list) -> int:
         return _emit({"ok": False, "error": str(e), "code": f"github_api_{e.status_code}"})
 
 
+def cmd_explore(args: list) -> int:
+    """explore <list-repos|repo-detail|readme|languages|commits> <owner> [repo] [인자]
+
+    레포 탐색 계열 커맨드. 출력은 언제나 JSON이며 다음 탐색 힌트를 next에 담는다.
+    """
+    if len(args) < 2:
+        return _emit({
+            "ok": False,
+            "error": "사용법: explore <sub> <owner> [repo] [인자]",
+            "subcommands": [
+                "list-repos OWNER [--type user|org|auto]",
+                "repo-detail OWNER REPO",
+                "readme OWNER REPO",
+                "languages OWNER REPO",
+                "commits OWNER REPO [--limit N]",
+            ],
+        })
+
+    sub = args[0]
+
+    def _opt_int(rest: list, key: str, default: int) -> int:
+        if key in rest:
+            idx = rest.index(key)
+            if idx + 1 < len(rest):
+                try:
+                    return int(rest[idx + 1])
+                except ValueError:
+                    pass
+        return default
+
+    try:
+        if sub == "list-repos":
+            owner = args[1]
+            rest = args[2:]
+            repo_type = "auto"
+            if "--type" in rest:
+                idx = rest.index("--type")
+                if idx + 1 < len(rest):
+                    repo_type = rest[idx + 1]
+            if repo_type not in ("user", "org", "auto"):
+                return _emit({"ok": False, "error": "--type은 user|org|auto 중 하나여야 합니다.", "code": "invalid_argument"})
+            pat = _get_pat(owner, None)
+            if not pat:
+                return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
+            owner_type = _github.get_user_type(owner, pat) if repo_type == "auto" else repo_type
+            repos = _github.list_repos(owner, owner_type, pat)
+            next_hint = f"explore repo-detail {owner} {repos[0]['name']}" if repos else None
+            return _emit({
+                "ok": True,
+                "owner": owner,
+                "owner_type": owner_type,
+                "count": len(repos),
+                "repos": repos,
+                "summary": f"{owner} {owner_type} 레포 {len(repos)}개 조회",
+                "next": next_hint,
+            })
+
+        if len(args) < 3:
+            return _emit({"ok": False, "error": f"사용법: explore {sub} <owner> <repo>"})
+        owner, repo = args[1], args[2]
+        rest = args[3:]
+        pat = _get_pat(owner, repo)
+        if not pat:
+            return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
+
+        if sub == "repo-detail":
+            repo_detail = _github.get_repo_detail(owner, repo, pat)
+            return _emit({
+                "ok": True,
+                "repo": repo_detail,
+                "summary": f"{owner}/{repo} 상세 조회 완료",
+                "next": f"explore readme {owner} {repo}",
+            })
+
+        if sub == "readme":
+            readme = _github.get_readme(owner, repo, pat)
+            return _emit({
+                "ok": True,
+                "readme": readme,
+                "summary": "README 조회 완료" if readme.get("content") is not None else "README가 없습니다.",
+                "next": f"explore languages {owner} {repo}",
+            })
+
+        if sub == "languages":
+            languages = _github.get_languages(owner, repo, pat)
+            return _emit({
+                "ok": True,
+                "languages": languages,
+                "summary": f"{owner}/{repo} 언어 {len(languages)}개 조회",
+                "next": None,
+            })
+
+        if sub == "commits":
+            limit = _opt_int(rest, "--limit", 10)
+            commits = _github.list_commits(owner, repo, pat, limit=limit)
+            return _emit({
+                "ok": True,
+                "count": len(commits),
+                "commits": commits,
+                "summary": f"{owner}/{repo} 최근 커밋 {len(commits)}개 조회",
+                "next": None,
+            })
+
+        return _emit({"ok": False, "error": f"알 수 없는 explore 서브커맨드: {sub}"})
+
+    except _github.GitHubAPIError as e:
+        return _emit({"ok": False, "error": str(e), "code": f"github_api_{e.status_code}"})
+    except ValueError as e:
+        return _emit({"ok": False, "error": f"인자 형식 오류: {e}"})
+
+
+def cmd_secrets(args: list) -> int:
+    """secrets <list|set> <owner> <repo> [name]
+
+    Actions Secret 목록 조회 및 등록/갱신. set 값은 SECRET_VALUE 환경변수로 받는다.
+    """
+    if len(args) < 3:
+        return _emit({
+            "ok": False,
+            "error": "사용법: secrets <list|set> <owner> <repo> [name]",
+            "subcommands": ["list OWNER REPO", "set OWNER REPO NAME (SECRET_VALUE 환경변수 사용)"],
+        })
+
+    sub, owner, repo = args[0], args[1], args[2]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
+
+    try:
+        if sub == "list":
+            secrets = _github.list_secrets(owner, repo, pat)
+            return _emit({
+                "ok": True,
+                "count": len(secrets),
+                "secrets": secrets,
+                "summary": f"{owner}/{repo} Actions Secret {len(secrets)}개 조회",
+                "next": f"secrets set {owner} {repo} <NAME> (SECRET_VALUE 환경변수 사용)",
+            })
+
+        if sub == "set":
+            if len(args) < 4:
+                return _emit({"ok": False, "error": "secret name이 필요합니다.", "code": "missing_argument"})
+            name = args[3]
+            value = os.environ.get("SECRET_VALUE")
+            if value is None and len(args) >= 5:
+                value = args[4]
+            if value is None:
+                return _emit({
+                    "ok": False,
+                    "error": "SECRET_VALUE 환경변수에 secret 값을 담아 호출하세요.",
+                    "code": "missing_secret_value",
+                })
+            result = _github.set_secret(owner, repo, name, value, pat)
+            return _emit({
+                "ok": True,
+                **result,
+                "summary": f"{owner}/{repo} secret {name} 갱신 완료",
+                "next": None,
+            })
+
+        return _emit({"ok": False, "error": f"알 수 없는 secrets 서브커맨드: {sub}"})
+
+    except _github.PyNaClMissingError as e:
+        return _emit({"ok": False, "error": str(e), "code": e.code, "hint": "수동 설치: pip install PyNaCl"})
+    except _github.GitHubAPIError as e:
+        return _emit({"ok": False, "error": str(e), "code": f"github_api_{e.status_code}"})
+
+
 # 커맨드 → 핸들러 함수 매핑
 _COMMANDS = {
     "get-output-path": cmd_get_output_path,
@@ -652,6 +867,7 @@ _COMMANDS = {
     "create-issue": cmd_create_issue,
     "add-comment": cmd_add_comment,
     "get-issue": cmd_get_issue,
+    "get-issues": cmd_get_issues,
     "update-issue": cmd_update_issue,
     "create-pr": cmd_create_pr,
     "list-prs": cmd_list_prs,
@@ -659,6 +875,8 @@ _COMMANDS = {
     "update-pr": cmd_update_pr,
     "actions": cmd_actions,
     "deploy-status": cmd_deploy_status,
+    "explore": cmd_explore,
+    "secrets": cmd_secrets,
 }
 
 

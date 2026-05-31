@@ -149,50 +149,15 @@ git push origin main
 
 push 완료 후 `VERSION-CONTROL` (patch 버전 자동 증가) 워크플로우가 자동 트리거된다.
 
-### 4단계: deploy PR 생성
+> **⚠️ 단계 순서 (레이스컨디션 방지 — 반드시 지킨다)**
+>
+> AUTO-CHANGELOG-CONTROL 워크플로우는 deploy PR `opened` 시점에 본문을 확인해, 본문에 `Summary by CodeRabbit`이 **없으면 본문을 초기화**한다. 따라서 빈 본문으로 PR을 먼저 만들면, 워크플로우가 그 순간 끼어들어 본문을 비워 릴리스 노트가 사라진다.
+>
+> 이를 막기 위해 **PR 생성을 맨 마지막에** 둔다: 커밋 분석(4단계) → 릴리스 노트 작성(5단계) → 릴리스 노트를 본문에 담아 PR 생성(6단계). PR이 처음부터 `Summary by CodeRabbit`을 담고 태어나므로 워크플로우가 본문을 지우지 않는다. (워크플로우 로직은 수정하지 않는다.)
 
-VERSION-CONTROL 워크플로우 완료를 기다리지 않고 바로 deploy PR을 생성한다.
-(PR 생성 타이밍과 버전 증가 타이밍이 겹쳐도 무방 — 워크플로우가 알아서 처리)
+### 4단계: 커밋 분석
 
-```bash
-# ⚠️ Bash stateless — 이 블록 맨 앞 5개 변수를 [시작 전]에서 구한 실제 값으로 채운다.
-GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."
-
-TODAY=$(date '+%Y%m%d')
-TITLE="🚀 Deploy ${TODAY}"
-
-# 기존 open deploy PR이 있으면 재사용
-EXISTING_PR=$(curl -s \
-  -H "Authorization: token $GITHUB_PAT" \
-  "https://api.github.com/repos/$OWNER/$REPO/pulls?state=open&base=deploy" \
-  | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
-
-if [ -n "$EXISTING_PR" ]; then
-  PR_NUMBER=$EXISTING_PR
-  echo "기존 deploy PR #$PR_NUMBER 재사용"
-else
-  # 인라인 Python 금지 — 재사용 스크립트 cli.py의 create-pr 호출.
-  # body는 빈값이므로 존재하지 않는 경로("")를 넘기면 cli.py가 빈 본문으로 처리한다.
-  # 출력 JSON({"number":..,"url":..})에서 number 추출. (stdin pipe 대신 환경변수로 파싱 — Windows 안전)
-  cd "$PROJECT_ROOT/scripts"
-  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
-    create-pr "$OWNER" "$REPO" "$TITLE" "" "main" "deploy")
-  PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
-  cd "$PROJECT_ROOT"
-  echo "새 deploy PR #$PR_NUMBER 생성"
-fi
-
-if [ -z "$PR_NUMBER" ]; then
-  echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요."
-  exit 1
-fi
-```
-
-### 5단계: 커밋 분석 → 릴리스 노트 작성
-
-> **⚠️ AGENT 필독: 이 단계 완료 즉시 6단계(PR 본문 업데이트)를 반드시 실행한다. 절대 건너뛰지 않는다.**
-
-PR 생성 직후 바로 커밋을 분석한다 (워크플로우가 CodeRabbit을 기다리는 동안):
+PR을 만들기 **전에** 먼저 main → deploy 변경분을 분석한다:
 
 ```bash
 git fetch origin deploy main 2>/dev/null || true
@@ -213,6 +178,10 @@ git log origin/deploy..origin/main --pretty=format:"%s" | grep -v "\[skip ci\]" 
 
 **커밋 메시지를 그대로 쓰지 않는다.** 이슈 제목, URL, 타입 prefix, 파일명, 기술 용어를 모두 제거하고
 **클라이언트(사용자)가 이해할 수 있는 기능/변경 관점**으로 재작성한다.
+
+### 5단계: 릴리스 노트 작성
+
+> **⚠️ AGENT 필독: 노트 파일을 만든 뒤 반드시 6단계(PR 생성)를 실행한다. PR 생성 없이 끝내지 않는다.**
 
 **릴리스 노트 작성 원칙 — 앱스토어 업데이트 노트처럼 쓴다**:
 
@@ -240,15 +209,9 @@ git log origin/deploy..origin/main --pretty=format:"%s" | grep -v "\[skip ci\]" 
 ✅ 앱 설치 용량이 소폭 감소했습니다
 ```
 
-릴리스 노트 초안이 완성되면 **즉시 다음 6단계로 넘어간다.**
+릴리스 노트 본문 파일은 워크플로우가 파싱하는 형식과 **100% 동일한 구조**로 작성한다. 카테고리명은 아래 고정값만 사용하고, 항목이 없는 카테고리는 생략한다.
 
-### 6단계: PR 본문 업데이트
-
-워크플로우가 파싱하는 형식과 **100% 동일한 구조**로 작성. 카테고리명은 아래 고정값만 사용:
-
-**인라인 Python 작성 금지.** 릴리스 노트 본문을 임시 `.md` 파일에 저장한 뒤 `cli.py`의 `update-pr`을 `body_file`로 호출한다 (줄바꿈·이모지 안전 보존). 본문은 워크플로우가 파싱하는 아래 고정 구조를 100% 따른다.
-
-릴리스 노트 파일 작성 (Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장):
+**Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장**:
 
 ```
 <!-- This is an auto-generated comment: release notes by coderabbit.ai -->
@@ -275,20 +238,50 @@ git log origin/deploy..origin/main --pretty=format:"%s" | grep -v "\[skip ci\]" 
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 ```
 
-항목이 없는 카테고리는 생략한다. 그 후 update-pr 호출:
+이 파일이 완성되면 **즉시 6단계(PR 생성)로 넘어간다.**
+
+### 6단계: deploy PR 생성 (릴리스 노트 본문 포함)
+
+VERSION-CONTROL 워크플로우 완료를 기다리지 않고 deploy PR을 생성한다. **5단계에서 만든 릴리스 노트 파일을 본문으로 담아 생성**하는 것이 핵심이다 — PR이 처음부터 `Summary by CodeRabbit`을 담고 있어야 AUTO-CHANGELOG-CONTROL 워크플로우가 본문을 초기화하지 않는다.
 
 ```bash
-# ⚠️ Bash stateless — 5개 변수를 실제 값으로 채운다. PR_NUMBER는 4단계에서 구한 번호.
-GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."; PR_NUMBER="..."
+# ⚠️ Bash stateless — 이 블록 맨 앞 5개 변수를 [시작 전]에서 구한 실제 값으로 채운다.
+GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."
+
+TODAY=$(date '+%Y%m%d')
+TITLE="🚀 Deploy ${TODAY}"
+
+# 기존 open deploy PR이 있으면 재사용 — 닫지 않는다 (새로 열면 워크플로우 재트리거되어 본문 초기화 위험)
+EXISTING_PR=$(curl -s \
+  -H "Authorization: token $GITHUB_PAT" \
+  "https://api.github.com/repos/$OWNER/$REPO/pulls?state=open&base=deploy" \
+  | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
 
 cd "$PROJECT_ROOT/scripts"
-GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
-  update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
+if [ -n "$EXISTING_PR" ]; then
+  # 재사용 케이스: 이미 PR이 존재하므로 update-pr로 릴리스 노트 본문만 갱신한다.
+  PR_NUMBER=$EXISTING_PR
+  echo "기존 deploy PR #$PR_NUMBER 재사용 → 본문 업데이트"
+  GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+    update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
+else
+  # 신규 케이스: create-pr의 body_file에 릴리스 노트 파일 경로를 넘겨 본문 포함 PR 생성.
+  # cli.py가 body_file을 읽어 본문에 채운다 (빈 경로를 넘기던 기존 동작과 달리, 노트 파일을 넘긴다).
+  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+    create-pr "$OWNER" "$REPO" "$TITLE" "_release_notes.md" "main" "deploy")
+  PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+  echo "새 deploy PR #$PR_NUMBER 생성 (릴리스 노트 본문 포함)"
+fi
 rm -f _release_notes.md
 cd "$PROJECT_ROOT"
+
+if [ -z "$PR_NUMBER" ]; then
+  echo "❌ PR 생성/업데이트 실패. GitHub API 응답을 확인하세요. ($CREATE_OUT)"
+  exit 1
+fi
 ```
 
-출력 JSON(`{"number","url"}`)으로 업데이트 성공을 확인한다.
+출력 JSON(`{"number","url"}`)으로 성공을 확인한다.
 
 ### 7단계: 결과 안내
 
@@ -348,7 +341,30 @@ curl -s -X PATCH \
   "https://api.github.com/repos/$OWNER/$REPO/pulls/$EXISTING_PR"
 ```
 
-### fix 3단계: 새 deploy PR 생성
+> **⚠️ fix 모드도 deploy 모드와 동일하게 PR 생성을 맨 마지막에 둔다.** 빈 본문으로 새 PR을 먼저 열면 워크플로우가 본문을 초기화한다. 따라서 커밋 분석(fix 3단계) → 릴리스 노트 작성(fix 4단계) → 릴리스 노트 본문 담아 PR 생성(fix 5단계) 순으로 진행한다.
+
+### fix 3단계: 커밋 분석
+
+새 PR을 만들기 **전에** main → deploy 변경분을 먼저 분석한다:
+
+```bash
+git fetch origin deploy main 2>/dev/null || true
+# 분석 base는 origin/main (deploy 4단계와 동일 이유 — HEAD가 origin/main보다 뒤일 수 있음).
+git log origin/deploy..origin/main --pretty=format:"%s" | grep -v "\[skip ci\]" | head -60
+```
+
+커밋 메시지를 deploy 모드 4·5단계와 **완전히 동일한 기준**으로 분류 및 재작성한다.
+앱스토어 업데이트 노트처럼 — 파일명·기술 prefix·구현 방식·이슈 번호·URL 모두 금지. 사용자가 직접 느끼는 변화만, 40자 이내로 간결하게.
+
+### fix 4단계: 릴리스 노트 작성
+
+> **⚠️ AGENT 필독: 노트 파일을 만든 뒤 반드시 fix 5단계(PR 생성)를 실행한다.**
+
+deploy 6단계와 **동일한 고정 구조**로 릴리스 노트 파일을 작성한다 (Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장). 구조는 deploy 5단계의 고정 템플릿(`Summary by CodeRabbit` 포함)을 그대로 따른다.
+
+### fix 5단계: 새 deploy PR 생성 (릴리스 노트 본문 포함)
+
+fix 4단계에서 만든 릴리스 노트 파일을 **본문으로 담아** 새 PR을 생성한다. PR이 처음부터 `Summary by CodeRabbit`을 담고 태어나야 워크플로우가 본문을 초기화하지 않는다.
 
 ```bash
 # ⚠️ Bash stateless — 5개 변수를 실제 값으로 채운다.
@@ -357,55 +373,22 @@ GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-# 인라인 Python 금지 — 재사용 스크립트 cli.py의 create-pr 호출 (deploy 모드 4단계와 동일 패턴).
+# create-pr의 body_file에 릴리스 노트 파일 경로를 넘겨 본문 포함 PR 생성 (deploy 6단계와 동일 패턴).
 cd "$PROJECT_ROOT/scripts"
 CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
-  create-pr "$OWNER" "$REPO" "$TITLE" "" "main" "deploy")
+  create-pr "$OWNER" "$REPO" "$TITLE" "_release_notes.md" "main" "deploy")
 PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+rm -f _release_notes.md
 cd "$PROJECT_ROOT"
 
 if [ -z "$PR_NUMBER" ]; then
   echo "❌ PR 생성 실패. GitHub API 응답을 확인하세요. ($CREATE_OUT)"
   exit 1
 fi
-echo "✅ PR #$PR_NUMBER 생성 완료, 릴리스 노트 작성 시작..."
+echo "✅ PR #$PR_NUMBER 생성 완료 (릴리스 노트 본문 포함)"
 ```
 
-### fix 4단계: 커밋 분석 → 릴리스 노트 작성
-
-> **⚠️ AGENT 필독: 이 단계 완료 즉시 fix 5단계(PR 본문 업데이트)를 반드시 실행한다. 절대 건너뛰지 않는다.**
-
-```bash
-git fetch origin deploy main 2>/dev/null || true
-# 분석 base는 origin/main (deploy 5단계와 동일 이유 — HEAD가 origin/main보다 뒤일 수 있음).
-git log origin/deploy..origin/main --pretty=format:"%s" | grep -v "\[skip ci\]" | head -60
-```
-
-커밋 메시지를 deploy 모드 5단계와 **완전히 동일한 기준**으로 분류 및 재작성한다.
-
-앱스토어 업데이트 노트처럼 — 파일명·기술 prefix·구현 방식·이슈 번호·URL 모두 금지.
-사용자가 직접 느끼는 변화만, 40자 이내로 간결하게.
-
-릴리스 노트 초안이 완성되면 **즉시 fix 5단계로 넘어간다.**
-
-### fix 5단계: PR 본문 업데이트
-
-**인라인 Python 작성 금지.** deploy 6단계와 동일하게 릴리스 노트를 임시 `.md`에 저장 후 `cli.py`의 `update-pr`을 `body_file`로 호출한다. 본문 구조는 deploy 6단계와 100% 동일(워크플로우 파싱 형식).
-
-릴리스 노트 파일 작성 (Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`) — 구조는 deploy 6단계 참조. 그 후:
-
-```bash
-# ⚠️ Bash stateless — 5개 변수 + PR_NUMBER(fix 3단계 번호)을 실제 값으로 채운다.
-GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."; PR_NUMBER="..."
-
-cd "$PROJECT_ROOT/scripts"
-GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
-  update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
-rm -f _release_notes.md
-cd "$PROJECT_ROOT"
-```
-
-출력 JSON(`{"number","url"}`)으로 업데이트 성공을 확인한다. 항목이 없는 카테고리는 생략한다.
+출력 JSON(`{"number","url"}`)으로 성공을 확인한다.
 
 ### fix 6단계: 결과 안내
 
@@ -420,8 +403,8 @@ cd "$PROJECT_ROOT"
 
 ## 주의사항
 
-- 워크플로우가 PR 본문을 초기화하는 타이밍과 스킬이 본문을 올리는 타이밍이 겹칠 수 있다.
-  만약 워크플로우가 본문을 다시 지워버리면 fix 모드로 재실행한다.
+- **PR은 릴리스 노트를 본문에 담아 생성한다** (deploy 6단계 / fix 5단계). PR이 처음부터 `Summary by CodeRabbit`을 담고 있어 워크플로우가 본문 초기화를 건너뛴다. 빈 본문으로 먼저 만든 뒤 나중에 본문을 채우면 레이스컨디션으로 노트가 사라진다.
+- 그래도 워크플로우가 본문을 지워버린 정황이 보이면 fix 모드로 재실행한다.
 - deploy PR이 이미 있으면 닫지 않고 재사용한다 — 새로 열면 워크플로우가 다시 트리거되어 본문이 초기화될 수 있다.
 - 10분이 지나도 automerge가 안 되면 fix 모드로 재실행한다.
 - **Windows 내부망에서 curl exit 35 (SSL 오류) 발생 시**: curl 호출에 `--ssl-no-revoke` 옵션 추가 (`references/common-rules.md` Windows 내부망 환경 섹션 참조).

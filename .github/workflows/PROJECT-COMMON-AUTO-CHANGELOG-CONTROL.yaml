@@ -157,6 +157,11 @@ jobs:
           # changelog-deploy가 이미 Summary를 작성한 경우 폴링 생략
           if [ "${{ steps.clear_body.outputs.already_found }}" = "true" ]; then
             echo "✅ 초기화 단계에서 이미 Summary 감지 — 폴링 생략"
+            # clear_body가 만든 pr_body.md는 직후 체크아웃에서 덮어써져 사라지므로,
+            # 체크아웃 이후 시점인 여기서 PR 본문을 다시 받아 파일로 저장해야 업로드 artifact가 비지 않는다
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                 jq -r '.body // ""' > pr_body.md
             echo "summary_found=true" >> $GITHUB_OUTPUT
             exit 0
           fi

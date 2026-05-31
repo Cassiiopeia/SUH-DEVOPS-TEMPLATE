@@ -302,13 +302,15 @@ cd "$PROJECT_ROOT"
 | verdict | 의미 | 행동 |
 |---------|------|------|
 | `merged` | automerge 완료 | 8단계 결과 안내, 종료 |
-| `waiting_for_automerge` | 정상 대기 중 | **sleep 금지.** `ScheduleWakeup`으로 ~90초 후 `next` 힌트(`deploy-status ... --pr N`)를 재호출해 재확인 |
+| `waiting_for_automerge` | 정상 대기 중 | **sleep 금지.** `ScheduleWakeup`으로 **첫 재확인 45초** 후 `next` 힌트(`deploy-status ... --pr N`)를 재호출. 여전히 waiting이면 **이후 30초 간격**으로 재확인 (automerge는 보통 30~60초 안에 완료) |
 | `missing_coderabbit_summary` | 본문 초기화됨(레이스컨디션) | fix 모드로 재실행 |
 | `workflow_failed` | 워크플로우 실패 | `workflow.run_url` 안내 + fix 모드로 재실행 |
 | `conflict` | 머지 충돌/차단 | 사용자에게 충돌 상태 안내, 수동 확인 요청 |
 | `no_pr` | open deploy PR 없음 | `deploy_branch.head_sha`로 이미 머지됐는지 확인 후 안내 |
 
-> **재확인 시 sleep을 쓰지 않는다.** Claude Code Bash는 `sleep 120`을 차단한다. 대기가 필요하면 `ScheduleWakeup(delaySeconds=90)`으로 자기 페이스를 잡고, 깨어나면 `next` 힌트의 `deploy-status` 커맨드를 다시 호출한다.
+> **재확인 시 sleep을 쓰지 않는다.** Claude Code Bash는 `sleep 120`을 차단한다. 대기가 필요하면 `ScheduleWakeup`으로 자기 페이스를 잡고, 깨어나면 `next` 힌트의 `deploy-status` 커맨드를 다시 호출한다.
+>
+> **재확인 주기 (실측 기반)**: 릴리스 노트를 본문에 담아 PR을 만들면 CodeRabbit 10분 대기가 없으므로 automerge는 **보통 30~60초** 안에 끝난다 (VERSION-CONTROL → CHANGELOG → automerge 한 사이클). 따라서 **첫 재확인은 `delaySeconds=45`**, 그래도 waiting이면 **`delaySeconds=30`**으로 짧게 폴링한다. 90초 같은 긴 간격은 이미 끝난 배포를 늦게 확인해 시간을 낭비한다. (45·30초 모두 캐시 유지 구간 270초 이내라 비용 페널티 없음.)
 
 ### 8단계: 결과 안내
 

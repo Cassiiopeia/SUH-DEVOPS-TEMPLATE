@@ -11,8 +11,9 @@ description: "브랜치명에서 이슈 번호를 자동 추출해 커밋 메시
 
 - **사용자 확인 없이 절대 커밋하지 않는다** — 메시지는 반드시 제안 후 승인받고 실행
 - **이슈를 자동 생성하지 않는다** — 이슈 없으면 선택지 제시 후 사용자가 결정
-- **staged 파일 없으면 `git add`를 대신하지 않는다** — 사용자가 직접 스테이징
-- **`git push`는 절대 실행하지 않는다** — 커밋까지만 담당
+- **staged 파일이 없으면 변경 파일을 자동으로 `git add`한다** — 사용자가 멈춰서 직접 스테이징할 필요 없음
+- **`git push`는 절대 실행하지 않는다** — 커밋까지만 담당 (CLAUDE.md 규칙: push는 명시 허락 시에만)
+- **커밋에 Claude/AI 흔적을 절대 남기지 않는다** — `Co-Authored-By`, `Generated with Claude`, `🤖` 등 AI 서명/푸터 일절 금지. 사용자의 git 설정으로만 커밋되어 사용자가 직접 작성한 것처럼 보여야 한다. 커밋 메시지는 본문만 작성한다.
 
 ## 시작 전
 
@@ -30,24 +31,28 @@ $ARGUMENTS
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 ```
 
-### 2단계: staged 변경사항 확인
+### 2단계: 변경사항 확인 및 스테이징
 
 ```bash
 git diff --cached --stat
 git status --short
 ```
 
-staged 파일이 없으면 **즉시 멈추고** 선택지 제시:
+**staged 파일이 있으면** 그대로 진행한다.
 
-```
-커밋할 staged 파일이 없습니다.
+**staged 파일이 없으면** 변경된(추적/미추적) 파일을 자동으로 스테이징한다:
 
-어떻게 할까요?
-1. 직접 git add 후 다시 /commit 실행할게요
-2. 취소
+```bash
+git add -A
 ```
 
-선택을 기다린다. 절대 자동으로 `git add`하지 않는다.
+스테이징 후 다시 확인하고 진행한다:
+
+```bash
+git diff --cached --stat
+```
+
+> 이슈별로 따로 커밋하려는 경우(사용자가 명시), 해당 이슈 관련 파일만 골라서 `git add <파일들>` 한다. 그 외엔 `git add -A`로 일괄 스테이징한다.
 
 ### 3단계: 이슈 번호 자동 추출
 
@@ -70,12 +75,38 @@ REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\
 
 `references/config-rules.md` §2~3 절차로 config의 `github` 섹션에서 `global_pat` 읽기.
 
+**이슈 제목·URL은 agent가 해석하지 않고, 아래 정적 추출 스크립트로 결정적으로 뽑는다.** (SUH-ISSUE-HELPER의 `extractIssueTitle` 로직과 동일 — agent의 임의 요약/재작성 금지)
+
 ```bash
-curl -s -H "Authorization: token {github_pat}" \
-  "https://api.github.com/repos/{owner}/{repo}/issues/{ISSUE_NUMBER}"
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+
+ISSUE_NUMBER="{추출된 이슈번호}" OWNER="{owner}" REPO="{repo}" GH_PAT="{github_pat}" "$PYTHON" - <<'EOF'
+import os, re, json, urllib.request, urllib.error
+num = os.environ["ISSUE_NUMBER"]
+url = f"https://api.github.com/repos/{os.environ['OWNER']}/{os.environ['REPO']}/issues/{num}"
+req = urllib.request.Request(url)
+req.add_header("Authorization", "token " + os.environ["GH_PAT"])
+try:
+    res = urllib.request.urlopen(req)
+    issue = json.loads(res.read())
+except urllib.error.HTTPError as e:
+    print(json.dumps({"error": e.code, "msg": e.reason})); raise SystemExit
+except Exception as e:
+    print(json.dumps({"error": "exception", "msg": str(e)})); raise SystemExit
+
+raw_title = issue["title"]
+html_url = issue["html_url"]
+
+# 1) [태그] 제거  2) 이모지/제어문자(So/C/VS16/ZWJ) 제거  3) trim
+clean = re.sub(r"\[.*?\]", "", raw_title).strip()
+clean = re.sub(r"[\U0001F000-\U0001FAFF☀-➿️‍]", "", clean).strip()
+clean = clean if clean else raw_title.strip()
+
+print(json.dumps({"clean_title": clean, "html_url": html_url, "raw_title": raw_title}, ensure_ascii=False))
+EOF
 ```
 
-응답에서 `title`, `html_url` 추출 → 4단계로 진행
+stdout JSON에서 `clean_title`, `html_url`을 **그대로** 사용한다. `error` 키가 있으면(401 등) PAT 만료 안내 후 사용자에게 직접 입력받는다. → 4단계로 진행
 
 **이슈 번호가 없는 경우** — 즉시 멈추고 선택지 제시:
 
@@ -108,10 +139,19 @@ staged 파일 목록과 diff를 분석하여 적절한 타입 추천:
 
 ### 5단계: 커밋 메시지 제안 후 사용자 확인
 
-`references/common-rules.md` 커밋 컨벤션에 따라 메시지를 구성한 뒤 **제안만** 한다:
+`references/common-rules.md` 커밋 컨벤션에 따라 메시지를 구성한 뒤 **제안만** 한다.
 
-- 형식: `{이슈제목에서 이모지·태그 제거한 순수 내용} : {타입} : {변경사항 설명} {이슈URL}`
-- 이모지·태그(`🚀[기능개선][ChangeLog]` 등)는 **반드시 제거**한다
+**형식**: `{clean_title} : {타입} : {변경설명} {html_url}`
+
+| 부분 | 결정 방식 |
+|------|-----------|
+| `clean_title` | 3단계 정적 추출 스크립트의 `clean_title` **그대로** — agent가 다시 요약/재작성하지 않는다 |
+| `html_url` | 3단계 스크립트의 `html_url` **그대로** |
+| `{타입}` | 4단계 diff 분석으로 agent 추천 (사용자 승인) |
+| `{변경설명}` | staged diff 분석으로 agent 작성 (사용자 승인) |
+
+- agent가 자유 판단하는 부분은 **타입과 변경설명뿐**이다. 제목·URL은 이슈 원본에서 정규식으로 정리한 값을 손대지 않고 사용한다.
+- 이슈 없이 자유 형식으로 커밋하는 경우(3단계 2선택)에만 제목을 직접 입력받는다.
 
 ```
 📝 제안 커밋 메시지:
@@ -132,7 +172,9 @@ staged 파일 목록과 diff를 분석하여 적절한 타입 추천:
 
 ### 6단계: 커밋 실행
 
-사용자가 1번(확인)을 선택한 경우에만 실행한다:
+사용자가 1번(확인)을 선택한 경우에만 실행한다.
+
+**커밋 메시지에 AI 서명/푸터를 절대 추가하지 않는다.** `Co-Authored-By`, `Generated with Claude`, `🤖` 등 금지. 아래 명령 외에 `--author` 옵션이나 추가 trailer를 붙이지 않는다 — 사용자 git 설정 그대로 커밋한다:
 
 ```bash
 git commit -m "{최종 커밋 메시지}"

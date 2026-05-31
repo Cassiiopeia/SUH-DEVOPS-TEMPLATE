@@ -15,7 +15,7 @@ if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
 else
   SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
 fi
-PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli get-output-path <skill_id>
+PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.suh_command get-output-path <skill_id>
 ```
 
 반환값 예시:

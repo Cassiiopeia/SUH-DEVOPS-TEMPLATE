@@ -90,18 +90,18 @@ agent가 직접 경로를 계산하여 파일을 저장한다:
 
 2. **repo 확인**: `git remote get-url origin`에서 `owner`/`repo` 추출, 실패 시 config의 `repos`에서 `default: true`인 repo 사용.
 
-3. **댓글 포스팅** — 인라인 Python 작성 금지. 재사용 스크립트 `scripts/suh_template/cli.py`의 `add-comment`를 호출한다. 보고서 본문은 이미 저장된 `.md` 파일을 `body_file`로 그대로 전달하므로 한국어·이모지·줄바꿈이 안전하게 보존된다. PAT는 `GITHUB_PAT` 환경변수로 넘긴다.
+3. **댓글 포스팅** — 인라인 Python 작성 금지. 재사용 스크립트 `scripts/suh_template/suh_command.py`의 `add-comment`를 호출한다. 보고서 본문은 이미 저장된 `.md` 파일을 `body_file`로 그대로 전달하므로 한국어·이모지·줄바꿈이 안전하게 보존된다. **PAT는 `suh_command`가 config.json에서 자동 로드하므로 `GITHUB_PAT=`는 생략 가능**하다(환경변수가 있으면 우선 사용).
 
 ```bash
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 cd "$PROJECT_ROOT/scripts"
-GITHUB_PAT="{github_pat}" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
   add-comment {owner} {repo} {이슈번호} "{보고서 .md 파일 절대경로}"
 ```
 
 출력은 JSON: `{"id": ..., "url": "https://github.com/.../issues/{번호}#issuecomment-..."}`. `url` 필드를 완료 메시지에 사용한다.
 
-> **Windows 주의**: `cd "$PROJECT_ROOT/scripts"` 후 `-m suh_template.cli`로 실행한다. `/tmp`·heredoc·`curl|python` 미사용. 인자는 명령행/환경변수로 전달한다.
+> **Windows 주의**: `cd "$PROJECT_ROOT/scripts"` 후 `-m suh_template.suh_command`로 실행한다. `/tmp`·heredoc·`curl|python` 미사용. 인자는 명령행/환경변수로 전달한다.
 
 ### 완료 메시지
 

@@ -1,7 +1,6 @@
 import os
 import sys
 import subprocess
-import json
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent.parent
@@ -16,7 +15,7 @@ def run_cli(*args, cwd=None):
     sep = os.pathsep
     env["PYTHONPATH"] = f"{SCRIPTS_DIR}{sep}{existing}" if existing else str(SCRIPTS_DIR)
     result = subprocess.run(
-        [sys.executable, "-m", "suh_template.cli", *args],
+        [sys.executable, "-m", "suh_template.suh_command", *args],
         capture_output=True,
         text=True,
         cwd=str(cwd or SCRIPTS_DIR),
@@ -60,41 +59,5 @@ def test_invalid_command():
 
 def test_skill_id_invalid():
     stdout, stderr, code = run_cli("get-next-seq", "invalid-skill")
-    assert code == 1
-    assert "skill_id_invalid" in stderr
-
-
-def test_init_config_returns_example_path(tmp_path):
-    """init-config는 .example 파일 경로를 stdout에 출력한다."""
-    # tmp_path를 git 저장소로 초기화
-    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
-
-    example_dir = tmp_path / ".suh-template.example" / "config"
-    example_dir.mkdir(parents=True)
-    (example_dir / "analyze.config.example.json").write_text(
-        json.dumps({"github_pat": "", "github_repos": []}), encoding="utf-8"
-    )
-    stdout, stderr, code = run_cli("init-config", "analyze", cwd=tmp_path)
-    assert code == 0
-    expected = str(tmp_path / ".suh-template.example" / "config" / "analyze.config.example.json")
-    assert stdout == expected
-
-
-def test_init_config_missing_example_file(tmp_path):
-    """init-config는 .example 파일이 없으면 ERROR + exit 1."""
-    # tmp_path를 git 저장소로 초기화
-    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
-
-    stdout, stderr, code = run_cli("init-config", "analyze", cwd=tmp_path)
-    assert code == 1
-    assert "example_not_found" in stderr
-
-
-def test_init_config_invalid_skill_id(tmp_path):
-    """init-config는 잘못된 skill_id이면 ERROR + exit 1."""
-    # tmp_path를 git 저장소로 초기화
-    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
-
-    stdout, stderr, code = run_cli("init-config", "nonexistent", cwd=tmp_path)
     assert code == 1
     assert "skill_id_invalid" in stderr

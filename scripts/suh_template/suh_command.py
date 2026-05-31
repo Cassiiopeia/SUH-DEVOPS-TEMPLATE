@@ -1,8 +1,20 @@
 """
-suh_template CLI 진입점.
+suh_command — cassiiopeia 스킬들이 공유하는 공통 명령 진입점.
+
+이 파일이 하는 일:
+    suh-issue / suh-github / suh-report / suh-review / suh-changelog-deploy /
+    suh-troubleshoot 등 여러 스킬이 GitHub API 호출(이슈·PR·Actions)과
+    문자열 유틸(제목 정규화·브랜치명·출력 경로)을 직접 인라인 Python으로
+    짜지 않고, 이 한 파일의 서브커맨드로 호출한다.
+    실제 로직은 gh_client.py(GitHub API) / gh_branch.py / paths.py 등에 있고,
+    이 파일은 "명령을 받아 알맞은 모듈로 넘기는 라우터" 역할만 한다.
+
+PAT(GitHub 토큰)는 직접 넘기지 않아도 된다:
+    GITHUB_PAT 환경변수가 있으면 그것을, 없으면 config.json에서 자동으로 읽는다
+    (_get_pat 참조). 따라서 호출 측에서 GITHUB_PAT= 를 빼먹어도 동작한다.
 
 사용법:
-    python3 -m suh_template.cli <command> [args]
+    python3 -m suh_template.suh_command <command> [args]
 
 커맨드:
     get-output-path <skill_id> [--title <제목>]
@@ -17,6 +29,9 @@ suh_template CLI 진입점.
     update-issue <owner> <repo> <issue_number> [옵션]
     create-pr <owner> <repo> <title> <body_file> <head> <base>
     list-prs <owner> <repo> [--state open|closed|all]
+    search-issues <owner> <repo> <keyword...>
+    update-pr <owner> <repo> <pr_number> <body_file> [옵션]
+    actions <show-run|joblog|list-failed|resolve-pr|resolve-branch> <owner> <repo> [인자]
 """
 
 from __future__ import annotations
@@ -199,15 +214,22 @@ def cmd_get_commit_template(args: list) -> int:
     return 0
 
 
-def _get_pat() -> Optional[str]:
-    """GITHUB_PAT를 반환한다. 환경변수 우선, 없으면 config 파일에서 자동 로드."""
+def _get_pat(owner: Optional[str] = None, repo: Optional[str] = None) -> Optional[str]:
+    """
+    GitHub PAT를 반환한다.
+
+    1. GITHUB_PAT 환경변수가 있으면 그것을 사용 (명시적 전달 우선)
+    2. 없으면 config.json에서 자동 로드
+       - owner/repo가 일치하는 repos[].pat(non-null) 우선, 없으면 global_pat
+
+    환경변수를 안 붙여도 config만 있으면 동작하므로, 호출 측(스킬)에서
+    GITHUB_PAT= 전달을 빼먹어도 missing_pat이 나지 않는다.
+    """
     pat = os.environ.get("GITHUB_PAT")
     if pat:
         return pat
-    # 환경변수에 없으면 config 파일에서 폴백 로드
-    project_root = _get_project_root()
     try:
-        return _config.get_value(project_root, "issue", "github_pat")
+        return _config.get_github_pat(owner, repo)
     except Exception:
         return None
 
@@ -217,11 +239,11 @@ def cmd_create_issue(args: list) -> int:
     if len(args) < 5:
         _err("ERROR", "create-issue", "owner, repo, title, body_file, labels_csv 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "create-issue", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo, title, body_file, labels_csv = args[0], args[1], args[2], args[3], args[4]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "create-issue", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
     labels = [l.strip() for l in labels_csv.split(",") if l.strip()] if labels_csv else []
     assignees = []
@@ -240,11 +262,11 @@ def cmd_add_comment(args: list) -> int:
     if len(args) < 4:
         _err("ERROR", "add-comment", "owner, repo, issue_number, body_file 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "add-comment", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo, issue_number, body_file = args[0], args[1], int(args[2]), args[3]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "add-comment", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
     try:
         result = _github.add_comment(owner, repo, issue_number, body, pat)
@@ -261,11 +283,11 @@ def cmd_update_issue(args: list) -> int:
     if len(args) < 3:
         _err("ERROR", "update-issue", "owner, repo, issue_number 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "update-issue", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo, issue_number = args[0], args[1], int(args[2])
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "update-issue", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     rest = args[3:]
 
     def _opt(key: str) -> Optional[str]:
@@ -296,11 +318,11 @@ def cmd_get_issue(args: list) -> int:
     if len(args) < 3:
         _err("ERROR", "get-issue", "owner, repo, issue_number 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "get-issue", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo, issue_number = args[0], args[1], int(args[2])
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "get-issue", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     try:
         result = _github.get_issue(owner, repo, issue_number, pat)
         import json as _json
@@ -316,11 +338,11 @@ def cmd_create_pr(args: list) -> int:
     if len(args) < 6:
         _err("ERROR", "create-pr", "owner, repo, title, body_file, head, base 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "create-pr", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo, title, body_file, head, base = args[0], args[1], args[2], args[3], args[4], args[5]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "create-pr", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else ""
     try:
         result = _github.create_pull_request(owner, repo, title, body, head, base, pat)
@@ -337,11 +359,11 @@ def cmd_list_prs(args: list) -> int:
     if len(args) < 2:
         _err("ERROR", "list-prs", "owner, repo 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "list-prs", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo = args[0], args[1]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "list-prs", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     state = "open"
     if "--state" in args:
         idx = args.index("--state")
@@ -362,11 +384,11 @@ def cmd_search_issues(args: list) -> int:
     if len(args) < 3:
         _err("ERROR", "search-issues", "owner, repo, keyword 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "search-issues", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo = args[0], args[1]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "search-issues", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     keyword = " ".join(args[2:])
     try:
         result = _github.search_issues(owner, repo, keyword, pat)
@@ -383,11 +405,11 @@ def cmd_update_pr(args: list) -> int:
     if len(args) < 4:
         _err("ERROR", "update-pr", "owner, repo, pr_number, body_file 인수가 필요합니다.", "missing_argument")
         return 1
-    pat = _get_pat()
-    if not pat:
-        _err("ERROR", "update-pr", "환경변수 GITHUB_PAT가 설정되지 않았습니다.", "missing_pat")
-        return 1
     owner, repo, pr_number, body_file = args[0], args[1], int(args[2]), args[3]
+    pat = _get_pat(owner, repo)
+    if not pat:
+        _err("ERROR", "update-pr", "GITHUB_PAT 환경변수도 config.json도 없습니다.", "missing_pat")
+        return 1
     rest = args[4:]
     body = Path(body_file).read_text(encoding="utf-8") if body_file and Path(body_file).exists() else None
 
@@ -434,9 +456,9 @@ def cmd_actions(args: list) -> int:
     sub, owner, repo = args[0], args[1], args[2]
     rest = args[3:]
 
-    pat = _get_pat()
+    pat = _get_pat(owner, repo)
     if not pat:
-        return _emit({"ok": False, "error": "GITHUB_PAT 미설정", "code": "missing_pat"})
+        return _emit({"ok": False, "error": "GITHUB_PAT 환경변수도 config.json도 없음", "code": "missing_pat"})
 
     def _opt_int(key: str, default: int) -> int:
         if key in rest:
@@ -530,7 +552,7 @@ def main() -> None:
     """CLI 진입점 — 커맨드를 파싱하고 해당 핸들러를 실행한다."""
     args = sys.argv[1:]
     if not args:
-        print("사용법: python3 -m suh_template.cli <command> [args]", file=sys.stderr)
+        print("사용법: python3 -m suh_template.suh_command <command> [args]", file=sys.stderr)
         print(f"커맨드: {', '.join(_COMMANDS)}", file=sys.stderr)
         sys.exit(1)
 

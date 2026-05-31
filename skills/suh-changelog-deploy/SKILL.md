@@ -262,12 +262,12 @@ if [ -n "$EXISTING_PR" ]; then
   # 재사용 케이스: 이미 PR이 존재하므로 update-pr로 릴리스 노트 본문만 갱신한다.
   PR_NUMBER=$EXISTING_PR
   echo "기존 deploy PR #$PR_NUMBER 재사용 → 본문 업데이트"
-  GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
     update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
 else
   # 신규 케이스: create-pr의 body_file에 릴리스 노트 파일 경로를 넘겨 본문 포함 PR 생성.
-  # cli.py가 body_file을 읽어 본문에 채운다 (빈 경로를 넘기던 기존 동작과 달리, 노트 파일을 넘긴다).
-  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+  # suh_command가 body_file을 읽어 본문에 채운다 (빈 경로를 넘기던 기존 동작과 달리, 노트 파일을 넘긴다).
+  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
     create-pr "$OWNER" "$REPO" "$TITLE" "_release_notes.md" "main" "deploy")
   PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
   echo "새 deploy PR #$PR_NUMBER 생성 (릴리스 노트 본문 포함)"
@@ -375,7 +375,7 @@ TITLE="🚀 Deploy ${TODAY} (재시도)"
 
 # create-pr의 body_file에 릴리스 노트 파일 경로를 넘겨 본문 포함 PR 생성 (deploy 6단계와 동일 패턴).
 cd "$PROJECT_ROOT/scripts"
-CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.cli \
+CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
   create-pr "$OWNER" "$REPO" "$TITLE" "_release_notes.md" "main" "deploy")
 PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
 rm -f _release_notes.md

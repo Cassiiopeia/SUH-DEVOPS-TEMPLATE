@@ -73,40 +73,21 @@ OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
 ```
 
-`references/config-rules.md` §2~3 절차로 config의 `github` 섹션에서 `global_pat` 읽기.
-
-**이슈 제목·URL은 agent가 해석하지 않고, 아래 정적 추출 스크립트로 결정적으로 뽑는다.** (SUH-ISSUE-HELPER의 `extractIssueTitle` 로직과 동일 — agent의 임의 요약/재작성 금지)
+**이슈 조회는 인라인 Python으로 하지 않는다.** 재사용 스크립트 `suh_command`의 `get-issue`로 이슈 정보를 가져온다. PAT는 `suh_command`가 config.json에서 자동 로드하므로 직접 추출할 필요가 없다(환경변수가 있으면 우선 사용).
 
 ```bash
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
-
-ISSUE_NUMBER="{추출된 이슈번호}" OWNER="{owner}" REPO="{repo}" GH_PAT="{github_pat}" "$PYTHON" - <<'EOF'
-import os, re, json, urllib.request, urllib.error
-num = os.environ["ISSUE_NUMBER"]
-url = f"https://api.github.com/repos/{os.environ['OWNER']}/{os.environ['REPO']}/issues/{num}"
-req = urllib.request.Request(url)
-req.add_header("Authorization", "token " + os.environ["GH_PAT"])
-try:
-    res = urllib.request.urlopen(req)
-    issue = json.loads(res.read())
-except urllib.error.HTTPError as e:
-    print(json.dumps({"error": e.code, "msg": e.reason})); raise SystemExit
-except Exception as e:
-    print(json.dumps({"error": "exception", "msg": str(e)})); raise SystemExit
-
-raw_title = issue["title"]
-html_url = issue["html_url"]
-
-# 1) [태그] 제거  2) 이모지/제어문자(So/C/VS16/ZWJ) 제거  3) trim
-clean = re.sub(r"\[.*?\]", "", raw_title).strip()
-clean = re.sub(r"[\U0001F000-\U0001FAFF☀-➿️‍]", "", clean).strip()
-clean = clean if clean else raw_title.strip()
-
-print(json.dumps({"clean_title": clean, "html_url": html_url, "raw_title": raw_title}, ensure_ascii=False))
-EOF
+cd "$PROJECT_ROOT/scripts"
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command get-issue {owner} {repo} {추출된 이슈번호}
 ```
 
-stdout JSON에서 `clean_title`, `html_url`을 **그대로** 사용한다. `error` 키가 있으면(401 등) PAT 만료 안내 후 사용자에게 직접 입력받는다. → 4단계로 진행
+출력 JSON에서 `title`(원본 제목)과 `html_url`을 얻는다. **이슈 제목은 agent가 임의 요약/재작성하지 않고**, 아래 규칙으로 결정적으로 정제해 커밋 메시지에 쓴다 (SUH-ISSUE-HELPER의 `extractIssueTitle`과 동일):
+
+1. `[태그]` 형식(`[버그]`, `[기능개선]` 등)을 모두 제거
+2. 앞에 붙은 이모지·제어문자(So/VS16/ZWJ)를 제거
+3. 앞뒤 공백 trim — 결과가 비면 원본 제목을 그대로 사용
+
+`get-issue`가 `[ERROR] ... github_api_401`(PAT 만료) 또는 `github_api_404`(이슈 없음)을 stderr로 내면, 그 사유를 안내하고 사용자에게 제목을 직접 입력받는다. → 4단계로 진행
 
 **이슈 번호가 없는 경우** — 즉시 멈추고 선택지 제시:
 

@@ -233,6 +233,50 @@ def create_pull_request(
     return {"number": data["number"], "url": data["html_url"]}
 
 
+def get_pull_detail(owner: str, repo: str, pr_number: int, pat: str) -> dict:
+    """단일 PR 상세에서 머지 판정에 필요한 필드를 추출한다.
+
+    list_pulls에는 body·mergeable_state가 없어 deploy-status 검증용으로 별도 조회한다.
+    """
+    pr = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}", None, pat)
+    return {
+        "number": pr["number"],
+        "state": pr["state"],
+        "merged": pr.get("merged", False),
+        "mergeable_state": pr.get("mergeable_state"),
+        "body": pr.get("body") or "",
+        "head_sha": pr.get("head", {}).get("sha"),
+        "url": pr["html_url"],
+    }
+
+
+def find_open_pr_by_base(owner: str, repo: str, base: str, pat: str) -> dict | None:
+    """base 브랜치로 들어오는 open PR 중 첫 번째의 상세를 반환한다. 없으면 None.
+
+    deploy-status를 --pr 없이 호출할 때 deploy PR을 자동으로 찾기 위함.
+    """
+    items = _request(
+        "GET",
+        f"{_API_BASE}/repos/{owner}/{repo}/pulls?state=open&base={base}&per_page=50",
+        None, pat,
+    )
+    if not items:
+        return None
+    return get_pull_detail(owner, repo, items[0]["number"], pat)
+
+
+def get_branch_head(owner: str, repo: str, branch: str, pat: str) -> str | None:
+    """브랜치 HEAD SHA를 반환한다. 브랜치가 없으면 None (404를 None으로 흡수)."""
+    enc = urllib.parse.quote(branch, safe="")
+    try:
+        ref = _request("GET", f"{_API_BASE}/repos/{owner}/{repo}/git/ref/heads/{enc}", None, pat)
+    except GitHubAPIError as e:
+        if e.status_code == 404:
+            return None
+        raise
+    return ref.get("object", {}).get("sha")
+
+
 # --- GitHub Actions ---
 
 def _run_summary(run: dict) -> dict:

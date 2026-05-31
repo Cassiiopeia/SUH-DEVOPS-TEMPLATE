@@ -238,6 +238,7 @@ skills/
 └── references/
     ├── common-rules.md       # 절대 규칙, 커밋 컨벤션
     ├── config-rules.md       # config 경로·스키마·읽기/쓰기 표준
+    ├── mcp-subcommand-rules.md # suh_command 서브커맨드 MCP-style 설계 표준 (JSON+next, 코드 템플릿)
     ├── doc-output-path.md
     ├── project-detection.md
     ├── code-style-detection.md
@@ -259,6 +260,8 @@ skills/
 
 스킬이 Python으로 외부 시스템(GitHub API, SSH 등)을 호출할 때 반드시 이 패턴을 따른다.
 이 표준은 Windows Git Bash + macOS 양쪽에서 깨지지 않도록 실측 검증된 것이다.
+
+> **`suh_command.py`에 새 서브커맨드를 추가할 때는 `skills/references/mcp-subcommand-rules.md`를 먼저 읽는다.** 입력 계약·JSON 스키마(`ok`/`verdict`/`summary`/`next`)·gh_client와 command 레이어 분리·테스트 패턴을 코드 템플릿과 체크리스트로 정리해 둔 구체적 구현 레퍼런스다. 모범 사례는 `actions`·`deploy-status` 서브커맨드.
 
 #### 1. 로직은 재사용 스크립트 파일에 둔다
 

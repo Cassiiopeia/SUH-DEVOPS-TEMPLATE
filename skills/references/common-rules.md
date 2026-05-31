@@ -216,76 +216,24 @@ if [ -z "$PYTHON" ]; then echo "❌ Python을 찾을 수 없습니다."; exit 1;
 PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.suh_command <command> [args]
 ```
 
-지원 커맨드: `get-output-path`, `get-issue-number`, `get-next-seq`, `normalize-title`, `create-branch-name`, `get-commit-template`, `create-issue`, `add-comment`, `get-issue`, `update-issue`, `create-pr`, `list-prs`
+지원 커맨드: `get-output-path`, `get-issue-number`, `get-next-seq`, `normalize-title`, `create-branch-name`, `get-commit-template`, `create-issue`, `add-comment`, `get-issue`, `get-issues`, `update-issue`, `create-pr`, `list-prs`, `search-issues`, `update-pr`, `actions`, `deploy-status`, `explore`, `secrets`
 
 ## GitHub 작업 원칙
 
-GitHub API 작업은 **curl로 직접 호출**한다. `gh` CLI는 사용하지 않는다.
-(이유: `gh` CLI는 별도 설치가 필요하고 Windows/macOS 환경 차이로 동작이 달라질 수 있다. curl은 모든 환경에서 동일하게 동작한다.)
+GitHub API 작업은 **재사용 스크립트 `suh_command` 서브커맨드로 호출**한다. 스킬 문서에 curl 레시피, Python heredoc, 임시 Python 파일을 새로 넣지 않는다.
 
-### Windows 내부망 환경 — SSL 인증서 오류 대응
+- PAT는 `suh_command`가 `GITHUB_PAT` 환경변수 → `config.json` 순으로 자동 로드한다.
+- 새 GitHub API 동작이 필요하면 먼저 `references/mcp-subcommand-rules.md`를 읽고 `gh_client.py` 헬퍼 + `suh_command.py` 서브커맨드 + 테스트를 추가한다.
+- `gh` CLI는 별도 설치 필요 및 Windows/macOS 환경 차이로 사용하지 않는다.
+- curl 직접 호출은 아직 서브커맨드가 없는 긴급 조사에만 임시 허용한다. 그 경우 결과를 커밋하지 말고, 반복 사용이 보이면 즉시 `suh_command`로 승격한다.
 
-Windows 환경(특히 내부망/폐쇄망)에서 curl이 SSL 인증서 검증 오류로 실패할 수 있다:
-```
-curl: (35) schannel: next InitializeSecurityContext failed
-```
-
-이 경우 `--ssl-no-revoke` 플래그를 추가한다:
-```bash
-curl -s --ssl-no-revoke -H "Authorization: token $PAT" \
-  "https://api.github.com/repos/{owner}/{repo}/issues"
-```
-
-**적용 조건**: curl 실행 후 exit code 35 또는 SSL 관련 오류 메시지가 나올 때만 추가.
-정상 환경에서는 불필요하므로 기본 curl 호출에는 포함하지 않는다.
-(이유: `--ssl-no-revoke`를 기본값으로 쓰면 정상 환경에서도 인증서 검증이 약화되므로, 오류 발생 시에만 opt-in 한다.)
-
-PAT는 `references/config-rules.md` §3의 표준 추출기로 변수에 담는다 (인라인 Python 추출 금지):
+대표 호출:
 
 ```bash
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
-PAT=$("$PYTHON" "$PROJECT_ROOT/scripts/suh_template/get_pat.py" {owner} {repo})
+cd "$PROJECT_ROOT/scripts"
+PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command get-issue {owner} {repo} {number} --with-comments
 ```
-
-아래 curl 예시의 `$PAT`는 이렇게 채운 값이다. (`suh_command` 서브커맨드를 쓰면 PAT 추출 자체가 불필요 — 자동 로드한다.)
-
-| 작업 | curl 예시 |
-|------|-----------|
-| 이슈 생성 | `POST /repos/{owner}/{repo}/issues` |
-| 이슈 조회 | `GET /repos/{owner}/{repo}/issues/{number}` |
-| 이슈 수정 | `PATCH /repos/{owner}/{repo}/issues/{number}` |
-| 댓글 추가 | `POST /repos/{owner}/{repo}/issues/{number}/comments` |
-| PR 생성 | `POST /repos/{owner}/{repo}/pulls` |
-| PR 목록 조회 | `GET /repos/{owner}/{repo}/pulls?state=open` |
-| PR 본문 수정 | `PATCH /repos/{owner}/{repo}/pulls/{number}` |
-
-**본문 없는 GET 요청** (이슈 조회, PR 목록 등):
-```bash
-curl -s -H "Authorization: token $PAT" \
-  "https://api.github.com/repos/{owner}/{repo}/issues"
-```
-
-**본문 있는 POST/PATCH 요청** (이슈 생성·수정, 댓글 추가, PR 생성 등):
-한국어·이모지·줄바꿈이 포함되면 curl 인라인 이스케이프가 Windows에서 깨진다.
-임시 파일 없이 Python urllib로 직접 전송한다:
-
-```bash
-PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
-GITHUB_PAT="$PAT" $PYTHON - <<'EOF'
-import os, urllib.request, json
-pat = os.environ["GITHUB_PAT"]
-url = "https://api.github.com/repos/{owner}/{repo}/issues"
-payload = {"title": "...", "body": "..."}
-data = json.dumps(payload).encode()
-req = urllib.request.Request(url, data=data, method="POST")
-req.add_header("Authorization", f"token {pat}")
-req.add_header("Content-Type", "application/json")
-res = urllib.request.urlopen(req)
-print(json.loads(res.read())["html_url"])
-EOF
-```
-
-> `gh` CLI는 별도 설치 필요 및 Windows/Mac 환경 차이로 사용 금지.
 
 ### GitHub API 공통 에러 대응
 

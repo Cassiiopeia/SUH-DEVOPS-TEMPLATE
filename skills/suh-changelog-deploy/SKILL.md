@@ -72,7 +72,7 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 
 > **이후 모든 Bash 블록의 사용 규칙**: PAT/OWNER/REPO/PYTHON/PROJECT_ROOT가 등장하는 블록은 **그 블록 맨 앞에 실제 값을 인라인 prefix**로 붙인다. 예:
 > ```bash
-> GITHUB_PAT="ghp_실제값" OWNER="Cassiiopeia" REPO="SUH-DEVOPS-TEMPLATE" \
+> GITHUB_PAT="{PAT}" OWNER="Cassiiopeia" REPO="SUH-DEVOPS-TEMPLATE" \
 > PYTHON="/c/Users/USER/.../python" PROJECT_ROOT="/d/0-suh/.../suh-github-template" \
 >   bash -c '...아래 블록 내용...'
 > ```
@@ -251,32 +251,32 @@ GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY}"
 
-# 기존 open deploy PR이 있으면 재사용 — 닫지 않는다 (새로 열면 워크플로우 재트리거되어 본문 초기화 위험)
-EXISTING_PR=$(curl -s \
-  -H "Authorization: token $GITHUB_PAT" \
-  "https://api.github.com/repos/$OWNER/$REPO/pulls?state=open&base=deploy" \
-  | grep -o '"number":[0-9]*' | head -1 | grep -o '[0-9]*')
-
 cd "$PROJECT_ROOT/scripts"
+DEPLOY_STATUS=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
+  deploy-status "$OWNER" "$REPO" --base deploy)
+EXISTING_PR=$(DEPLOY_STATUS="$DEPLOY_STATUS" "$PYTHON" -c "import os,json; d=json.loads(os.environ['DEPLOY_STATUS']); print((d.get('pr') or {}).get('number',''))")
+
+# 기존 open deploy PR이 있으면 재사용 — 닫지 않는다 (새로 열면 워크플로우 재트리거되어 본문 초기화 위험)
 if [ -n "$EXISTING_PR" ]; then
   # 재사용 케이스: 이미 PR이 존재하므로 update-pr로 릴리스 노트 본문만 갱신한다.
   PR_NUMBER=$EXISTING_PR
   echo "기존 deploy PR #$PR_NUMBER 재사용 → 본문 업데이트"
-  GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
+  RESULT_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
     update-pr "$OWNER" "$REPO" "$PR_NUMBER" "_release_notes.md"
+  )
 else
   # 신규 케이스: create-pr의 body_file에 릴리스 노트 파일 경로를 넘겨 본문 포함 PR 생성.
   # suh_command가 body_file을 읽어 본문에 채운다 (빈 경로를 넘기던 기존 동작과 달리, 노트 파일을 넘긴다).
-  CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
+  RESULT_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
     create-pr "$OWNER" "$REPO" "$TITLE" "_release_notes.md" "main" "deploy")
-  PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
+  PR_NUMBER=$(RESULT_OUT="$RESULT_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['RESULT_OUT']).get('number',''))")
   echo "새 deploy PR #$PR_NUMBER 생성 (릴리스 노트 본문 포함)"
 fi
 rm -f _release_notes.md
 cd "$PROJECT_ROOT"
 
 if [ -z "$PR_NUMBER" ]; then
-  echo "❌ PR 생성/업데이트 실패. GitHub API 응답을 확인하세요. ($CREATE_OUT)"
+  echo "❌ PR 생성/업데이트 실패. GitHub API 응답을 확인하세요. ($RESULT_OUT)"
   exit 1
 fi
 ```
@@ -366,13 +366,12 @@ cd "$PROJECT_ROOT"
 
 ```bash
 # ⚠️ Bash stateless — 변수 + EXISTING_PR(fix 1단계 번호)을 실제 값으로 채운다.
-GITHUB_PAT="..."; OWNER="..."; REPO="..."; EXISTING_PR="..."
+GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."; EXISTING_PR="..."
 
-curl -s -X PATCH \
-  -H "Authorization: token $GITHUB_PAT" \
-  -H "Content-Type: application/json" \
-  -d '{"state":"closed"}' \
-  "https://api.github.com/repos/$OWNER/$REPO/pulls/$EXISTING_PR"
+cd "$PROJECT_ROOT/scripts"
+GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
+  update-pr "$OWNER" "$REPO" "$EXISTING_PR" "-" --state closed
+cd "$PROJECT_ROOT"
 ```
 
 > **⚠️ fix 모드도 deploy 모드와 동일하게 PR 생성을 맨 마지막에 둔다.** 빈 본문으로 새 PR을 먼저 열면 워크플로우가 본문을 초기화한다. 따라서 커밋 분석(fix 3단계) → 릴리스 노트 작성(fix 4단계) → 릴리스 노트 본문 담아 PR 생성(fix 5단계) 순으로 진행한다.

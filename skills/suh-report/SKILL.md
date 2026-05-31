@@ -101,7 +101,7 @@ PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command \
 
 출력은 JSON: `{"id": ..., "url": "https://github.com/.../issues/{번호}#issuecomment-..."}`. `url` 필드를 완료 메시지에 사용한다.
 
-> **Windows 주의**: `cd "$PROJECT_ROOT/scripts"` 후 `-m suh_template.suh_command`로 실행한다. `/tmp`·heredoc·`curl|python` 미사용. 인자는 명령행/환경변수로 전달한다.
+> **Windows 주의**: `cd "$PROJECT_ROOT/scripts"` 후 `-m suh_template.suh_command`로 실행한다. 임시 파일 파싱·heredoc·curl 파이프 Python 미사용. 인자는 명령행/환경변수로 전달한다.
 
 ### 완료 메시지
 

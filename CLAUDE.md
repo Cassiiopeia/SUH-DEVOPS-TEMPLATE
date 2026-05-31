@@ -354,15 +354,22 @@ get-next-seq        # 다음 시퀀스 번호
 normalize-title     # 제목 정규화
 create-branch-name  # 브랜치명 생성
 get-commit-template # 커밋 템플릿 생성
-create-issue        # GitHub 이슈 생성 (PAT는 GITHUB_PAT 환경변수로 전달)
+create-issue        # GitHub 이슈 생성
 add-comment         # 이슈 댓글 추가
-get-issue           # 이슈 조회
+get-issue           # 이슈 조회 (--with-comments 지원)
+get-issues          # 여러 이슈 조회
 update-issue        # 이슈 수정
 create-pr           # PR 생성
 list-prs            # PR 목록 조회
+search-issues       # 이슈 검색
+update-pr           # PR 본문/상태 수정
+actions             # GitHub Actions run/job/log 조회
+deploy-status       # deploy PR 상태 판정
+explore             # 레포 탐색
+secrets             # Actions Secret 조회/등록
 ```
 
-> CLI는 Windows 환경에서 인코딩 불안정 이슈 있음. GitHub API 호출은 curl 직접 사용 권장.
+> GitHub API 호출은 `suh_command` 서브커맨드 우선. 새 동작이 필요하면 `skills/references/mcp-subcommand-rules.md` 기준으로 고정 헬퍼+서브커맨드+테스트를 추가한다.
 
 ### Agent 주의사항
 

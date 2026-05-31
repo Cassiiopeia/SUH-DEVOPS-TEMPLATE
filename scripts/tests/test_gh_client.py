@@ -7,8 +7,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from suh_template.gh_client import (
     create_issue, add_comment, get_issue, list_issues,
-    create_pull_request, GitHubAPIError,
+    create_pull_request, GitHubAPIError, search_issues,
     get_pull_detail, find_open_pr_by_base, get_branch_head,
+    get_issue_comments, get_languages, get_readme, get_repo_detail,
+    get_user_type, list_commits, list_repos, list_secrets,
 )
 
 
@@ -65,11 +67,25 @@ def test_add_comment_not_found():
 
 
 def test_get_issue_success():
-    resp = _mock_response({"number": 5, "title": "제목", "html_url": "https://...", "state": "open", "body": "본문"})
+    resp = _mock_response({
+        "number": 5,
+        "title": "제목",
+        "html_url": "https://...",
+        "state": "open",
+        "body": "본문",
+        "labels": [{"name": "작업중"}],
+        "assignees": [{"login": "Cassiiopeia"}],
+        "created_at": "2026-05-30T10:00:00Z",
+        "updated_at": "2026-05-31T10:00:00Z",
+        "comments": 3,
+    })
     with patch("suh_template.gh_client._opener.open", return_value=resp):
         result = get_issue("owner", "repo", 5, "ghp_fake")
     assert result["number"] == 5
     assert result["state"] == "open"
+    assert result["labels"] == ["작업중"]
+    assert result["assignees"] == ["Cassiiopeia"]
+    assert result["comments_count"] == 3
 
 
 def test_get_issue_not_found():
@@ -90,6 +106,21 @@ def test_list_issues_success():
         result = list_issues("owner", "repo", "ghp_fake")
     assert len(result) == 1
     assert result[0]["number"] == 1
+
+
+def test_search_issues_includes_labels():
+    resp = _mock_response({
+        "items": [{
+            "number": 7,
+            "title": "중복 후보",
+            "html_url": "https://...",
+            "state": "open",
+            "labels": [{"name": "작업전"}, {"name": "Skills"}],
+        }]
+    })
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = search_issues("owner", "repo", "중복 후보", "ghp_fake")
+    assert result[0]["labels"] == ["작업전", "Skills"]
 
 
 def test_create_pull_request_success():
@@ -171,3 +202,110 @@ def test_get_branch_head_missing():
     )):
         result = get_branch_head("owner", "repo", "nope", "ghp_fake")
     assert result is None
+
+
+def test_get_issue_comments_success():
+    resp = _mock_response([
+        {
+            "user": {"login": "reviewer"},
+            "body": "확인했습니다",
+            "created_at": "2026-05-31T10:00:00Z",
+        }
+    ])
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = get_issue_comments("owner", "repo", 5, "ghp_fake")
+    assert result == [{"author": "reviewer", "body": "확인했습니다", "created_at": "2026-05-31T10:00:00Z"}]
+
+
+def test_get_user_type_success():
+    resp = _mock_response({"type": "Organization"})
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = get_user_type("owner", "ghp_fake")
+    assert result == "org"
+
+
+def test_list_repos_success():
+    resp = _mock_response([
+        {
+            "name": "repo",
+            "description": "설명",
+            "language": "Python",
+            "stargazers_count": 7,
+            "updated_at": "2026-05-31T10:00:00Z",
+            "fork": False,
+            "private": True,
+            "html_url": "https://github.com/o/repo",
+            "topics": ["skills"],
+        }
+    ])
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = list_repos("owner", "org", "ghp_fake")
+    assert result[0]["name"] == "repo"
+    assert result[0]["stars"] == 7
+    assert result[0]["topics"] == ["skills"]
+
+
+def test_get_repo_detail_success():
+    resp = _mock_response({
+        "name": "repo",
+        "description": "설명",
+        "language": "Python",
+        "stargazers_count": 7,
+        "forks_count": 2,
+        "open_issues_count": 4,
+        "default_branch": "main",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-05-31T10:00:00Z",
+        "topics": ["skills"],
+        "html_url": "https://github.com/o/repo",
+    })
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = get_repo_detail("owner", "repo", "ghp_fake")
+    assert result["forks"] == 2
+    assert result["open_issues"] == 4
+    assert result["default_branch"] == "main"
+
+
+def test_get_readme_decodes_base64():
+    resp = _mock_response({"content": "IyBUaXRsZQo=", "encoding": "base64"})
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = get_readme("owner", "repo", "ghp_fake")
+    assert result == {"content": "# Title\n"}
+
+
+def test_get_readme_missing_returns_null():
+    import urllib.error
+    with patch("suh_template.gh_client._opener.open", side_effect=urllib.error.HTTPError(
+        url=None, code=404, msg="Not Found", hdrs=None, fp=BytesIO(b'{"message":"Not Found"}')
+    )):
+        result = get_readme("owner", "repo", "ghp_fake")
+    assert result == {"content": None}
+
+
+def test_get_languages_percent_descending():
+    resp = _mock_response({"Python": 300, "Shell": 100})
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = get_languages("owner", "repo", "ghp_fake")
+    assert result == [{"lang": "Python", "percent": 75.0}, {"lang": "Shell", "percent": 25.0}]
+
+
+def test_list_commits_success():
+    resp = _mock_response([
+        {
+            "sha": "abcdef123456",
+            "commit": {
+                "author": {"name": "A", "date": "2026-05-31T10:00:00Z"},
+                "message": "feat: add command\n\nbody",
+            },
+        }
+    ])
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = list_commits("owner", "repo", "ghp_fake", limit=5)
+    assert result == [{"sha": "abcdef1", "date": "2026-05-31T10:00:00Z", "author": "A", "msg": "feat: add command"}]
+
+
+def test_list_secrets_success():
+    resp = _mock_response({"secrets": [{"name": "BACKEND_ENV_FILE", "updated_at": "2026-05-31T10:00:00Z"}]})
+    with patch("suh_template.gh_client._opener.open", return_value=resp):
+        result = list_secrets("owner", "repo", "ghp_fake")
+    assert result == [{"name": "BACKEND_ENV_FILE", "updated_at": "2026-05-31T10:00:00Z"}]

@@ -14,3 +14,6 @@ __pycache__/
 
 # Windows NUL 디바이스 파일
 nul
+
+# CodeGraph 로컬 인덱스 (SQLite 지식 그래프)
+.codegraph/

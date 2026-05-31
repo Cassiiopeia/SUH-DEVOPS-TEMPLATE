@@ -625,7 +625,7 @@ def cmd_deploy_status(args: list) -> int:
             summary = f"PR #{pr['number']} 본문에 'Summary by CodeRabbit'이 없습니다. 본문이 초기화된 것으로 보입니다 — fix 모드로 재작성하세요."
         else:
             verdict = "waiting_for_automerge"
-            summary = f"PR #{pr['number']} open·{pr['mergeable_state']}, CodeRabbit 본문 있음 — automerge 대기 중. 약 90초 후 재확인하세요."
+            summary = f"PR #{pr['number']} open·{pr['mergeable_state']}, CodeRabbit 본문 있음 — automerge 대기 중. 약 60초 후 재확인하세요 (보통 60초 안에 머지 완료)."
 
         return _emit({
             "ok": True,

@@ -1,4 +1,4 @@
-# ===================================================================
+﻿# ===================================================================
 # GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
 # ===================================================================
 #
@@ -245,11 +245,172 @@ function Read-UserInput {
 
 function Read-SingleKey {
     param([string]$Prompt)
-    
+
     Write-Host $Prompt -NoNewline
     $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     Write-Host ""
     return $key.Character.ToString().ToUpper()
+}
+
+# ─────────────────────────────────────────────────────────────
+# 인터랙티브 메뉴 (TTY 전용) — 화살표/숫자/Enter/ESC
+# ─────────────────────────────────────────────────────────────
+function Invoke-InteractiveMenu {
+    param(
+        [Parameter(Mandatory=$true)][string]$Prompt,
+        [Parameter(Mandatory=$true)][hashtable[]]$Options,
+        [int]$DefaultIndex = 0
+    )
+
+    $n = $Options.Count
+    if ($n -eq 0) {
+        [Console]::Error.WriteLine("Invoke-InteractiveMenu: 옵션이 없습니다")
+        return $null
+    }
+
+    $useColor = -not $env:NO_COLOR
+
+    $cursor = $DefaultIndex
+    if ($cursor -lt 0 -or $cursor -ge $n) { $cursor = 0 }
+
+    Write-Host ""
+    Write-Host ("{0} (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):" -f $Prompt)
+    Write-Host ""
+
+    $startTop = [Console]::CursorTop
+    $width = [Console]::WindowWidth
+    if ($width -lt 20) { $width = 80 }
+
+    $renderMenu = {
+        [Console]::SetCursorPosition(0, $startTop)
+        for ($i = 0; $i -lt $n; $i++) {
+            $opt = $Options[$i]
+            $num = $i + 1
+            if ($i -eq $cursor) {
+                $line = "> [•] {0}) {1}    {2}" -f $num, $opt.Value, $opt.Label
+            } else {
+                $line = "  [ ] {0}) {1}    {2}" -f $num, $opt.Value, $opt.Label
+            }
+            # 줄 끝까지 빈공간으로 채워 이전 잔재 제거
+            if ($line.Length -lt ($width - 1)) {
+                $line = $line.PadRight($width - 1)
+            } else {
+                $line = $line.Substring(0, $width - 1)
+            }
+
+            if ($i -eq $cursor -and $useColor) {
+                Write-Host $line -ForegroundColor Cyan
+            } else {
+                Write-Host $line
+            }
+        }
+    }
+
+    [Console]::CursorVisible = $false
+
+    try {
+        & $renderMenu
+        while ($true) {
+            $key = [Console]::ReadKey($true)
+            switch ($key.Key) {
+                'UpArrow' {
+                    $cursor--
+                    if ($cursor -lt 0) { $cursor = $n - 1 }
+                }
+                'DownArrow' {
+                    $cursor++
+                    if ($cursor -ge $n) { $cursor = 0 }
+                }
+                'K' {
+                    $cursor--
+                    if ($cursor -lt 0) { $cursor = $n - 1 }
+                }
+                'J' {
+                    $cursor++
+                    if ($cursor -ge $n) { $cursor = 0 }
+                }
+                'Enter' {
+                    [Console]::SetCursorPosition(0, $startTop + $n)
+                    return $Options[$cursor].Value
+                }
+                'Escape' {
+                    [Console]::SetCursorPosition(0, $startTop + $n)
+                    return $null
+                }
+                'Q' {
+                    [Console]::SetCursorPosition(0, $startTop + $n)
+                    return $null
+                }
+                default {
+                    $ch = $key.KeyChar
+                    if ($ch -ge '1' -and $ch -le '9') {
+                        $jump = [int]([string]$ch) - 1
+                        if ($jump -lt $n) { $cursor = $jump }
+                    }
+                }
+            }
+            & $renderMenu
+        }
+    }
+    finally {
+        [Console]::CursorVisible = $true
+    }
+}
+
+# ─────────────────────────────────────────────────────────────
+# 비TTY fallback — 기존 숫자 입력 방식
+# ─────────────────────────────────────────────────────────────
+function Invoke-LegacyNumericMenu {
+    param(
+        [Parameter(Mandatory=$true)][string]$Prompt,
+        [Parameter(Mandatory=$true)][hashtable[]]$Options
+    )
+
+    $n = $Options.Count
+    if ($n -eq 0) { return $null }
+
+    Write-Host ""
+    Write-Host $Prompt
+    Write-Host ""
+    for ($i = 0; $i -lt $n; $i++) {
+        $opt = $Options[$i]
+        Write-Host ("  {0}) {1,-20} - {2}" -f ($i + 1), $opt.Value, $opt.Label)
+    }
+    Write-Host ""
+
+    while ($true) {
+        try {
+            $choice = Read-Host ("선택 (1-{0})" -f $n)
+        } catch {
+            # stdin redirect 환경에서 Read-Host 실패 → 첫 옵션
+            return $Options[0].Value
+        }
+        if ($choice -match '^\d+$') {
+            $c = [int]$choice
+            if ($c -ge 1 -and $c -le $n) {
+                return $Options[$c - 1].Value
+            }
+        }
+        Write-Host ("잘못된 입력입니다. 1-{0} 사이의 숫자를 입력해주세요." -f $n)
+    }
+}
+
+# ─────────────────────────────────────────────────────────────
+# 통합 entry point — TTY면 Invoke-InteractiveMenu, 아니면 fallback
+# ─────────────────────────────────────────────────────────────
+function Invoke-ChooseMenu {
+    param(
+        [Parameter(Mandatory=$true)][string]$Prompt,
+        [Parameter(Mandatory=$true)][hashtable[]]$Options,
+        [int]$DefaultIndex = 0
+    )
+
+    $isTty = (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
+    if ($isTty) {
+        return Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex
+    } else {
+        return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options
+    }
 }
 
 function Ask-YesNo {
@@ -553,40 +714,24 @@ function Detect-DefaultBranch {
 # ===================================================================
 
 function Show-ProjectTypeMenu {
-    Write-Host ""
-    Write-Host "프로젝트 타입을 선택하세요:"
-    Write-Host ""
-    Write-Host "  1) spring            - Spring Boot 백엔드"
-    Write-Host "  2) flutter           - Flutter 모바일 앱"
-    Write-Host "  3) next              - Next.js 웹 앱"
-    Write-Host "  4) react             - React 웹 앱"
-    Write-Host "  5) react-native      - React Native 모바일 앱"
-    Write-Host "  6) react-native-expo - React Native Expo 앱"
-    Write-Host "  7) node              - Node.js 프로젝트"
-    Write-Host "  8) python            - Python 프로젝트"
-    Write-Host "  9) basic             - 기타 프로젝트"
-    Write-Host ""
+    $selected = Invoke-ChooseMenu -Prompt "프로젝트 타입을 선택하세요" -Options @(
+        @{Value='spring';            Label='Spring Boot 백엔드'},
+        @{Value='flutter';           Label='Flutter 모바일 앱'},
+        @{Value='next';              Label='Next.js 웹 앱'},
+        @{Value='react';             Label='React 웹 앱'},
+        @{Value='react-native';      Label='React Native 모바일 앱'},
+        @{Value='react-native-expo'; Label='React Native Expo 앱'},
+        @{Value='node';              Label='Node.js 프로젝트'},
+        @{Value='python';            Label='Python 프로젝트'},
+        @{Value='basic';             Label='기타 프로젝트'}
+    )
 
-    while ($true) {
-        $choice = Read-SingleKey "선택 (1-9) "
-
-        if ($choice -match '^[1-9]$') {
-            switch ($choice) {
-                "1" { return "spring" }
-                "2" { return "flutter" }
-                "3" { return "next" }
-                "4" { return "react" }
-                "5" { return "react-native" }
-                "6" { return "react-native-expo" }
-                "7" { return "node" }
-                "8" { return "python" }
-                "9" { return "basic" }
-            }
-        } else {
-            Print-Error "잘못된 입력입니다. 1-9 사이의 숫자를 입력해주세요."
-            Write-Host ""
-        }
+    if (-not $selected) {
+        Print-Error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
+        return $script:ProjectType
     }
+
+    return $selected
 }
 
 # ===================================================================
@@ -595,67 +740,57 @@ function Show-ProjectTypeMenu {
 
 function Edit-ProjectInfo {
     Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
-    
-    Write-Host "  1) Project Type"
-    Write-Host "  2) Version"
-    Write-Host "  3) Default Branch (기본 브랜치)"
-    Write-Host "  4) 모두 맞음, 계속"
-    Write-Host ""
-    
-    while ($true) {
-        $choice = Read-SingleKey "선택 (1-4) "
-        
-        if ($choice -match '^[1-4]$') {
-            switch ($choice) {
-                "1" {
-                    # Project Type 수정
-                    $script:ProjectType = Show-ProjectTypeMenu
-                    Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
-                    Write-Host ""
-                    break
-                }
-                "2" {
-                    # Version 수정
-                    Write-Host ""
-                    $newVersion = Read-UserInput "새 버전을 입력하세요 (예: 1.0.0)"
-                    Write-Host ""
-                    
-                    if ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
-                        $script:ProjectVersion = $newVersion
-                        Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
-                    } else {
-                        Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-                    }
-                    Write-Host ""
-                    break
-                }
-                "3" {
-                    # Default Branch 수정
-                    Write-Host ""
-                    Write-Host "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
-                    Write-Host ""
-                    $newBranch = Read-UserInput "기본 브랜치 이름을 입력하세요 (예: main, develop)"
-                    Write-Host ""
-                    
-                    if (![string]::IsNullOrWhiteSpace($newBranch)) {
-                        $script:DetectedBranch = $newBranch
-                        Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
-                    } else {
-                        Print-Error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-                    }
-                    Write-Host ""
-                    break
-                }
-                "4" {
-                    # 모두 맞음, 계속
-                    Print-Success "프로젝트 정보 확인 완료"
-                    Write-Host ""
-                    return
-                }
-            }
-        } else {
-            Print-Error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+
+    $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
+        @{Value='type';    Label='Project Type'},
+        @{Value='version'; Label='Version'},
+        @{Value='branch';  Label='Default Branch (기본 브랜치)'},
+        @{Value='done';    Label='모두 맞음, 계속'}
+    )
+
+    if (-not $editChoice) {
+        Write-Host "수정 메뉴가 취소되었습니다."
+        return
+    }
+
+    switch ($editChoice) {
+        'type' {
+            $script:ProjectType = Show-ProjectTypeMenu
+            Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
             Write-Host ""
+        }
+        'version' {
+            Write-Host ""
+            $newVersion = Read-UserInput "새 버전을 입력하세요 (예: 1.0.0)"
+            Write-Host ""
+
+            if ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
+                $script:ProjectVersion = $newVersion
+                Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
+            } else {
+                Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+            }
+            Write-Host ""
+        }
+        'branch' {
+            Write-Host ""
+            Write-Host "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+            Write-Host ""
+            $newBranch = Read-UserInput "기본 브랜치 이름을 입력하세요 (예: main, develop)"
+            Write-Host ""
+
+            if (![string]::IsNullOrWhiteSpace($newBranch)) {
+                $script:DetectedBranch = $newBranch
+                Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
+            } else {
+                Print-Error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+            }
+            Write-Host ""
+        }
+        'done' {
+            Print-Success "프로젝트 정보 확인 완료"
+            Write-Host ""
+            return
         }
     }
 }
@@ -2079,36 +2214,21 @@ function Start-InteractiveMode {
 
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
 
-    Write-Host "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
-    Write-Host "  2) 버전 관리 시스템만"
-    Write-Host "  3) GitHub Actions 워크플로우만"
-    Write-Host "  4) 이슈/PR 템플릿만"
-    Write-Host "  5) Agent Skill 설치 (Claude, Cursor, Gemini, Codex)"
-    Write-Host "  6) 취소"
-    Write-Host ""
+    $_modeSelected = Invoke-ChooseMenu -Prompt "어떤 기능을 통합하시겠습니까?" -Options @(
+        @{Value='full';      Label='전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)'},
+        @{Value='version';   Label='버전 관리 시스템만'},
+        @{Value='workflows'; Label='GitHub Actions 워크플로우만'},
+        @{Value='issues';    Label='이슈/PR 템플릿만'},
+        @{Value='skills';    Label='Agent Skill 설치 (Claude, Cursor, Gemini, Codex)'},
+        @{Value='cancel';    Label='취소'}
+    )
 
-    # 입력 검증 루프
-    while ($true) {
-        $choice = Read-SingleKey "선택 (1-6) "
-
-        if ($choice -match '^[1-6]$') {
-            switch ($choice) {
-                "1" { $script:Mode = "full"; break }
-                "2" { $script:Mode = "version"; break }
-                "3" { $script:Mode = "workflows"; break }
-                "4" { $script:Mode = "issues"; break }
-                "5" { $script:Mode = "skills"; break }
-                "6" {
-                    Print-Info "취소되었습니다"
-                    exit 0
-                }
-            }
-            break
-        } else {
-            Print-Error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
-            Write-Host ""
-        }
+    if (-not $_modeSelected -or $_modeSelected -eq 'cancel') {
+        Print-Info "취소되었습니다"
+        exit 0
     }
+
+    $script:Mode = $_modeSelected
 
     # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
     if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
@@ -2364,17 +2484,15 @@ function Offer-IdeToolsInstall {
 
             if (-not $Force) {
                 $updateLabel = if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { "업데이트 (이미 최신 — 재적용)" } else { "업데이트 (최신 버전으로)" }
-                Write-Host "  1 - $updateLabel"
-                Write-Host "  2 - 재설치 (scope 변경)"
-                Write-Host "  3 - 삭제"
-                Write-Host "      삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
-                Write-Host "                 $env:USERPROFILE\.claude\plugins\data\cassiiopeia@cassiiopeia-marketplace\"
-                Write-Host "  4 - 건너뛰기"
-                Write-Host ""
 
-                $choice = Read-Host "선택"
+                $choice = Invoke-ChooseMenu -Prompt "Claude Code 플러그인 (cassiiopeia)" -Options @(
+                    @{Value='update';    Label=$updateLabel},
+                    @{Value='reinstall'; Label='재설치 (scope 변경)'},
+                    @{Value='delete';    Label="삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installedScope})"},
+                    @{Value='skip';      Label='건너뛰기'}
+                )
 
-                if ($choice -eq "1") {
+                if ($choice -eq "update") {
                     Print-Step "플러그인 업데이트 중..."
                     $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                     if ($LASTEXITCODE -eq 0) {
@@ -2383,13 +2501,13 @@ function Offer-IdeToolsInstall {
                     } else {
                         Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
                     }
-                } elseif ($choice -eq "2") {
+                } elseif ($choice -eq "reinstall") {
                     Print-Step "기존 플러그인 삭제 중 (scope: ${installedScope})..."
                     $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
                     Remove-ClaudePluginData
                     $newScope = Get-ClaudeScope
                     Invoke-ClaudePluginInstall $newScope
-                } elseif ($choice -eq "3") {
+                } elseif ($choice -eq "delete") {
                     Print-Step "플러그인 삭제 중..."
                     Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
                     Print-Info "             $env:USERPROFILE\.claude\plugins\data\cassiiopeia@cassiiopeia-marketplace\"
@@ -2450,16 +2568,14 @@ function Offer-IdeToolsInstall {
 
     if ($cursorAnyInstalled) {
         if (-not $Force) {
-            Write-Host "어떻게 하시겠습니까?"
-            Write-Host "  1 - 업데이트 (기존 scope 유지)"
-            Write-Host "  2 - 신규 설치 (다른 scope에 추가)"
-            Write-Host "  3 - 삭제"
-            Write-Host "  4 - 건너뛰기"
-            Write-Host ""
+            $cursorChoice = Invoke-ChooseMenu -Prompt "Cursor Skills 관리" -Options @(
+                @{Value='update';  Label='업데이트 (기존 scope 유지)'},
+                @{Value='install'; Label='신규 설치 (다른 scope에 추가)'},
+                @{Value='delete';  Label='삭제'},
+                @{Value='skip';    Label='건너뛰기'}
+            )
 
-            $cursorChoice = Read-Host "선택"
-
-            if ($cursorChoice -eq "1") {
+            if ($cursorChoice -eq "update") {
                 # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
                 if ($cursorUserVer -and $cursorProjVer) {
                     $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
@@ -2471,13 +2587,13 @@ function Offer-IdeToolsInstall {
                 $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
                 if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
                 else { Invoke-CursorSkillsCopy $targetScope $src }
-            } elseif ($cursorChoice -eq "2") {
+            } elseif ($cursorChoice -eq "install") {
                 # 신규 설치: scope 자유 선택 (다른 scope에 추가)
                 $targetScope = Get-CursorScope "" ""
                 $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
                 if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
                 else { Invoke-CursorSkillsCopy $targetScope $src }
-            } elseif ($cursorChoice -eq "3") {
+            } elseif ($cursorChoice -eq "delete") {
                 Invoke-CursorDelete $cursorUserVer $cursorProjVer
             } else {
                 Print-Info "Cursor Skills 변경 없이 건너뜁니다"
@@ -2517,14 +2633,11 @@ function Offer-IdeToolsInstall {
 
 # scope 선택 (user / project)
 function Get-ClaudeScope {
-    Write-Host ""
-    Write-Host "설치 scope를 선택하세요:"
-    Write-Host "  1 - user    (모든 프로젝트에서 사용, 추천)"
-    Write-Host "  2 - project (현재 프로젝트에서만 사용)"
-    Write-Host ""
-
-    $scopeChoice = Read-Host "선택"
-    if ($scopeChoice -eq "2") { return "project" }
+    $scopeChoice = Invoke-ChooseMenu -Prompt "설치 scope를 선택하세요" -Options @(
+        @{Value='user';    Label='모든 프로젝트에서 사용 (추천)'},
+        @{Value='project'; Label='현재 프로젝트에서만 사용'}
+    )
+    if ($scopeChoice -eq "project") { return "project" }
     return "user"
 }
 
@@ -2648,15 +2761,13 @@ function Write-CursorSkillsMeta {
 # Cursor scope 선택 (user / project)
 function Get-CursorScope {
     param([string]$UserVer, [string]$ProjVer)
-    Write-Host ""
-    Write-Host "설치 scope를 선택하세요:"
-    $uLabel = if ($UserVer) { "  1 - user    (모든 프로젝트 공통, ~\.cursor\skills\)  현재: v${UserVer}" } else { "  1 - user    (모든 프로젝트 공통, ~\.cursor\skills\)" }
-    $pLabel = if ($ProjVer) { "  2 - project (현재 프로젝트 전용, .cursor\skills\)   현재: v${ProjVer}" } else { "  2 - project (현재 프로젝트 전용, .cursor\skills\)" }
-    Write-Host $uLabel
-    Write-Host $pLabel
-    Write-Host ""
-    $scopeChoice = Read-Host "선택"
-    if ($scopeChoice -eq "1") { return "user" }
+    $uLabel = if ($UserVer) { "모든 프로젝트 공통 (~\.cursor\skills\) 현재: v${UserVer}" } else { "모든 프로젝트 공통 (~\.cursor\skills\)" }
+    $pLabel = if ($ProjVer) { "현재 프로젝트 전용 (.cursor\skills\) 현재: v${ProjVer}" } else { "현재 프로젝트 전용 (.cursor\skills\)" }
+    $scopeChoice = Invoke-ChooseMenu -Prompt "설치 scope를 선택하세요" -Options @(
+        @{Value='user';    Label=$uLabel},
+        @{Value='project'; Label=$pLabel}
+    )
+    if ($scopeChoice -eq "user") { return "user" }
     return "project"
 }
 
@@ -2678,28 +2789,35 @@ function Invoke-CursorSkillsCopy {
 # Cursor Skills 삭제 (scope 선택)
 function Invoke-CursorDelete {
     param([string]$UserVer, [string]$ProjVer)
-    Write-Host "삭제할 scope를 선택하세요:"
-    if ($UserVer) { Write-Host "  1 - user    (~\.cursor\skills\)  v${UserVer}" }
-    if ($ProjVer) { Write-Host "  2 - project (.cursor\skills\)    v${ProjVer}" }
-    if ($UserVer -and $ProjVer) { Write-Host "  3 - 모두 삭제" }
-    Write-Host "  0 - 취소"
-    Write-Host ""
-    $delChoice = Read-Host "선택"
+
+    $opts = New-Object 'System.Collections.Generic.List[hashtable]'
+    if ($UserVer) {
+        $opts.Add(@{Value='user'; Label="user (~\.cursor\skills\) v${UserVer}"})
+    }
+    if ($ProjVer) {
+        $opts.Add(@{Value='project'; Label=".cursor\skills\ v${ProjVer}"})
+    }
+    if ($UserVer -and $ProjVer) {
+        $opts.Add(@{Value='all'; Label='모두 삭제'})
+    }
+    $opts.Add(@{Value='cancel'; Label='취소'})
+
+    $delChoice = Invoke-ChooseMenu -Prompt "삭제할 scope를 선택하세요" -Options $opts.ToArray()
 
     $userDest = Join-Path $env:USERPROFILE ".cursor\skills"
-    if ($delChoice -eq "1") {
+    if ($delChoice -eq "user") {
         if ($UserVer) {
             Print-Info "삭제 대상: $userDest (v${UserVer})"
             Remove-Item -Path $userDest -Recurse -Force -ErrorAction SilentlyContinue
             Print-Success "user scope Cursor Skills 삭제 완료"
         } else { Print-Warning "user scope에 설치된 Skills 없음" }
-    } elseif ($delChoice -eq "2") {
+    } elseif ($delChoice -eq "project") {
         if ($ProjVer) {
             Print-Info "삭제 대상: .cursor\skills\ (v${ProjVer})"
             Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
             Print-Success "project scope Cursor Skills 삭제 완료"
         } else { Print-Warning "project scope에 설치된 Skills 없음" }
-    } elseif ($delChoice -eq "3" -and $UserVer -and $ProjVer) {
+    } elseif ($delChoice -eq "all") {
         Print-Info "삭제 대상: $userDest (v${UserVer}), .cursor\skills\ (v${ProjVer})"
         Remove-Item -Path $userDest -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
@@ -2716,13 +2834,11 @@ function Get-CursorSkillsSrc {
     if (-not $RemoteSrc -and $LocalSrc) { return $LocalSrc }
     if (-not $RemoteSrc -and -not $LocalSrc) { return "" }
 
-    Write-Host ""
-    Write-Host "설치 소스를 선택하세요:"
-    Write-Host "  1 - 원격 최신 (repo에서 다운로드, 추천)"
-    Write-Host "  2 - 로컬 (현재 디렉토리 skills\ 폴더)"
-    Write-Host ""
-    $srcChoice = Read-Host "선택"
-    if ($srcChoice -eq "2") { return $LocalSrc }
+    $srcChoice = Invoke-ChooseMenu -Prompt "설치 소스를 선택하세요" -Options @(
+        @{Value='remote'; Label='원격 최신 (repo에서 다운로드, 추천)'},
+        @{Value='local';  Label='로컬 (현재 디렉토리 skills\ 폴더)'}
+    )
+    if ($srcChoice -eq "local") { return $LocalSrc }
     return $RemoteSrc
 }
 

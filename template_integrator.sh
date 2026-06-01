@@ -372,15 +372,20 @@ legacy_numeric_menu() {
     done
     printf "\n" >&2
 
-    local choice
+    local choice read_ok=0
     while true; do
+        choice=""
+        read_ok=0
         if [ -t 0 ]; then
             printf "선택 (1-%d): " "$n" >&2
-            IFS= read -r choice
-        elif [ -c /dev/tty ]; then
+            IFS= read -r choice && read_ok=1
+        elif [ -c /dev/tty ] 2>/dev/null && [ -r /dev/tty ]; then
             printf "선택 (1-%d): " "$n" >&2
-            IFS= read -r choice < /dev/tty
-        else
+            IFS= read -r choice < /dev/tty && read_ok=1
+        fi
+
+        if [ "$read_ok" -eq 0 ]; then
+            # stdin/tty 모두 못 읽음 → 첫 옵션 자동 선택
             IFS='|' read -r value _ <<< "${options[0]}"
             echo "$value"
             return 0
@@ -2521,23 +2526,15 @@ offer_ide_tools_install() {
             fi
 
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "  1 - ${update_label}"
-                print_to_user "  2 - 재설치 (scope 변경)"
-                print_to_user "  3 - 삭제"
-                print_to_user "      삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
-                print_to_user "                 ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
-                print_to_user "  4 - 건너뛰기"
-                print_to_user ""
-
                 local choice
-                if [ -c /dev/tty ]; then
-                    read -r choice < /dev/tty
-                else
-                    read -r choice
-                fi
+                choice=$(choose_menu "Claude Code 플러그인 (cassiiopeia)" \
+                    "update|${update_label}" \
+                    "reinstall|재설치 (scope 변경)" \
+                    "delete|삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installed_scope})" \
+                    "skip|건너뛰기")
 
                 case "$choice" in
-                    1)
+                    update)
                         print_step "플러그인 업데이트 중..."
                         # 업데이트 전 현재 캐시 경로 저장 (마이그레이션용)
                         local old_cache_path
@@ -2559,7 +2556,7 @@ offer_ide_tools_install() {
                             echo "    claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
                         fi
                         ;;
-                    2)
+                    reinstall)
                         print_step "기존 플러그인 삭제 중 (scope: ${installed_scope})..."
                         claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
                         _remove_claude_plugin_data
@@ -2567,7 +2564,7 @@ offer_ide_tools_install() {
                         new_scope=$(_ask_claude_scope)
                         _do_claude_plugin_install "$new_scope"
                         ;;
-                    3)
+                    delete)
                         print_step "플러그인 삭제 중..."
                         print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
                         print_info "             ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
@@ -2670,22 +2667,15 @@ offer_ide_tools_install() {
         echo "" >&2
 
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user "어떻게 하시겠습니까?"
-            print_to_user "  1 - 업데이트 (기존 scope 유지)"
-            print_to_user "  2 - 신규 설치 (다른 scope에 추가)"
-            print_to_user "  3 - 삭제"
-            print_to_user "  4 - 건너뛰기"
-            print_to_user ""
-
             local cursor_choice
-            if [ -c /dev/tty ]; then
-                read -r cursor_choice < /dev/tty
-            else
-                read -r cursor_choice
-            fi
+            cursor_choice=$(choose_menu "Cursor Skills 관리" \
+                "update|업데이트 (기존 scope 유지)" \
+                "install|신규 설치 (다른 scope에 추가)" \
+                "delete|삭제" \
+                "skip|건너뛰기")
 
             case "$cursor_choice" in
-                1)
+                update)
                     # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
                     local target_scope
                     if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
@@ -2703,7 +2693,7 @@ offer_ide_tools_install() {
                         _do_cursor_skills_copy "$target_scope" "$src"
                     fi
                     ;;
-                2)
+                install)
                     # 신규 설치: scope 자유 선택 (다른 scope에 추가)
                     local target_scope
                     target_scope=$(_ask_cursor_scope "" "")
@@ -2715,7 +2705,7 @@ offer_ide_tools_install() {
                         _do_cursor_skills_copy "$target_scope" "$src"
                     fi
                     ;;
-                3)
+                delete)
                     _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
                     ;;
                 *)

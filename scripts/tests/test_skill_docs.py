@@ -18,7 +18,7 @@ def test_skill_docs_do_not_teach_inline_python_workarounds():
         "python_heredoc": re.compile(r"(?:python3?|\\\$PYTHON|PYTHONIOENCODING=[^\n]*)\s+-\s+<<|<<'EOF'|<<EOF"),
         "tmp_python": re.compile(r"/tmp/[^`\s]*\.py"),
         "curl_pipe_python": re.compile(r"curl[^\n|]*\|[^\n]*(?:python3?|\\\$PYTHON)"),
-        "old_cli_py": re.compile(r"\bcli\.py\b"),
+        "old_suh_command": re.compile(r"-m suh_template\.suh_command|scripts/suh_template/suh_command\.py"),
     }
     allowed_files = {
         "skills/references/mcp-subcommand-rules.md",
@@ -51,10 +51,15 @@ def test_github_skill_docs_use_suh_command_instead_of_direct_curl_recipes():
     assert failures == []
 
 
-def test_common_rules_lists_current_suh_command_github_commands():
+def test_common_rules_documents_3layer_architecture():
+    """common-rules.md에 3-layer 아키텍처와 7개 skill cli 매핑이 명시되어야 한다."""
     text = (ROOT / "skills" / "references" / "common-rules.md").read_text(encoding="utf-8")
-    for command in ["get-issues", "update-pr", "actions", "deploy-status", "explore", "secrets"]:
-        assert command in text
+    for cli in ["github_cli.py", "issue_cli.py", "commit_cli.py", "report_cli.py",
+                "review_cli.py", "troubleshoot_cli.py", "changelog_cli.py"]:
+        assert cli in text, f"{cli} 매핑이 common-rules.md에 없음"
+    # 3-layer 핵심 키워드
+    for keyword in ["scripts/common/", "skills/<skill>/scripts/", "self-contained 5줄"]:
+        assert keyword in text, f"\"{keyword}\" 키워드 누락"
 
 
 def test_agent_docs_do_not_recommend_direct_curl_for_github_api():

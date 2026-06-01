@@ -345,31 +345,23 @@ skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 
 **별도 config 파일(`skill-name.config.json` 등)을 새로 만들지 않는다.**
 
-### suh_template CLI 커맨드
+### skill별 CLI 커맨드 (3-layer 아키텍처)
 
-```
-get-output-path     # 출력 파일 경로 계산
-get-issue-number    # 이슈 번호 추출
-get-next-seq        # 다음 시퀀스 번호
-normalize-title     # 제목 정규화
-create-branch-name  # 브랜치명 생성
-get-commit-template # 커밋 템플릿 생성
-create-issue        # GitHub 이슈 생성
-add-comment         # 이슈 댓글 추가
-get-issue           # 이슈 조회 (--with-comments 지원)
-get-issues          # 여러 이슈 조회
-update-issue        # 이슈 수정
-create-pr           # PR 생성
-list-prs            # PR 목록 조회
-search-issues       # 이슈 검색
-update-pr           # PR 본문/상태 수정
-actions             # GitHub Actions run/job/log 조회
-deploy-status       # deploy PR 상태 판정
-explore             # 레포 탐색
-secrets             # Actions Secret 조회/등록
-```
+각 skill이 자체 `scripts/<scope>_cli.py`를 보유한다. 호출 패턴 = self-contained 5줄 (`skills/references/common-rules.md` §"skill별 py 분산 호출" 참조).
 
-> GitHub API 호출은 `suh_command` 서브커맨드 우선. 새 동작이 필요하면 `skills/references/mcp-subcommand-rules.md` 기준으로 고정 헬퍼+서브커맨드+테스트를 추가한다.
+| skill | cli 파일 | 주요 서브커맨드 |
+|---|---|---|
+| suh-github | `skills/suh-github/scripts/github_cli.py` | get-issue, get-issues, update-issue, create-pr, list-prs, update-pr, search-issues, add-comment, explore, secrets |
+| suh-issue | `skills/suh-issue/scripts/issue_cli.py` | create-issue, search-issues, update-issue, get-next-seq, normalize-title, create-branch-name, get-commit-template |
+| suh-commit | `skills/suh-commit/scripts/commit_cli.py` | get-issue-number, get-issue, normalize-title, get-commit-template |
+| suh-report | `skills/suh-report/scripts/report_cli.py` | get-output-path, add-comment |
+| suh-review | `skills/suh-review/scripts/review_cli.py` | get-output-path |
+| suh-troubleshoot | `skills/suh-troubleshoot/scripts/troubleshoot_cli.py` | get-output-path |
+| suh-changelog-deploy | `skills/suh-changelog-deploy/scripts/changelog_cli.py` | actions, deploy-status, list-prs, update-pr, create-pr |
+
+공유 도메인 로직은 `scripts/common/`에 있다 (gh_client, config, paths, title, issue_number, gh_branch, manifest, emit, bootstrap).
+
+> GitHub API 호출은 각 skill의 `<scope>_cli.py` 서브커맨드 우선. 새 동작이 필요하면 `skills/references/mcp-subcommand-rules.md` 기준으로 `common/gh_client` 헬퍼 + cli 서브커맨드 + 테스트를 추가한다. 신규 skill에 py 필요하면 `skills/suh-skill-creator/templates/python_cli_script.py` 골격을 복사.
 
 ### Agent 주의사항
 

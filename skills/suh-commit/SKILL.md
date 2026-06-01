@@ -73,12 +73,14 @@ OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
 ```
 
-**이슈 조회는 인라인 Python으로 하지 않는다.** 재사용 스크립트 `suh_command`의 `get-issue`로 이슈 정보를 가져온다. PAT는 `suh_command`가 config.json에서 자동 로드하므로 직접 추출할 필요가 없다(환경변수가 있으면 우선 사용).
+**이슈 조회는 인라인 Python으로 하지 않는다.** `skills/suh-commit/scripts/commit_cli.py`의 `get-issue` 서브커맨드로 이슈 정보를 가져온다. PAT는 commit_cli가 config.json에서 자동 로드하므로 직접 추출할 필요가 없다(환경변수가 있으면 우선 사용).
 
 ```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
-cd "$PROJECT_ROOT/scripts"
-PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command get-issue {owner} {repo} {추출된 이슈번호}
+[ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
+cd "$PROJECT_ROOT/skills/suh-commit/scripts" || exit 1
+PYTHONIOENCODING=utf-8 "$PYTHON" commit_cli.py get-issue {owner} {repo} {추출된 이슈번호}
 ```
 
 출력 JSON에서 `title`(원본 제목)과 `html_url`을 얻는다. **이슈 제목은 agent가 임의 요약/재작성하지 않고**, 아래 규칙으로 결정적으로 정제해 커밋 메시지에 쓴다 (SUH-ISSUE-HELPER의 `extractIssueTitle`과 동일):

@@ -1,78 +1,212 @@
 ---
 name: suh-analyze
-description: "Analyze Mode - 코드 분석 전문가. 구현 전 현재 상태를 분석하고 구현 계획을 수립한다. 코드 분석, 영향 범위 평가, 구현 계획서 작성이 필요할 때 사용. 직접적인 코드 수정은 하지 않는다. /suh-analyze 호출 시 사용."
+description: "Analyze Mode (HOW 구체화) - plan 문서(WHAT)를 기반으로 '어떻게 만들 것인가'를 파일·함수·라인 단위로 구체화한다. 실제 파일을 읽고 변경 계획을 작성하며 placeholder를 금지한다. 코드 분석, 영향 범위 평가, 구현 계획서 작성이 필요할 때 또는 plan 승인 직후 트리거. /suh-analyze 호출 시 사용. 코드는 수정하지 않는다."
 ---
 
-# Analyze Mode
+# Analyze Mode (HOW 구체화)
 
-당신은 코드 분석 전문가다. **구현은 하지 말고 분석만** 수행하라.
+> **핵심 원칙**: HOW(어떻게, 어느 파일/함수/라인)만 다룬다. plan.md(WHAT)가 없으면 먼저 만든다.
+> **흐름**: `suh-plan → suh-analyze → suh-implement`
+> **writing-plans 패턴**: 각 변경 행에 파일+함수+라인 필수. placeholder(TBD/TODO/"적절히") 금지.
+
+> ⛔ **HARD-GATE — No Placeholders**: 다음이 analyze 문서에 있으면 즉시 실패:
+> - "TBD", "TODO", "나중에", "적절히", "필요 시", "유사하게"
+> - 파일 경로 없는 변경 항목
+> - 함수명/라인 없는 변경 항목
+> - Before/After 코드 없는 코드 변경 항목
 
 ## 시작 전
 
-`references/common-rules.md`의 **작업 시작 프로토콜** + **분석 전용 스킬 규칙** 적용
+`references/common-rules.md`의 **작업 시작 프로토콜** + **분석 전용 스킬 규칙** 적용.
 
-## 프로세스
+## 절대 규칙
 
-### 1단계: 현재 상태 파악
-- 관련 파일 및 코드베이스 구조 검토
-- 기존 아키텍처 및 디자인 패턴 이해
-- 의존성 및 통합 지점 파악
+- **코드 수정 금지.** Read/Grep/Glob/Bash(읽기)만. 마지막 analyze 문서 1개 작성만 허용.
+- **추측으로 HOW 쓰지 않는다.** 파일을 실제로 읽고 함수명·라인을 인용한다.
+- **plan.md 없으면 시작 안 한다.** Phase -1에서 자동 처리.
+- **승인 없이 suh-implement로 넘어가지 않는다.** Phase 4에서 사용자 명시 승인 후에만.
 
-### 2단계: 요구사항 분석
-- 핵심 목표 명확화
-- 기술적 제약사항 도출
-- 예상 엣지 케이스 식별
+---
 
-### 3단계: 영향 범위 평가
-- 변경 필요 파일/모듈 리스트업
-- 잠재적 사이드 이펙트
-- 테스트 필요 영역
+## Phase -1 — 사전 상태 확인 (가장 먼저 실행)
 
-### 4단계: 구현 계획 수립
+> **Phase -1 역할**: 파일 존재 여부만 판단. 실제 파일 읽기는 Phase 0에서.
+
+`docs/suh-template/` 하위 스캔:
 
 ```
-📋 구현 계획서
-├── 1️⃣ 준비 단계 (의존성, 환경)
-├── 2️⃣ 핵심 구현 (파일별 변경 요약)
-├── 3️⃣ 테스트 작성 (시나리오)
-└── 4️⃣ 검증 및 문서화
+docs/suh-template/plan/     → suh-plan 산출물 (.md)
+docs/suh-template/analyze/  → suh-analyze 산출물 (.md)
 ```
 
-### 5단계: 위험 요소 및 대안
-- 잠재적 문제점
-- 대안 솔루션
-- 성능/보안 고려사항
+> suh-implement는 별도 산출물 md를 만들지 않음 — 코드 자체가 결과.
 
-## 출력 형식
+현재 요청과 관련된 파일인지 날짜·제목·내용으로 판단.
 
-```markdown
-### 📊 분석 요약
-**감지된 프로젝트 타입**: [타입]
-**주요 기술 스택**: [스택]
-**코드 스타일**: [감지된 패턴]
+| 상태 | 행동 |
+|------|------|
+| analyze.md 있음 | "analyze가 이미 완료됐습니다(`{경로}`). `/suh-implement`로 넘어가면 됩니다." 안내 후 종료 |
+| plan.md만 있음 | Phase 0으로 진행 (plan.md 실제 읽기는 Phase 0에서) |
+| 아무것도 없음 | `suh-plan` 스킬 자동 호출. suh-plan 완료 후 Phase 0부터 재시작 |
 
-### 🔍 현재 상태
-[코드베이스 구조]
+---
 
-### 🎯 구현 목표
-[구체적 목표]
+## Phase 0 — plan.md 로드 및 의도 파악
 
-### 📝 상세 구현 계획
-[단계별 계획]
+plan.md를 읽고 다음을 정리:
+- 작업 종류 (버그 수정 / 새 기능 / 리팩터링 / 마이그레이션)
+- 핵심 요구사항 (Must 항목)
+- 성공 기준
+- 제약 사항
 
-### ⚠️ 주의사항
-[위험 요소]
-```
+한 줄로 "이 plan 기반으로 HOW를 구체화하겠습니다: {한 줄 요약}" 알림 후 Phase 1 진행.
 
-## 다음 단계
+---
 
-분석 완료 후 → `/implement`로 구현 진행
+## Phase 1 — 코드베이스 정찰 (사실 수집)
 
-## 산출물 저장
+추측 금지. 실제 파일을 읽고 인용.
 
-**산출물 저장 경로**: `{PROJECT_ROOT}/docs/suh-template/analyze/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
+체크리스트:
+- [ ] 진입점 파일/함수/라우트 찾았는가? (Grep으로 함수명·이벤트명 검색)
+- [ ] 변경이 닿을 모든 호출자/의존자 나열했는가?
+- [ ] 비슷한 기존 패턴이 코드베이스에 있는가? (있으면 그 스타일 따라야 함)
+- [ ] 관련 테스트가 있는가? 어디에?
+- [ ] 데이터 모델/스키마 변경이 있는가?
+
+> 탐색 범위가 크면 Explore 서브에이전트에 위임. 메인 컨텍스트에 raw grep 결과 쌓지 말 것.
+
+---
+
+## Phase 2 — 변경 계획 작성 (writing-plans 패턴)
+
+### 산출 위치
+
+`{PROJECT_ROOT}/docs/suh-template/analyze/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 
 - 이슈번호 없으면 순번(`001`, `002`…) 자동 사용
 - 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
+- `suh_template` CLI의 `get-output-path` 등 활용
 
-파일 저장 전 `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜**을 따라 작성한 내용 전체를 검토한다. 민감 정보 발견 시 플레이스홀더로 교체 후 저장한다.
+### No Placeholders 규칙
+
+상단 HARD-GATE 참조. Phase 3 Self-Review에서 체크.
+
+### 병렬 태스크 식별
+
+태스크 간 의존 관계 확인:
+- **순차**: 앞 태스크 결과에 의존 (예: 모델 변경 → 그걸 쓰는 서비스 변경)
+- **병렬**: 독립적 (예: 서로 다른 모듈의 변경, 같은 파일 안 건드림) → 표에 `[병렬]` 표시
+
+### 산출물 템플릿
+
+````markdown
+# {제목} — HOW 계획
+
+작성일: {YYYY-MM-DD}
+참조: docs/suh-template/plan/{파일명}.md
+GitHub 이슈: {이슈 번호 또는 없음}
+
+## 1. 변경 파일 목록
+
+| # | 파일 | 함수/위치 (라인) | 무엇을 | 실행 순서 |
+|---|------|----------------|-------|---------|
+| 1 | `path/to/File.java` | `methodName()` (L42~67) | A를 B로 교체 | 순차 |
+| 2 | `path/to/Other.java` | `otherMethod()` (L88) | X 필드 추가 | [병렬] |
+
+## 2. 태스크별 상세
+
+### Task 1: {이름}
+
+**파일**: `path/to/File.java`
+**함수**: `methodName()` (line 42~67)
+**변경 이유**: {plan Must 항목과 연결}
+
+**Before**:
+```java
+// 현재 코드 (실제로 읽은 것)
+public void methodName() {
+    // 기존 로직
+}
+```
+
+**After**:
+```java
+// 변경 후 코드
+public void methodName() {
+    // 새 로직
+}
+```
+
+**검증**: {구체적 명령 또는 수동 확인 단계}
+예: `mvn test -pl module-name -Dtest=ClassName#testMethodName`
+
+---
+
+### Task 2: {이름}
+...
+
+## 3. 현재 상태 (코드 인용)
+
+실제로 읽은 파일/함수 요약:
+- `path/to/File.java:42` — `methodName()`: 현재 X를 한다
+- `path/to/Other.java:88` — `otherMethod()`: Y 역할
+
+## 4. 위험 & 완화
+
+- **위험**: {예: 기존 호출자 영향} → **완화**: {예: 하위 호환 오버로드 추가}
+
+## 5. 검증 방법
+
+- [ ] {입력값 또는 시나리오} → {기대 결과}
+- [ ] {회귀 확인 대상} — {확인 명령}
+
+## 6. 다음 단계
+
+구현 방식을 선택하세요:
+
+**1. Subagent-Driven (권장)** — `/suh-implement` 호출 시 태스크별 서브에이전트 + Self-Review 자동 진행
+**2. Inline** — 현재 세션에서 순차 실행
+
+병렬 태스크 있음: Task {N}, Task {M} → Subagent-Driven 선택 시 병렬 dispatch 가능.
+````
+
+파일 저장 전 `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜** 적용.
+
+---
+
+## Phase 3 — Self-Review (제출 전)
+
+방금 작성한 analyze 파일을 `Read` 도구로 다시 읽는다.
+
+`references/self-review-checklist.md`의 **suh-analyze 체크리스트** 적용. 문제 발견 시 인라인 수정.
+
+---
+
+## Phase 4 — 사용자에게 제출 (HARD-GATE)
+
+> "Analyze가 `{경로}`에 작성되었습니다. 검토 후 수정할 부분 있으면 말씀해주세요.
+> 승인하시면 구현 방식을 선택해주세요:
+> 1. **Subagent-Driven (권장)** — 태스크별 서브에이전트 위임
+> 2. **Inline** — 현재 세션 순차 실행"
+
+**종료 조건**: 사용자 명시적 승인 + 방식 선택 ("1", "subagent", "2", "inline", "implement" 등).
+
+❌ 금지: 사용자 답변 전 suh-implement 자동 호출.
+
+---
+
+## 안티 패턴
+
+| ❌ | ✅ |
+|---|---|
+| "이 클래스를 수정하면 됩니다" (파일만, 함수/라인 없음) | `path/File.java:42` — `method()` 명시 |
+| Before/After 없이 "X를 Y로 변경" | 실제 코드 블록 포함 |
+| TBD/TODO 남기기 | 모르면 사용자에게 질문, 가정이면 명시 |
+| plan.md 안 읽고 analyze 작성 | Phase 0에서 반드시 Read |
+| 코드 안 읽고 영향 범위 추정 | Read/Grep으로 호출자 직접 확인 |
+| 모든 태스크 순차로만 표시 | 독립 태스크는 `[병렬]` 표시 |
+
+## 다음 단계
+
+Analyze 승인 후 → `/suh-implement` (Subagent-Driven 또는 Inline 선택)

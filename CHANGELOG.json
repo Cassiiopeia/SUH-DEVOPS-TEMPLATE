@@ -1,11 +1,42 @@
 {
   "metadata": {
-    "lastUpdated": "2026-05-31T14:20:10Z",
-    "currentVersion": "3.0.74",
+    "lastUpdated": "2026-06-01T02:32:02Z",
+    "currentVersion": "3.0.78",
     "projectType": "basic",
-    "totalReleases": 114
+    "totalReleases": 115
   },
   "releases": [
+    {
+      "version": "3.0.78",
+      "project_type": "basic",
+      "date": "2026-06-01",
+      "pr_number": 327,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 메뉴 선택을 키보드로 빠르게 할 수 있도록 개선\n\n* **개선**\n  * Windows·macOS 모두에서 안정적으로 동작하도록 정리\n  * 기능을 영역별로 나눠 관리성·확장성 향상\n  * 작업 안내 메시지를 더 명확하게 표시\n\n* **문서**\n  * skill 작성·구조 가이드 정비\n  * 옛 표기 잔재 정리",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "메뉴 선택을 키보드로 빠르게 할 수 있도록 개선"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "Windows·macOS 모두에서 안정적으로 동작하도록 정리",
+            "기능을 영역별로 나눠 관리성·확장성 향상",
+            "작업 안내 메시지를 더 명확하게 표시"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "skill 작성·구조 가이드 정비",
+            "옛 표기 잔재 정리"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.74",
       "project_type": "basic",

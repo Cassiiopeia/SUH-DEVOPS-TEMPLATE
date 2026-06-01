@@ -314,3 +314,33 @@ Phase 번호는 선형이지만 **고집스러운 절차는 아니다**. Phase 3
 ---
 
 이 문서는 그 습관의 결과로 짧고 Phase 중심이다. 상세는 references/에 있고, 여기서는 **"어느 Phase인지"** 와 **"종료 조건이 충족되었는가"** 두 질문만 agent가 계속 자신에게 묻게 한다.
+
+---
+
+## 7. 신규 skill에 Python 호출이 필요한 경우 (3-layer 표준)
+
+신규 skill이 GitHub API·외부 시스템·서브커맨드 호출이 필요하면 **반드시 3-layer 표준을 따른다**:
+
+1. **공유 도메인 로직 점검**: 필요한 함수가 `scripts/common/`에 이미 있나? (`gh_client`, `config`, `paths`, `title` 등). 있으면 import 재사용. 새로 작성하지 않는다.
+2. **skill 전용 cli 작성**: `templates/python_cli_script.py` 골격을 복사.
+   ```bash
+   cp skills/suh-skill-creator/templates/python_cli_script.py skills/suh-<new>/scripts/<scope>_cli.py
+   ```
+3. **prog + 서브커맨드 교체**: 골격의 `<scope>_cli` 부분과 `cmd_example`을 실제 도메인으로 교체.
+4. **공유 로직은 import**: `from common.<module> import ...` 형태. Layer 1 재작성 금지.
+5. **SKILL.md 호출**: 표준 self-contained 5줄 패턴 (`references/common-rules.md` §"skill별 py 분산 호출" 참조).
+6. **공유 로직이 부족하면 Layer 1에 추가**: 단일 skill 전용 로직만 cli에 두고, 2개 이상 skill이 쓸 가능성이 있으면 `scripts/common/<new>.py`로 분리.
+
+### 골격이 제공하는 것
+
+- cwd 무관 동작 (`__file__` 기준 sys.path 자동 조작)
+- argparse 자동 `--help`
+- `common.emit.emit()` 헬퍼로 MCP-style JSON 4필드 자동 보장 (ok/code/summary/next)
+- Windows Git Bash + macOS/WSL 양쪽 동작 (실측 검증)
+
+### 검증
+
+- 신규 skill cli 작성 후 dry-run: `cd skills/suh-<new>/scripts && python <scope>_cli.py --help` → argparse usage 출력 확인
+- 한 개 서브커맨드 실측 호출 → JSON 4필드 확인
+
+Phase 6의 표준은 이 표준에 종속된다 — 신규 skill 생성 시 py 호출 항목은 위 절차로 자동 수행한다.

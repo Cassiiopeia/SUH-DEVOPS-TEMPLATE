@@ -1,147 +1,103 @@
 #!/usr/bin/env python3
-"""
-Somansa 표준 Python CLI 스크립트 뼈대.
+"""<scope>_cli — <skill name> 전용 CLI (suh-github-template 3-layer 표준 골격).
 
-왜 이 템플릿이 필요한가:
-- 사내망은 외부 의존성 설치가 막히는 경우가 많음 → stdlib만 사용.
-- 사내 자체 서명 SSL 인증서 → verify_ssl opt-out 옵션 필요.
-- Windows cp949 콘솔 → 한글 출력 깨짐 방지 UTF-8 강제.
-- HTTP 에러는 구조화된 dict + 다음 액션 힌트로 파싱해 agent가 소비하기 쉽게.
+이 파일은 신규 skill 생성 시 복사하는 표준 골격이다.
+3-layer 아키텍처 Layer 2 (`skills/<skill>/scripts/<scope>_cli.py`).
+
+표준 (`skills/references/common-rules.md` §"skill별 py 분산 호출" 참조):
+- Layer 1 (`scripts/common/`): 공유 인프라 (gh_client, config, paths, title 등)
+- Layer 2 (이 파일): skill 1개 = py 1개 = argparse 서브커맨드
+- Layer 3 (SKILL.md): self-contained 5줄 Bash 호출
 
 사용법:
-  1. 이 파일을 scripts/<skill-name>_api.py 로 복사.
-  2. {PLACEHOLDER} 부분을 실제 로직으로 교체.
-  3. main()의 action 분기에 명령 추가.
-"""
+    1. 이 파일을 skills/suh-<new>/scripts/<scope>_cli.py 로 복사.
+    2. prog 이름 + 서브커맨드를 신규 skill에 맞게 교체.
+    3. 공유 로직은 `from common.<module> import ...` 형태로 import (재작성 금지).
+    4. SKILL.md 코드블록은 표준 5줄 패턴 사용.
 
+호출 예 (SKILL.md):
+    PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+    PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
+    [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
+    cd "$PROJECT_ROOT/skills/<skill>/scripts" || exit 1
+    PYTHONIOENCODING=utf-8 "$PYTHON" <scope>_cli.py <subcommand> [args]
+
+출력: 모든 서브커맨드는 stdout으로 MCP-style JSON 출력 (4필드 강제: ok/code/summary/next).
+"""
 from __future__ import annotations
 
-import json
-import os
-import ssl
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
+import argparse
 from pathlib import Path
-from typing import Any
 
-# Windows 콘솔 UTF-8 강제 (Python 3.7+)
-try:
-    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
-    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
-except Exception:
-    pass
+# Bootstrap — scripts/common import 가능하게 sys.path 조작 (cwd 무관 동작)
+_HERE = Path(__file__).resolve()
+_PROJECT_ROOT = _HERE.parents[3]  # skills/<x>/scripts/<x>_cli.py → 3 up = project root
+_SCRIPTS_ROOT = _PROJECT_ROOT / "scripts"
+if str(_SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_ROOT))
 
+from common.emit import emit  # noqa: E402
 
-SKILL_DIR = Path(__file__).resolve().parent.parent
-CONFIG_CANDIDATES = [
-    SKILL_DIR / "config.json",
-    Path.home() / ".config" / "somansa" / f"{SKILL_DIR.name}.json",
-]
+# 신규 skill이 공유 로직 import:
+# from common.gh_client import GitHubAPIError, get_issue  # noqa: E402
+# from common.config import get_github_pat  # noqa: E402
 
 
-def _load_config() -> dict[str, Any]:
-    for path in CONFIG_CANDIDATES:
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-    raise SystemExit(
-        "config.json not found. Copy config.json.example to config.json and fill in required fields."
+# =========================================================================
+# Subcommand handlers
+# =========================================================================
+
+def cmd_example(args) -> int:
+    """예시 서브커맨드 — 인자 그대로 echo한다.
+
+    실제 skill에서는 이 함수를 도메인 로직으로 교체한다:
+        - common.gh_client import 하여 GitHub API 호출
+        - common.config get_github_pat() 로 PAT 자동 로드
+        - 결과 dict를 emit()로 반환 (4필드 자동 보장)
+    """
+    return emit({
+        "input": args.text,
+        "summary": f"입력: {args.text}",
+        # 필요 시 next 힌트 추가:
+        # "next": f"another-cmd {args.text}",
+    })
+
+
+# =========================================================================
+# argparse setup
+# =========================================================================
+
+def build_parser() -> argparse.ArgumentParser:
+    """argparse subparser 정의. 신규 서브커맨드 등록 시 여기에 추가."""
+    parser = argparse.ArgumentParser(
+        prog="<scope>_cli",
+        description="<skill name> skill CLI",
     )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_ex = sub.add_parser("example", help="예시 서브커맨드")
+    p_ex.add_argument("text")
+    p_ex.set_defaults(func=cmd_example)
+
+    # 신규 서브커맨드 추가 패턴:
+    # p_new = sub.add_parser("new-cmd", help="설명")
+    # p_new.add_argument("owner")
+    # p_new.add_argument("repo")
+    # p_new.add_argument("--state", choices=["open", "closed"], default="open")
+    # p_new.set_defaults(func=cmd_new)
+
+    return parser
 
 
-def _ssl_context(cfg: dict[str, Any]) -> ssl.SSLContext | None:
-    """사내 자체 서명 인증서 대응. verify_ssl=false 또는 env INSECURE=1 이면 검증 OFF."""
-    service = cfg.get("service", {})
-    verify = service.get("verify_ssl", True)
-    if os.environ.get("INSECURE") == "1":
-        verify = False
-    if verify:
-        return None
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
-def _request(cfg: dict[str, Any], method: str, path: str,
-             query: dict | None = None, body: dict | None = None) -> Any:
-    base = cfg["service"]["url"].rstrip("/")
-    url = f"{base}{path}"
-    if query:
-        url += "?" + urllib.parse.urlencode({k: v for k, v in query.items() if v is not None})
-    headers = {"Accept": "application/json"}
-    # TODO: 인증 헤더 추가 (PAT 또는 Basic 등)
-    token = cfg.get("service", {}).get("token")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    data = json.dumps(body).encode("utf-8") if body is not None else None
-    if data is not None:
-        headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    ctx = _ssl_context(cfg)
-    try:
-        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
-            raw = resp.read()
-            if not raw:
-                return None
-            ctype = resp.headers.get("Content-Type", "")
-            if "application/json" in ctype:
-                return json.loads(raw.decode("utf-8"))
-            return raw.decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode("utf-8", errors="replace")
-        # 구조화된 에러 — agent가 소비하기 쉽게 next_actions 포함
-        err = {
-            "error": f"http_{e.code}",
-            "http_status": e.code,
-            "reason": e.reason,
-            "url": url,
-            "raw_response": (json.loads(body_text)
-                             if body_text.strip().startswith("{") else body_text),
-            "next_actions": [],  # TODO: 특정 코드(409 등)에서 친절한 힌트 추가
-        }
-        raise SystemExit(json.dumps(err, ensure_ascii=False, indent=2))
-    except urllib.error.URLError as e:
-        raise SystemExit(f"Connection failed: {e.reason} ({url})")
-
-
-def _print(obj: Any) -> None:
-    if isinstance(obj, (dict, list)):
-        print(json.dumps(obj, ensure_ascii=False, indent=2))
-    else:
-        print(obj)
-
-
-# ---------- Actions ----------
-
-def action_ping(cfg: dict[str, Any]) -> Any:
-    """TODO: 실제 상태 체크 API로 교체."""
-    return {"ok": True, "config_path": str(CONFIG_CANDIDATES[0])}
-
-
-# ---------- CLI ----------
-
-def main() -> None:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
-    action = sys.argv[1]
-    args = sys.argv[2:]
-
-    cfg = _load_config()
-
-    if action == "ping":
-        _print(action_ping(cfg))
-        return
-
-    # TODO: 추가 action 분기
-
-    print(f"Unknown action: {action}")
-    print(__doc__)
-    sys.exit(1)
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    if not hasattr(args, "func"):
+        parser.print_help(sys.stderr)
+        return 1
+    return args.func(args)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

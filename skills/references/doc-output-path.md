@@ -4,19 +4,29 @@
 
 ## 저장 전 경로 계산
 
-산출물 md 저장 전 반드시 아래 커맨드를 실행해 경로를 받아라.  
-**`PYTHONPATH`는 항상 필수다** (`common-rules.md` → suh_template CLI 실행 규칙 참조):
+산출물 md 저장 전 반드시 해당 skill의 `_cli.py` 의 `get-output-path` 서브커맨드를 호출해 경로를 받아라.
+표준은 `common-rules.md` §"skill별 py 분산 호출" 참조.
+
+skill별 호출 위치 매핑:
+
+| skill_id | 호출 cwd | cli 파일 |
+|---|---|---|
+| review | `skills/suh-review/scripts/` | `review_cli.py` |
+| troubleshoot | `skills/suh-troubleshoot/scripts/` | `troubleshoot_cli.py` |
+| report | `skills/suh-report/scripts/` | `report_cli.py` |
+| 나머지 (analyze, plan, design-analyze, refactor-analyze, ppt) | (해당 skill 자체 cli 없음 — agent가 직접 경로 계산하거나 report_cli 임시 사용) | — |
+
+예시 (suh-review):
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
-if [ -d "$PROJECT_ROOT/scripts/suh_template" ]; then
-  SCRIPTS_PATH="$PROJECT_ROOT/scripts"
-else
-  SCRIPTS_PATH=$(find "$HOME/.claude/plugins/cache" -type d -name "suh_template" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
-fi
-PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.suh_command get-output-path <skill_id>
+[ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
+cd "$PROJECT_ROOT/skills/suh-review/scripts" || exit 1
+PYTHONIOENCODING=utf-8 "$PYTHON" review_cli.py get-output-path review
 ```
+
+출력 JSON의 `path` 필드를 추출해 사용한다.
 
 반환값 예시:
 - `docs/suh-template/plan/20260418_427_드롭다운_디자인_변경.md`

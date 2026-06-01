@@ -1,8 +1,8 @@
 # MCP-style 서브커맨드 설계 표준
 
-`suh_command.py`에 외부 시스템(GitHub API, SSH 등)을 다루는 새 서브커맨드를 추가할 때 **반드시 이 표준을 따른다.** CLAUDE.md "Python 행동 스크립트 표준"의 구체적 구현 레퍼런스다.
+각 skill의 `<scope>_cli.py`에 외부 시스템(GitHub API, SSH 등)을 다루는 새 서브커맨드를 추가할 때 **반드시 이 표준을 따른다.** CLAUDE.md "Python 행동 스크립트 표준"의 구체적 구현 레퍼런스다.
 
-> **모범 사례**: `actions`, `deploy-status` 서브커맨드 (`scripts/suh_template/suh_command.py`). 새 커맨드를 만들기 전에 이 둘을 먼저 읽고 같은 모양으로 만든다.
+> **모범 사례**: `actions`, `deploy-status` 서브커맨드 (`skills/suh-changelog-deploy/scripts/changelog_cli.py`). 새 커맨드를 만들기 전에 이 둘을 먼저 읽고 같은 모양으로 만든다.
 
 ---
 
@@ -64,7 +64,7 @@ def cmd_groupname(args: list) -> int:
 ### 데이터는 헬퍼(gh_client), 판정은 커맨드 레이어
 
 - `gh_client.py` 함수는 **순수 API 조회**만 한다 (raw 데이터 dict 반환, 판정 없음).
-- `suh_command.py`의 `cmd_*`가 **verdict 판정 + JSON 조립 + next 힌트**를 담당한다.
+- `<scope>_cli.py`의 `cmd_*`가 **verdict 판정 + JSON 조립 + next 힌트**를 담당한다.
 - 이 분리 덕분에 헬퍼는 단독 테스트 가능하고, 판정 로직만 따로 검증할 수 있다.
 
 ```python
@@ -73,7 +73,7 @@ def get_thing(owner, repo, id, pat) -> dict:
     data = _request("GET", f"{_API_BASE}/...", None, pat)
     return {"id": data["id"], "state": data["state"], ...}  # raw 추출
 
-# suh_command.py — 판정 + 조립
+# <scope>_cli.py — 판정 + 조립
 def cmd_thing(args):
     ...
     thing = _github.get_thing(owner, repo, id, pat)
@@ -128,10 +128,10 @@ except _github.GitHubAPIError as e:
 
 ```python
 def _call_cmd(mock_data, args_rest, capsys):
-    from suh_template import suh_command
-    with patch.object(suh_command, "_get_pat", return_value="ghp_fake"), \
-         patch.object(suh_command._github, "get_thing", return_value=mock_data):
-        suh_command.cmd_thing(["owner", "repo", *args_rest])
+    import <scope>_cli
+    with patch.object(<scope>_cli, "_get_pat", return_value="ghp_fake"), \
+         patch.object(<scope>_cli, "get_thing", return_value=mock_data):
+        <scope>_cli.cmd_thing(["owner", "repo", *args_rest])
     return _json.loads(capsys.readouterr().out.strip())
 
 def test_thing_ready(capsys):
@@ -150,7 +150,7 @@ def test_thing_ready(capsys):
 ```bash
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 cd "$PROJECT_ROOT/scripts"
-PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command groupname sub OWNER REPO ARG
+PYTHONIOENCODING=utf-8 "$PYTHON" <scope>_cli.py groupname sub OWNER REPO ARG
 ```
 
 ---
@@ -160,7 +160,7 @@ PYTHONIOENCODING=utf-8 "$PYTHON" -m suh_template.suh_command groupname sub OWNER
 - [ ] 입력 계약이 명확한가? (agent가 뭘 넘길지 헷갈리지 않게)
 - [ ] 모든 경로가 `_emit`으로 JSON을 내는가? (stderr+exit 1 없음)
 - [ ] `ok`/`next`/`summary` 필드를 담는가?
-- [ ] 데이터 조회는 gh_client, 판정은 suh_command로 분리했는가?
+- [ ] 데이터 조회는 common.gh_client, 판정은 `<scope>_cli`로 분리했는가?
 - [ ] `_get_pat` 재사용 + `GitHubAPIError` JSON 변환했는가?
 - [ ] `_COMMANDS`에 등록 + 테스트 추가했는가?
 - [ ] SKILL.md에 인라인 Python 대신 호출법만 적었는가?

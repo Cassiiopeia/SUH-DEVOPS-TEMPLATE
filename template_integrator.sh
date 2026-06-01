@@ -234,6 +234,184 @@ print_to_user() {
     safe_echo "$@"
 }
 
+# ─────────────────────────────────────────────────────────────
+# 인터랙티브 메뉴 (TTY 전용) — 화살표/숫자/Enter/ESC
+# 사용법: selected=$(interactive_menu "prompt" "value1|label1" "value2|label2" ...)
+# stdout: 선택된 value
+# exit:   0=확정, 1=취소
+# ─────────────────────────────────────────────────────────────
+interactive_menu() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local n=${#options[@]}
+
+    if [ "$n" -eq 0 ]; then
+        echo "interactive_menu: 옵션이 없습니다" >&2
+        return 1
+    fi
+
+    local use_color=true
+    if [ -n "${NO_COLOR:-}" ] || [ ! -t 2 ]; then
+        use_color=false
+    fi
+
+    local C_RESET="" C_CYAN="" C_DIM=""
+    if [ "$use_color" = true ]; then
+        C_RESET=$'\033[0m'
+        C_CYAN=$'\033[36m'
+        C_DIM=$'\033[2m'
+    fi
+
+    printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+
+    local cursor=0
+
+    trap 'printf "\033[?25h" >&2; return 130' INT
+    printf "\033[?25l" >&2
+
+    _interactive_menu_render() {
+        local i value label num
+        for i in $(seq 0 $((n - 1))); do
+            IFS='|' read -r value label <<< "${options[$i]}"
+            num=$((i + 1))
+            if [ "$i" -eq "$cursor" ]; then
+                printf "%s> [•] %d) %s    %s%s%s%s\n" \
+                    "$C_CYAN" "$num" "$value" \
+                    "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
+            else
+                printf "  [ ] %d) %s    %s%s%s\n" \
+                    "$num" "$value" \
+                    "$C_DIM" "$label" "$C_RESET" >&2
+            fi
+        done
+    }
+
+    _interactive_menu_clear() {
+        local i
+        for i in $(seq 1 "$n"); do
+            printf "\033[1A\033[2K" >&2
+        done
+    }
+
+    _interactive_menu_render
+
+    local key rest value
+    while true; do
+        IFS= read -rsn1 key < /dev/tty || { printf "\033[?25h" >&2; trap - INT; return 1; }
+
+        if [ "$key" = $'\e' ]; then
+            IFS= read -rsn2 -t 0.01 rest < /dev/tty 2>/dev/null || rest=""
+            case "$rest" in
+                '[A') key=UP ;;
+                '[B') key=DOWN ;;
+                '')   key=ESC ;;
+                *)    continue ;;
+            esac
+        fi
+
+        case "$key" in
+            UP|k)
+                cursor=$(( cursor - 1 ))
+                [ "$cursor" -lt 0 ] && cursor=$((n - 1))
+                ;;
+            DOWN|j)
+                cursor=$(( cursor + 1 ))
+                [ "$cursor" -ge "$n" ] && cursor=0
+                ;;
+            [1-9])
+                local jump=$((key - 1))
+                if [ "$jump" -ge 0 ] && [ "$jump" -lt "$n" ]; then
+                    cursor=$jump
+                fi
+                ;;
+            ""|$'\n'|$'\r')
+                _interactive_menu_clear
+                printf "\033[?25h" >&2
+                trap - INT
+                IFS='|' read -r value _ <<< "${options[$cursor]}"
+                echo "$value"
+                return 0
+                ;;
+            ESC|q)
+                _interactive_menu_clear
+                printf "\033[?25h" >&2
+                trap - INT
+                return 1
+                ;;
+            *)
+                continue
+                ;;
+        esac
+
+        _interactive_menu_clear
+        _interactive_menu_render
+    done
+}
+
+# ─────────────────────────────────────────────────────────────
+# 비TTY fallback — 기존 숫자 입력 방식
+# 사용법: selected=$(legacy_numeric_menu "prompt" "value1|label1" ...)
+# ─────────────────────────────────────────────────────────────
+legacy_numeric_menu() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local n=${#options[@]}
+
+    if [ "$n" -eq 0 ]; then
+        echo "legacy_numeric_menu: 옵션이 없습니다" >&2
+        return 1
+    fi
+
+    printf "\n%s\n\n" "$prompt" >&2
+    local i value label
+    for i in $(seq 0 $((n - 1))); do
+        IFS='|' read -r value label <<< "${options[$i]}"
+        printf "  %d) %-20s - %s\n" "$((i + 1))" "$value" "$label" >&2
+    done
+    printf "\n" >&2
+
+    local choice read_ok=0
+    while true; do
+        choice=""
+        read_ok=0
+        if [ -t 0 ]; then
+            printf "선택 (1-%d): " "$n" >&2
+            IFS= read -r choice && read_ok=1
+        elif [ -c /dev/tty ] 2>/dev/null && [ -r /dev/tty ]; then
+            printf "선택 (1-%d): " "$n" >&2
+            IFS= read -r choice < /dev/tty && read_ok=1
+        fi
+
+        if [ "$read_ok" -eq 0 ]; then
+            # stdin/tty 모두 못 읽음 → 첫 옵션 자동 선택
+            IFS='|' read -r value _ <<< "${options[0]}"
+            echo "$value"
+            return 0
+        fi
+
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "$n" ]; then
+            IFS='|' read -r value _ <<< "${options[$((choice - 1))]}"
+            echo "$value"
+            return 0
+        else
+            printf "잘못된 입력입니다. 1-%d 사이의 숫자를 입력해주세요.\n" "$n" >&2
+        fi
+    done
+}
+
+# ─────────────────────────────────────────────────────────────
+# 통합 entry point — TTY면 interactive_menu, 아니면 legacy_numeric_menu
+# ─────────────────────────────────────────────────────────────
+choose_menu() {
+    if [ "$TTY_AVAILABLE" = true ] && [ -t 2 ]; then
+        interactive_menu "$@"
+    else
+        legacy_numeric_menu "$@"
+    fi
+}
+
 # Y/N 질문 함수 (기본값 지원)
 # 반환: 0 (Yes), 1 (No)
 ask_yes_no() {
@@ -652,49 +830,24 @@ print_question_header() {
 
 # 프로젝트 타입 선택 메뉴
 show_project_type_menu() {
-    print_to_user ""
-    print_to_user "프로젝트 타입을 선택하세요:"
-    print_to_user ""
-    print_to_user "  1) spring            - Spring Boot 백엔드"
-    print_to_user "  2) flutter           - Flutter 모바일 앱"
-    print_to_user "  3) react             - React 웹 앱"
-    print_to_user "  4) react-native      - React Native 모바일 앱"
-    print_to_user "  5) react-native-expo - React Native Expo 앱"
-    print_to_user "  6) node              - Node.js 프로젝트"
-    print_to_user "  7) python            - Python 프로젝트"
-    print_to_user "  8) basic             - 기타 프로젝트"
-    print_to_user ""
-    
-    local choice
-    local valid_input=false
-    
-    while [ "$valid_input" = false ]; do
-        if safe_read "선택 (1-8): " choice "-n 1"; then
-            print_to_user ""
-            
-            if [[ "$choice" =~ ^[1-8]$ ]]; then
-                valid_input=true
-                case $choice in
-                    1) echo "spring" ;;
-                    2) echo "flutter" ;;
-                    3) echo "react" ;;
-                    4) echo "react-native" ;;
-                    5) echo "react-native-expo" ;;
-                    6) echo "node" ;;
-                    7) echo "python" ;;
-                    8) echo "basic" ;;
-                esac
-            else
-                print_error "잘못된 입력입니다. 1-8 사이의 숫자를 입력해주세요."
-                print_to_user ""
-            fi
-        else
-            # TTY를 읽을 수 없는 환경 - 기존 값 유지
-            print_error "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
-            echo "$PROJECT_TYPE"
-            return 1
-        fi
-    done
+    local selected
+    selected=$(choose_menu "프로젝트 타입을 선택하세요" \
+        "spring|Spring Boot 백엔드" \
+        "flutter|Flutter 모바일 앱" \
+        "react|React 웹 앱" \
+        "react-native|React Native 모바일 앱" \
+        "react-native-expo|React Native Expo 앱" \
+        "node|Node.js 프로젝트" \
+        "python|Python 프로젝트" \
+        "basic|기타 프로젝트")
+
+    if [ -z "$selected" ]; then
+        print_error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
+        echo "$PROJECT_TYPE"
+        return 1
+    fi
+
+    echo "$selected"
 }
 
 # 프로젝트 감지 및 확인
@@ -759,92 +912,67 @@ detect_and_confirm_project() {
 # 프로젝트 정보 수정 메뉴
 handle_project_edit_menu() {
     print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
-    
-    print_to_user "  1) Project Type"
-    print_to_user "  2) Version"
-    print_to_user "  3) Default Branch (기본 브랜치)"
-    print_to_user "  4) 모두 맞음, 계속"
-    print_to_user ""
-        
+
     local edit_choice
-    local edit_valid=false
-    
-    while [ "$edit_valid" = false ]; do
-        if safe_read "선택 (1-4): " edit_choice "-n 1"; then
+    edit_choice=$(choose_menu "어떤 항목을 수정하시겠습니까?" \
+        "type|Project Type" \
+        "version|Version" \
+        "branch|Default Branch (기본 브랜치)" \
+        "done|모두 맞음, 계속")
+
+    if [ -z "$edit_choice" ]; then
+        print_warning "수정 메뉴가 취소되었습니다."
+        return 1
+    fi
+
+    case "$edit_choice" in
+        type)
+            PROJECT_TYPE=$(show_project_type_menu)
+            print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
             print_to_user ""
-            
-            if [[ "$edit_choice" =~ ^[1-4]$ ]]; then
-                edit_valid=true
-                
-                case $edit_choice in
-                    1)
-                        # Project Type 수정
-                        PROJECT_TYPE=$(show_project_type_menu)
-                        print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
-                        print_to_user ""
-                        ;;
-                    2)
-                        # Version 수정
-                        local new_version
-                        print_to_user ""
-                        
-                        if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
-                            print_to_user ""
-                            
-                            if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                VERSION="$new_version"
-                                print_success "Version이 '$VERSION'(으)로 변경되었습니다"
-                            else
-                                print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-                            fi
-                            print_to_user ""
-                        else
-                            print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
-                            print_to_user ""
-                        fi
-                        ;;
-                    3)
-                        # Default Branch 수정
-                        local new_branch
-                        print_to_user ""
-                        print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
-                        print_to_user ""
-                        
-                        if safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""; then
-                            print_to_user ""
-                            
-                            if [ -n "$new_branch" ]; then
-                                DETECTED_BRANCH="$new_branch"
-                                print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
-                            else
-                                print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-                            fi
-                            print_to_user ""
-                        else
-                            print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
-                            print_to_user ""
-                        fi
-                        ;;
-                    4)
-                        # 모두 맞음, 계속
-                        print_success "프로젝트 정보 확인 완료"
-                        print_to_user ""
-                        # 메인 루프로 돌아가지 않고 바로 종료
-                        return 0
-                        ;;
-                esac
+            ;;
+        version)
+            local new_version
+            print_to_user ""
+            if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
+                print_to_user ""
+                if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    VERSION="$new_version"
+                    print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                else
+                    print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                fi
+                print_to_user ""
             else
-                print_error "잘못된 입력입니다. 1-4 사이의 숫자를 입력해주세요."
+                print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
                 print_to_user ""
             fi
-        else
-            # TTY를 읽을 수 없는 환경 - 대화형 편집 불가
-            print_error "대화형 입력이 불가능한 환경입니다."
-            print_warning "자동화 환경에서는 --type, --version 옵션을 직접 지정해주세요."
+            ;;
+        branch)
+            local new_branch
             print_to_user ""
-            return 1
-        fi
-    done
+            print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+            print_to_user ""
+            if safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""; then
+                print_to_user ""
+                if [ -n "$new_branch" ]; then
+                    DETECTED_BRANCH="$new_branch"
+                    print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                else
+                    print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+                fi
+                print_to_user ""
+            else
+                print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                print_to_user ""
+            fi
+            ;;
+        done)
+            print_success "프로젝트 정보 확인 완료"
+            print_to_user ""
+            return 0
+            ;;
+    esac
 }
 
 # 템플릿 다운로드
@@ -2138,47 +2266,21 @@ interactive_mode() {
 
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
 
-    print_to_user "  1) 전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)"
-    print_to_user "  2) 버전 관리 시스템만"
-    print_to_user "  3) GitHub Actions 워크플로우만"
-    print_to_user "  4) 이슈/PR 템플릿만"
-    print_to_user "  5) Agent Skill 설치 (Claude, Cursor, Gemini, Codex)"
-    print_to_user "  6) 취소"
-    print_to_user ""
+    local _mode_selected
+    _mode_selected=$(choose_menu "어떤 기능을 통합하시겠습니까?" \
+        "full|전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" \
+        "version|버전 관리 시스템만" \
+        "workflows|GitHub Actions 워크플로우만" \
+        "issues|이슈/PR 템플릿만" \
+        "skills|Agent Skill 설치 (Claude, Cursor, Gemini, Codex)" \
+        "cancel|취소")
 
-    local choice
-    local valid_input=false
+    if [ -z "$_mode_selected" ] || [ "$_mode_selected" = "cancel" ]; then
+        print_info "취소되었습니다"
+        exit 0
+    fi
 
-    # 입력 검증 루프 - 올바른 값(1-6)이 입력될 때까지 반복
-    while [ "$valid_input" = false ]; do
-        if safe_read "선택 (1-6): " choice "-n 1"; then
-            print_to_user ""
-
-            # 입력값 검증: 1-6 숫자만 허용
-            if [[ "$choice" =~ ^[1-6]$ ]]; then
-                valid_input=true
-                case $choice in
-                    1) MODE="full" ;;
-                    2) MODE="version" ;;
-                    3) MODE="workflows" ;;
-                    4) MODE="issues" ;;
-                    5) MODE="skills" ;;
-                    6)
-                        print_info "취소되었습니다"
-                        exit 0
-                        ;;
-                esac
-            else
-                # 잘못된 입력 시 에러 메시지 표시 후 재입력 요청
-                print_error "잘못된 입력입니다. 1-6 사이의 숫자를 입력해주세요."
-                print_to_user ""
-            fi
-        else
-            # safe_read 실패 (이론상 여기 도달 안 함)
-            print_error "입력을 읽을 수 없습니다"
-            exit 1
-        fi
-    done
+    MODE="$_mode_selected"
 
     # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
     if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
@@ -2424,23 +2526,15 @@ offer_ide_tools_install() {
             fi
 
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "  1 - ${update_label}"
-                print_to_user "  2 - 재설치 (scope 변경)"
-                print_to_user "  3 - 삭제"
-                print_to_user "      삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
-                print_to_user "                 ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
-                print_to_user "  4 - 건너뛰기"
-                print_to_user ""
-
                 local choice
-                if [ -c /dev/tty ]; then
-                    read -r choice < /dev/tty
-                else
-                    read -r choice
-                fi
+                choice=$(choose_menu "Claude Code 플러그인 (cassiiopeia)" \
+                    "update|${update_label}" \
+                    "reinstall|재설치 (scope 변경)" \
+                    "delete|삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installed_scope})" \
+                    "skip|건너뛰기")
 
                 case "$choice" in
-                    1)
+                    update)
                         print_step "플러그인 업데이트 중..."
                         # 업데이트 전 현재 캐시 경로 저장 (마이그레이션용)
                         local old_cache_path
@@ -2462,7 +2556,7 @@ offer_ide_tools_install() {
                             echo "    claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
                         fi
                         ;;
-                    2)
+                    reinstall)
                         print_step "기존 플러그인 삭제 중 (scope: ${installed_scope})..."
                         claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null || true
                         _remove_claude_plugin_data
@@ -2470,7 +2564,7 @@ offer_ide_tools_install() {
                         new_scope=$(_ask_claude_scope)
                         _do_claude_plugin_install "$new_scope"
                         ;;
-                    3)
+                    delete)
                         print_step "플러그인 삭제 중..."
                         print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
                         print_info "             ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
@@ -2573,22 +2667,15 @@ offer_ide_tools_install() {
         echo "" >&2
 
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user "어떻게 하시겠습니까?"
-            print_to_user "  1 - 업데이트 (기존 scope 유지)"
-            print_to_user "  2 - 신규 설치 (다른 scope에 추가)"
-            print_to_user "  3 - 삭제"
-            print_to_user "  4 - 건너뛰기"
-            print_to_user ""
-
             local cursor_choice
-            if [ -c /dev/tty ]; then
-                read -r cursor_choice < /dev/tty
-            else
-                read -r cursor_choice
-            fi
+            cursor_choice=$(choose_menu "Cursor Skills 관리" \
+                "update|업데이트 (기존 scope 유지)" \
+                "install|신규 설치 (다른 scope에 추가)" \
+                "delete|삭제" \
+                "skip|건너뛰기")
 
             case "$cursor_choice" in
-                1)
+                update)
                     # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
                     local target_scope
                     if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
@@ -2606,7 +2693,7 @@ offer_ide_tools_install() {
                         _do_cursor_skills_copy "$target_scope" "$src"
                     fi
                     ;;
-                2)
+                install)
                     # 신규 설치: scope 자유 선택 (다른 scope에 추가)
                     local target_scope
                     target_scope=$(_ask_cursor_scope "" "")
@@ -2618,7 +2705,7 @@ offer_ide_tools_install() {
                         _do_cursor_skills_copy "$target_scope" "$src"
                     fi
                     ;;
-                3)
+                delete)
                     _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
                     ;;
                 *)

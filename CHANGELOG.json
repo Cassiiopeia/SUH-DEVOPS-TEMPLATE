@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T04:46:35Z",
-    "currentVersion": "3.0.94",
+    "lastUpdated": "2026-06-02T08:32:07Z",
+    "currentVersion": "3.0.95",
     "projectType": "basic",
-    "totalReleases": 124
+    "totalReleases": 125
   },
   "releases": [
+    {
+      "version": "3.0.95",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 343,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 구현 보고서에 기능 흐름도가 그림으로 표시됩니다\n  * 테스트케이스가 항목별 표 형식으로 더 보기 쉬워졌습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "구현 보고서에 기능 흐름도가 그림으로 표시됩니다",
+            "테스트케이스가 항목별 표 형식으로 더 보기 쉬워졌습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.94",
       "project_type": "basic",

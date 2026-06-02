@@ -104,3 +104,21 @@ def test_issue_cli_bad_args_emits_json(tmp_path):
     out = json.loads(proc.stdout.strip().splitlines()[-1])
     assert out["ok"] is False
     assert out["code"] == "bad_args"
+
+
+def test_commit_cli_bad_args_emits_json():
+    """commit_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-commit" / "scripts" / "commit_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"

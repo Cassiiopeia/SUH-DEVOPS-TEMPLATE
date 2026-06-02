@@ -1,11 +1,20 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T00:54:02Z",
-    "currentVersion": "3.0.84",
+    "lastUpdated": "2026-06-02T00:59:47Z",
+    "currentVersion": "3.0.86",
     "projectType": "basic",
-    "totalReleases": 117
+    "totalReleases": 118
   },
   "releases": [
+    {
+      "version": "3.0.86",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 335,
+      "raw_summary": "",
+      "parsed_changes": {},
+      "parse_method": "markdown_failed"
+    },
     {
       "version": "3.0.84",
       "project_type": "basic",

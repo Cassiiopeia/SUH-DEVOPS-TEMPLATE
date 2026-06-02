@@ -1,7 +1,18 @@
 # Changelog
 
-**현재 버전:** 3.0.82  
-**마지막 업데이트:** 2026-06-02T00:35:32Z  
+**현재 버전:** 3.0.84  
+**마지막 업데이트:** 2026-06-02T00:54:02Z  
+
+---
+
+## [3.0.84] - 2026-06-02
+
+**PR:** #332  
+
+**기타**
+- changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 매칭을 name(라벨)에서 path(파일 식별자)로 변경(name 'AUTO UPDATE PROJECT CHANGELOG' 매칭 실패 근본 해결), workflow=null+PR 생성 120초 이내면 waiting_for_automerge 가드, AUTO-CHANGELOG-CONTROL 워크플로우 step 2에 body 비어있을 때 3회 retry로 GitHub API replication lag 대응 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331
+- changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 in_progress 시 has_summary=false여도 waiting_for_automerge로 판정해 race 가드 추가, SKILL.md 7단계 라우팅 표에 즉시 update-pr 호출 금지·60초 재확인 후 두 번 연속일 때만 fix 모드 진입 명시 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331
+- changelog-deploy 릴리스 노트 사용자 승인 게이트 + 자동화 옵션 : docs : 첫 실행 자동화 제안 메시지 명확화(무엇을 자동화하는지·전환 방법 안내), 자동 모드 진행 메시지 친화화 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/328
 
 ---
 

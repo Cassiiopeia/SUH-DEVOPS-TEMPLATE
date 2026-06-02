@@ -1,11 +1,29 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T00:35:32Z",
-    "currentVersion": "3.0.82",
+    "lastUpdated": "2026-06-02T00:54:02Z",
+    "currentVersion": "3.0.84",
     "projectType": "basic",
-    "totalReleases": 116
+    "totalReleases": 117
   },
   "releases": [
+    {
+      "version": "3.0.84",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 332,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **기타**\n\n  * changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 매칭을 name(라벨)에서 path(파일 식별자)로 변경(name 'AUTO UPDATE PROJECT CHANGELOG' 매칭 실패 근본 해결), workflow=null+PR 생성 120초 이내면 waiting_for_automerge 가드, AUTO-CHANGELOG-CONTROL 워크플로우 step 2에 body 비어있을 때 3회 retry로 GitHub API replication lag 대응 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331\n  * changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 in_progress 시 has_summary=false여도 waiting_for_automerge로 판정해 race 가드 추가, SKILL.md 7단계 라우팅 표에 즉시 update-pr 호출 금지·60초 재확인 후 두 번 연속일 때만 fix 모드 진입 명시 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331\n  * changelog-deploy 릴리스 노트 사용자 승인 게이트 + 자동화 옵션 : docs : 첫 실행 자동화 제안 메시지 명확화(무엇을 자동화하는지·전환 방법 안내), 자동 모드 진행 메시지 친화화 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/328\n\n> 💡 더 정확한 릴리스 노트를 원한다면 Claude Code에서 `/github` 스킬로 PR 릴리스 노트를 업데이트할 수 있습니다.",
+      "parsed_changes": {
+        "기타": {
+          "title": "기타",
+          "items": [
+            "changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 매칭을 name(라벨)에서 path(파일 식별자)로 변경(name 'AUTO UPDATE PROJECT CHANGELOG' 매칭 실패 근본 해결), workflow=null+PR 생성 120초 이내면 waiting_for_automerge 가드, AUTO-CHANGELOG-CONTROL 워크플로우 step 2에 body 비어있을 때 3회 retry로 GitHub API replication lag 대응 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331",
+            "changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 in_progress 시 has_summary=false여도 waiting_for_automerge로 판정해 race 가드 추가, SKILL.md 7단계 라우팅 표에 즉시 update-pr 호출 금지·60초 재확인 후 두 번 연속일 때만 fix 모드 진입 명시 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331",
+            "changelog-deploy 릴리스 노트 사용자 승인 게이트 + 자동화 옵션 : docs : 첫 실행 자동화 제안 메시지 명확화(무엇을 자동화하는지·전환 방법 안내), 자동 모드 진행 메시지 친화화 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/328"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.82",
       "project_type": "basic",

@@ -88,6 +88,28 @@ def list_labels(owner: str, repo: str, pat: str) -> list[str]:
     return [item["name"] for item in items]
 
 
+def add_issue_labels(owner: str, repo: str, issue_number: int, labels: list[str], pat: str) -> list[str]:
+    """이슈/PR(GitHub API에선 둘 다 issue)에 라벨을 **추가**한다 (덮어쓰기 아님).
+
+    PR도 GitHub API에서는 issue로 다뤄지므로 `/issues/{n}/labels`로 호출 가능.
+    레포에 존재하지 않는 라벨은 사전 필터링해 422를 방지한다.
+    반환: PR에 현재 붙어 있는 모든 라벨 이름 리스트.
+    """
+    if not labels:
+        return []
+    existing = set(list_labels(owner, repo, pat))
+    filtered = [l for l in labels if l in existing]
+    if not filtered:
+        return []
+    items = _request(
+        "POST",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/labels",
+        {"labels": filtered},
+        pat,
+    )
+    return [item["name"] for item in items]
+
+
 def create_issue(
     owner: str, repo: str, title: str, body: str,
     labels: list[str], pat: str, assignees: list[str] | None = None,

@@ -51,9 +51,22 @@ jobs:
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
 
-          # changelog-deploy가 이미 Summary를 작성한 PR을 보호한다.
-          # PR opened 직후엔 GitHub API replication lag로 body가 비어 보일 수 있으므로
-          # 비어 있으면 최대 3회(2초 간격) 재시도해 본다. 한 번이라도 Summary가 잡히면 본문 보존.
+          # 1. 라벨 컨트랙트 — 'release-notes:ready' 라벨이 있으면 스킬이 본문을 책임진다.
+          #    워크플로우는 본문에 절대 손대지 않는다. (race 본질적 차단)
+          LABELS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                        "https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/labels" | \
+                        jq -r '.[].name')
+          if echo "$LABELS" | grep -qx "release-notes:ready"; then
+            echo "🏷️ 'release-notes:ready' 라벨 감지 — 본문 초기화 step 전체 skip"
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                 jq -r '.body // ""' > pr_body.md
+            echo "already_found=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 2. (legacy 보호선) 라벨 없는 PR은 본문 검사. PR opened 직후엔 GitHub API replication
+          #    lag로 body가 비어 보일 수 있으므로 최대 3회(2초 간격) 재시도해 본다.
           CURRENT_BODY=""
           for attempt in 1 2 3; do
             CURRENT_BODY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \

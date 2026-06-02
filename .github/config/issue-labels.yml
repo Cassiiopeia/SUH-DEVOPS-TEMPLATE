@@ -33,3 +33,7 @@
 - name: 취소
   color: f28b25
   description: 작업 취소됨
+
+- name: release-notes:ready
+  color: 1F883D
+  description: changelog-deploy 스킬이 릴리스 노트를 본문에 직접 작성한 deploy PR. AUTO-CHANGELOG-CONTROL 워크플로우는 본문을 건드리지 않는다

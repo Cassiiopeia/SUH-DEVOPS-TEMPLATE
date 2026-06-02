@@ -1,11 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T01:36:20Z",
-    "currentVersion": "3.0.90",
+    "lastUpdated": "2026-06-02T01:45:37Z",
+    "currentVersion": "3.0.92",
     "projectType": "basic",
-    "totalReleases": 121
+    "totalReleases": 122
   },
   "releases": [
+    {
+      "version": "3.0.92",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 339,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 배포 PR 생성 시 릴리스 노트 본문이 누락되던 문제 해결\n\n* **개선**\n  * 커밋 메시지에 자동 서명·멘션이 끼어들지 않도록 차단 강화",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "배포 PR 생성 시 릴리스 노트 본문이 누락되던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "커밋 메시지에 자동 서명·멘션이 끼어들지 않도록 차단 강화"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.90",
       "project_type": "basic",

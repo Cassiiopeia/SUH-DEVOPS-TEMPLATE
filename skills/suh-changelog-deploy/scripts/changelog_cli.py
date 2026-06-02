@@ -27,12 +27,7 @@ from common.gh_client import (  # noqa: E402
     list_pulls, update_pull_request, create_pull_request,
     get_run, get_job_log, list_failed_runs, resolve_pr_runs, resolve_branch_runs,
     get_pull_detail, find_open_pr_by_base, get_branch_head,
-    add_issue_labels,
 )
-
-# 스킬이 본문에 릴리스 노트를 직접 담아 만든 PR을 식별하는 컨트랙트 라벨.
-# AUTO-CHANGELOG-CONTROL 워크플로우는 이 라벨이 붙은 PR의 본문을 건드리지 않는다.
-RELEASE_NOTES_READY_LABEL = "release-notes:ready"
 
 
 def cmd_actions(args) -> int:
@@ -232,21 +227,35 @@ def cmd_create_pr(args) -> int:
     try:
         result = create_pull_request(args.owner, args.repo, args.title, body, args.head, args.base, pat)
         pr_number = result.get("number")
-        # 스킬이 본문을 직접 담아 만든 PR임을 라벨로 표시.
-        # AUTO-CHANGELOG-CONTROL 워크플로우가 이 라벨을 보고 본문 초기화를 건너뛴다.
-        label_applied = []
-        if pr_number:
+
+        # PR 생성 직후엔 AUTO-CHANGELOG-CONTROL 워크플로우 step 2가 본문을 초기화할 수 있다.
+        # step 2는 PR opened 후 보통 3~10초 안에 실행되므로, 워크플로우 본문 초기화가 끝난 뒤
+        # (대기 후) 본문을 다시 확인해 비어 있으면 update-pr로 재주입한다. 이렇게 하면 step 8
+        # (CodeRabbit Summary 폴링)이 첫 attempt(5초 간격)에서 즉시 본문을 잡고 빠르게 머지된다.
+        # 본문이 비어 있지 않으면(워크플로우가 보존했거나 CodeRabbit이 자기 Summary 작성한 경우) skip.
+        guard_summary = None
+        if pr_number and body:
+            import time
+            time.sleep(15)
             try:
-                label_applied = add_issue_labels(args.owner, args.repo, pr_number, [RELEASE_NOTES_READY_LABEL], pat)
+                detail = get_pull_detail(args.owner, args.repo, pr_number, pat)
+                cur_body = detail.get("body") or ""
+                if "Summary by CodeRabbit" not in cur_body:
+                    update_pull_request(args.owner, args.repo, pr_number, pat, body=body)
+                    guard_summary = "본문 재주입 (워크플로우 step 2 race 회복)"
+                else:
+                    guard_summary = "본문 보존 확인 — 재주입 불필요"
             except GitHubAPIError:
-                # 라벨 부여 실패해도 PR 생성 자체는 성공 — 워크플로우 retry fix가 보호선
-                label_applied = []
-        return emit({
+                guard_summary = "본문 재확인 실패 — 무시하고 진행"
+
+        out = {
             **result,
-            "labels_applied": label_applied,
-            "summary": f"PR #{pr_number} 생성 완료" + (f" (label: {RELEASE_NOTES_READY_LABEL})" if RELEASE_NOTES_READY_LABEL in label_applied else ""),
+            "summary": f"PR #{pr_number} 생성 완료" + (f" / {guard_summary}" if guard_summary else ""),
             "next": f"deploy-status {args.owner} {args.repo} --pr {pr_number}",
-        })
+        }
+        if guard_summary:
+            out["body_guard"] = guard_summary
+        return emit(out)
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 

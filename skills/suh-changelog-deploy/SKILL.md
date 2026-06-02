@@ -341,10 +341,6 @@ PR을 생성합니다.
 
 VERSION-CONTROL 워크플로우 완료를 기다리지 않고 deploy PR을 생성한다. **5단계에서 만든 릴리스 노트 파일을 본문으로 담아 생성**하는 것이 핵심이다 — PR이 처음부터 `Summary by CodeRabbit`을 담고 있어야 AUTO-CHANGELOG-CONTROL 워크플로우가 본문을 초기화하지 않는다.
 
-> **`changelog_cli.py:create-pr`은 PR 생성 후 자동으로 `release-notes:ready` 라벨을 부여한다** (이슈 #334).
-> AUTO-CHANGELOG-CONTROL 워크플로우는 그 라벨이 있는 PR의 본문에 절대 손대지 않는다 — race 본질적 차단.
-> 라벨 부여 실패 시(레포에 라벨 미동기화 등)에도 PR 생성 자체는 성공하며, 워크플로우 step 2의 retry·Summary 감지 보호선이 작동한다.
-
 ```bash
 # ⚠️ Bash stateless — 이 블록 맨 앞 5개 변수를 [시작 전]에서 구한 실제 값으로 채운다.
 GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."

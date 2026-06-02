@@ -27,12 +27,7 @@ from common.gh_client import (  # noqa: E402
     list_pulls, update_pull_request, create_pull_request,
     get_run, get_job_log, list_failed_runs, resolve_pr_runs, resolve_branch_runs,
     get_pull_detail, find_open_pr_by_base, get_branch_head,
-    add_issue_labels,
 )
-
-# 스킬이 본문에 릴리스 노트를 직접 담아 만든 PR을 식별하는 컨트랙트 라벨.
-# AUTO-CHANGELOG-CONTROL 워크플로우는 이 라벨이 붙은 PR의 본문을 건드리지 않는다.
-RELEASE_NOTES_READY_LABEL = "release-notes:ready"
 
 
 def cmd_actions(args) -> int:
@@ -231,21 +226,10 @@ def cmd_create_pr(args) -> int:
     body = body_path.read_text(encoding="utf-8") if body_path.exists() else ""
     try:
         result = create_pull_request(args.owner, args.repo, args.title, body, args.head, args.base, pat)
-        pr_number = result.get("number")
-        # 스킬이 본문을 직접 담아 만든 PR임을 라벨로 표시.
-        # AUTO-CHANGELOG-CONTROL 워크플로우가 이 라벨을 보고 본문 초기화를 건너뛴다.
-        label_applied = []
-        if pr_number:
-            try:
-                label_applied = add_issue_labels(args.owner, args.repo, pr_number, [RELEASE_NOTES_READY_LABEL], pat)
-            except GitHubAPIError:
-                # 라벨 부여 실패해도 PR 생성 자체는 성공 — 워크플로우 retry fix가 보호선
-                label_applied = []
         return emit({
             **result,
-            "labels_applied": label_applied,
-            "summary": f"PR #{pr_number} 생성 완료" + (f" (label: {RELEASE_NOTES_READY_LABEL})" if RELEASE_NOTES_READY_LABEL in label_applied else ""),
-            "next": f"deploy-status {args.owner} {args.repo} --pr {pr_number}",
+            "summary": f"PR #{result.get('number')} 생성 완료",
+            "next": f"deploy-status {args.owner} {args.repo} --pr {result.get('number')}",
         })
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})

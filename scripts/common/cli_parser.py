@@ -79,4 +79,11 @@ def run_cli(parser: JSONArgumentParser, argv: Optional[Sequence[str]] = None) ->
             "hint": _make_hint(parser),
             "available_subcommands": _list_subcommands(parser),
         })
-    return args.func(args)
+    try:
+        return args.func(args)
+    except Exception as e:
+        return emit({
+            "ok": False,
+            "code": "handler_error",
+            "error": f"{type(e).__name__}: {e}",
+        })

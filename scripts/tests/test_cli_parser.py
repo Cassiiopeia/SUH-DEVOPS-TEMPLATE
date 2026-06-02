@@ -75,3 +75,23 @@ def test_success_path_unaffected(capsys):
     parser = _build_sample_parser()
     rc = run_cli(parser, ["do-thing", "value"])
     assert rc == 0
+
+
+def test_handler_exception_emits_json(capsys):
+    """cmd_* handler가 예외를 던지면 JSON으로 포착되어야 한다."""
+    def _raising_handler(args):
+        raise RuntimeError("boom")
+
+    parser = JSONArgumentParser(prog="sample_cli")
+    sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("do-thing")
+    p.add_argument("arg1")
+    p.set_defaults(func=_raising_handler)
+
+    rc = run_cli(parser, ["do-thing", "value"])
+    assert rc == 1
+    out = json.loads(capsys.readouterr().out.strip())
+    assert out["ok"] is False
+    assert out["code"] == "handler_error"
+    assert "RuntimeError" in out["error"]
+    assert "boom" in out["error"]

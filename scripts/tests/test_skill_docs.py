@@ -1,4 +1,5 @@
 import re
+import sys
 from pathlib import Path
 
 
@@ -72,3 +73,34 @@ def test_agent_docs_do_not_recommend_direct_curl_for_github_api():
         if "GitHub API 호출은 curl 직접 사용 권장" in text:
             failures.append(path.name)
     assert failures == []
+
+
+def test_issue_cli_does_not_expose_get_next_seq():
+    """get-next-seq는 issue_cli.py CLI 표면에서 제거되어야 한다 (이슈 #329).
+
+    SKILL.md 4단계는 TMP1 직접 사용 절차이므로 CLI 노출은 agent 오추론을 유도한다.
+    """
+    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    text = cli_path.read_text(encoding="utf-8")
+    assert "add_parser(\"get-next-seq\"" not in text, \
+        "issue_cli.py에 get-next-seq 서브커맨드가 남아있다 (이슈 #329)"
+    assert "\"get-next-seq\"" not in text or "removed" in text.lower(), \
+        "get-next-seq 참조가 코드에 남아있다"
+
+
+def test_issue_cli_bad_args_emits_json(tmp_path):
+    """issue_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"

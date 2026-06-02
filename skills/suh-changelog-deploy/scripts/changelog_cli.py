@@ -93,13 +93,22 @@ def cmd_deploy_status(args) -> int:
                 "summary": f"base={args.base}로 들어오는 open PR 없음",
             })
 
+        # 워크플로우 매칭 — name이 아니라 path로 매칭한다.
+        # name 필드는 사람이 보는 라벨(예: "AUTO UPDATE PROJECT CHANGELOG")이라 언제든 바뀌고,
+        # 실제 파일 path(`.github/workflows/PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml`)가 식별자다.
+        # 과거: `"AUTO-CHANGELOG-CONTROL" in name` → name은 "AUTO UPDATE PROJECT CHANGELOG"라 영원히 매칭 실패.
         workflow = None
         try:
             run_data = resolve_pr_runs(args.owner, args.repo, pr["number"], pat)
             for r in run_data.get("runs", []):
-                if "AUTO-CHANGELOG-CONTROL" in (r.get("name") or ""):
+                path = (r.get("path") or "").lower()
+                name = (r.get("name") or "").upper()
+                # 1순위: 파일 path. 2순위(legacy fallback): name에 키워드.
+                if path.endswith("project-common-auto-changelog-control.yaml") \
+                        or ("CHANGELOG" in name and ("AUTO" in name or "DEPLOY" in name)):
                     workflow = {
                         "name": r.get("name"),
+                        "path": r.get("path"),
                         "status": r.get("status"),
                         "conclusion": r.get("conclusion"),
                         "run_url": r.get("url"),
@@ -108,7 +117,8 @@ def cmd_deploy_status(args) -> int:
         except GitHubAPIError:
             workflow = None
 
-        has_summary = "Summary by CodeRabbit" in pr.get("body", "")
+        body = pr.get("body") or ""
+        has_summary = "Summary by CodeRabbit" in body
         pr_out = {
             "number": pr["number"],
             "state": pr["state"],
@@ -117,7 +127,26 @@ def cmd_deploy_status(args) -> int:
             "has_coderabbit_summary": has_summary,
             "head_sha": pr["head_sha"],
             "url": pr["url"],
+            "created_at": pr.get("created_at"),
         }
+
+        workflow_status = (workflow or {}).get("status")
+        workflow_conclusion = (workflow or {}).get("conclusion")
+        workflow_running = workflow_status in ("in_progress", "queued", "waiting", "requested")
+
+        # PR 생성 후 얼마 안 지났으면(120초 이내) 워크플로우가 막 trigger되어 아직 API에
+        # 반영되지 않았을 가능성을 가드한다. workflow=null이라도 PR이 갓 만들어진 상태면
+        # missing 판정 대신 waiting으로 양보한다.
+        import datetime as _dt
+        pr_age_sec = None
+        if pr.get("created_at"):
+            try:
+                created = _dt.datetime.fromisoformat(pr["created_at"].replace("Z", "+00:00"))
+                now = _dt.datetime.now(_dt.timezone.utc)
+                pr_age_sec = (now - created).total_seconds()
+            except Exception:
+                pr_age_sec = None
+        pr_young = (pr_age_sec is not None and pr_age_sec < 120)
 
         next_hint = f"deploy-status {args.owner} {args.repo} --pr {pr['number']}"
         if pr["merged"]:
@@ -125,10 +154,19 @@ def cmd_deploy_status(args) -> int:
         elif pr["mergeable_state"] in ("dirty", "blocked", "behind"):
             verdict = "conflict"
             summary = f"PR #{pr['number']} mergeable_state={pr['mergeable_state']} — 충돌/차단"
-        elif workflow and workflow["conclusion"] == "failure":
+        elif workflow and workflow_conclusion == "failure":
             verdict = "workflow_failed"
             summary = "AUTO-CHANGELOG-CONTROL 워크플로우 실패"
+        elif workflow_running:
+            # 워크플로우 진행 중이면 body·has_summary가 일시적으로 비어 보여도 정상 대기로 본다 (race 가드)
+            verdict = "waiting_for_automerge"
+            summary = f"PR #{pr['number']} 워크플로우 진행 중({workflow_status}), automerge 대기"
+        elif workflow is None and pr_young:
+            # 워크플로우 매칭 못 했지만 PR이 갓 만들어진 상태 — API 반영 lag 가능, race 가드
+            verdict = "waiting_for_automerge"
+            summary = f"PR #{pr['number']} 생성 직후({int(pr_age_sec)}s), 워크플로우 trigger 대기"
         elif not has_summary:
+            # 워크플로우가 진행 중이 아니고 PR도 갓 생성된 게 아니면 진짜 body 초기화 사고로 판정
             verdict = "missing_coderabbit_summary"
             summary = f"PR #{pr['number']} 본문에 'Summary by CodeRabbit' 없음 — fix 모드로 재작성"
         else:

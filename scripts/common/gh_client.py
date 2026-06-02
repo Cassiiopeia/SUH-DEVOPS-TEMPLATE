@@ -425,6 +425,8 @@ def get_pull_detail(owner: str, repo: str, pr_number: int, pat: str) -> dict:
         "body": pr.get("body") or "",
         "head_sha": pr.get("head", {}).get("sha"),
         "url": pr["html_url"],
+        "created_at": pr.get("created_at"),
+        "updated_at": pr.get("updated_at"),
     }
 
 
@@ -462,6 +464,7 @@ def _run_summary(run: dict) -> dict:
     return {
         "run_id": run["id"],
         "name": run.get("name"),
+        "path": run.get("path"),
         "branch": run.get("head_branch"),
         "event": run.get("event"),
         "status": run.get("status"),

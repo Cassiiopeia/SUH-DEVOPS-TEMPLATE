@@ -1,11 +1,28 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T01:45:37Z",
-    "currentVersion": "3.0.92",
+    "lastUpdated": "2026-06-02T02:07:06Z",
+    "currentVersion": "3.0.93",
     "projectType": "basic",
-    "totalReleases": 122
+    "totalReleases": 123
   },
   "releases": [
+    {
+      "version": "3.0.93",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 341,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 커밋·이슈·배포 확인 단계를 자동으로 건너뛰는 옵션 추가\n  * 같은 작업을 반복할 때 발생하던 마찰 감소",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "커밋·이슈·배포 확인 단계를 자동으로 건너뛰는 옵션 추가",
+            "같은 작업을 반복할 때 발생하던 마찰 감소"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.92",
       "project_type": "basic",

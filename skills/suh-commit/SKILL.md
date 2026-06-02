@@ -13,7 +13,7 @@ description: "브랜치명에서 이슈 번호를 자동 추출해 커밋 메시
 - **이슈를 자동 생성하지 않는다** — 이슈 없으면 선택지 제시 후 사용자가 결정
 - **staged 파일이 없으면 변경 파일을 자동으로 `git add`한다** — 사용자가 멈춰서 직접 스테이징할 필요 없음
 - **`git push`는 절대 실행하지 않는다** — 커밋까지만 담당 (CLAUDE.md 규칙: push는 명시 허락 시에만)
-- **커밋에 Claude/AI 흔적을 절대 남기지 않는다** — `Co-Authored-By`, `Generated with Claude`, `🤖` 등 AI 서명/푸터 일절 금지. 사용자의 git 설정으로만 커밋되어 사용자가 직접 작성한 것처럼 보여야 한다. 커밋 메시지는 본문만 작성한다.
+- **커밋에 Claude/AI 흔적을 절대 남기지 않는다** — `Co-Authored-By`, `Generated with Claude`, `🤖`, `@claude` 등 AI 서명/푸터/GitHub @mention trailer 일절 금지. 변경설명·푸터 어디에도 `@username` GitHub mention을 포함하지 않는다(이슈 본문에서 가져온 mention도 제거). 사용자의 git 설정으로만 커밋되어 사용자가 직접 작성한 것처럼 보여야 한다. 커밋 메시지는 본문만 작성한다.
 
 ## 시작 전
 
@@ -134,6 +134,7 @@ staged 파일 목록과 diff를 분석하여 적절한 타입 추천:
 | `{변경설명}` | staged diff 분석으로 agent 작성 (사용자 승인) |
 
 - agent가 자유 판단하는 부분은 **타입과 변경설명뿐**이다. 제목·URL은 이슈 원본에서 정규식으로 정리한 값을 손대지 않고 사용한다.
+- `{변경설명}`에 `@username` GitHub mention(`@claude` 등)을 절대 포함하지 않는다. 이슈 본문·제목에서 따온 문구에 mention이 있으면 제거 후 사용한다.
 - 이슈 없이 자유 형식으로 커밋하는 경우(3단계 2선택)에만 제목을 직접 입력받는다.
 
 ```
@@ -157,10 +158,14 @@ staged 파일 목록과 diff를 분석하여 적절한 타입 추천:
 
 사용자가 1번(확인)을 선택한 경우에만 실행한다.
 
-**커밋 메시지에 AI 서명/푸터를 절대 추가하지 않는다.** `Co-Authored-By`, `Generated with Claude`, `🤖` 등 금지. 아래 명령 외에 `--author` 옵션이나 추가 trailer를 붙이지 않는다 — 사용자 git 설정 그대로 커밋한다:
+**커밋 메시지에 AI 서명/푸터를 절대 추가하지 않는다.** `Co-Authored-By`, `Generated with Claude`, `🤖`, `@claude` 등 GitHub @mention trailer 금지. 아래 명령 외에 `--author` 옵션이나 추가 trailer를 붙이지 않는다 — 사용자 git 설정 그대로 커밋한다.
+
+커밋 직전, 메시지 끝의 `@username` mention trailer를 무조건 자동 제거한다(skill 차원 강제 sanitize). 5단계 검열을 우회한 경우의 마지막 방어선:
 
 ```bash
-git commit -m "{최종 커밋 메시지}"
+RAW_MSG="{최종 커밋 메시지}"
+CLEAN_MSG=$(printf '%s' "$RAW_MSG" | sed -E ':a;$!N;$!ba;s/[[:space:]]*(@[A-Za-z0-9_-]+([[:space:]]+@[A-Za-z0-9_-]+)*)[[:space:]]*$//')
+git commit -m "$CLEAN_MSG"
 ```
 
 커밋 성공 후 결과 출력:

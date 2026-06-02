@@ -399,11 +399,14 @@ cd "$PROJECT_ROOT"
 | verdict | 의미 | 행동 |
 |---------|------|------|
 | `merged` | automerge 완료 | 8단계 결과 안내, 종료 |
-| `waiting_for_automerge` | 정상 대기 중 | **sleep 금지.** `ScheduleWakeup(delaySeconds=60)`으로 재확인하고, `merged`가 될 때까지 **60초 간격으로 계속 반복**한다 (automerge는 보통 60초 안에 완료). 60초는 ScheduleWakeup이 허용하는 최소값이다 |
-| `missing_coderabbit_summary` | 본문 초기화됨(레이스컨디션) | fix 모드로 재실행 |
+| `waiting_for_automerge` | 정상 대기 중 (워크플로우 in_progress 포함) | **sleep 금지.** `ScheduleWakeup(delaySeconds=60)`으로 재확인하고, `merged`가 될 때까지 **60초 간격으로 계속 반복**한다 (automerge는 보통 60초 안에 완료). 60초는 ScheduleWakeup이 허용하는 최소값이다 |
+| `missing_coderabbit_summary` | 워크플로우는 끝났는데 본문에 `Summary by CodeRabbit`이 없는 상태 | **즉시 fix 모드로 가지 않는다.** 60초 후 한 번 더 `deploy-status`로 재확인하고, **두 번 연속 같은 verdict일 때만** fix 모드 안내. 한 번이면 race 가능성을 우선 가정한다 (이슈 #331) |
 | `workflow_failed` | 워크플로우 실패 | `workflow.run_url` 안내 + fix 모드로 재실행 |
 | `conflict` | 머지 충돌/차단 | 사용자에게 충돌 상태 안내, 수동 확인 요청 |
 | `no_pr` | open deploy PR 없음 | `deploy_branch.head_sha`로 이미 머지됐는지 확인 후 안내 |
+
+> **`missing_coderabbit_summary` 시 즉시 `update-pr` 호출 금지** (실측 사고: 이슈 #331).
+> 워크플로우 step과 CodeRabbit 봇 PATCH가 동시에 본문을 갱신하는 race 구간이 있어, agent가 즉시 update-pr로 본문을 재주입하면 워크플로우 PATCH와 또 race를 일으켜 본문 사라짐이 반복된다. 반드시 60초 재확인 후 두 번 연속일 때만 fix 모드로 간다.
 
 > **재확인 시 sleep을 쓰지 않는다.** Claude Code Bash는 `sleep 120`을 차단한다. 대기가 필요하면 `ScheduleWakeup`으로 자기 페이스를 잡고, 깨어나면 `next` 힌트의 `deploy-status` 커맨드를 다시 호출한다.
 >

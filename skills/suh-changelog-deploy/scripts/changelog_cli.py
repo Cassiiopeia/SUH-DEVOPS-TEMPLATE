@@ -108,7 +108,8 @@ def cmd_deploy_status(args) -> int:
         except GitHubAPIError:
             workflow = None
 
-        has_summary = "Summary by CodeRabbit" in pr.get("body", "")
+        body = pr.get("body") or ""
+        has_summary = "Summary by CodeRabbit" in body
         pr_out = {
             "number": pr["number"],
             "state": pr["state"],
@@ -119,16 +120,25 @@ def cmd_deploy_status(args) -> int:
             "url": pr["url"],
         }
 
+        workflow_status = (workflow or {}).get("status")
+        workflow_conclusion = (workflow or {}).get("conclusion")
+        workflow_running = workflow_status in ("in_progress", "queued", "waiting", "requested")
+
         next_hint = f"deploy-status {args.owner} {args.repo} --pr {pr['number']}"
         if pr["merged"]:
             verdict, summary, next_hint = "merged", f"PR #{pr['number']} automerge 완료", None
         elif pr["mergeable_state"] in ("dirty", "blocked", "behind"):
             verdict = "conflict"
             summary = f"PR #{pr['number']} mergeable_state={pr['mergeable_state']} — 충돌/차단"
-        elif workflow and workflow["conclusion"] == "failure":
+        elif workflow and workflow_conclusion == "failure":
             verdict = "workflow_failed"
             summary = "AUTO-CHANGELOG-CONTROL 워크플로우 실패"
+        elif workflow_running:
+            # 워크플로우 진행 중이면 body·has_summary가 일시적으로 비어 보여도 정상 대기로 본다 (race 가드)
+            verdict = "waiting_for_automerge"
+            summary = f"PR #{pr['number']} 워크플로우 진행 중({workflow_status}), automerge 대기"
         elif not has_summary:
+            # 워크플로우가 진행 중이 아닐 때만 진짜 body 초기화 사고로 판정
             verdict = "missing_coderabbit_summary"
             summary = f"PR #{pr['number']} 본문에 'Summary by CodeRabbit' 없음 — fix 모드로 재작성"
         else:

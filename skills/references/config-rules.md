@@ -141,9 +141,9 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
   "github": {
     "default_assignee": "GitHub_사용자명",
     "global_pat": "ghp_xxxxxxxxxxxxxxxxxxxx",
-    "changelog_deploy": {
-      "auto_approve_release_notes": false
-    },
+    "commit":            { "auto_approve": false },
+    "issue":             { "auto_approve": false },
+    "changelog_deploy":  { "auto_approve": false },
     "repos": [
       {
         "name": "프로젝트 이름",
@@ -151,9 +151,9 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
         "repo": "저장소명",
         "pat": null,
         "default": true,
-        "changelog_deploy": {
-          "auto_approve_release_notes": true
-        }
+        "commit":            { "auto_approve": true },
+        "issue":             { "auto_approve": true },
+        "changelog_deploy":  { "auto_approve": true }
       }
     ]
   }
@@ -164,28 +164,34 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
 |------|------|------|
 | `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 |
 | `global_pat` | ✅ | 전체 공용 GitHub PAT (repo + workflow 권한) |
-| `changelog_deploy.auto_approve_release_notes` | — | changelog-deploy 스킬의 릴리스 노트 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 모든 레포에서 본문 표시만 하고 즉시 PR 생성. 누락 시 `false`(수동 승인) |
+| `commit.auto_approve` | — | suh-commit 스킬의 커밋 메시지 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제안 메시지 표시 후 즉시 커밋. 누락 시 `false`(수동 승인) |
+| `issue.auto_approve` | — | suh-issue 스킬의 이슈 등록 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제목·라벨·로컬 파일 경로 표시 후 즉시 GitHub 등록. **중복 검사(2-1, 4-1단계)는 항상 실행** — 자동 모드라도 open 동일 이슈 발견 시 중단. 누락 시 `false` |
+| `changelog_deploy.auto_approve` | — | changelog-deploy 스킬의 릴리스 노트 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 본문 표시만 하고 즉시 PR 생성. 누락 시 `false` |
 | `repos` | ✅ | 사용할 저장소 목록 |
 | `repos[].name` | ✅ | 프로젝트 식별 이름 |
 | `repos[].owner` | ✅ | GitHub 사용자명 또는 조직명 |
 | `repos[].repo` | ✅ | 저장소명 |
 | `repos[].pat` | — | 레포별 개별 PAT. `null`이면 `global_pat` 사용 |
 | `repos[].default` | — | `true`인 항목이 기본 선택 repo |
-| `repos[].changelog_deploy.auto_approve_release_notes` | — | 해당 레포에 한정한 자동 승인 오버라이드. 글로벌 값보다 우선 |
+| `repos[].{commit,issue,changelog_deploy}.auto_approve` | — | 해당 레포에 한정한 자동 승인 오버라이드. 글로벌 값보다 우선 |
 
 **PAT 결정 로직:**
 ```
 effective_pat = repo.pat if repo.pat else config["github"].global_pat
 ```
 
-**changelog_deploy 자동 승인 결정 로직 (해석 우선순위):**
+**자동 승인 결정 로직 (3 스킬 공통, 해석 우선순위):**
 ```
-1. repos[i].changelog_deploy.auto_approve_release_notes  (현 owner/repo 매칭 결과)
-2. github.changelog_deploy.auto_approve_release_notes    (글로벌 기본값)
-3. false                                                 (안전 default — 수동 승인)
+1. repos[i].{skill_id}.auto_approve   (현 owner/repo 매칭 결과)
+2. github.{skill_id}.auto_approve     (글로벌 기본값)
+3. false                              (안전 default — 수동 승인)
 ```
 
-> **운영 원칙**: `changelog_deploy` 옵션은 사용자가 직접 편집하기보다 `suh-changelog-deploy` 스킬이 자연어 응답("다음부턴 자동으로 진행해주세요" 등)을 받아 자동 갱신하도록 설계됐다. SKILL이 사용자에게 키 이름·파일 경로를 노출하지 않는다.
+`{skill_id}` = `commit` / `issue` / `changelog_deploy`
+
+> **운영 원칙**: `commit`·`issue`·`changelog_deploy` 옵션은 사용자가 직접 편집하기보다 각 스킬이 자연어 응답("다음부턴 자동으로 진행해주세요" 등)을 받아 자동 갱신하도록 설계됐다. SKILL이 사용자에게 키 이름·파일 경로를 노출하지 않는다.
+
+> **마이그레이션 — 명시적 break**: 이전 키 `changelog_deploy.auto_approve_release_notes`는 더 이상 인식하지 않는다. config에 남아 있어도 무시되며, 자동 모드를 다시 켜려면 1회 토글 발화로 `changelog_deploy.auto_approve: true`를 새로 저장한다.
 
 ### `synology-expose` 섹션
 

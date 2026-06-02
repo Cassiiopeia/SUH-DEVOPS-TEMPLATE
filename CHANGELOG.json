@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T01:29:35Z",
-    "currentVersion": "3.0.87",
+    "lastUpdated": "2026-06-02T01:36:20Z",
+    "currentVersion": "3.0.90",
     "projectType": "basic",
-    "totalReleases": 120
+    "totalReleases": 121
   },
   "releases": [
+    {
+      "version": "3.0.90",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 338,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 배포 시 릴리스 노트가 사라지는 현상을 자동으로 복구하도록 처리",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "배포 시 릴리스 노트가 사라지는 현상을 자동으로 복구하도록 처리"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.87",
       "project_type": "basic",

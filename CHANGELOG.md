@@ -1,7 +1,30 @@
 # Changelog
 
-**현재 버전:** 3.0.86  
-**마지막 업데이트:** 2026-06-02T00:59:47Z  
+**현재 버전:** 3.0.85  
+**마지막 업데이트:** 2026-06-02T01:04:33Z  
+
+---
+
+## [3.0.85] - 2026-06-02
+
+**PR:** #333  
+
+**기타**
+- SUH-DEVOPS-TEMPLATE 버전 관리 : docs : v3.0.86 릴리즈 문서 업데이트 (PR #335)
+- changelog-deploy 워크플로우 본문 관리 책임 분리 (라벨 컨트랙트) : feat : 스킬이 본문 담아 만든 PR에 release-notes:ready 라벨 자동 부여, AUTO-CHANGELOG-CONTROL 워크플로우는 그 라벨이 있으면 본문 초기화 step 전체 skip해 race 본질 차단, gh_client.add_issue_labels 헬퍼 추가, 라벨 동기화 파일에 신규 라벨 등록 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/334
+- SUH-DEVOPS-TEMPLATE 버전 관리 : docs : v3.0.84 릴리즈 문서 업데이트 (PR #332)
+- changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 매칭을 name(라벨)에서 path(파일 식별자)로 변경(name 'AUTO UPDATE PROJECT CHANGELOG' 매칭 실패 근본 해결), workflow=null+PR 생성 120초 이내면 waiting_for_automerge 가드, AUTO-CHANGELOG-CONTROL 워크플로우 step 2에 body 비어있을 때 3회 retry로 GitHub API replication lag 대응 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331
+- changelog-deploy deploy-status verdict 판정 race로 본문 반복 사라짐 : fix : 워크플로우 in_progress 시 has_summary=false여도 waiting_for_automerge로 판정해 race 가드 추가, SKILL.md 7단계 라우팅 표에 즉시 update-pr 호출 금지·60초 재확인 후 두 번 연속일 때만 fix 모드 진입 명시 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/331
+- changelog-deploy 릴리스 노트 사용자 승인 게이트 + 자동화 옵션 : docs : 첫 실행 자동화 제안 메시지 명확화(무엇을 자동화하는지·전환 방법 안내), 자동 모드 진행 메시지 친화화 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/328
+- SUH-DEVOPS-TEMPLATE 버전 관리 : docs : v3.0.82 릴리즈 문서 업데이트 (PR #330)
+- _cli.py 서브커맨드 시그니처·JSON·문서화 표준 강화 : docs : 이슈 로컬 사본 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+- template_integrator 단일 선택 메뉴 인터랙티브 UI : docs : 이슈·구현 보고서 로컬 사본 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/326
+- suh-plan/analyze/implement 재설계 : docs : 구현 보고서 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/323
+- skill 내부 py 실행 구조 MCP-style 표준화 및 OS 호환성 강건화 : docs : 작업완료 댓글·PR 본문 로컬 사본 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322
+- changelog-deploy 릴리스 노트 사용자 승인 게이트 + 자동화 옵션 : feat : deploy 5.5단계·fix 4.5단계 신규로 PR 생성 전 본문 표시 후 사용자 승인 받음, config로 자동/수동 모드 토글(글로벌+레포별 오버라이드), 첫 실행 시 자연어 자동화 제안 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/328
+- 멀티 프로젝트 타입 구현 계획서 추가 : docs : #302 17개 task plan
+- 멀티 프로젝트 타입 지원 설계 문서 추가 : docs : #302 spec
+- SUH-DEVOPS-TEMPLATE 버전 관리 : docs : v3.0.78 릴리즈 문서 업데이트 (PR #327)
 
 ---
 

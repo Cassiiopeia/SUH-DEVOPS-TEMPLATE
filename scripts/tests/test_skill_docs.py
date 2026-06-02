@@ -212,3 +212,20 @@ def test_changelog_cli_bad_args_emits_json():
     out = json.loads(proc.stdout.strip().splitlines()[-1])
     assert out["ok"] is False
     assert out["code"] == "bad_args"
+
+
+def test_mcp_rules_document_json_argparse_standard():
+    """mcp-subcommand-rules.md에 JSONArgumentParser 사용 규칙이 명시되어야 한다 (이슈 #329)."""
+    path = ROOT / "skills" / "references" / "mcp-subcommand-rules.md"
+    text = path.read_text(encoding="utf-8")
+    assert "JSONArgumentParser" in text
+    assert "bad_args" in text
+    assert "available_subcommands" in text
+
+
+def test_plan_skill_does_not_reference_removed_get_next_seq_subcommand():
+    """suh-plan/SKILL.md는 issue_cli의 get-next-seq를 참조하면 안 된다 (이슈 #329)."""
+    path = ROOT / "skills" / "suh-plan" / "SKILL.md"
+    text = path.read_text(encoding="utf-8")
+    assert "issue_cli.py 가 `get-next-seq`" not in text
+    assert "`get-next-seq`·`normalize-title` 보유" not in text

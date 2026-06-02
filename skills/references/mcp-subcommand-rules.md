@@ -146,12 +146,54 @@ def test_thing_ready(capsys):
 - SKILL.md는 **호출법만** 기술한다 (서브커맨드·인자·환경변수 + "이런 입력 → 이런 서브커맨드" 라우팅 규칙).
 - 긴 Python heredoc을 SKILL.md에 인라인하지 않는다. `$PYTHON - <<'EOF'` 블록이 SKILL.md에 보이면 그건 이 표준 위반이다 — 서브커맨드로 빼야 한다.
 - `verdict`별 agent 행동을 표로 명시해 agent가 반환값→행동을 정확히 라우팅하게 한다 (`deploy-status`의 verdict 표 참고).
+- **CLI에 정의된 모든 서브커맨드는 해당 skill SKILL.md(또는 명시적으로 참조하는 다른 SKILL.md)에 호출 예시가 있어야 한다.** 호출 예시 없는 서브커맨드는 agent가 시그니처를 추측해 호출하다 실패한다 (이슈 #329). 호출예를 추가할 수 없다면 CLI 표면에서 제거하거나 내부 함수로 옮긴다.
+- 호출 예시에는 다음 3가지를 반드시 포함한다: ①정확한 인자 순서를 포함한 `bash` 실행 라인, ②기대 JSON 출력 한 줄, ③agent가 결과를 어떻게 사용해야 하는지 한 줄 설명.
+- `scripts/tests/test_cli_signatures_doc_sync.py`가 이 매칭을 강제한다. 신규 서브커맨드 추가 시 테스트가 통과하도록 SKILL.md를 함께 갱신해야 한다.
 
 ```bash
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 cd "$PROJECT_ROOT/scripts"
 PYTHONIOENCODING=utf-8 "$PYTHON" <scope>_cli.py groupname sub OWNER REPO ARG
 ```
+
+---
+
+## 8. argparse 실패도 JSON으로 — `JSONArgumentParser` 필수
+
+argparse 기본 동작은 인자 오류 시 stderr text + `SystemExit(2)`로 종료한다. agent는 stdout JSON만 파싱하므로 이 출력을 self-correct에 활용하지 못한다.
+
+모든 `_cli.py`는 `scripts/common/cli_parser.py`의 `JSONArgumentParser` + `run_cli`를 사용한다:
+
+```python
+from common.cli_parser import JSONArgumentParser, run_cli
+
+def build_parser() -> JSONArgumentParser:
+    parser = JSONArgumentParser(prog="scope_cli", description="...")
+    sub = parser.add_subparsers(dest="command", required=True)
+    # ... add_parser들 ...
+    return parser
+
+def main() -> int:
+    return run_cli(build_parser())
+```
+
+`run_cli`는 argparse 에러를 다음 형태의 JSON으로 변환해 stdout에 출력한다:
+
+```json
+{
+  "ok": false,
+  "code": "bad_args",
+  "error": "unrecognized arguments: extra1 extra2",
+  "hint": "scope_cli <subcommand> — available: ...",
+  "available_subcommands": ["...", "..."],
+  "summary": null,
+  "next": null
+}
+```
+
+agent는 `code == "bad_args"`를 보면 `available_subcommands`로 정확한 서브커맨드를 선택해 재호출한다.
+
+`--help`/`-h`는 argparse 기본 동작 그대로 유지해 사람이 직접 실행할 때 도움말이 보이게 한다.
 
 ---
 

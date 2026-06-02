@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T08:32:07Z",
-    "currentVersion": "3.0.95",
+    "lastUpdated": "2026-06-02T08:36:33Z",
+    "currentVersion": "3.0.96",
     "projectType": "basic",
-    "totalReleases": 125
+    "totalReleases": 126
   },
   "releases": [
+    {
+      "version": "3.0.96",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 344,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **문서**\n  * 테스트케이스 작성 규칙을 더 명확하게 다듬었습니다",
+      "parsed_changes": {
+        "문서": {
+          "title": "문서",
+          "items": [
+            "테스트케이스 작성 규칙을 더 명확하게 다듬었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.95",
       "project_type": "basic",

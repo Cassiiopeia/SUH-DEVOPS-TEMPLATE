@@ -1,11 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-02T01:04:33Z",
-    "currentVersion": "3.0.85",
+    "lastUpdated": "2026-06-02T01:29:35Z",
+    "currentVersion": "3.0.87",
     "projectType": "basic",
-    "totalReleases": 119
+    "totalReleases": 120
   },
   "releases": [
+    {
+      "version": "3.0.87",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 336,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 잘못된 명령 입력 시 오류 안내가 보이지 않던 문제 해결\n  * 일부 환경에서 실행이 비정상 종료되던 문제 해결\n\n* **개선**\n  * 명령 도구 사용 시 더 친절한 안내 메시지 제공\n  * 자동 배포 동작이 더 안정적으로 진행됩니다\n\n* **문서**\n  * 도구 사용 가이드 일부 정정",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "잘못된 명령 입력 시 오류 안내가 보이지 않던 문제 해결",
+            "일부 환경에서 실행이 비정상 종료되던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "명령 도구 사용 시 더 친절한 안내 메시지 제공",
+            "자동 배포 동작이 더 안정적으로 진행됩니다"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "도구 사용 가이드 일부 정정"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.85",
       "project_type": "basic",

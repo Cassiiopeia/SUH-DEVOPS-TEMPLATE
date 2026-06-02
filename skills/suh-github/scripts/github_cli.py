@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 import sys
-import argparse
 from pathlib import Path
 
 # Bootstrap — scripts/common import 가능하게 sys.path 조작 (cwd 무관 동작)
@@ -28,6 +27,7 @@ if str(_SCRIPTS_ROOT) not in sys.path:
 
 from common.emit import emit  # noqa: E402
 from common.config import get_github_pat  # noqa: E402
+from common.cli_parser import JSONArgumentParser, run_cli  # noqa: E402
 from common.gh_client import (  # noqa: E402
     GitHubAPIError, PyNaClMissingError,
     get_issue, get_issue_comments, update_issue, create_issue,
@@ -264,8 +264,8 @@ def cmd_secrets(args) -> int:
 # argparse setup
 # =========================================================================
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def build_parser() -> JSONArgumentParser:
+    parser = JSONArgumentParser(
         prog="github_cli",
         description="suh-github skill 전용 GitHub API CLI",
     )
@@ -350,12 +350,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-    if not hasattr(args, "func"):
-        parser.print_help(sys.stderr)
-        return 1
-    return args.func(args)
+    return run_cli(build_parser())
 
 
 if __name__ == "__main__":

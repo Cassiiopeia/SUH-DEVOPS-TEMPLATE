@@ -11,7 +11,6 @@ deploy PR 자동화 + Actions/CodeRabbit 상태 종합.
 from __future__ import annotations
 
 import sys
-import argparse
 from pathlib import Path
 
 _HERE = Path(__file__).resolve()
@@ -20,6 +19,7 @@ _SCRIPTS_ROOT = _PROJECT_ROOT / "scripts"
 if str(_SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_ROOT))
 
+from common.cli_parser import JSONArgumentParser, run_cli  # noqa: E402
 from common.emit import emit  # noqa: E402
 from common.config import get_github_pat  # noqa: E402
 from common.gh_client import (  # noqa: E402
@@ -251,8 +251,8 @@ def cmd_create_pr(args) -> int:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="changelog_cli", description="suh-changelog-deploy skill CLI")
+def build_parser() -> JSONArgumentParser:
+    parser = JSONArgumentParser(prog="changelog_cli", description="suh-changelog-deploy skill CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_a = sub.add_parser("actions", help="GitHub Actions run/job/log 조회")
@@ -300,12 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-    if not hasattr(args, "func"):
-        parser.print_help(sys.stderr)
-        return 1
-    return args.func(args)
+    return run_cli(build_parser())
 
 
 if __name__ == "__main__":

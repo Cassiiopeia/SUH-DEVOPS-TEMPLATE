@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 import sys
-import argparse
 from pathlib import Path
 
 _HERE = Path(__file__).resolve()
@@ -24,6 +23,7 @@ if str(_SCRIPTS_ROOT) not in sys.path:
 from common.emit import emit  # noqa: E402
 from common.config import get_github_pat  # noqa: E402
 from common.gh_client import GitHubAPIError, get_issue  # noqa: E402
+from common.cli_parser import JSONArgumentParser, run_cli  # noqa: E402
 
 
 def cmd_get_issue_number(_args) -> int:
@@ -71,8 +71,8 @@ def cmd_get_commit_template(args) -> int:
     return emit({"template": template, "summary": template})
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="commit_cli", description="suh-commit skill CLI")
+def build_parser() -> JSONArgumentParser:
+    parser = JSONArgumentParser(prog="commit_cli", description="suh-commit skill CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_gin = sub.add_parser("get-issue-number", help="cwd 기준 현재 이슈 번호 추출")
@@ -97,12 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-    if not hasattr(args, "func"):
-        parser.print_help(sys.stderr)
-        return 1
-    return args.func(args)
+    return run_cli(build_parser())
 
 
 if __name__ == "__main__":

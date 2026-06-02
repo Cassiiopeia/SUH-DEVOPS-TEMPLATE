@@ -2,7 +2,7 @@
 """issue_cli — suh-issue skill 전용 CLI.
 
 이슈 작성 워크플로우 헬퍼.
-서브커맨드: create-issue, search-issues, get-next-seq, normalize-title,
+서브커맨드: create-issue, search-issues, normalize-title,
            create-branch-name, get-commit-template, update-issue
 
 사용법:
@@ -12,9 +12,6 @@
 from __future__ import annotations
 
 import sys
-import argparse
-import subprocess
-from datetime import date
 from pathlib import Path
 
 _HERE = Path(__file__).resolve()
@@ -26,6 +23,7 @@ if str(_SCRIPTS_ROOT) not in sys.path:
 from common.emit import emit  # noqa: E402
 from common.config import get_github_pat  # noqa: E402
 from common.gh_client import GitHubAPIError, create_issue, search_issues, update_issue  # noqa: E402
+from common.cli_parser import JSONArgumentParser, run_cli  # noqa: E402
 
 
 def cmd_create_issue(args) -> int:
@@ -69,21 +67,6 @@ def cmd_update_issue(args) -> int:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
 
-def cmd_get_next_seq(args) -> int:
-    from common.paths import get_next_seq
-    try:
-        root_str = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
-    except subprocess.CalledProcessError:
-        return emit({"ok": False, "code": "git_not_found", "error": "git 저장소 아님"})
-    skill_dir = Path(root_str) / "docs" / "suh-template" / args.skill_id
-    today = date.today().strftime("%Y%m%d")
-    seq = get_next_seq(skill_dir, today)
-    return emit({"seq": seq, "summary": f"{args.skill_id} 다음 seq: {seq}"})
-
-
 def cmd_normalize_title(args) -> int:
     from common.title import normalize
     result = normalize(" ".join(args.title))
@@ -102,8 +85,8 @@ def cmd_get_commit_template(args) -> int:
     return emit({"template": template, "summary": template})
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="issue_cli", description="suh-issue skill CLI")
+def build_parser() -> JSONArgumentParser:
+    parser = JSONArgumentParser(prog="issue_cli", description="suh-issue skill CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_ci = sub.add_parser("create-issue", help="이슈 생성")
@@ -130,9 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ui.add_argument("--assignees")
     p_ui.set_defaults(func=cmd_update_issue)
 
-    p_gns = sub.add_parser("get-next-seq", help="다음 시퀀스 번호")
-    p_gns.add_argument("skill_id")
-    p_gns.set_defaults(func=cmd_get_next_seq)
+    # get-next-seq 제거됨 (이슈 #329) — paths.get_next_seq는 다른 CLI가 내부 사용
 
     p_nt = sub.add_parser("normalize-title", help="제목 정규화")
     p_nt.add_argument("title", nargs="+")
@@ -153,12 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-    if not hasattr(args, "func"):
-        parser.print_help(sys.stderr)
-        return 1
-    return args.func(args)
+    return run_cli(build_parser())
 
 
 if __name__ == "__main__":

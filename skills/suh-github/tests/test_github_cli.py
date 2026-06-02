@@ -32,9 +32,21 @@ def test_help_includes_all_subcommands():
 
 
 def test_get_issue_missing_args_returns_argparse_error():
-    rc, out, err = run_cli("get-issue")
-    assert rc != 0
-    assert "owner" in err.lower() or "usage" in err.lower()
+    """get-issue 호출 시 인자 누락 → JSON bad_args (이슈 #329)."""
+    import os
+    result = subprocess.run(
+        [sys.executable, str(CLI), "get-issue"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+    assert result.returncode == 1
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["ok"] is False
+    assert payload["code"] == "bad_args"
+    # error mentions the missing positional 'owner'
+    assert "owner" in payload["error"].lower()
 
 
 def test_emit_format_4_fields_consistent():

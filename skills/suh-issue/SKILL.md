@@ -189,6 +189,7 @@ PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
 저장 경로를 agent가 직접 계산한다:
 - 형식: `{PROJECT_ROOT}/docs/suh-template/issue/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 - 이슈 번호는 GitHub 등록 전이므로 임시로 `TMP1`, `TMP2`… 를 사용한다 (GitHub 등록 후 실제 번호로 rename)
+- **`issue_cli.py`의 `get-next-seq` 서브커맨드를 호출하지 않는다.** 이슈 #329로 CLI에서 제거됨 — 임시 번호는 agent가 직접 생성한다.
 - 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
 
 **저장 직전**: `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜**을 따라 작성한 이슈 본문 전체를 검토한다. 민감 정보가 발견되면 마스킹 처리 후 저장한다.

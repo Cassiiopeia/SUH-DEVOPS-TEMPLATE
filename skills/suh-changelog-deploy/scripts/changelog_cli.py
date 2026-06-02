@@ -226,11 +226,36 @@ def cmd_create_pr(args) -> int:
     body = body_path.read_text(encoding="utf-8") if body_path.exists() else ""
     try:
         result = create_pull_request(args.owner, args.repo, args.title, body, args.head, args.base, pat)
-        return emit({
+        pr_number = result.get("number")
+
+        # PR 생성 직후엔 AUTO-CHANGELOG-CONTROL 워크플로우 step 2가 본문을 초기화할 수 있다.
+        # step 2는 PR opened 후 보통 3~10초 안에 실행되므로, 워크플로우 본문 초기화가 끝난 뒤
+        # (대기 후) 본문을 다시 확인해 비어 있으면 update-pr로 재주입한다. 이렇게 하면 step 8
+        # (CodeRabbit Summary 폴링)이 첫 attempt(5초 간격)에서 즉시 본문을 잡고 빠르게 머지된다.
+        # 본문이 비어 있지 않으면(워크플로우가 보존했거나 CodeRabbit이 자기 Summary 작성한 경우) skip.
+        guard_summary = None
+        if pr_number and body:
+            import time
+            time.sleep(15)
+            try:
+                detail = get_pull_detail(args.owner, args.repo, pr_number, pat)
+                cur_body = detail.get("body") or ""
+                if "Summary by CodeRabbit" not in cur_body:
+                    update_pull_request(args.owner, args.repo, pr_number, pat, body=body)
+                    guard_summary = "본문 재주입 (워크플로우 step 2 race 회복)"
+                else:
+                    guard_summary = "본문 보존 확인 — 재주입 불필요"
+            except GitHubAPIError:
+                guard_summary = "본문 재확인 실패 — 무시하고 진행"
+
+        out = {
             **result,
-            "summary": f"PR #{result.get('number')} 생성 완료",
-            "next": f"deploy-status {args.owner} {args.repo} --pr {result.get('number')}",
-        })
+            "summary": f"PR #{pr_number} 생성 완료" + (f" / {guard_summary}" if guard_summary else ""),
+            "next": f"deploy-status {args.owner} {args.repo} --pr {pr_number}",
+        }
+        if guard_summary:
+            out["body_guard"] = guard_summary
+        return emit(out)
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 

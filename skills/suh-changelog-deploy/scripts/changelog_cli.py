@@ -200,14 +200,32 @@ def cmd_list_prs(args) -> int:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
 
+def _resolve_body_file(body_file: str | None) -> Path | None:
+    """본문 파일 경로 해석 — 절대 경로면 그대로, 상대 경로면 cwd → PROJECT_ROOT/scripts 순서로 탐색.
+
+    SKILL.md 절차는 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장하지만 cli는 cwd가
+    `skills/suh-changelog-deploy/scripts`라 단순 상대 경로로는 못 찾는 경로 미스매치를 보강한다.
+    찾지 못하면 None을 반환한다 (호출자가 본문 없음을 판단).
+    """
+    if not body_file:
+        return None
+    raw = Path(body_file)
+    if raw.is_absolute():
+        return raw if raw.exists() else None
+    for candidate in (raw, _PROJECT_ROOT / "scripts" / raw.name, Path.cwd() / raw):
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def cmd_update_pr(args) -> int:
     pat = get_github_pat(args.owner, args.repo)
     if not pat:
         return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
     body = None
     if args.body_file:
-        body_path = Path(args.body_file)
-        body = body_path.read_text(encoding="utf-8") if body_path.exists() else None
+        body_path = _resolve_body_file(args.body_file)
+        body = body_path.read_text(encoding="utf-8") if body_path else None
     try:
         result = update_pull_request(
             args.owner, args.repo, args.number, pat,
@@ -222,8 +240,13 @@ def cmd_create_pr(args) -> int:
     pat = get_github_pat(args.owner, args.repo)
     if not pat:
         return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
-    body_path = Path(args.body_file)
-    body = body_path.read_text(encoding="utf-8") if body_path.exists() else ""
+    body_path = _resolve_body_file(args.body_file)
+    if args.body_file and not body_path:
+        return emit({
+            "ok": False, "code": "body_file_not_found",
+            "error": f"본문 파일을 찾을 수 없습니다: {args.body_file} (cwd={Path.cwd()}, PROJECT_ROOT={_PROJECT_ROOT})",
+        })
+    body = body_path.read_text(encoding="utf-8") if body_path else ""
     try:
         result = create_pull_request(args.owner, args.repo, args.title, body, args.head, args.base, pat)
         pr_number = result.get("number")

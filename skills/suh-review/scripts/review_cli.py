@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 import sys
-import argparse
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -20,6 +19,7 @@ if str(_SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_ROOT))
 
 from common.emit import emit  # noqa: E402
+from common.cli_parser import JSONArgumentParser, run_cli  # noqa: E402
 
 
 def cmd_get_output_path(args) -> int:
@@ -62,8 +62,8 @@ def cmd_get_output_path(args) -> int:
     return emit({"path": str(path), "summary": str(path), "mismatch": mismatch})
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="review_cli", description="suh-review skill CLI")
+def build_parser() -> JSONArgumentParser:
+    parser = JSONArgumentParser(prog="review_cli", description="suh-review skill CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_gop = sub.add_parser("get-output-path", help="리뷰 결과 출력 경로")
@@ -75,12 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-    if not hasattr(args, "func"):
-        parser.print_help(sys.stderr)
-        return 1
-    return args.func(args)
+    return run_cli(build_parser())
 
 
 if __name__ == "__main__":

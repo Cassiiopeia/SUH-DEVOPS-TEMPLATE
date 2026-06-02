@@ -1,4 +1,5 @@
 import re
+import sys
 from pathlib import Path
 
 
@@ -72,3 +73,159 @@ def test_agent_docs_do_not_recommend_direct_curl_for_github_api():
         if "GitHub API 호출은 curl 직접 사용 권장" in text:
             failures.append(path.name)
     assert failures == []
+
+
+def test_issue_cli_does_not_expose_get_next_seq():
+    """get-next-seq는 issue_cli.py CLI 표면에서 제거되어야 한다 (이슈 #329).
+
+    SKILL.md 4단계는 TMP1 직접 사용 절차이므로 CLI 노출은 agent 오추론을 유도한다.
+    """
+    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    text = cli_path.read_text(encoding="utf-8")
+    assert "add_parser(\"get-next-seq\"" not in text, \
+        "issue_cli.py에 get-next-seq 서브커맨드가 남아있다 (이슈 #329)"
+    assert "\"get-next-seq\"" not in text or "removed" in text.lower(), \
+        "get-next-seq 참조가 코드에 남아있다"
+
+
+def test_issue_cli_bad_args_emits_json(tmp_path):
+    """issue_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_commit_cli_bad_args_emits_json():
+    """commit_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-commit" / "scripts" / "commit_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_report_cli_bad_args_emits_json():
+    """report_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-report" / "scripts" / "report_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_review_cli_bad_args_emits_json():
+    """review_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-review" / "scripts" / "review_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_troubleshoot_cli_bad_args_emits_json():
+    """troubleshoot_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-troubleshoot" / "scripts" / "troubleshoot_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_github_cli_bad_args_emits_json():
+    """github_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-github" / "scripts" / "github_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_changelog_cli_bad_args_emits_json():
+    """changelog_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
+    import subprocess
+    import os
+    import json
+    cli_path = ROOT / "skills" / "suh-changelog-deploy" / "scripts" / "changelog_cli.py"
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.run(
+        [sys.executable, str(cli_path), "nonexistent-sub"],
+        capture_output=True, text=True, encoding="utf-8",
+        env=env,
+    )
+    assert proc.stdout.strip(), f"stdout empty, stderr={proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"] is False
+    assert out["code"] == "bad_args"
+
+
+def test_mcp_rules_document_json_argparse_standard():
+    """mcp-subcommand-rules.md에 JSONArgumentParser 사용 규칙이 명시되어야 한다 (이슈 #329)."""
+    path = ROOT / "skills" / "references" / "mcp-subcommand-rules.md"
+    text = path.read_text(encoding="utf-8")
+    assert "JSONArgumentParser" in text
+    assert "bad_args" in text
+    assert "available_subcommands" in text
+
+
+def test_plan_skill_does_not_reference_removed_get_next_seq_subcommand():
+    """suh-plan/SKILL.md는 issue_cli의 get-next-seq를 참조하면 안 된다 (이슈 #329)."""
+    path = ROOT / "skills" / "suh-plan" / "SKILL.md"
+    text = path.read_text(encoding="utf-8")
+    assert "issue_cli.py 가 `get-next-seq`" not in text
+    assert "`get-next-seq`·`normalize-title` 보유" not in text

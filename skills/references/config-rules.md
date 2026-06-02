@@ -141,13 +141,19 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
   "github": {
     "default_assignee": "GitHub_사용자명",
     "global_pat": "ghp_xxxxxxxxxxxxxxxxxxxx",
+    "changelog_deploy": {
+      "auto_approve_release_notes": false
+    },
     "repos": [
       {
         "name": "프로젝트 이름",
         "owner": "GitHub_사용자명_또는_조직명",
         "repo": "저장소명",
         "pat": null,
-        "default": true
+        "default": true,
+        "changelog_deploy": {
+          "auto_approve_release_notes": true
+        }
       }
     ]
   }
@@ -158,17 +164,28 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
 |------|------|------|
 | `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 |
 | `global_pat` | ✅ | 전체 공용 GitHub PAT (repo + workflow 권한) |
+| `changelog_deploy.auto_approve_release_notes` | — | changelog-deploy 스킬의 릴리스 노트 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 모든 레포에서 본문 표시만 하고 즉시 PR 생성. 누락 시 `false`(수동 승인) |
 | `repos` | ✅ | 사용할 저장소 목록 |
 | `repos[].name` | ✅ | 프로젝트 식별 이름 |
 | `repos[].owner` | ✅ | GitHub 사용자명 또는 조직명 |
 | `repos[].repo` | ✅ | 저장소명 |
 | `repos[].pat` | — | 레포별 개별 PAT. `null`이면 `global_pat` 사용 |
 | `repos[].default` | — | `true`인 항목이 기본 선택 repo |
+| `repos[].changelog_deploy.auto_approve_release_notes` | — | 해당 레포에 한정한 자동 승인 오버라이드. 글로벌 값보다 우선 |
 
 **PAT 결정 로직:**
 ```
 effective_pat = repo.pat if repo.pat else config["github"].global_pat
 ```
+
+**changelog_deploy 자동 승인 결정 로직 (해석 우선순위):**
+```
+1. repos[i].changelog_deploy.auto_approve_release_notes  (현 owner/repo 매칭 결과)
+2. github.changelog_deploy.auto_approve_release_notes    (글로벌 기본값)
+3. false                                                 (안전 default — 수동 승인)
+```
+
+> **운영 원칙**: `changelog_deploy` 옵션은 사용자가 직접 편집하기보다 `suh-changelog-deploy` 스킬이 자연어 응답("다음부턴 자동으로 진행해주세요" 등)을 받아 자동 갱신하도록 설계됐다. SKILL이 사용자에게 키 이름·파일 경로를 노출하지 않는다.
 
 ### `synology-expose` 섹션
 

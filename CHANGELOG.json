@@ -1,11 +1,46 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-01T02:32:02Z",
-    "currentVersion": "3.0.78",
+    "lastUpdated": "2026-06-02T00:35:32Z",
+    "currentVersion": "3.0.82",
     "projectType": "basic",
-    "totalReleases": 115
+    "totalReleases": 116
   },
   "releases": [
+    {
+      "version": "3.0.82",
+      "project_type": "basic",
+      "date": "2026-06-02",
+      "pr_number": 330,
+      "raw_summary": "## Summary by CodeRabbit\n\n# 릴리스 노트\n\n* **New Features**\n  * 릴리스 노트 생성 후 사용자 승인 게이트 추가\n  * 인터랙티브 단일 선택 메뉴 UI 확장 (화살표 네비게이션, ESC 취소)\n  * 다중 프로젝트 타입 지원 계획 추가\n\n* **Documentation**\n  * 3-layer 아키텍처 설계 및 구현 보고서 추가\n  * 릴리스 노트 승인 게이트 설계 명세 추가\n  * 다중 프로젝트 타입 설계 및 계획 문서 추가\n  * 스킬 CLI 서브커맨드 표준화 및 인터랙티브 메뉴 UI 구현 계획 추가\n\n* **Chores**\n  * 플러그인 및 확장 버전 3.0.78로 업데이트\n  * README 버전 정보 업데이트\n  * 설정 파일에 자동 승인 옵션 추가",
+      "parsed_changes": {
+        "new_features": {
+          "title": "New Features",
+          "items": [
+            "릴리스 노트 생성 후 사용자 승인 게이트 추가",
+            "인터랙티브 단일 선택 메뉴 UI 확장 (화살표 네비게이션, ESC 취소)",
+            "다중 프로젝트 타입 지원 계획 추가"
+          ]
+        },
+        "documentation": {
+          "title": "Documentation",
+          "items": [
+            "3-layer 아키텍처 설계 및 구현 보고서 추가",
+            "릴리스 노트 승인 게이트 설계 명세 추가",
+            "다중 프로젝트 타입 설계 및 계획 문서 추가",
+            "스킬 CLI 서브커맨드 표준화 및 인터랙티브 메뉴 UI 구현 계획 추가"
+          ]
+        },
+        "chores": {
+          "title": "Chores",
+          "items": [
+            "플러그인 및 확장 버전 3.0.78로 업데이트",
+            "README 버전 정보 업데이트",
+            "설정 파일에 자동 승인 옵션 추가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.78",
       "project_type": "basic",

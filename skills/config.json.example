@@ -2,9 +2,9 @@
   "github": {
     "default_assignee": "{GitHub_사용자명}",
     "global_pat": "{ghp_xxxxxxxxxxxxxxxxxxxx}",
-    "changelog_deploy": {
-      "auto_approve_release_notes": false
-    },
+    "commit":           { "auto_approve": false },
+    "issue":            { "auto_approve": false },
+    "changelog_deploy": { "auto_approve": false },
     "repos": [
       {
         "name": "{프로젝트 이름}",
@@ -19,9 +19,9 @@
         "repo": "{저장소명}",
         "pat": "{ghp_별도PAT_있으면_입력}",
         "default": false,
-        "changelog_deploy": {
-          "auto_approve_release_notes": true
-        }
+        "commit":           { "auto_approve": true },
+        "issue":            { "auto_approve": true },
+        "changelog_deploy": { "auto_approve": true }
       }
     ]
   },

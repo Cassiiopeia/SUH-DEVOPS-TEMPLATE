@@ -82,13 +82,15 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 
 ### 3) 자동 승인 모드 판정 — Read 도구로 config에서 직접 추출
 
-§2에서 이미 읽은 `config.json`의 동일 내용에서 `auto_approve_release_notes` 값을 결정한다.
+§2에서 이미 읽은 `config.json`의 동일 내용에서 `changelog_deploy.auto_approve` 값을 결정한다.
 
 해석 우선순위 (위→아래로 검사, 먼저 발견되는 값 채택):
 
-1. `github.repos[]` 중 `owner == 위 OWNER && repo == 위 REPO`인 항목의 `changelog_deploy.auto_approve_release_notes`
-2. `github.changelog_deploy.auto_approve_release_notes` (글로벌 기본값)
+1. `github.repos[]` 중 `owner == 위 OWNER && repo == 위 REPO`인 항목의 `changelog_deploy.auto_approve`
+2. `github.changelog_deploy.auto_approve` (글로벌 기본값)
 3. 어디에도 없으면 `false` (안전 default — 수동 승인)
+
+> **이전 키 `auto_approve_release_notes`는 명시적 break**. 더 이상 인식하지 않으며 config에 남아 있어도 무시한다. 자동 모드를 원하면 1회 토글 발화로 `auto_approve: true`를 새로 저장한다.
 
 판정 결과를 두 값으로 **기억**한다:
 
@@ -97,7 +99,7 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 
 `CONFIG_HAS_KEY=false`인 경우는 deploy 5.5단계 / fix 4.5단계의 **첫 실행 안내 분기** 트리거로 사용한다.
 
-> **사용자에게 노출하는 안내는 자연어로만 한다.** "auto_approve_release_notes", "config.json", "changelog_deploy 섹션" 같은 키 이름·파일 경로를 사용자 메시지에 절대 쓰지 않는다. 사용자는 "자동으로 진행" / "매번 확인" 같은 자연어로 의사 표시하며 agent가 config를 직접 갱신한다.
+> **사용자에게 노출하는 안내는 자연어로만 한다.** "auto_approve", "config.json", "changelog_deploy 섹션" 같은 키 이름·파일 경로를 사용자 메시지에 절대 쓰지 않는다. 사용자는 "자동으로 진행" / "매번 확인" 같은 자연어로 의사 표시하며 agent가 config를 직접 갱신한다.
 
 ## 사용자 입력
 
@@ -323,9 +325,9 @@ PR을 생성합니다.
 
 응답에 따라 agent가 Read/Write 도구로 `config.json`을 갱신한다:
 
-- **1 선택** → `github.repos[]`에서 현 OWNER/REPO 매칭 항목에 `changelog_deploy.auto_approve_release_notes: true` 추가
-- **2 선택** → `github.changelog_deploy.auto_approve_release_notes: true` 추가 (객체가 없으면 생성)
-- **3 선택** → `github.changelog_deploy.auto_approve_release_notes: false` 추가 (다음 실행부터 묻지 않도록 키 자체는 남긴다)
+- **1 선택** → `github.repos[]`에서 현 OWNER/REPO 매칭 항목에 `changelog_deploy.auto_approve: true` 추가
+- **2 선택** → `github.changelog_deploy.auto_approve: true` 추가 (객체가 없으면 생성)
+- **3 선택** → `github.changelog_deploy.auto_approve: false` 추가 (다음 실행부터 묻지 않도록 키 자체는 남긴다)
 
 갱신 후 사용자에게 안내:
 

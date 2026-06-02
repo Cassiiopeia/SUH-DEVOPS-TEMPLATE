@@ -51,10 +51,21 @@ jobs:
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
 
-          # changelog-deploy가 이미 Summary를 작성했을 수 있으므로 먼저 확인
-          CURRENT_BODY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                              "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
-                              jq -r '.body // ""')
+          # changelog-deploy가 이미 Summary를 작성한 PR을 보호한다.
+          # PR opened 직후엔 GitHub API replication lag로 body가 비어 보일 수 있으므로
+          # 비어 있으면 최대 3회(2초 간격) 재시도해 본다. 한 번이라도 Summary가 잡히면 본문 보존.
+          CURRENT_BODY=""
+          for attempt in 1 2 3; do
+            CURRENT_BODY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                                "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" | \
+                                jq -r '.body // ""')
+            if [ -n "$CURRENT_BODY" ] && [ "$CURRENT_BODY" != "null" ]; then
+              echo "[try $attempt] body length=$(echo -n "$CURRENT_BODY" | wc -c)"
+              break
+            fi
+            echo "[try $attempt] body 비어 있음 — replication lag 가능, 재시도"
+            sleep 2
+          done
 
           if echo "$CURRENT_BODY" | grep -q "Summary by CodeRabbit"; then
             echo "✅ 이미 'Summary by CodeRabbit' 감지 — 본문 초기화 건너뜀"

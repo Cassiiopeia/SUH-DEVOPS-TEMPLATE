@@ -714,6 +714,9 @@ source "https://rubygems.org"
 
 # Fastlane - Android 빌드 자동화
 gem "fastlane", "~> 2.225"
+
+# multi_json - google-apis transitive 의존성이 gemspec에 선언 누락한 upstream 버그 회피 (Gem::LoadError 방지)
+gem "multi_json"
 EOF
 
     print_success "Gemfile 생성 완료: $gemfile_path"

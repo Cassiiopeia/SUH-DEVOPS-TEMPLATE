@@ -194,6 +194,9 @@ source "https://rubygems.org"
 # Ruby 3.4+ 공식 지원 버전 (2.228+)
 gem "fastlane", "~> 2.228"
 
+# multi_json - google-apis transitive 의존성이 gemspec에 선언 누락한 upstream 버그 회피 (Gem::LoadError 방지)
+gem "multi_json"
+
 # CocoaPods - iOS 의존성 관리
 gem "cocoapods", "~> 1.15"
 EOF

@@ -723,7 +723,11 @@ function Create-Gemfile {
     $content = @'
 source "https://rubygems.org"
 
-gem "fastlane"
+# Fastlane - Android 빌드 자동화
+gem "fastlane", "~> 2.225"
+
+# multi_json - google-apis transitive 의존성이 gemspec에 선언 누락한 upstream 버그 회피 (Gem::LoadError 방지)
+gem "multi_json"
 '@
     
     Set-Content $gemfilePath $content -Encoding UTF8

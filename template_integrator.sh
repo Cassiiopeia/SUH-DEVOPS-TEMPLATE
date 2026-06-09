@@ -1064,10 +1064,17 @@ print_question_header() {
 
 # 프로젝트 타입 선택 메뉴
 show_project_type_menu() {
+    # 현재 PROJECT_TYPES를 preselect csv로 — 멀티 선택 메뉴(Space 토글)
+    local _preselect
+    local IFS=','
+    _preselect="${PROJECT_TYPES[*]:-}"
+    unset IFS
+
     local selected
-    selected=$(choose_menu "프로젝트 타입을 선택하세요" \
+    selected=$(choose_menu --multi --preselect="$_preselect" "프로젝트 타입을 선택하세요 (멀티 가능 — Space로 토글)" \
         "spring|Spring Boot 백엔드" \
         "flutter|Flutter 모바일 앱" \
+        "next|Next.js 웹 앱" \
         "react|React 웹 앱" \
         "react-native|React Native 모바일 앱" \
         "react-native-expo|React Native Expo 앱" \
@@ -1077,7 +1084,10 @@ show_project_type_menu() {
 
     if [ -z "$selected" ]; then
         print_error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
-        echo "$PROJECT_TYPE"
+        # 기존 PROJECT_TYPES csv 반환 (호출측이 사용)
+        local IFS=','
+        echo "${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+        unset IFS
         return 1
     fi
 
@@ -1173,8 +1183,17 @@ handle_project_edit_menu() {
 
     case "$edit_choice" in
         type)
-            PROJECT_TYPE=$(show_project_type_menu)
-            print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+            local _new_csv
+            _new_csv=$(show_project_type_menu)
+            if [ -n "$_new_csv" ]; then
+                IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
+                PROJECT_TYPE="${PROJECT_TYPES[0]}"
+                if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+                    print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
+                else
+                    print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                fi
+            fi
             print_to_user ""
             ;;
         version)

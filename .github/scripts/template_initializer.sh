@@ -268,7 +268,8 @@ create_version_yml() {
 
 version: "$version"
 version_code: 1  # app build number
-project_type: "$type" # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
+project_types: ["$type"]   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
+project_type: "$type" # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "$user"

@@ -19,6 +19,8 @@
 | `react-native-expo` | Expo | `app.json` |
 | `basic` | 범용 | `version.yml`만 |
 
+> **멀티타입**: 단일 레포에 여러 타입 공존 시 `--type spring,react,python` csv로 지정. `version.yml`의 `project_types` 배열에 저장되며, 단수 `project_type` 키는 배열 첫 항목으로 자동 미러된다.
+
 ---
 
 ## 폴더 구조

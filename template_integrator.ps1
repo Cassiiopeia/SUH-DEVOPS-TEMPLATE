@@ -115,7 +115,8 @@ $WORKFLOW_COMMON_PREFIX = "PROJECT-COMMON"
 $WORKFLOW_TEMPLATE_INIT = "PROJECT-TEMPLATE-INITIALIZER.yaml"
 
 # 전역 변수
-$script:ProjectType = $Type
+$script:ProjectType = ""
+$script:ProjectTypes = @()   # 멀티타입 배열 — ProjectType은 ProjectTypes[0] 미러
 $script:ProjectVersion = $Version
 $script:DetectedBranch = ""
 $script:IsInteractiveMode = $false
@@ -259,7 +260,9 @@ function Invoke-InteractiveMenu {
     param(
         [Parameter(Mandatory=$true)][string]$Prompt,
         [Parameter(Mandatory=$true)][hashtable[]]$Options,
-        [int]$DefaultIndex = 0
+        [int]$DefaultIndex = 0,
+        [switch]$Multi,
+        [string]$Preselect = ""
     )
 
     $n = $Options.Count
@@ -273,8 +276,21 @@ function Invoke-InteractiveMenu {
     $cursor = $DefaultIndex
     if ($cursor -lt 0 -or $cursor -ge $n) { $cursor = 0 }
 
+    # multi 선택 상태 — preselect csv를 초기 선택값으로 반영
+    $selected = New-Object 'bool[]' $n
+    if ($Multi -and $Preselect) {
+        $pre = $Preselect.Split(',') | ForEach-Object { $_.Trim() }
+        for ($i = 0; $i -lt $n; $i++) {
+            if ($pre -contains $Options[$i].Value) { $selected[$i] = $true }
+        }
+    }
+
     Write-Host ""
-    Write-Host ("{0} (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):" -f $Prompt)
+    if ($Multi) {
+        Write-Host ("{0} (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC 취소):" -f $Prompt)
+    } else {
+        Write-Host ("{0} (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):" -f $Prompt)
+    }
     Write-Host ""
 
     $startTop = [Console]::CursorTop
@@ -286,10 +302,16 @@ function Invoke-InteractiveMenu {
         for ($i = 0; $i -lt $n; $i++) {
             $opt = $Options[$i]
             $num = $i + 1
-            if ($i -eq $cursor) {
-                $line = "> [•] {0}) {1}    {2}" -f $num, $opt.Value, $opt.Label
+            # multi: [✓]/[ ] 선택표시, single: [•]/[ ] 커서표시
+            if ($Multi) {
+                if ($selected[$i]) { $indicator = "[✓]" } else { $indicator = "[ ]" }
             } else {
-                $line = "  [ ] {0}) {1}    {2}" -f $num, $opt.Value, $opt.Label
+                if ($i -eq $cursor) { $indicator = "[•]" } else { $indicator = "[ ]" }
+            }
+            if ($i -eq $cursor) {
+                $line = "> {0} {1}) {2}    {3}" -f $indicator, $num, $opt.Value, $opt.Label
+            } else {
+                $line = "  {0} {1}) {2}    {3}" -f $indicator, $num, $opt.Value, $opt.Label
             }
             # 줄 끝까지 빈공간으로 채워 이전 잔재 제거
             if ($line.Length -lt ($width - 1)) {
@@ -300,6 +322,8 @@ function Invoke-InteractiveMenu {
 
             if ($i -eq $cursor -and $useColor) {
                 Write-Host $line -ForegroundColor Cyan
+            } elseif ($Multi -and $selected[$i] -and $useColor) {
+                Write-Host $line -ForegroundColor Green
             } else {
                 Write-Host $line
             }
@@ -329,8 +353,27 @@ function Invoke-InteractiveMenu {
                     $cursor++
                     if ($cursor -ge $n) { $cursor = 0 }
                 }
+                'Spacebar' {
+                    # multi 모드에서만 현재 항목 선택 토글
+                    if ($Multi) { $selected[$cursor] = -not $selected[$cursor] }
+                }
+                'A' {
+                    # multi 모드 전체토글 — 전부 켜져있으면 다 끄고, 아니면 다 켬
+                    if ($Multi) {
+                        $allOn = $true
+                        for ($i = 0; $i -lt $n; $i++) { if (-not $selected[$i]) { $allOn = $false; break } }
+                        for ($i = 0; $i -lt $n; $i++) { $selected[$i] = -not $allOn }
+                    }
+                }
                 'Enter' {
                     [Console]::SetCursorPosition(0, $startTop + $n)
+                    if ($Multi) {
+                        # 선택된 값들을 csv로 반환, 0개면 $null
+                        $picked = @()
+                        for ($i = 0; $i -lt $n; $i++) { if ($selected[$i]) { $picked += $Options[$i].Value } }
+                        if ($picked.Count -eq 0) { return $null }
+                        return ($picked -join ',')
+                    }
                     return $Options[$cursor].Value
                 }
                 'Escape' {
@@ -363,7 +406,9 @@ function Invoke-InteractiveMenu {
 function Invoke-LegacyNumericMenu {
     param(
         [Parameter(Mandatory=$true)][string]$Prompt,
-        [Parameter(Mandatory=$true)][hashtable[]]$Options
+        [Parameter(Mandatory=$true)][hashtable[]]$Options,
+        [switch]$Multi,
+        [string]$Preselect = ""
     )
 
     $n = $Options.Count
@@ -378,21 +423,47 @@ function Invoke-LegacyNumericMenu {
     }
     Write-Host ""
 
-    while ($true) {
-        try {
-            $choice = Read-Host ("선택 (1-{0})" -f $n)
-        } catch {
-            # stdin redirect 환경에서 Read-Host 실패 → 첫 옵션
-            return $Options[0].Value
-        }
-        if ($choice -match '^\d+$') {
-            $c = [int]$choice
-            if ($c -ge 1 -and $c -le $n) {
-                return $Options[$c - 1].Value
+    $promptMsg = if ($Multi) {
+        if ($Preselect) { "여러 항목 선택 (csv, 예: 1,3,5 또는 spring,react) [기본: $Preselect]" }
+        else { "여러 항목 선택 (csv, 예: 1,3,5 또는 spring,react)" }
+    } else { "선택 (1-$n)" }
+
+    try {
+        $choice = Read-Host $promptMsg
+    } catch {
+        # stdin redirect 환경에서 Read-Host 실패 → preselect 또는 첫 옵션
+        if ($Multi -and $Preselect) { return $Preselect }
+        return $Options[0].Value
+    }
+
+    if ($Multi) {
+        # 빈 입력 + preselect → preselect 사용
+        if (-not $choice -and $Preselect) { return $Preselect }
+        # csv 파싱 — 숫자/이름 혼용 허용
+        $resolved = @()
+        foreach ($p in $choice.Split(',')) {
+            $p = $p.Trim()
+            if (-not $p) { continue }
+            if ($p -match '^\d+$' -and [int]$p -ge 1 -and [int]$p -le $n) {
+                $resolved += $Options[[int]$p - 1].Value
+            } else {
+                for ($i = 0; $i -lt $n; $i++) {
+                    if ($Options[$i].Value -eq $p) { $resolved += $p; break }
+                }
             }
         }
-        Write-Host ("잘못된 입력입니다. 1-{0} 사이의 숫자를 입력해주세요." -f $n)
+        if ($resolved.Count -eq 0) {
+            Write-Host "유효한 선택이 없습니다."
+            return $null
+        }
+        return ($resolved -join ',')
     }
+
+    if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $n) {
+        return $Options[[int]$choice - 1].Value
+    }
+    Write-Host "잘못된 입력입니다."
+    return $null
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -402,13 +473,21 @@ function Invoke-ChooseMenu {
     param(
         [Parameter(Mandatory=$true)][string]$Prompt,
         [Parameter(Mandatory=$true)][hashtable[]]$Options,
-        [int]$DefaultIndex = 0
+        [int]$DefaultIndex = 0,
+        [switch]$Multi,
+        [string]$Preselect = ""
     )
 
     $isTty = (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
     if ($isTty) {
+        if ($Multi) {
+            return Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex -Multi -Preselect $Preselect
+        }
         return Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex
     } else {
+        if ($Multi) {
+            return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options -Multi -Preselect $Preselect
+        }
         return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options
     }
 }
@@ -610,6 +689,54 @@ function Detect-ProjectType {
 }
 
 # ===================================================================
+# 프로젝트 타입 멀티 감지 — 모든 일치 타입을 csv로 반환 (sh detect_project_types 포팅)
+# ===================================================================
+
+function Detect-ProjectTypes {
+    Print-Step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+
+    # PowerShell 5.1 호환: null += 방지 위해 빈 배열로 초기화
+    $detected = @()
+
+    # 고유 마커 파일 — 독립적으로 모두 감지
+    if (Test-Path "pubspec.yaml") { $detected += "flutter" }
+
+    if ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts") -or (Test-Path "pom.xml")) {
+        $detected += "spring"
+    }
+
+    if ((Test-Path "pyproject.toml") -or (Test-Path "setup.py") -or (Test-Path "requirements.txt")) {
+        $detected += "python"
+    }
+
+    # package.json 기반 — next / react-native / react-native-expo / react / node 구분
+    # (spring/flutter가 build 도구로 쓰는 package.json과 구분하기 위해 내용 검사)
+    if (Test-Path "package.json") {
+        $packageJson = Get-Content "package.json" -Raw
+        if ($packageJson -match "@react-native|react-native") {
+            if ($packageJson -match "expo") {
+                $detected += "react-native-expo"
+            } else {
+                $detected += "react-native"
+            }
+        } elseif ($packageJson -match '"next"') {
+            $detected += "next"
+        } elseif ($packageJson -match '"react"') {
+            $detected += "react"
+        } else {
+            # spring/flutter가 이미 감지된 경우 순수 node 보조 도구일 수 있어 중복 추가 방지
+            if ($detected.Count -eq 0) { $detected += "node" }
+        }
+    }
+
+    if ($detected.Count -eq 0) { $detected = @("basic") }
+
+    Print-Info "감지된 타입: $($detected -join ' ')"
+
+    return ($detected -join ',')
+}
+
+# ===================================================================
 # 버전 자동 감지
 # ===================================================================
 
@@ -714,7 +841,9 @@ function Detect-DefaultBranch {
 # ===================================================================
 
 function Show-ProjectTypeMenu {
-    $selected = Invoke-ChooseMenu -Prompt "프로젝트 타입을 선택하세요" -Options @(
+    # 현재 ProjectTypes를 preselect csv로 — 멀티 선택 메뉴(Space 토글)
+    $preselect = ($script:ProjectTypes -join ',')
+    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요 (멀티 가능 — Space로 토글)" -Options @(
         @{Value='spring';            Label='Spring Boot 백엔드'},
         @{Value='flutter';           Label='Flutter 모바일 앱'},
         @{Value='next';              Label='Next.js 웹 앱'},
@@ -728,6 +857,8 @@ function Show-ProjectTypeMenu {
 
     if (-not $selected) {
         Print-Error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
+        # 기존 ProjectTypes csv 반환 (호출측이 사용)
+        if ($script:ProjectTypes.Count -gt 0) { return ($script:ProjectTypes -join ',') }
         return $script:ProjectType
     }
 
@@ -755,8 +886,16 @@ function Edit-ProjectInfo {
 
     switch ($editChoice) {
         'type' {
-            $script:ProjectType = Show-ProjectTypeMenu
-            Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
+            $newCsv = Show-ProjectTypeMenu
+            if ($newCsv) {
+                $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                $script:ProjectType = $script:ProjectTypes[0]
+                if ($script:ProjectTypes.Count -gt 1) {
+                    Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
+                } else {
+                    Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
+                }
+            }
             Write-Host ""
         }
         'version' {
@@ -800,9 +939,11 @@ function Edit-ProjectInfo {
 # ===================================================================
 
 function Detect-AndConfirmProject {
-    # 자동 감지 (최초 1회만)
-    if ([string]::IsNullOrWhiteSpace($script:ProjectType)) {
-        $script:ProjectType = Detect-ProjectType
+    # 자동 감지 (최초 1회만) — -Type으로 ProjectTypes가 이미 채워졌으면 건너뜀
+    if ($script:ProjectTypes.Count -eq 0) {
+        $detectedCsv = Detect-ProjectTypes
+        $script:ProjectTypes = @($detectedCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        $script:ProjectType = $script:ProjectTypes[0]
     }
     if ([string]::IsNullOrWhiteSpace($script:ProjectVersion)) {
         $script:ProjectVersion = Detect-Version
@@ -810,16 +951,20 @@ function Detect-AndConfirmProject {
     if ([string]::IsNullOrWhiteSpace($script:DetectedBranch)) {
         $script:DetectedBranch = Detect-DefaultBranch
     }
-    
+
     $confirmed = $false
-    
+
     # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
     while (-not $confirmed) {
         Print-SectionHeader "🛰️" "프로젝트 분석 결과"
-        
-        # 감지 결과 표시
+
+        # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
         Write-Host ""
-        Write-Host "       📂 Project Type     : $($script:ProjectType)"
+        if ($script:ProjectTypes.Count -gt 1) {
+            Write-Host "       📂 Project Types    : $($script:ProjectTypes -join ',') (멀티)"
+        } else {
+            Write-Host "       📂 Project Type     : $($script:ProjectType)"
+        }
         Write-Host "       🌙 Version          : $($script:ProjectVersion)"
         Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
         Write-Host ""
@@ -1027,7 +1172,17 @@ function Create-VersionYml {
     
     $currentDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $integrationDate = Get-Date -Format "yyyy-MM-dd"
-    
+
+    # 멀티타입 — ProjectTypes 배열을 ["a","b"] json 형태로, primary는 첫 항목
+    # (배열이 비었으면 $Type 단수로 fallback — 하위 호환)
+    if ($script:ProjectTypes.Count -gt 0) {
+        $typesJson = '[' + (($script:ProjectTypes | ForEach-Object { '"' + $_ + '"' }) -join ',') + ']'
+        $primaryType = $script:ProjectTypes[0]
+    } else {
+        $typesJson = "[`"$Type`"]"
+        $primaryType = $Type
+    }
+
     $versionYmlContent = @"
 # ===================================================================
 # 프로젝트 버전 관리 파일
@@ -1067,7 +1222,8 @@ function Create-VersionYml {
 
 version: "$Version"
 version_code: $existingVersionCode  # app build number
-project_type: "$Type"  # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
+project_types: $typesJson   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
+project_type: "$primaryType"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
   last_updated: "$currentDate"
   last_updated_by: "template_integrator"
@@ -1451,56 +1607,17 @@ function Ask-SynologyOption {
 # 워크플로우 다운로드
 # ===================================================================
 
-function Copy-Workflows {
-    Print-Step "프로젝트 타입별 워크플로우 다운로드 중..."
-    Print-Info "프로젝트 타입: $($script:ProjectType)"
-
-    if (-not (Test-Path $WORKFLOWS_DIR)) {
-        New-Item -Path $WORKFLOWS_DIR -ItemType Directory -Force | Out-Null
-    }
-
-    $copied = 0
-    $skipped = 0
-    $templateAdded = 0
-    $projectTypesDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR"
-
-    # project-types 폴더 존재 확인
-    if (-not (Test-Path $projectTypesDir)) {
-        Print-Error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
-        Print-Error "project-types 폴더를 찾을 수 없습니다."
-        exit 1
-    }
-
-    # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
-    Print-Info "공통 워크플로우 다운로드 중..."
-    $commonDir = Join-Path $projectTypesDir "common"
-    if (Test-Path $commonDir) {
-        # PowerShell 5.1 호환성: 배열 초기화 후 추가 (null += 방지)
-        $workflows = @()
-        $yamlFiles = Get-ChildItem -Path $commonDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-        $ymlFiles = Get-ChildItem -Path $commonDir -Filter "*.yml" -ErrorAction SilentlyContinue
-        if ($yamlFiles) { $workflows += $yamlFiles }
-        if ($ymlFiles) { $workflows += $ymlFiles }
-
-        foreach ($workflow in $workflows) {
-            $filename = $workflow.Name
-            $destPath = Join-Path $WORKFLOWS_DIR $filename
-
-            # COMMON은 항상 덮어쓰기 (핵심 기능)
-            if (Test-Path $destPath) {
-                Print-Info "$filename 업데이트"
-            }
-
-            Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-            Write-Host "  ✓ $filename"
-            $copied++
-        }
-    } else {
-        Print-Warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
-    }
+# 단일 타입의 워크플로우 복사 (기존 단일 처리 로직을 함수로 추출 — 멀티 순회용)
+# 카운터는 호출측이 [ref]로 넘기는 해시테이블($counters)을 공유한다 (PowerShell scope 회피)
+function Copy-Workflows-ForType {
+    param(
+        [string]$Type,
+        [string]$ProjectTypesDir,
+        [hashtable]$Counters
+    )
 
     # 2. 타입별 워크플로우 처리 (선택적 업데이트)
-    $typeDir = Join-Path $projectTypesDir $script:ProjectType
+    $typeDir = Join-Path $ProjectTypesDir $Type
     if (Test-Path $typeDir) {
         # 먼저 이미 존재하는 파일 목록 수집
         $existingFiles = @()
@@ -1526,11 +1643,11 @@ function Copy-Workflows {
 
         # 신규 파일은 바로 복사
         if ($newFiles.Count -gt 0) {
-            Print-Info "$($script:ProjectType) 신규 워크플로우 다운로드 중..."
+            Print-Info "$Type 신규 워크플로우 다운로드 중..."
             foreach ($workflow in $newFiles) {
                 Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                Write-Host "  ✓ $($workflow.Name) (신규)"
-                $copied++
+                Write-Host "  ✓ $($workflow.Name) (신규, $Type)"
+                $Counters.copied++
             }
         }
 
@@ -1538,7 +1655,7 @@ function Copy-Workflows {
         if ($existingFiles.Count -gt 0) {
             Write-Host ""
             Print-Warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            Print-Warning "⚠️  이미 존재하는 타입별 워크플로우: $($existingFiles.Count)개"
+            Print-Warning "⚠️  이미 존재하는 타입별 워크플로우($Type): $($existingFiles.Count)개"
             Print-Warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             foreach ($workflow in $existingFiles) {
                 Write-Host "   • $($workflow.Name)"
@@ -1574,7 +1691,7 @@ function Copy-Workflows {
                         }
                         Copy-Item -Path $workflow.FullName -Destination $templatePath -Force
                         Write-Host "  ✓ $templateName (참고용 추가)"
-                        $templateAdded++
+                        $Counters.templateAdded++
                     }
                     Print-Info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
                     Print-Info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
@@ -1584,7 +1701,7 @@ function Copy-Workflows {
                     Print-Info "기존 파일을 유지합니다..."
                     foreach ($workflow in $existingFiles) {
                         Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
-                        $skipped++
+                        $Counters.skipped++
                     }
                 }
                 "O" {
@@ -1597,7 +1714,7 @@ function Copy-Workflows {
                         Move-Item -Path $destPath -Destination $backupPath -Force
                         Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
                         Write-Host "  ✓ $filename (백업: ${filename}.bak)"
-                        $copied++
+                        $Counters.copied++
                     }
                 }
                 default {
@@ -1605,24 +1722,23 @@ function Copy-Workflows {
                     Print-Warning "잘못된 선택. 기존 파일을 유지합니다."
                     foreach ($workflow in $existingFiles) {
                         Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
-                        $skipped++
+                        $Counters.skipped++
                     }
                 }
             }
         } else {
-            Print-Info "$($script:ProjectType) 타입의 기존 워크플로우가 없습니다."
+            Print-Info "$Type 타입의 기존 워크플로우가 없습니다."
         }
     } else {
-        Print-Info "$($script:ProjectType) 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
+        Print-Info "$Type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     }
 
-    # 3. Synology 하위폴더 처리 (선택적)
-    $synologyCopied = 0
-    $synologyDir = Join-Path $projectTypesDir "$($script:ProjectType)\synology"
+    # 3. 타입별 Synology 하위폴더 처리 (선택적)
+    $synologyDir = Join-Path $ProjectTypesDir "$Type\synology"
 
     if (Test-Path $synologyDir) {
         if ($script:IncludeSynology -eq $true) {
-            Print-Info "Synology 워크플로우 다운로드 중..."
+            Print-Info "$Type Synology 워크플로우 다운로드 중..."
 
             $synologyWorkflows = @()
             $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
@@ -1640,13 +1756,13 @@ function Copy-Workflows {
                     $backupPath = [string]$destPath + ".bak"
                     Move-Item -Path $destPath -Destination $backupPath -Force
                     Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (Synology, 백업: ${filename}.bak)"
+                    Write-Host "  ✓ $filename (Synology $Type, 백업: ${filename}.bak)"
                 } else {
                     Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (Synology)"
+                    Write-Host "  ✓ $filename (Synology $Type)"
                 }
-                $synologyCopied++
-                $copied++
+                $Counters.synologyCopied++
+                $Counters.copied++
             }
         } else {
             # Synology 제외됨 - 사용자에게 알림
@@ -1657,10 +1773,79 @@ function Copy-Workflows {
             if ($ymlFiles) { $synologyFiles += $ymlFiles }
 
             if ($synologyFiles.Count -gt 0) {
-                Print-Info "Synology 워크플로우 $($synologyFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
+                Print-Info "$Type Synology 워크플로우 $($synologyFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
             }
         }
     }
+}
+
+# 멀티타입 안내·체크 헬퍼 — ProjectTypes 배열에 특정 타입 포함 여부
+function Test-ContainsType {
+    param([string]$Needle)
+    $arr = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    return ($arr -contains $Needle)
+}
+
+function Copy-Workflows {
+    Print-Step "프로젝트 타입별 워크플로우 다운로드 중..."
+    $typesDisplay = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+    Print-Info "프로젝트 타입: $typesDisplay"
+
+    if (-not (Test-Path $WORKFLOWS_DIR)) {
+        New-Item -Path $WORKFLOWS_DIR -ItemType Directory -Force | Out-Null
+    }
+
+    # 멀티타입 순회에서 Copy-Workflows-ForType이 공유하는 카운터 (해시테이블 ref)
+    $counters = @{ copied = 0; skipped = 0; templateAdded = 0; synologyCopied = 0 }
+    $projectTypesDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR"
+
+    # project-types 폴더 존재 확인
+    if (-not (Test-Path $projectTypesDir)) {
+        Print-Error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
+        Print-Error "project-types 폴더를 찾을 수 없습니다."
+        exit 1
+    }
+
+    # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
+    Print-Info "공통 워크플로우 다운로드 중..."
+    $commonDir = Join-Path $projectTypesDir "common"
+    if (Test-Path $commonDir) {
+        # PowerShell 5.1 호환성: 배열 초기화 후 추가 (null += 방지)
+        $workflows = @()
+        $yamlFiles = Get-ChildItem -Path $commonDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $commonDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $workflows += $yamlFiles }
+        if ($ymlFiles) { $workflows += $ymlFiles }
+
+        foreach ($workflow in $workflows) {
+            $filename = $workflow.Name
+            $destPath = Join-Path $WORKFLOWS_DIR $filename
+
+            # COMMON은 항상 덮어쓰기 (핵심 기능)
+            if (Test-Path $destPath) {
+                Print-Info "$filename 업데이트"
+            }
+
+            Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+            Write-Host "  ✓ $filename"
+            $counters.copied++
+        }
+    } else {
+        Print-Warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
+    }
+
+    # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — ProjectTypes 배열 순회
+    #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
+    $typesToCopy = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    foreach ($t in $typesToCopy) {
+        Copy-Workflows-ForType -Type $t -ProjectTypesDir $projectTypesDir -Counters $counters
+    }
+
+    # 카운터를 로컬 변수로 펼침 (이후 요약 출력에서 사용)
+    $copied = $counters.copied
+    $skipped = $counters.skipped
+    $templateAdded = $counters.templateAdded
+    $synologyCopied = $counters.synologyCopied
 
     # 4. Common Synology 워크플로우 처리 (선택적)
     $commonSynologyDir = Join-Path $projectTypesDir "common\synology"
@@ -1704,7 +1889,8 @@ function Copy-Workflows {
 
     # 결과 요약
     Write-Host ""
-    Print-Success "워크플로우 처리 완료 (타입: $($script:ProjectType))"
+    $typesSummary = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+    Print-Success "워크플로우 처리 완료 (타입: $typesSummary)"
     Write-Host "   📥 복사됨: $copied 개"
     if ($synologyCopied -gt 0) {
         Write-Host "   🗄️ Synology: $synologyCopied 개"
@@ -1719,8 +1905,16 @@ function Copy-Workflows {
     # 복사된 워크플로우 수를 전역 변수로 저장
     $script:WorkflowsCopied = $copied
 
-    # CI/CD 워크플로우 안내
-    if ($script:ProjectType -eq "spring") {
+    # 멀티타입 CI 트리거 충돌 경고 — 여러 *-CI.yaml이 같은 push에 동시 발화
+    if ($script:ProjectTypes.Count -gt 1) {
+        Write-Host ""
+        Print-Warning "⚠️  멀티타입 주의: 여러 타입의 CI/CD 워크플로우가 같은 push에 동시 실행됩니다."
+        Print-Warning "   각 워크플로우의 paths: 필터를 디렉토리별로 수동 추가해 분리하길 권장합니다."
+        Print-Warning "   배포 워크플로우는 PROJECT_NAME/CONTAINER_NAME/DEPLOY_PORT를 타입별로 다르게 설정하세요."
+    }
+
+    # CI/CD 워크플로우 안내 — ProjectTypes 배열에 spring 포함 시
+    if (Test-ContainsType "spring") {
         Write-Host ""
         Print-Info "🔐 Spring CI/CD 워크플로우 사용 시 GitHub Secrets 설정:"
         Write-Host "     Repository > Settings > Secrets > Actions"
@@ -2250,8 +2444,11 @@ function Start-Integration {
 
     # CLI 모드에서만 자동 감지 및 확인 (skills 모드는 프로젝트 정보 불필요)
     if (-not $script:IsInteractiveMode -and $Mode -ne "skills") {
-        if ([string]::IsNullOrWhiteSpace($script:ProjectType)) {
-            $script:ProjectType = Detect-ProjectType
+        # -Type으로 ProjectTypes가 안 채워졌으면 멀티 자동 감지
+        if ($script:ProjectTypes.Count -eq 0) {
+            $detectedCsv = Detect-ProjectTypes
+            $script:ProjectTypes = @($detectedCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            $script:ProjectType = $script:ProjectTypes[0]
         }
 
         if ([string]::IsNullOrWhiteSpace($script:ProjectVersion)) {
@@ -2262,10 +2459,14 @@ function Start-Integration {
             $script:DetectedBranch = Detect-DefaultBranch
         }
 
-        # CLI 모드에서만 통합 정보 표시
+        # CLI 모드에서만 통합 정보 표시 — 멀티면 csv로
         Print-QuestionHeader "🪐" "통합 정보"
 
-        Write-Host "🔭 프로젝트 타입  : $($script:ProjectType)"
+        if ($script:ProjectTypes.Count -gt 1) {
+            Write-Host "🔭 프로젝트 타입  : $($script:ProjectTypes -join ',') (멀티)"
+        } else {
+            Write-Host "🔭 프로젝트 타입  : $($script:ProjectType)"
+        }
         Write-Host "🌙 초기 버전     : v$($script:ProjectVersion)"
         Write-Host "🌿 Default 브랜치 : $($script:DetectedBranch)"
         Write-Host "💫 통합 모드     : $Mode"
@@ -2312,7 +2513,9 @@ function Start-Integration {
             Copy-CodeRabbitConfig
             Ensure-GitIgnore
             Copy-SetupGuide
-            Copy-UtilModules $script:ProjectType
+            # util 모듈 — ProjectTypes 배열 순회
+            $utilTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+            foreach ($ut in $utilTypes) { Copy-UtilModules $ut }
         }
         "version" {
             Create-VersionYml $script:ProjectVersion $script:ProjectType $script:DetectedBranch
@@ -2327,7 +2530,9 @@ function Start-Integration {
             Copy-Scripts
             Copy-ConfigFolder
             Copy-SetupGuide
-            Copy-UtilModules $script:ProjectType
+            # util 모듈 — ProjectTypes 배열 순회
+            $utilTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+            foreach ($ut in $utilTypes) { Copy-UtilModules $ut }
         }
         "issues" {
             Copy-IssueTemplates
@@ -3059,7 +3264,8 @@ function Show-Summary {
 
     Write-Host ""
     Write-Host "추가된 파일:"
-    Write-Host "  📄 version.yml (버전: $($script:ProjectVersion), 타입: $($script:ProjectType))"
+    $summaryTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+    Write-Host "  📄 version.yml (버전: $($script:ProjectVersion), 타입: $summaryTypes)"
     Write-Host "  📝 README.md (버전 섹션 추가)"
     Write-Host ""
     Write-Host "추가된 워크플로우:"
@@ -3070,14 +3276,23 @@ function Show-Summary {
     Write-Host "     └─ changelog_manager.py"
     Write-Host ""
 
-    # util 모듈 정보 표시
+    # util 모듈 정보 표시 — ProjectTypes 배열 순회
     if ($script:UtilModulesCopied -gt 0) {
         Write-Host "  📦 유틸리티 모듈:"
-        Write-Host "     ✅ $($script:UtilModulesCopied)개 모듈 복사됨 (.github/util/$($script:ProjectType)/)"
+        $utTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+        foreach ($ut in $utTypes) {
+            $utilPath = ".github/util/$ut"
+            if (Test-Path $utilPath) {
+                $modDirs = Get-ChildItem -Path $utilPath -Directory -ErrorAction SilentlyContinue
+                foreach ($d in $modDirs) {
+                    Write-Host "     ├─ $($d.Name) ($ut)"
+                }
+            }
+        }
         Write-Host ""
 
-        # Flutter인 경우 상세 안내
-        if ($script:ProjectType -eq "flutter") {
+        # Flutter 유틸리티 모듈 안내 — 배열에 flutter 포함 시
+        if (Test-ContainsType "flutter") {
             Write-Host "  💡 Flutter 유틸리티 모듈 사용법:"
             Write-Host "     • iOS TestFlight 마법사: .github/util/flutter/ios-testflight-setup-wizard/"
             Write-Host "       → index.html을 브라우저에서 열어 설정 파일 생성"
@@ -3087,8 +3302,8 @@ function Show-Summary {
         }
     }
 
-    # 프로젝트 타입별 안내
-    if ($script:ProjectType -eq "spring") {
+    # 프로젝트 타입별 안내 — 배열에 spring 포함 시
+    if (Test-ContainsType "spring") {
         Write-Host "  💡 Spring 프로젝트 추가 설정:"
         Write-Host "     • build.gradle의 버전 정보가 자동 동기화됩니다"
         Write-Host "     • CI/CD 워크플로우에서 GitHub Secrets 설정이 필요합니다"
@@ -3144,12 +3359,24 @@ function Main {
         exit 1
     }
     
-    if ($Type -ne "" -and $Type -notin $script:ValidTypes) {
-        Print-Error "잘못된 프로젝트 타입: $Type"
-        Write-Host "지원되는 타입: $($script:ValidTypes -join ', ')"
-        Write-Host ""
-        Write-Host "도움말: .\template_integrator.ps1 -Help"
-        exit 1
+    # -Type csv 분해 → ProjectTypes 배열 (멀티타입). dedup + 검증 후 첫 항목을 ProjectType에 미러
+    if ($Type -ne "") {
+        $arr = $Type.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        $script:ProjectTypes = @($arr | Select-Object -Unique)
+        foreach ($t in $script:ProjectTypes) {
+            if ($script:ValidTypes -notcontains $t) {
+                Print-Error "지원하지 않는 타입: '$t'"
+                Write-Host "지원되는 타입: $($script:ValidTypes -join ', ')"
+                Write-Host ""
+                Write-Host "도움말: .\template_integrator.ps1 -Help"
+                exit 1
+            }
+        }
+        if ($script:ProjectTypes.Count -eq 0) {
+            Print-Error "-Type 인자가 비어 있습니다"
+            exit 1
+        }
+        $script:ProjectType = $script:ProjectTypes[0]
     }
     
     # Git 저장소 확인 (경고만 표시)

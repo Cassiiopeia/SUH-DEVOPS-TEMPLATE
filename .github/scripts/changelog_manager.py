@@ -229,6 +229,11 @@ def cmd_update_from_summary() -> int:
     """pr_body.md에서 Markdown을 파싱하여 CHANGELOG.json 갱신."""
     version = os.environ.get('VERSION')
     project_type = os.environ.get('PROJECT_TYPE')
+    # 멀티타입 — PROJECT_TYPES(csv) env가 있으면 배열로, 없으면 단수 키 fallback
+    project_types_csv = os.environ.get('PROJECT_TYPES', '')
+    project_types = [t.strip() for t in project_types_csv.split(',') if t.strip()]
+    if not project_types and project_type:
+        project_types = [project_type]
     today = os.environ.get('TODAY')
     pr_number_raw = os.environ.get('PR_NUMBER')
     timestamp = os.environ.get('TIMESTAMP')
@@ -272,7 +277,8 @@ def cmd_update_from_summary() -> int:
         # 릴리즈 데이터 생성
         new_release = {
             "version": version,
-            "project_type": project_type,
+            "project_type": project_type,      # 기존 단수 키 — 유지 (하위 호환)
+            "project_types": project_types,    # 신규 멀티타입 배열
             "date": today,
             "pr_number": pr_number,
             "raw_summary": raw_summary,
@@ -300,6 +306,7 @@ def cmd_update_from_summary() -> int:
                     "lastUpdated": timestamp,
                     "currentVersion": version,
                     "projectType": project_type,
+                    "projectTypes": project_types,
                     "totalReleases": 0,
                 },
                 "releases": [],
@@ -308,6 +315,7 @@ def cmd_update_from_summary() -> int:
         changelog_data["metadata"]["lastUpdated"] = timestamp
         changelog_data["metadata"]["currentVersion"] = version
         changelog_data["metadata"]["projectType"] = project_type
+        changelog_data["metadata"]["projectTypes"] = project_types
         changelog_data["metadata"]["totalReleases"] = len(changelog_data.get("releases", [])) + 1
         changelog_data.setdefault("releases", []).insert(0, new_release)
 

@@ -21,6 +21,23 @@ SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 5종의 워크플로우를 
 
 ---
 
+## 멀티 프로젝트 타입 배포 시
+
+단일 레포에 여러 타입(예: Spring 백엔드 + Python AI)이 공존해 여러 SYNOLOGY-CICD 워크플로우가 함께 설치된 경우, 같은 NAS에 배포하므로 리소스 충돌을 막기 위해 각 워크플로우의 env를 **서로 다른 값**으로 설정해야 합니다.
+
+- 각 워크플로우의 `PROJECT_NAME`, `CONTAINER_NAME`, `DEPLOY_PORT`(또는 `PROJECT_DEPLOY_PORT`)를 타입별로 분리합니다.
+- 동일 NAS에 같은 포트로 두 컨테이너를 배포할 수 없습니다 (`port is already allocated`).
+- 예: Spring 백엔드 `8096`, Python AI `8092` 등으로 포트를 분리한 뒤 사용합니다.
+
+| 항목 | Spring 백엔드 | Python AI |
+|------|--------------|-----------|
+| `PROJECT_NAME` | `myapp-back` | `myapp-ai` |
+| `DEPLOY_PORT` | `8096` | `8092` |
+
+> CI 워크플로우(`*-CI.yaml`)가 멀티타입에서 동시에 발화하는 문제는 [TEMPLATE-INTEGRATOR.md](TEMPLATE-INTEGRATOR.md#멀티-프로젝트-타입)의 CI 트리거 주의를 참고하세요.
+
+---
+
 ## 사전 준비
 
 ### 1. Synology NAS 설정

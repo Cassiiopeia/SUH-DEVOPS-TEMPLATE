@@ -32,6 +32,7 @@ set -euo pipefail
 
 # 전역 변수 초기화
 PROJECT_TYPE=""
+PROJECT_TYPES_CSV=""   # 멀티타입 — project_types 배열을 csv로 보관 (빈 문자열이면 legacy 단수)
 VERSION_FILE=""
 CURRENT_VERSION=""
 
@@ -94,6 +95,33 @@ check_required_tools() {
 # ===================================================================
 # version.yml에서 설정 읽기 (yq 사용)
 # ===================================================================
+# version.yml의 project_types 배열을 csv로 반환 (키 없으면 빈 문자열 — legacy)
+parse_project_types() {
+    if [ ! -f "version.yml" ]; then
+        echo ""
+        return
+    fi
+    # project_types 배열 → "spring,react" 형태 csv. 키 없으면 빈 문자열
+    yq -r '.project_types // [] | join(",")' version.yml 2>/dev/null || echo ""
+}
+
+# project_type 단수 키를 project_types[0]으로 강제 동기화 (사용자 수동 편집 실수 자동 복구)
+sync_project_type_field() {
+    local types_csv=$1
+    [ -z "$types_csv" ] && return 0
+
+    local first
+    first=$(echo "$types_csv" | cut -d',' -f1)
+
+    local current_single
+    current_single=$(yq -r '.project_type // ""' version.yml)
+
+    if [ "$current_single" != "$first" ]; then
+        log_info "project_type 정합화: '$current_single' → '$first' (project_types[0])"
+        yq -i ".project_type = \"$first\"" version.yml
+    fi
+}
+
 read_version_config() {
     if [ ! -f "version.yml" ]; then
         log_error "version.yml 파일을 찾을 수 없습니다!"
@@ -102,14 +130,28 @@ read_version_config() {
 
     log_debug "version.yml 파싱 시작 (yq 사용)"
 
-    # yq로 정확한 값 추출 (따옴표 제거)
+    # 1. project_types 배열 파싱 (멀티타입)
+    PROJECT_TYPES_CSV=$(parse_project_types)
+
+    # 2. 정합화 — 배열 있으면 project_type 단수 키를 첫 항목으로 강제
+    if [ -n "$PROJECT_TYPES_CSV" ]; then
+        sync_project_type_field "$PROJECT_TYPES_CSV"
+    fi
+
+    # 3. 단수 키 + 현재 버전 읽기 (정합화 이후)
     PROJECT_TYPE=$(yq -r '.project_type // "basic"' version.yml)
     CURRENT_VERSION=$(yq -r '.version // "0.0.0"' version.yml)
 
-    # 필수 도구 확인
-    check_required_tools "$PROJECT_TYPE"
+    # 4. 필수 도구 확인 — 배열이면 모든 타입 검사, 아니면 단수
+    if [ -n "$PROJECT_TYPES_CSV" ]; then
+        local _t
+        IFS=',' read -ra _types <<< "$PROJECT_TYPES_CSV"
+        for _t in "${_types[@]}"; do check_required_tools "$_t"; done
+    else
+        check_required_tools "$PROJECT_TYPE"
+    fi
 
-    # 프로젝트 타입별 버전 파일 설정
+    # 5. VERSION_FILE — primary 타입(단수 키) 기준 — 기존 동작 유지
     case "$PROJECT_TYPE" in
         "spring")
             VERSION_FILE="build.gradle"
@@ -139,8 +181,11 @@ read_version_config() {
     esac
 
     log_info "프로젝트 설정"
-    log_info "  타입: $PROJECT_TYPE"
-    log_info "  버전 파일: $VERSION_FILE"
+    if [ -n "$PROJECT_TYPES_CSV" ]; then
+        log_info "  타입(배열): $PROJECT_TYPES_CSV"
+    fi
+    log_info "  타입(primary): $PROJECT_TYPE"
+    log_info "  버전 파일(primary): $VERSION_FILE"
     log_info "  현재 버전: $CURRENT_VERSION"
 }
 
@@ -427,6 +472,94 @@ update_project_file_version() {
 }
 
 # ===================================================================
+# 특정 타입에 대해 프로젝트 파일 sync (멀티타입 지원)
+# update_project_file_version은 VERSION_FILE(primary) 단일만 다루므로,
+# 멀티타입에서는 각 타입의 sync 파일을 독립적으로 찾아 업데이트한다.
+# ===================================================================
+sync_for_type() {
+    local t=$1
+    local new_version=$2
+
+    log_info "타입별 sync: $t → $new_version"
+
+    case "$t" in
+        "spring")
+            find . -maxdepth 2 -name "build.gradle" -type f 2>/dev/null | while read -r gradle_file; do
+                sed -i.bak "s/version = '[^']*'/version = '$new_version'/g; s/version = \"[^\"]*\"/version = \"$new_version\"/g" "$gradle_file"
+                rm -f "${gradle_file}.bak"
+                log_success "업데이트: $gradle_file"
+            done
+            ;;
+        "flutter")
+            if [ -f "pubspec.yaml" ]; then
+                local code
+                code=$(get_version_code)
+                yq -i ".version = \"$new_version+$code\"" pubspec.yaml
+                log_success "업데이트: pubspec.yaml"
+            fi
+            ;;
+        "react"|"next"|"node")
+            if [ -f "package.json" ]; then
+                jq ".version = \"$new_version\"" package.json > tmp.json && mv tmp.json package.json
+                log_success "업데이트: package.json"
+            fi
+            ;;
+        "python")
+            if [ -f "pyproject.toml" ]; then
+                # TOML: sed 유지 (파서 없음)
+                sed -i.bak "s/^version = \"[^\"]*\"/version = \"$new_version\"/" pyproject.toml
+                rm -f pyproject.toml.bak
+                log_success "업데이트: pyproject.toml"
+            fi
+            ;;
+        "react-native")
+            find ios -name "Info.plist" -type f 2>/dev/null | while read -r plist_file; do
+                if grep -q "CFBundleShortVersionString" "$plist_file"; then
+                    sed -i.bak '/CFBundleShortVersionString/{n;s/<string>[^<]*<\/string>/<string>'"$new_version"'<\/string>/;}' "$plist_file"
+                    rm -f "${plist_file}.bak"
+                    log_success "업데이트: $plist_file"
+                fi
+            done
+            if [ -f "android/app/build.gradle" ]; then
+                sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$new_version\"/" "android/app/build.gradle"
+                rm -f "android/app/build.gradle.bak"
+                log_success "업데이트: android/app/build.gradle"
+            fi
+            ;;
+        "react-native-expo")
+            if [ -f "app.json" ]; then
+                jq ".expo.version = \"$new_version\"" app.json > tmp.json && mv tmp.json app.json
+                log_success "업데이트: app.json"
+            fi
+            ;;
+        "basic")
+            : ;;
+        *)
+            log_warning "알 수 없는 타입: $t — 건너뜀"
+            ;;
+    esac
+}
+
+# ===================================================================
+# 모든 타입 sync (멀티 또는 단일)
+# ===================================================================
+sync_all_project_files() {
+    local new_version=$1
+
+    if [ -n "${PROJECT_TYPES_CSV:-}" ]; then
+        log_info "멀티타입 sync 시작: $PROJECT_TYPES_CSV"
+        local _t
+        IFS=',' read -ra _types <<< "$PROJECT_TYPES_CSV"
+        for _t in "${_types[@]}"; do
+            sync_for_type "$_t" "$new_version"
+        done
+    else
+        # Legacy 단일 — 기존 update_project_file_version 호출 (하위 호환)
+        update_project_file_version "$new_version"
+    fi
+}
+
+# ===================================================================
 # 모든 버전 파일 업데이트
 # ===================================================================
 update_all_versions() {
@@ -437,8 +570,8 @@ update_all_versions() {
     # version.yml 업데이트
     update_version_yml "$new_version"
 
-    # 프로젝트 파일 업데이트
-    update_project_file_version "$new_version"
+    # 프로젝트 파일 업데이트 (멀티타입이면 배열 순회)
+    sync_all_project_files "$new_version"
 
     log_success "모든 버전 파일 업데이트 완료: $new_version"
 }

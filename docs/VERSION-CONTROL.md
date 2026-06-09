@@ -29,6 +29,20 @@ metadata:
   last_updated_by: "username"
 ```
 
+### `project_types` (배열, 신규)
+
+단일 레포에 여러 타입이 공존하는 경우를 위해 `project_types` 배열 키를 사용합니다.
+
+```yaml
+project_types: ["spring", "react", "python"]
+project_type: "spring"   # project_types[0] 자동 미러
+```
+
+- 단일 타입도 배열 형태로 통일됩니다 (`project_types: ["basic"]`).
+- 단수 `project_type` 키는 항상 `project_types`의 첫 항목으로 자동 미러되므로 **직접 수정하지 않습니다**.
+- 단수 키만 있는 기존 version.yml도 100% 하위 호환되어 그대로 동작합니다.
+- `version_manager.sh`가 배열을 순회하여 모든 타입의 버전 파일을 동기화합니다.
+
 ---
 
 ## 프로젝트 타입별 버전 파일

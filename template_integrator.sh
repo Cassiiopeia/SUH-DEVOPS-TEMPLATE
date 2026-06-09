@@ -301,12 +301,20 @@ interactive_menu() {
         IFS= read -rsn1 key < /dev/tty || { printf "\033[?25h" >&2; trap - INT; return 1; }
 
         if [ "$key" = $'\e' ]; then
-            IFS= read -rsn2 -t 0.01 rest < /dev/tty 2>/dev/null || rest=""
+            # ESC 다음 바이트를 1개씩 읽는다. bash 3.2는 `read -t 0.01`(소수점) 타임아웃을
+            # 0초로 절삭해 화살표 시퀀스([ A/B)를 놓치고 ESC로 오인 → 메뉴가 멋대로 취소됐다.
+            # 정수 타임아웃(-t 1)으로 바꾸고, 화살표(ESC [) + 애플리케이션 커서모드(ESC O)
+            # 양쪽을 모두 처리한다. 타임아웃되면(rest 비어있음) 진짜 ESC 키로 간주.
+            local b1 b2 rest=""
+            if IFS= read -rsn1 -t 1 b1 < /dev/tty 2>/dev/null && [ -n "$b1" ]; then
+                IFS= read -rsn1 -t 1 b2 < /dev/tty 2>/dev/null || b2=""
+                rest="${b1}${b2}"
+            fi
             case "$rest" in
-                '[A') key=UP ;;
-                '[B') key=DOWN ;;
-                '')   key=ESC ;;
-                *)    continue ;;
+                '[A'|'OA') key=UP ;;
+                '[B'|'OB') key=DOWN ;;
+                '')        key=ESC ;;
+                *)         continue ;;
             esac
         fi
 

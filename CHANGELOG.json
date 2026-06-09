@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-09T08:24:13Z",
-    "currentVersion": "3.0.100",
+    "lastUpdated": "2026-06-09T14:03:56Z",
+    "currentVersion": "3.0.101",
     "projectType": "basic",
-    "totalReleases": 129
+    "totalReleases": 130
   },
   "releases": [
+    {
+      "version": "3.0.101",
+      "project_type": "basic",
+      "date": "2026-06-09",
+      "pr_number": 352,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 템플릿 설치 화면에서 화살표 키로 항목을 고를 때 메뉴가 갑자기 닫히던 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "템플릿 설치 화면에서 화살표 키로 항목을 고를 때 메뉴가 갑자기 닫히던 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.100",
       "project_type": "basic",

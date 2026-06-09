@@ -241,6 +241,17 @@ print_to_user() {
 # exit:   0=확정, 1=취소
 # ─────────────────────────────────────────────────────────────
 interactive_menu() {
+    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값)
+    local multi=false
+    local preselect_csv=""
+    while [[ "$1" == --* ]]; do
+        case "$1" in
+            --multi) multi=true; shift ;;
+            --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            *) break ;;
+        esac
+    done
+
     local prompt="$1"
     shift
     local options=("$@")
@@ -256,14 +267,39 @@ interactive_menu() {
         use_color=false
     fi
 
-    local C_RESET="" C_CYAN="" C_DIM=""
+    local C_RESET="" C_CYAN="" C_DIM="" C_GREEN=""
     if [ "$use_color" = true ]; then
         C_RESET=$'\033[0m'
         C_CYAN=$'\033[36m'
         C_DIM=$'\033[2m'
+        C_GREEN=$'\033[32m'
     fi
 
-    printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+    # multi 모드 선택 상태 — index → bool
+    local selected=()
+    local i
+    for i in $(seq 0 $((n - 1))); do selected[$i]=false; done
+
+    # preselect 적용 — value가 일치하는 항목을 초기 선택
+    if [ -n "$preselect_csv" ] && [ "$multi" = true ]; then
+        local p pre_value
+        IFS=',' read -ra _pre <<< "$preselect_csv"
+        for p in "${_pre[@]}"; do
+            for i in $(seq 0 $((n - 1))); do
+                IFS='|' read -r pre_value _ <<< "${options[$i]}"
+                if [ "$pre_value" = "$p" ]; then
+                    selected[$i]=true
+                    break
+                fi
+            done
+        done
+    fi
+
+    if [ "$multi" = true ]; then
+        printf "\n%s (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+    else
+        printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+    fi
 
     local cursor=0
 
@@ -271,17 +307,31 @@ interactive_menu() {
     printf "\033[?25l" >&2
 
     _interactive_menu_render() {
-        local i value label num
+        local i value label num indicator
         for i in $(seq 0 $((n - 1))); do
             IFS='|' read -r value label <<< "${options[$i]}"
             num=$((i + 1))
+            # 표시자 — multi면 체크박스([✓]/[ ]), single이면 커서표시([•]/[ ])
+            if [ "$multi" = true ]; then
+                if [ "${selected[$i]}" = true ]; then
+                    indicator="${C_GREEN}[✓]${C_RESET}"
+                else
+                    indicator="[ ]"
+                fi
+            else
+                if [ "$i" -eq "$cursor" ]; then
+                    indicator="[•]"
+                else
+                    indicator="[ ]"
+                fi
+            fi
             if [ "$i" -eq "$cursor" ]; then
-                printf "%s> [•] %d) %s    %s%s%s%s\n" \
-                    "$C_CYAN" "$num" "$value" \
+                printf "%s> %s %d) %s    %s%s%s%s\n" \
+                    "$C_CYAN" "$indicator" "$num" "$value" \
                     "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
             else
-                printf "  [ ] %d) %s    %s%s%s\n" \
-                    "$num" "$value" \
+                printf "  %s %d) %s    %s%s%s\n" \
+                    "$indicator" "$num" "$value" \
                     "$C_DIM" "$label" "$C_RESET" >&2
             fi
         done
@@ -333,13 +383,53 @@ interactive_menu() {
                     cursor=$jump
                 fi
                 ;;
+            ' ')
+                # Space — multi 모드에서 현재 행 선택 토글
+                if [ "$multi" = true ]; then
+                    if [ "${selected[$cursor]}" = true ]; then
+                        selected[$cursor]=false
+                    else
+                        selected[$cursor]=true
+                    fi
+                fi
+                ;;
+            a|A)
+                # a — multi 모드에서 전체 토글 (모두 선택돼 있으면 전체 해제, 아니면 전체 선택)
+                if [ "$multi" = true ]; then
+                    local all_on=true
+                    for i in $(seq 0 $((n - 1))); do
+                        [ "${selected[$i]}" = true ] || { all_on=false; break; }
+                    done
+                    for i in $(seq 0 $((n - 1))); do
+                        if [ "$all_on" = true ]; then selected[$i]=false; else selected[$i]=true; fi
+                    done
+                fi
+                ;;
             ""|$'\n'|$'\r')
                 _interactive_menu_clear
                 printf "\033[?25h" >&2
                 trap - INT
-                IFS='|' read -r value _ <<< "${options[$cursor]}"
-                echo "$value"
-                return 0
+                if [ "$multi" = true ]; then
+                    # 선택된 항목들을 csv로 출력 (하나도 없으면 취소 처리)
+                    local out="" first=true
+                    for i in $(seq 0 $((n - 1))); do
+                        if [ "${selected[$i]}" = true ]; then
+                            IFS='|' read -r value _ <<< "${options[$i]}"
+                            if [ "$first" = true ]; then
+                                out="$value"; first=false
+                            else
+                                out="$out,$value"
+                            fi
+                        fi
+                    done
+                    [ -z "$out" ] && return 1
+                    echo "$out"
+                    return 0
+                else
+                    IFS='|' read -r value _ <<< "${options[$cursor]}"
+                    echo "$value"
+                    return 0
+                fi
                 ;;
             ESC|q)
                 _interactive_menu_clear
@@ -362,6 +452,17 @@ interactive_menu() {
 # 사용법: selected=$(legacy_numeric_menu "prompt" "value1|label1" ...)
 # ─────────────────────────────────────────────────────────────
 legacy_numeric_menu() {
+    # 옵션 파싱 — interactive_menu와 동일한 --multi/--preselect 지원
+    local multi=false
+    local preselect_csv=""
+    while [[ "$1" == --* ]]; do
+        case "$1" in
+            --multi) multi=true; shift ;;
+            --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            *) break ;;
+        esac
+    done
+
     local prompt="$1"
     shift
     local options=("$@")
@@ -380,25 +481,73 @@ legacy_numeric_menu() {
     done
     printf "\n" >&2
 
+    # 입력 프롬프트 — multi면 csv 안내
+    local input_prompt
+    if [ "$multi" = true ]; then
+        input_prompt="여러 항목 선택 (csv, 예: 1,3,5 또는 spring,react)"
+        [ -n "$preselect_csv" ] && input_prompt="$input_prompt [기본: $preselect_csv]"
+        input_prompt="$input_prompt: "
+    else
+        input_prompt=$(printf "선택 (1-%d): " "$n")
+    fi
+
     local choice read_ok=0
     while true; do
         choice=""
         read_ok=0
         if [ -t 0 ]; then
-            printf "선택 (1-%d): " "$n" >&2
+            printf "%s" "$input_prompt" >&2
             IFS= read -r choice && read_ok=1
         elif [ -c /dev/tty ] 2>/dev/null && [ -r /dev/tty ]; then
-            printf "선택 (1-%d): " "$n" >&2
+            printf "%s" "$input_prompt" >&2
             IFS= read -r choice < /dev/tty && read_ok=1
         fi
 
         if [ "$read_ok" -eq 0 ]; then
-            # stdin/tty 모두 못 읽음 → 첫 옵션 자동 선택
+            # stdin/tty 모두 못 읽음 → multi+preselect면 그 값, 아니면 첫 옵션 자동 선택
+            if [ "$multi" = true ] && [ -n "$preselect_csv" ]; then
+                echo "$preselect_csv"
+                return 0
+            fi
             IFS='|' read -r value _ <<< "${options[0]}"
             echo "$value"
             return 0
         fi
 
+        if [ "$multi" = true ]; then
+            # 빈 입력 + preselect → preselect 사용
+            if [ -z "$choice" ] && [ -n "$preselect_csv" ]; then
+                echo "$preselect_csv"
+                return 0
+            fi
+            # csv 파싱 — 숫자(1,3,5)/이름(spring,react) 혼용 허용
+            local out="" first=true p resolved parts
+            IFS=',' read -ra parts <<< "$choice"
+            for p in "${parts[@]}"; do
+                p=$(echo "$p" | tr -d ' ')
+                [ -z "$p" ] && continue
+                resolved=""
+                if [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" -ge 1 ] && [ "$p" -le "$n" ]; then
+                    IFS='|' read -r resolved _ <<< "${options[$((p - 1))]}"
+                else
+                    for i in $(seq 0 $((n - 1))); do
+                        IFS='|' read -r value _ <<< "${options[$i]}"
+                        if [ "$value" = "$p" ]; then resolved="$value"; break; fi
+                    done
+                fi
+                if [ -n "$resolved" ]; then
+                    if [ "$first" = true ]; then out="$resolved"; first=false; else out="$out,$resolved"; fi
+                fi
+            done
+            if [ -z "$out" ]; then
+                printf "유효한 선택이 없습니다. 다시 입력해주세요.\n" >&2
+                continue
+            fi
+            echo "$out"
+            return 0
+        fi
+
+        # single 모드
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "$n" ]; then
             IFS='|' read -r value _ <<< "${options[$((choice - 1))]}"
             echo "$value"

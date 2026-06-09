@@ -1086,9 +1086,12 @@ show_project_type_menu() {
 
 # 프로젝트 감지 및 확인
 detect_and_confirm_project() {
-    # 자동 감지 (최초 1회만)
-    if [ -z "$PROJECT_TYPE" ]; then
-        PROJECT_TYPE=$(detect_project_type)
+    # 자동 감지 (최초 1회만) — --type으로 PROJECT_TYPES가 이미 채워졌으면 건너뜀
+    if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+        local _detected_csv
+        _detected_csv=$(detect_project_types)
+        IFS=',' read -ra PROJECT_TYPES <<< "$_detected_csv"
+        PROJECT_TYPE="${PROJECT_TYPES[0]}"
     fi
     if [ -z "$VERSION" ]; then
         VERSION=$(detect_version)
@@ -1096,16 +1099,25 @@ detect_and_confirm_project() {
     if [ -z "$DETECTED_BRANCH" ]; then
         DETECTED_BRANCH=$(detect_default_branch)
     fi
-    
+
     local confirmed=false
-    
+
     # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
     while [ "$confirmed" = false ]; do
         print_section_header "🛰️" "프로젝트 분석 결과"
-        
-        # 감지 결과 표시
+
+        # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
+        local _types_display
+        local IFS=','
+        _types_display="${PROJECT_TYPES[*]}"
+        unset IFS
+
         print_to_user ""
-        print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+        if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+            print_to_user "       📂 Project Types    : $_types_display (멀티)"
+        else
+            print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+        fi
         print_to_user "       🌙 Version          : $VERSION"
         print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
         print_to_user ""

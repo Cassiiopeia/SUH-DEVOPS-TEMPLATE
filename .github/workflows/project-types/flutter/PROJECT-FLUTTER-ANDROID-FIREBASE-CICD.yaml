@@ -557,6 +557,14 @@ jobs:
           echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}" | base64 --decode > firebase-service-account.json
           echo "✅ Firebase 서비스 계정 JSON 파일 생성 완료"
 
+      # Firebase App Distribution release notes 길이 제한 (안전망)
+      - name: Truncate release notes
+        run: |
+          if [ -f "final_release_notes.txt" ]; then
+            # Firebase App Distribution release notes 길이 제한 안전망 (4000자)
+            bash ./.github/scripts/truncate_release_notes.sh final_release_notes.txt 4000 char
+          fi
+
       # Firebase App Distribution에 AAB 업로드
       - name: Upload to Firebase App Distribution
         id: firebase_upload

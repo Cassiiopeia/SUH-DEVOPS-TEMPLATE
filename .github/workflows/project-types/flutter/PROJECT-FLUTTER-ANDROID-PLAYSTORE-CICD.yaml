@@ -628,8 +628,10 @@ jobs:
           # Release notes 준비
           CHANGELOG_DIR="android/fastlane/metadata/android/ko-KR/changelogs"
           mkdir -p "$CHANGELOG_DIR"
-          
+
           if [ -f "final_release_notes.txt" ]; then
+            # Google Play release notes 한도(500 글자)에 맞춰 절단 (마진 두어 480자)
+            bash ./.github/scripts/truncate_release_notes.sh final_release_notes.txt 480 char
             cp final_release_notes.txt "$CHANGELOG_DIR/${VERSION_CODE}.txt"
             echo "✅ Changelog 준비 완료 (버전 코드: $VERSION_CODE)"
           else

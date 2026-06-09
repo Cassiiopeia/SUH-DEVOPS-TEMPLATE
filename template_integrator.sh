@@ -758,7 +758,34 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -t|--type)
-            PROJECT_TYPE="$2"
+            # csv 분해 → PROJECT_TYPES 배열 (멀티타입). dedup + 검증 후 첫 항목을 PROJECT_TYPE에 미러
+            _arg_types="$2"
+            IFS=',' read -ra _arg_arr <<< "$_arg_types"
+            PROJECT_TYPES=()
+            _seen=""
+            for _t in "${_arg_arr[@]}"; do
+                _t=$(echo "$_t" | tr -d ' ')
+                [ -z "$_t" ] && continue
+                # dedup
+                [[ ",$_seen," == *",$_t,"* ]] && continue
+                # 검증
+                _valid=false
+                for _v in "${VALID_TYPES[@]}"; do
+                    [ "$_v" = "$_t" ] && _valid=true && break
+                done
+                if [ "$_valid" = false ]; then
+                    print_error "지원하지 않는 타입: '$_t'"
+                    print_error "지원 타입: ${VALID_TYPES[*]}"
+                    exit 1
+                fi
+                PROJECT_TYPES+=("$_t")
+                _seen="$_seen,$_t"
+            done
+            if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+                print_error "--type 인자가 비어 있습니다"
+                exit 1
+            fi
+            PROJECT_TYPE="${PROJECT_TYPES[0]}"
             shift 2
             ;;
         --force)

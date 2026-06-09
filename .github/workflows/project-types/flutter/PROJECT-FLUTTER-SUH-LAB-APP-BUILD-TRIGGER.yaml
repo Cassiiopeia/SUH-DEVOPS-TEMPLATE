@@ -74,7 +74,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // 키워드 판별은 소문자로(대소문자 무관 인식), 브랜치명 캡처는 원본 본문에서(대소문자 보존)
             const comment = context.payload.comment.body.toLowerCase();
+            const rawComment = context.payload.comment.body;
 
             let buildAndroid = false;
             let buildIos = false;
@@ -84,22 +86,26 @@ jobs:
 
             // 명령어 키워드 뒤의 같은 줄 토큰을 옵셔널 브랜치 인자로 캡처
             // (줄바꿈 너머 단어가 브랜치로 오인되지 않도록 [^\S\r\n]+ 로 같은 줄 공백만 허용)
-            if ((m = comment.match(/@suh-lab[^\S\r\n]+build[^\S\r\n]+app(?:[^\S\r\n]+(\S+))?/))) {
+            // 브랜치명은 rawComment에서 i 플래그로 다시 추출 → Feature/MyBranch 같은 대문자 브랜치 보존
+            if (comment.match(/@suh-lab[^\S\r\n]+build[^\S\r\n]+app/)) {
               // @suh-lab build app [브랜치] → 양쪽 모두
               buildAndroid = true;
               buildIos = true;
               buildType = 'app';
-              customBranch = m[1] || '';
-            } else if ((m = comment.match(/@suh-lab[^\S\r\n]+apk[^\S\r\n]+build(?:[^\S\r\n]+(\S+))?/))) {
+              m = rawComment.match(/@suh-lab[^\S\r\n]+build[^\S\r\n]+app(?:[^\S\r\n]+(\S+))?/i);
+              customBranch = (m && m[1]) || '';
+            } else if (comment.match(/@suh-lab[^\S\r\n]+apk[^\S\r\n]+build/)) {
               // @suh-lab apk build [브랜치] → Android만
               buildAndroid = true;
               buildType = 'apk';
-              customBranch = m[1] || '';
-            } else if ((m = comment.match(/@suh-lab[^\S\r\n]+ios[^\S\r\n]+build(?:[^\S\r\n]+(\S+))?/))) {
+              m = rawComment.match(/@suh-lab[^\S\r\n]+apk[^\S\r\n]+build(?:[^\S\r\n]+(\S+))?/i);
+              customBranch = (m && m[1]) || '';
+            } else if (comment.match(/@suh-lab[^\S\r\n]+ios[^\S\r\n]+build/)) {
               // @suh-lab ios build [브랜치] → iOS만
               buildIos = true;
               buildType = 'ios';
-              customBranch = m[1] || '';
+              m = rawComment.match(/@suh-lab[^\S\r\n]+ios[^\S\r\n]+build(?:[^\S\r\n]+(\S+))?/i);
+              customBranch = (m && m[1]) || '';
             }
 
             core.setOutput('buildAndroid', buildAndroid.toString());

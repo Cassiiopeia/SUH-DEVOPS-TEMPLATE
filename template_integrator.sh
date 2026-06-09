@@ -1360,7 +1360,22 @@ create_version_yml() {
     local type=$2
     local branch=$3
     local existing_version_code=1  # 기본값
-    
+
+    # 멀티타입 — PROJECT_TYPES 배열을 ["a","b"] json 형태로, primary는 첫 항목
+    # (배열이 비었으면 $type 단수로 fallback — 하위 호환)
+    local _types_json _primary_type
+    if [ ${#PROJECT_TYPES[@]} -gt 0 ]; then
+        local _t _parts=()
+        for _t in "${PROJECT_TYPES[@]}"; do _parts+=("\"$_t\""); done
+        local IFS=','
+        _types_json="[${_parts[*]}]"
+        unset IFS
+        _primary_type="${PROJECT_TYPES[0]}"
+    else
+        _types_json="[\"$type\"]"
+        _primary_type="$type"
+    fi
+
     print_step "version.yml 생성 중..."
     
     if [ -f "version.yml" ]; then
@@ -1436,7 +1451,8 @@ create_version_yml() {
 
 version: "$version"
 version_code: $existing_version_code  # app build number
-project_type: "$type"  # spring, flutter, react, react-native, react-native-expo, node, python, basic
+project_types: $_types_json   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
+project_type: "$_primary_type"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "template_integrator"

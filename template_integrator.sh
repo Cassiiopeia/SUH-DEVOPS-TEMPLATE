@@ -738,12 +738,13 @@ EOF
 MODE="interactive"
 VERSION=""
 PROJECT_TYPE=""
+PROJECT_TYPES=()   # 멀티타입 배열 — PROJECT_TYPE은 PROJECT_TYPES[0] 미러
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
 INCLUDE_SYNOLOGY=""  # Synology 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
 
-# 지원하는 프로젝트 타입
-VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
+# 지원하는 프로젝트 타입 (next 포함 — sh/ps1 일관성)
+VALID_TYPES=("spring" "flutter" "next" "react" "react-native" "react-native-expo" "node" "python" "basic")
 
 # 파라미터 파싱
 while [[ $# -gt 0 ]]; do
@@ -861,6 +862,55 @@ detect_project_type() {
     # ===================================================
     print_warning "프로젝트 타입을 감지하지 못했습니다. 기본(basic) 타입으로 설정합니다."
     echo "basic"
+}
+
+# 프로젝트 타입 자동 감지 (멀티 — 모든 일치 타입을 csv로 반환)
+# detect_project_type(단수)은 첫 일치 하나만 반환하지만, 모노레포는 여러 타입이
+# 공존할 수 있으므로 전부 감지해 사용자가 다중 선택 메뉴로 확정하게 한다.
+detect_project_types() {
+    print_step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+
+    local detected=()
+
+    # 고유 마커 파일 — 독립적으로 모두 감지
+    [ -f "pubspec.yaml" ] && detected+=("flutter")
+
+    if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] || [ -f "pom.xml" ]; then
+        detected+=("spring")
+    fi
+
+    if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
+        detected+=("python")
+    fi
+
+    # package.json 기반 — next / react-native / react-native-expo / react / node 구분
+    # (단, spring/flutter에서 build 도구로 쓰는 package.json과 구분하기 위해 내용 검사)
+    if [ -f "package.json" ]; then
+        if grep -q "@react-native" package.json || grep -q "react-native" package.json; then
+            if grep -q "expo" package.json; then
+                detected+=("react-native-expo")
+            else
+                detected+=("react-native")
+            fi
+        elif grep -q "\"next\"" package.json; then
+            detected+=("next")
+        elif grep -q "\"react\"" package.json; then
+            detected+=("react")
+        else
+            # spring/flutter가 이미 감지된 경우 순수 node 보조 도구일 수 있어 중복 추가 방지
+            if [ ${#detected[@]} -eq 0 ]; then
+                detected+=("node")
+            fi
+        fi
+    fi
+
+    [ ${#detected[@]} -eq 0 ] && detected=("basic")
+
+    print_info "감지된 타입: ${detected[*]}"
+
+    # csv로 stdout 출력
+    local IFS=','
+    echo "${detected[*]}"
 }
 
 # 버전 자동 감지

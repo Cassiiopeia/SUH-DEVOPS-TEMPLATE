@@ -1816,15 +1816,160 @@ ask_synology_option() {
 }
 
 # 워크플로우 다운로드 (폴더 기반, 선택적 업데이트)
+# 단일 타입의 타입별 워크플로우 + 타입별 synology 복사 (멀티타입 순회용 헬퍼)
+# 카운터는 호출측 전역 변수(_wf_copied/_wf_template_added/_wf_skipped/_wf_synology_copied) 공유
+_copy_workflows_for_type() {
+    local type="$1"
+    local project_types_dir="$2"
+
+    local type_dir="$project_types_dir/$type"
+    if [ -d "$type_dir" ]; then
+        local existing_files=()
+        local new_files=()
+
+        for workflow in "$type_dir"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            local filename=$(basename "$workflow")
+            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                existing_files+=("$filename")
+            else
+                new_files+=("$filename")
+            fi
+        done
+
+        # 신규 파일은 바로 복사
+        if [ ${#new_files[@]} -gt 0 ]; then
+            print_info "$type 신규 워크플로우 다운로드 중..."
+            for filename in "${new_files[@]}"; do
+                cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
+                echo "  ✓ $filename (신규, $type)"
+                _wf_copied=$((_wf_copied + 1))
+            done
+        fi
+
+        # 이미 존재하는 파일 처리 — T/S/O 선택
+        if [ ${#existing_files[@]} -gt 0 ]; then
+            echo ""
+            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            print_warning "⚠️  이미 존재하는 타입별 워크플로우($type): ${#existing_files[@]}개"
+            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            for f in "${existing_files[@]}"; do
+                echo "   • $f"
+            done
+            echo ""
+            print_info "처리 방법을 선택하세요:"
+            echo ""
+            echo "  (T) .template.yaml로 추가"
+            echo "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
+            echo ""
+            echo "  (S) 건너뛰기"
+            echo "      → 기존 파일만 유지, 아무것도 추가 안 함"
+            echo ""
+            echo "  (O) 덮어쓰기 (기존 방식)"
+            echo "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
+            echo ""
+
+            local choice
+            safe_read "선택 [T/S/O]: " choice "-n 1"
+            echo ""
+
+            case "${choice^^}" in
+                T)
+                    print_info "새 버전을 .template.yaml로 추가합니다..."
+                    for filename in "${existing_files[@]}"; do
+                        local template_name="${filename%.yaml}.template.yaml"
+                        rm -f "$WORKFLOWS_DIR/$template_name"
+                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/$template_name"
+                        echo "  ✓ $template_name (참고용 추가)"
+                        _wf_template_added=$((_wf_template_added + 1))
+                    done
+                    print_info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
+                    print_info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
+                    ;;
+                S)
+                    print_info "기존 파일을 유지합니다..."
+                    for filename in "${existing_files[@]}"; do
+                        echo "  ⏭ $filename (건너뜀)"
+                        _wf_skipped=$((_wf_skipped + 1))
+                    done
+                    ;;
+                O)
+                    print_info "기존 파일을 백업 후 덮어씁니다..."
+                    for filename in "${existing_files[@]}"; do
+                        mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
+                        echo "  ✓ $filename (백업: ${filename}.bak)"
+                        _wf_copied=$((_wf_copied + 1))
+                    done
+                    ;;
+                *)
+                    print_warning "잘못된 선택. 기존 파일을 유지합니다."
+                    for filename in "${existing_files[@]}"; do
+                        echo "  ⏭ $filename (건너뜀)"
+                        _wf_skipped=$((_wf_skipped + 1))
+                    done
+                    ;;
+            esac
+        else
+            print_info "$type 타입의 기존 워크플로우가 없습니다."
+        fi
+    else
+        print_info "$type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
+    fi
+
+    # 타입별 Synology 하위폴더 처리 (선택적)
+    local synology_dir="$project_types_dir/$type/synology"
+    if [ -d "$synology_dir" ]; then
+        if [ "$INCLUDE_SYNOLOGY" = true ]; then
+            print_info "$type Synology 워크플로우 다운로드 중..."
+            for workflow in "$synology_dir"/*.{yaml,yml}; do
+                [ -e "$workflow" ] || continue
+                local filename=$(basename "$workflow")
+                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (Synology $type, 백업: ${filename}.bak)"
+                else
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (Synology $type)"
+                fi
+                _wf_synology_copied=$((_wf_synology_copied + 1))
+                _wf_copied=$((_wf_copied + 1))
+            done
+        else
+            local synology_count=0
+            for f in "$synology_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && synology_count=$((synology_count + 1))
+            done
+            if [ $synology_count -gt 0 ]; then
+                print_info "$type Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
+            fi
+        fi
+    fi
+}
+
+# 멀티타입 안내·체크 헬퍼 — PROJECT_TYPES 배열에 특정 타입 포함 여부
+_contains_type() {
+    local needle=$1
+    local arr=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    local x
+    for x in "${arr[@]}"; do [ "$x" = "$needle" ] && return 0; done
+    return 1
+}
+
 copy_workflows() {
     print_step "프로젝트 타입별 워크플로우 다운로드 중..."
-    print_info "프로젝트 타입: $PROJECT_TYPE"
+    local IFS=','
+    print_info "프로젝트 타입: ${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
 
     mkdir -p "$WORKFLOWS_DIR"
 
-    local copied=0
-    local skipped=0
-    local template_added=0
+    # 멀티타입 순회에서 _copy_workflows_for_type이 공유하는 카운터 (전역)
+    _wf_copied=0
+    _wf_skipped=0
+    _wf_template_added=0
+    _wf_synology_copied=0
     local project_types_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"
 
     # project-types 폴더 존재 확인
@@ -1849,151 +1994,19 @@ copy_workflows() {
 
             cp "$workflow" "$WORKFLOWS_DIR/"
             echo "  ✓ $filename"
-            copied=$((copied + 1))
+            _wf_copied=$((_wf_copied + 1))
         done
     else
         print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
     fi
 
-    # 2. 타입별 워크플로우 처리 (선택적 업데이트)
-    local type_dir="$project_types_dir/$PROJECT_TYPE"
-    if [ -d "$type_dir" ]; then
-        # 먼저 이미 존재하는 파일 목록 수집
-        local existing_files=()
-        local new_files=()
-
-        for workflow in "$type_dir"/*.{yaml,yml}; do
-            [ -e "$workflow" ] || continue
-            local filename=$(basename "$workflow")
-
-            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                existing_files+=("$filename")
-            else
-                new_files+=("$filename")
-            fi
-        done
-
-        # 신규 파일은 바로 복사
-        if [ ${#new_files[@]} -gt 0 ]; then
-            print_info "$PROJECT_TYPE 신규 워크플로우 다운로드 중..."
-            for filename in "${new_files[@]}"; do
-                cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
-                echo "  ✓ $filename (신규)"
-                copied=$((copied + 1))
-            done
-        fi
-
-        # 이미 존재하는 파일 처리
-        if [ ${#existing_files[@]} -gt 0 ]; then
-            echo ""
-            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            print_warning "⚠️  이미 존재하는 타입별 워크플로우: ${#existing_files[@]}개"
-            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            for f in "${existing_files[@]}"; do
-                echo "   • $f"
-            done
-            echo ""
-            print_info "처리 방법을 선택하세요:"
-            echo ""
-            echo "  (T) .template.yaml로 추가"
-            echo "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
-            echo "      → 예: PROJECT-FLUTTER-*.yaml.template.yaml"
-            echo ""
-            echo "  (S) 건너뛰기"
-            echo "      → 기존 파일만 유지, 아무것도 추가 안 함"
-            echo ""
-            echo "  (O) 덮어쓰기 (기존 방식)"
-            echo "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
-            echo ""
-
-            local choice
-            safe_read "선택 [T/S/O]: " choice "-n 1"
-            echo ""
-
-            case "${choice^^}" in
-                T)
-                    # .template.yaml로 추가
-                    print_info "새 버전을 .template.yaml로 추가합니다..."
-                    for filename in "${existing_files[@]}"; do
-                        local template_name="${filename%.yaml}.template.yaml"
-                        # 기존 .template.yaml이 있으면 삭제
-                        rm -f "$WORKFLOWS_DIR/$template_name"
-                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/$template_name"
-                        echo "  ✓ $template_name (참고용 추가)"
-                        template_added=$((template_added + 1))
-                    done
-                    print_info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
-                    print_info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
-                    ;;
-                S)
-                    # 건너뛰기
-                    print_info "기존 파일을 유지합니다..."
-                    for filename in "${existing_files[@]}"; do
-                        echo "  ⏭ $filename (건너뜀)"
-                        skipped=$((skipped + 1))
-                    done
-                    ;;
-                O)
-                    # 기존 방식 (덮어쓰기)
-                    print_info "기존 파일을 백업 후 덮어씁니다..."
-                    for filename in "${existing_files[@]}"; do
-                        mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
-                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
-                        echo "  ✓ $filename (백업: ${filename}.bak)"
-                        copied=$((copied + 1))
-                    done
-                    ;;
-                *)
-                    # 기본값: 건너뛰기
-                    print_warning "잘못된 선택. 기존 파일을 유지합니다."
-                    for filename in "${existing_files[@]}"; do
-                        echo "  ⏭ $filename (건너뜀)"
-                        skipped=$((skipped + 1))
-                    done
-                    ;;
-            esac
-        else
-            print_info "$PROJECT_TYPE 타입의 기존 워크플로우가 없습니다."
-        fi
-    else
-        print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
-    fi
-
-    # 3. Synology 하위폴더 처리 (선택적)
-    local synology_copied=0
-    local synology_dir="$project_types_dir/$PROJECT_TYPE/synology"
-
-    if [ -d "$synology_dir" ]; then
-        if [ "$INCLUDE_SYNOLOGY" = true ]; then
-            print_info "Synology 워크플로우 다운로드 중..."
-            for workflow in "$synology_dir"/*.{yaml,yml}; do
-                [ -e "$workflow" ] || continue
-                local filename=$(basename "$workflow")
-
-                # 이미 존재하는 경우 처리
-                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                    # 기존 파일 백업 후 덮어쓰기
-                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Synology, 백업: ${filename}.bak)"
-                else
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Synology)"
-                fi
-                synology_copied=$((synology_copied + 1))
-                copied=$((copied + 1))
-            done
-        else
-            # Synology 제외됨 - 사용자에게 알림
-            local synology_count=0
-            for f in "$synology_dir"/*.{yaml,yml}; do
-                [ -e "$f" ] && synology_count=$((synology_count + 1))
-            done
-            if [ $synology_count -gt 0 ]; then
-                print_info "Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
-            fi
-        fi
-    fi
+    # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — PROJECT_TYPES 배열 순회
+    #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
+    local _types_to_copy=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    local _t
+    for _t in "${_types_to_copy[@]}"; do
+        _copy_workflows_for_type "$_t" "$project_types_dir"
+    done
 
     # 4. Common Synology 워크플로우 처리 (선택적)
     local common_synology_dir="$project_types_dir/common/synology"
@@ -2012,8 +2025,8 @@ copy_workflows() {
 
                 cp "$workflow" "$WORKFLOWS_DIR/"
                 echo "  ✓ $filename (공통 Synology)"
-                synology_copied=$((synology_copied + 1))
-                copied=$((copied + 1))
+                _wf_synology_copied=$((_wf_synology_copied + 1))
+                _wf_copied=$((_wf_copied + 1))
             done
         else
             local common_syn_count=0
@@ -2028,23 +2041,35 @@ copy_workflows() {
 
     # 결과 요약
     echo ""
-    print_success "워크플로우 처리 완료 (타입: $PROJECT_TYPE)"
-    echo "   📥 복사됨: $copied 개"
-    if [ $synology_copied -gt 0 ]; then
-        echo "   🗄️ Synology: $synology_copied 개"
+    local _types_summary
+    local IFS=','
+    _types_summary="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
+    print_success "워크플로우 처리 완료 (타입: $_types_summary)"
+    echo "   📥 복사됨: $_wf_copied 개"
+    if [ $_wf_synology_copied -gt 0 ]; then
+        echo "   🗄️ Synology: $_wf_synology_copied 개"
     fi
-    if [ $template_added -gt 0 ]; then
-        echo "   📄 참고용 추가 (.template.yaml): $template_added 개"
+    if [ $_wf_template_added -gt 0 ]; then
+        echo "   📄 참고용 추가 (.template.yaml): $_wf_template_added 개"
     fi
-    if [ $skipped -gt 0 ]; then
-        echo "   ⏭ 건너뜀: $skipped 개"
+    if [ $_wf_skipped -gt 0 ]; then
+        echo "   ⏭ 건너뜀: $_wf_skipped 개"
     fi
 
     # 복사된 워크플로우 수를 전역 변수로 저장 (최종 요약에서 사용)
-    WORKFLOWS_COPIED=$copied
+    WORKFLOWS_COPIED=$_wf_copied
 
-    # CI/CD 워크플로우 안내
-    if [ "$PROJECT_TYPE" = "spring" ]; then
+    # 멀티타입 CI 트리거 충돌 경고 — 여러 *-CI.yaml이 같은 push에 동시 발화
+    if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+        echo ""
+        print_warning "⚠️  멀티타입 주의: 여러 타입의 CI/CD 워크플로우가 같은 push에 동시 실행됩니다."
+        print_warning "   각 워크플로우의 paths: 필터를 디렉토리별로 수동 추가해 분리하길 권장합니다."
+        print_warning "   배포 워크플로우는 PROJECT_NAME/CONTAINER_NAME/DEPLOY_PORT를 타입별로 다르게 설정하세요."
+    fi
+
+    # CI/CD 워크플로우 안내 — PROJECT_TYPES 배열에 spring 포함 시
+    if _contains_type "spring"; then
         echo ""
         print_info "🔐 Spring CI/CD 워크플로우 사용 시 GitHub Secrets 설정:"
         echo "     Repository > Settings > Secrets and variables > Actions"
@@ -2565,8 +2590,12 @@ execute_integration() {
 
     # CLI 모드에서만 자동 감지 및 확인 (interactive 모드에서는 이미 감지 완료, skills 모드는 프로젝트 정보 불필요)
     if [ "$IS_INTERACTIVE_MODE" = false ] && [ "$MODE" != "skills" ]; then
-        if [ -z "$PROJECT_TYPE" ]; then
-            PROJECT_TYPE=$(detect_project_type)
+        # --type으로 PROJECT_TYPES가 안 채워졌으면 멀티 자동 감지
+        if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+            local _detected_csv
+            _detected_csv=$(detect_project_types)
+            IFS=',' read -ra PROJECT_TYPES <<< "$_detected_csv"
+            PROJECT_TYPE="${PROJECT_TYPES[0]}"
         fi
 
         if [ -z "$VERSION" ]; then
@@ -2580,7 +2609,15 @@ execute_integration() {
         # CLI 모드에서만 통합 정보 표시
         print_question_header "🪐" "통합 정보"
 
-        print_to_user "🔭 프로젝트 타입  : $PROJECT_TYPE"
+        local _cli_types
+        local IFS=','
+        _cli_types="${PROJECT_TYPES[*]}"
+        unset IFS
+        if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+            print_to_user "🔭 프로젝트 타입  : $_cli_types (멀티)"
+        else
+            print_to_user "🔭 프로젝트 타입  : $PROJECT_TYPE"
+        fi
         print_to_user "🌙 초기 버전     : v$VERSION"
         print_to_user "🌿 Default 브랜치 : $DETECTED_BRANCH"
         print_to_user "💫 통합 모드     : $MODE"
@@ -2631,7 +2668,7 @@ execute_integration() {
             copy_workflows
             copy_scripts
             copy_config_folder
-            copy_util_modules "$PROJECT_TYPE"
+            for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_issue_templates
             copy_discussion_templates
             copy_coderabbit_config
@@ -2650,7 +2687,7 @@ execute_integration() {
             copy_workflows
             copy_scripts
             copy_config_folder
-            copy_util_modules "$PROJECT_TYPE"
+            for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_setup_guide
             ;;
         issues)
@@ -3467,9 +3504,14 @@ print_summary() {
         return
     fi
 
+    local _summary_types
+    local IFS=','
+    _summary_types="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
+
     echo "" >&2
     echo "추가된 파일:" >&2
-    echo "  📄 version.yml (버전: $VERSION, 타입: $PROJECT_TYPE)" >&2
+    echo "  📄 version.yml (버전: $VERSION, 타입: $_summary_types)" >&2
     echo "  📝 README.md (버전 섹션 추가)" >&2
     echo "" >&2
     echo "추가된 워크플로우:" >&2
@@ -3490,8 +3532,17 @@ print_summary() {
                 existing_workflows+=("$filename")
             elif [[ "$filename" =~ ^${WORKFLOW_COMMON_PREFIX}- ]]; then
                 common_workflows+=("$filename")
-            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-$(echo "$PROJECT_TYPE" | tr '[:lower:]' '[:upper:]')- ]]; then
-                type_workflows+=("$filename")
+            else
+                # PROJECT_TYPES 배열 순회 — 어떤 타입 prefix와 매칭되는지 검사
+                local _check_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+                local _ct
+                for _ct in "${_check_types[@]}"; do
+                    local _prefix="^${WORKFLOW_PREFIX}-$(echo "$_ct" | tr '[:lower:]' '[:upper:]')-"
+                    if [[ "$filename" =~ $_prefix ]]; then
+                        type_workflows+=("$filename")
+                        break
+                    fi
+                done
             fi
         done
     fi
@@ -3526,21 +3577,25 @@ print_summary() {
     echo "     └─ changelog_manager.py" >&2
     echo "" >&2
     
-    # util 모듈 정보 표시
+    # util 모듈 정보 표시 — PROJECT_TYPES 배열 순회
     if [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
         echo "  🧙 유틸리티 모듈:" >&2
-        if [ -d ".github/util/$PROJECT_TYPE" ]; then
-            for dir in ".github/util/$PROJECT_TYPE"/*/; do
-                [ -d "$dir" ] || continue
-                local module_name=$(basename "$dir")
-                echo "     ├─ $module_name" >&2
-            done
-        fi
+        local _ut_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+        local _ut
+        for _ut in "${_ut_types[@]}"; do
+            if [ -d ".github/util/$_ut" ]; then
+                for dir in ".github/util/$_ut"/*/; do
+                    [ -d "$dir" ] || continue
+                    local module_name=$(basename "$dir")
+                    echo "     ├─ $module_name ($_ut)" >&2
+                done
+            fi
+        done
         echo "" >&2
     fi
 
-    # 프로젝트 타입별 안내
-    if [ "$PROJECT_TYPE" = "spring" ]; then
+    # 프로젝트 타입별 안내 — 배열에 spring 포함 시
+    if _contains_type "spring"; then
         echo "  💡 Spring 프로젝트 추가 설정:" >&2
         echo "     • build.gradle의 버전 정보가 자동 동기화됩니다" >&2
         echo "     • CI/CD 워크플로우에서 GitHub Secrets 설정이 필요합니다" >&2
@@ -3548,8 +3603,8 @@ print_summary() {
         echo "" >&2
     fi
 
-    # Flutter util 모듈 안내
-    if [ "$PROJECT_TYPE" = "flutter" ] && [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
+    # Flutter util 모듈 안내 — 배열에 flutter 포함 시
+    if _contains_type "flutter" && [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
         echo "  💡 Flutter 배포 마법사 사용법:" >&2
         echo "     • iOS TestFlight: .github/util/flutter/ios-testflight-setup-wizard/index.html" >&2
         echo "     • Android Play Store: .github/util/flutter/android-playstore-setup-wizard/index.html" >&2

@@ -14,6 +14,10 @@
 # 지원 타입: spring, flutter, next, react, react-native,
 #           react-native-expo, node, python, basic
 #
+# [멀티타입] 한 레포에 여러 타입 공존 시 project_types 배열에 나열:
+#           project_types: ["spring", "react", "python"]
+#           → project_type(단수)은 항상 배열 첫 항목으로 자동 미러링됨 (직접 수정 금지)
+#
 # 타입별 동기화 파일:
 # - spring: build.gradle
 # - flutter: pubspec.yaml
@@ -26,7 +30,8 @@
 
 version: "3.0.101"
 version_code: 293 # app build number
-project_type: "basic" # spring, flutter, next, react, react-native, react-native-expo, node, python, basic
+project_types: ["basic"]   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
+project_type: "basic" # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
   last_updated: "2026-06-09 14:02:34"
   last_updated_by: "Cassiiopeia"

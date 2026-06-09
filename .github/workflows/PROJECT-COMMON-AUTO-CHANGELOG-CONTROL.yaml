@@ -45,6 +45,7 @@ jobs:
       summary_found: ${{ steps.detect_summary.outputs.summary_found }}
       version: ${{ steps.get_version.outputs.version }}
       project_type: ${{ steps.get_version.outputs.project_type }}
+      project_types: ${{ steps.get_version.outputs.project_types }}
     steps:
       - name: PR 본문 초기화
         id: clear_body
@@ -125,10 +126,14 @@ jobs:
           if [ -f "version.yml" ] && [ "$PROJECT_TYPE" = "unknown" ]; then
             PROJECT_TYPE=$(grep "^project_type:" version.yml | sed 's/project_type: *"\([^"]*\)".*/\1/' || echo "unknown")
           fi
+          # 멀티타입 — project_types 배열을 csv로 추출, 없으면 단수 키 fallback
+          PROJECT_TYPES=$(grep "^project_types:" version.yml 2>/dev/null | sed -E 's/.*\[([^]]*)\].*/\1/' | tr -d '" ' || echo "")
+          [ -z "$PROJECT_TYPES" ] && PROJECT_TYPES="$PROJECT_TYPE"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "project_type=$PROJECT_TYPE" >> $GITHUB_OUTPUT
-          echo "✅ 버전: $VERSION, 프로젝트 타입: $PROJECT_TYPE"
+          echo "project_types=$PROJECT_TYPES" >> $GITHUB_OUTPUT
+          echo "✅ 버전: $VERSION, 프로젝트 타입: $PROJECT_TYPE (배열: $PROJECT_TYPES)"
 
       - name: PR 제목 즉시 변경
         run: |
@@ -372,6 +377,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           VERSION="${{ needs.detect-and-parse.outputs.version }}"
           PROJECT_TYPE="${{ needs.detect-and-parse.outputs.project_type }}"
+          PROJECT_TYPES="${{ needs.detect-and-parse.outputs.project_types }}"
           TODAY=$(date '+%Y-%m-%d')
           TIMESTAMP=$(date '+%Y-%m-%dT%H:%M:%SZ')
 
@@ -389,6 +395,7 @@ jobs:
           # 환경 변수 설정 후 Python 스크립트 실행
           export VERSION="$VERSION"
           export PROJECT_TYPE="$PROJECT_TYPE"
+          export PROJECT_TYPES="$PROJECT_TYPES"
           export TODAY="$TODAY"
           export PR_NUMBER="$PR_NUMBER"
           export TIMESTAMP="$TIMESTAMP"

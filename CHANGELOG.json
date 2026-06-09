@@ -1,11 +1,27 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-09T06:51:24Z",
-    "currentVersion": "3.0.98",
+    "lastUpdated": "2026-06-09T08:24:13Z",
+    "currentVersion": "3.0.100",
     "projectType": "basic",
-    "totalReleases": 128
+    "totalReleases": 129
   },
   "releases": [
+    {
+      "version": "3.0.100",
+      "project_type": "basic",
+      "date": "2026-06-09",
+      "pr_number": 350,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 앱 빌드 댓글에서 빌드할 브랜치를 직접 지정할 수 있습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "앱 빌드 댓글에서 빌드할 브랜치를 직접 지정할 수 있습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.98",
       "project_type": "basic",

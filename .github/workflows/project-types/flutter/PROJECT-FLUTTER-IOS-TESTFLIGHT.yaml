@@ -416,6 +416,8 @@ jobs:
 
           # Release notes 준비
           if [ -f "final_release_notes.txt" ]; then
+            # App Store Connect "What to Test" 한도(4000 바이트)에 맞춰 절단 (마진 두어 3800byte)
+            bash ./.github/scripts/truncate_release_notes.sh final_release_notes.txt 3800 byte
             RELEASE_NOTES=$(cat final_release_notes.txt)
             echo "📝 Release Notes:"
             echo "$RELEASE_NOTES"

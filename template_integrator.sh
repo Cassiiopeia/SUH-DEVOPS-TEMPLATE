@@ -241,6 +241,17 @@ print_to_user() {
 # exit:   0=확정, 1=취소
 # ─────────────────────────────────────────────────────────────
 interactive_menu() {
+    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값)
+    local multi=false
+    local preselect_csv=""
+    while [[ "$1" == --* ]]; do
+        case "$1" in
+            --multi) multi=true; shift ;;
+            --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            *) break ;;
+        esac
+    done
+
     local prompt="$1"
     shift
     local options=("$@")
@@ -256,14 +267,39 @@ interactive_menu() {
         use_color=false
     fi
 
-    local C_RESET="" C_CYAN="" C_DIM=""
+    local C_RESET="" C_CYAN="" C_DIM="" C_GREEN=""
     if [ "$use_color" = true ]; then
         C_RESET=$'\033[0m'
         C_CYAN=$'\033[36m'
         C_DIM=$'\033[2m'
+        C_GREEN=$'\033[32m'
     fi
 
-    printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+    # multi 모드 선택 상태 — index → bool
+    local selected=()
+    local i
+    for i in $(seq 0 $((n - 1))); do selected[$i]=false; done
+
+    # preselect 적용 — value가 일치하는 항목을 초기 선택
+    if [ -n "$preselect_csv" ] && [ "$multi" = true ]; then
+        local p pre_value
+        IFS=',' read -ra _pre <<< "$preselect_csv"
+        for p in "${_pre[@]}"; do
+            for i in $(seq 0 $((n - 1))); do
+                IFS='|' read -r pre_value _ <<< "${options[$i]}"
+                if [ "$pre_value" = "$p" ]; then
+                    selected[$i]=true
+                    break
+                fi
+            done
+        done
+    fi
+
+    if [ "$multi" = true ]; then
+        printf "\n%s (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+    else
+        printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+    fi
 
     local cursor=0
 
@@ -271,17 +307,31 @@ interactive_menu() {
     printf "\033[?25l" >&2
 
     _interactive_menu_render() {
-        local i value label num
+        local i value label num indicator
         for i in $(seq 0 $((n - 1))); do
             IFS='|' read -r value label <<< "${options[$i]}"
             num=$((i + 1))
+            # 표시자 — multi면 체크박스([✓]/[ ]), single이면 커서표시([•]/[ ])
+            if [ "$multi" = true ]; then
+                if [ "${selected[$i]}" = true ]; then
+                    indicator="${C_GREEN}[✓]${C_RESET}"
+                else
+                    indicator="[ ]"
+                fi
+            else
+                if [ "$i" -eq "$cursor" ]; then
+                    indicator="[•]"
+                else
+                    indicator="[ ]"
+                fi
+            fi
             if [ "$i" -eq "$cursor" ]; then
-                printf "%s> [•] %d) %s    %s%s%s%s\n" \
-                    "$C_CYAN" "$num" "$value" \
+                printf "%s> %s %d) %s    %s%s%s%s\n" \
+                    "$C_CYAN" "$indicator" "$num" "$value" \
                     "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
             else
-                printf "  [ ] %d) %s    %s%s%s\n" \
-                    "$num" "$value" \
+                printf "  %s %d) %s    %s%s%s\n" \
+                    "$indicator" "$num" "$value" \
                     "$C_DIM" "$label" "$C_RESET" >&2
             fi
         done
@@ -333,13 +383,53 @@ interactive_menu() {
                     cursor=$jump
                 fi
                 ;;
+            ' ')
+                # Space — multi 모드에서 현재 행 선택 토글
+                if [ "$multi" = true ]; then
+                    if [ "${selected[$cursor]}" = true ]; then
+                        selected[$cursor]=false
+                    else
+                        selected[$cursor]=true
+                    fi
+                fi
+                ;;
+            a|A)
+                # a — multi 모드에서 전체 토글 (모두 선택돼 있으면 전체 해제, 아니면 전체 선택)
+                if [ "$multi" = true ]; then
+                    local all_on=true
+                    for i in $(seq 0 $((n - 1))); do
+                        [ "${selected[$i]}" = true ] || { all_on=false; break; }
+                    done
+                    for i in $(seq 0 $((n - 1))); do
+                        if [ "$all_on" = true ]; then selected[$i]=false; else selected[$i]=true; fi
+                    done
+                fi
+                ;;
             ""|$'\n'|$'\r')
                 _interactive_menu_clear
                 printf "\033[?25h" >&2
                 trap - INT
-                IFS='|' read -r value _ <<< "${options[$cursor]}"
-                echo "$value"
-                return 0
+                if [ "$multi" = true ]; then
+                    # 선택된 항목들을 csv로 출력 (하나도 없으면 취소 처리)
+                    local out="" first=true
+                    for i in $(seq 0 $((n - 1))); do
+                        if [ "${selected[$i]}" = true ]; then
+                            IFS='|' read -r value _ <<< "${options[$i]}"
+                            if [ "$first" = true ]; then
+                                out="$value"; first=false
+                            else
+                                out="$out,$value"
+                            fi
+                        fi
+                    done
+                    [ -z "$out" ] && return 1
+                    echo "$out"
+                    return 0
+                else
+                    IFS='|' read -r value _ <<< "${options[$cursor]}"
+                    echo "$value"
+                    return 0
+                fi
                 ;;
             ESC|q)
                 _interactive_menu_clear
@@ -362,6 +452,17 @@ interactive_menu() {
 # 사용법: selected=$(legacy_numeric_menu "prompt" "value1|label1" ...)
 # ─────────────────────────────────────────────────────────────
 legacy_numeric_menu() {
+    # 옵션 파싱 — interactive_menu와 동일한 --multi/--preselect 지원
+    local multi=false
+    local preselect_csv=""
+    while [[ "$1" == --* ]]; do
+        case "$1" in
+            --multi) multi=true; shift ;;
+            --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            *) break ;;
+        esac
+    done
+
     local prompt="$1"
     shift
     local options=("$@")
@@ -380,25 +481,73 @@ legacy_numeric_menu() {
     done
     printf "\n" >&2
 
+    # 입력 프롬프트 — multi면 csv 안내
+    local input_prompt
+    if [ "$multi" = true ]; then
+        input_prompt="여러 항목 선택 (csv, 예: 1,3,5 또는 spring,react)"
+        [ -n "$preselect_csv" ] && input_prompt="$input_prompt [기본: $preselect_csv]"
+        input_prompt="$input_prompt: "
+    else
+        input_prompt=$(printf "선택 (1-%d): " "$n")
+    fi
+
     local choice read_ok=0
     while true; do
         choice=""
         read_ok=0
         if [ -t 0 ]; then
-            printf "선택 (1-%d): " "$n" >&2
+            printf "%s" "$input_prompt" >&2
             IFS= read -r choice && read_ok=1
         elif [ -c /dev/tty ] 2>/dev/null && [ -r /dev/tty ]; then
-            printf "선택 (1-%d): " "$n" >&2
+            printf "%s" "$input_prompt" >&2
             IFS= read -r choice < /dev/tty && read_ok=1
         fi
 
         if [ "$read_ok" -eq 0 ]; then
-            # stdin/tty 모두 못 읽음 → 첫 옵션 자동 선택
+            # stdin/tty 모두 못 읽음 → multi+preselect면 그 값, 아니면 첫 옵션 자동 선택
+            if [ "$multi" = true ] && [ -n "$preselect_csv" ]; then
+                echo "$preselect_csv"
+                return 0
+            fi
             IFS='|' read -r value _ <<< "${options[0]}"
             echo "$value"
             return 0
         fi
 
+        if [ "$multi" = true ]; then
+            # 빈 입력 + preselect → preselect 사용
+            if [ -z "$choice" ] && [ -n "$preselect_csv" ]; then
+                echo "$preselect_csv"
+                return 0
+            fi
+            # csv 파싱 — 숫자(1,3,5)/이름(spring,react) 혼용 허용
+            local out="" first=true p resolved parts
+            IFS=',' read -ra parts <<< "$choice"
+            for p in "${parts[@]}"; do
+                p=$(echo "$p" | tr -d ' ')
+                [ -z "$p" ] && continue
+                resolved=""
+                if [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" -ge 1 ] && [ "$p" -le "$n" ]; then
+                    IFS='|' read -r resolved _ <<< "${options[$((p - 1))]}"
+                else
+                    for i in $(seq 0 $((n - 1))); do
+                        IFS='|' read -r value _ <<< "${options[$i]}"
+                        if [ "$value" = "$p" ]; then resolved="$value"; break; fi
+                    done
+                fi
+                if [ -n "$resolved" ]; then
+                    if [ "$first" = true ]; then out="$resolved"; first=false; else out="$out,$resolved"; fi
+                fi
+            done
+            if [ -z "$out" ]; then
+                printf "유효한 선택이 없습니다. 다시 입력해주세요.\n" >&2
+                continue
+            fi
+            echo "$out"
+            return 0
+        fi
+
+        # single 모드
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "$n" ]; then
             IFS='|' read -r value _ <<< "${options[$((choice - 1))]}"
             echo "$value"
@@ -589,12 +738,13 @@ EOF
 MODE="interactive"
 VERSION=""
 PROJECT_TYPE=""
+PROJECT_TYPES=()   # 멀티타입 배열 — PROJECT_TYPE은 PROJECT_TYPES[0] 미러
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
 INCLUDE_SYNOLOGY=""  # Synology 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
 
-# 지원하는 프로젝트 타입
-VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
+# 지원하는 프로젝트 타입 (next 포함 — sh/ps1 일관성)
+VALID_TYPES=("spring" "flutter" "next" "react" "react-native" "react-native-expo" "node" "python" "basic")
 
 # 파라미터 파싱
 while [[ $# -gt 0 ]]; do
@@ -608,7 +758,34 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -t|--type)
-            PROJECT_TYPE="$2"
+            # csv 분해 → PROJECT_TYPES 배열 (멀티타입). dedup + 검증 후 첫 항목을 PROJECT_TYPE에 미러
+            _arg_types="$2"
+            IFS=',' read -ra _arg_arr <<< "$_arg_types"
+            PROJECT_TYPES=()
+            _seen=""
+            for _t in "${_arg_arr[@]}"; do
+                _t=$(echo "$_t" | tr -d ' ')
+                [ -z "$_t" ] && continue
+                # dedup
+                [[ ",$_seen," == *",$_t,"* ]] && continue
+                # 검증
+                _valid=false
+                for _v in "${VALID_TYPES[@]}"; do
+                    [ "$_v" = "$_t" ] && _valid=true && break
+                done
+                if [ "$_valid" = false ]; then
+                    print_error "지원하지 않는 타입: '$_t'"
+                    print_error "지원 타입: ${VALID_TYPES[*]}"
+                    exit 1
+                fi
+                PROJECT_TYPES+=("$_t")
+                _seen="$_seen,$_t"
+            done
+            if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+                print_error "--type 인자가 비어 있습니다"
+                exit 1
+            fi
+            PROJECT_TYPE="${PROJECT_TYPES[0]}"
             shift 2
             ;;
         --force)
@@ -712,6 +889,55 @@ detect_project_type() {
     # ===================================================
     print_warning "프로젝트 타입을 감지하지 못했습니다. 기본(basic) 타입으로 설정합니다."
     echo "basic"
+}
+
+# 프로젝트 타입 자동 감지 (멀티 — 모든 일치 타입을 csv로 반환)
+# detect_project_type(단수)은 첫 일치 하나만 반환하지만, 모노레포는 여러 타입이
+# 공존할 수 있으므로 전부 감지해 사용자가 다중 선택 메뉴로 확정하게 한다.
+detect_project_types() {
+    print_step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+
+    local detected=()
+
+    # 고유 마커 파일 — 독립적으로 모두 감지
+    [ -f "pubspec.yaml" ] && detected+=("flutter")
+
+    if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] || [ -f "pom.xml" ]; then
+        detected+=("spring")
+    fi
+
+    if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
+        detected+=("python")
+    fi
+
+    # package.json 기반 — next / react-native / react-native-expo / react / node 구분
+    # (단, spring/flutter에서 build 도구로 쓰는 package.json과 구분하기 위해 내용 검사)
+    if [ -f "package.json" ]; then
+        if grep -q "@react-native" package.json || grep -q "react-native" package.json; then
+            if grep -q "expo" package.json; then
+                detected+=("react-native-expo")
+            else
+                detected+=("react-native")
+            fi
+        elif grep -q "\"next\"" package.json; then
+            detected+=("next")
+        elif grep -q "\"react\"" package.json; then
+            detected+=("react")
+        else
+            # spring/flutter가 이미 감지된 경우 순수 node 보조 도구일 수 있어 중복 추가 방지
+            if [ ${#detected[@]} -eq 0 ]; then
+                detected+=("node")
+            fi
+        fi
+    fi
+
+    [ ${#detected[@]} -eq 0 ] && detected=("basic")
+
+    print_info "감지된 타입: ${detected[*]}"
+
+    # csv로 stdout 출력
+    local IFS=','
+    echo "${detected[*]}"
 }
 
 # 버전 자동 감지
@@ -838,10 +1064,17 @@ print_question_header() {
 
 # 프로젝트 타입 선택 메뉴
 show_project_type_menu() {
+    # 현재 PROJECT_TYPES를 preselect csv로 — 멀티 선택 메뉴(Space 토글)
+    local _preselect
+    local IFS=','
+    _preselect="${PROJECT_TYPES[*]:-}"
+    unset IFS
+
     local selected
-    selected=$(choose_menu "프로젝트 타입을 선택하세요" \
+    selected=$(choose_menu --multi --preselect="$_preselect" "프로젝트 타입을 선택하세요 (멀티 가능 — Space로 토글)" \
         "spring|Spring Boot 백엔드" \
         "flutter|Flutter 모바일 앱" \
+        "next|Next.js 웹 앱" \
         "react|React 웹 앱" \
         "react-native|React Native 모바일 앱" \
         "react-native-expo|React Native Expo 앱" \
@@ -851,7 +1084,10 @@ show_project_type_menu() {
 
     if [ -z "$selected" ]; then
         print_error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
-        echo "$PROJECT_TYPE"
+        # 기존 PROJECT_TYPES csv 반환 (호출측이 사용)
+        local IFS=','
+        echo "${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+        unset IFS
         return 1
     fi
 
@@ -860,9 +1096,12 @@ show_project_type_menu() {
 
 # 프로젝트 감지 및 확인
 detect_and_confirm_project() {
-    # 자동 감지 (최초 1회만)
-    if [ -z "$PROJECT_TYPE" ]; then
-        PROJECT_TYPE=$(detect_project_type)
+    # 자동 감지 (최초 1회만) — --type으로 PROJECT_TYPES가 이미 채워졌으면 건너뜀
+    if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+        local _detected_csv
+        _detected_csv=$(detect_project_types)
+        IFS=',' read -ra PROJECT_TYPES <<< "$_detected_csv"
+        PROJECT_TYPE="${PROJECT_TYPES[0]}"
     fi
     if [ -z "$VERSION" ]; then
         VERSION=$(detect_version)
@@ -870,16 +1109,25 @@ detect_and_confirm_project() {
     if [ -z "$DETECTED_BRANCH" ]; then
         DETECTED_BRANCH=$(detect_default_branch)
     fi
-    
+
     local confirmed=false
-    
+
     # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
     while [ "$confirmed" = false ]; do
         print_section_header "🛰️" "프로젝트 분석 결과"
-        
-        # 감지 결과 표시
+
+        # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
+        local _types_display
+        local IFS=','
+        _types_display="${PROJECT_TYPES[*]}"
+        unset IFS
+
         print_to_user ""
-        print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+        if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+            print_to_user "       📂 Project Types    : $_types_display (멀티)"
+        else
+            print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+        fi
         print_to_user "       🌙 Version          : $VERSION"
         print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
         print_to_user ""
@@ -935,8 +1183,17 @@ handle_project_edit_menu() {
 
     case "$edit_choice" in
         type)
-            PROJECT_TYPE=$(show_project_type_menu)
-            print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+            local _new_csv
+            _new_csv=$(show_project_type_menu)
+            if [ -n "$_new_csv" ]; then
+                IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
+                PROJECT_TYPE="${PROJECT_TYPES[0]}"
+                if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+                    print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
+                else
+                    print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                fi
+            fi
             print_to_user ""
             ;;
         version)
@@ -1103,7 +1360,22 @@ create_version_yml() {
     local type=$2
     local branch=$3
     local existing_version_code=1  # 기본값
-    
+
+    # 멀티타입 — PROJECT_TYPES 배열을 ["a","b"] json 형태로, primary는 첫 항목
+    # (배열이 비었으면 $type 단수로 fallback — 하위 호환)
+    local _types_json _primary_type
+    if [ ${#PROJECT_TYPES[@]} -gt 0 ]; then
+        local _t _parts=()
+        for _t in "${PROJECT_TYPES[@]}"; do _parts+=("\"$_t\""); done
+        local IFS=','
+        _types_json="[${_parts[*]}]"
+        unset IFS
+        _primary_type="${PROJECT_TYPES[0]}"
+    else
+        _types_json="[\"$type\"]"
+        _primary_type="$type"
+    fi
+
     print_step "version.yml 생성 중..."
     
     if [ -f "version.yml" ]; then
@@ -1179,7 +1451,8 @@ create_version_yml() {
 
 version: "$version"
 version_code: $existing_version_code  # app build number
-project_type: "$type"  # spring, flutter, react, react-native, react-native-expo, node, python, basic
+project_types: $_types_json   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
+project_type: "$_primary_type"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "template_integrator"
@@ -1559,15 +1832,160 @@ ask_synology_option() {
 }
 
 # 워크플로우 다운로드 (폴더 기반, 선택적 업데이트)
+# 단일 타입의 타입별 워크플로우 + 타입별 synology 복사 (멀티타입 순회용 헬퍼)
+# 카운터는 호출측 전역 변수(_wf_copied/_wf_template_added/_wf_skipped/_wf_synology_copied) 공유
+_copy_workflows_for_type() {
+    local type="$1"
+    local project_types_dir="$2"
+
+    local type_dir="$project_types_dir/$type"
+    if [ -d "$type_dir" ]; then
+        local existing_files=()
+        local new_files=()
+
+        for workflow in "$type_dir"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            local filename=$(basename "$workflow")
+            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                existing_files+=("$filename")
+            else
+                new_files+=("$filename")
+            fi
+        done
+
+        # 신규 파일은 바로 복사
+        if [ ${#new_files[@]} -gt 0 ]; then
+            print_info "$type 신규 워크플로우 다운로드 중..."
+            for filename in "${new_files[@]}"; do
+                cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
+                echo "  ✓ $filename (신규, $type)"
+                _wf_copied=$((_wf_copied + 1))
+            done
+        fi
+
+        # 이미 존재하는 파일 처리 — T/S/O 선택
+        if [ ${#existing_files[@]} -gt 0 ]; then
+            echo ""
+            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            print_warning "⚠️  이미 존재하는 타입별 워크플로우($type): ${#existing_files[@]}개"
+            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            for f in "${existing_files[@]}"; do
+                echo "   • $f"
+            done
+            echo ""
+            print_info "처리 방법을 선택하세요:"
+            echo ""
+            echo "  (T) .template.yaml로 추가"
+            echo "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
+            echo ""
+            echo "  (S) 건너뛰기"
+            echo "      → 기존 파일만 유지, 아무것도 추가 안 함"
+            echo ""
+            echo "  (O) 덮어쓰기 (기존 방식)"
+            echo "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
+            echo ""
+
+            local choice
+            safe_read "선택 [T/S/O]: " choice "-n 1"
+            echo ""
+
+            case "${choice^^}" in
+                T)
+                    print_info "새 버전을 .template.yaml로 추가합니다..."
+                    for filename in "${existing_files[@]}"; do
+                        local template_name="${filename%.yaml}.template.yaml"
+                        rm -f "$WORKFLOWS_DIR/$template_name"
+                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/$template_name"
+                        echo "  ✓ $template_name (참고용 추가)"
+                        _wf_template_added=$((_wf_template_added + 1))
+                    done
+                    print_info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
+                    print_info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
+                    ;;
+                S)
+                    print_info "기존 파일을 유지합니다..."
+                    for filename in "${existing_files[@]}"; do
+                        echo "  ⏭ $filename (건너뜀)"
+                        _wf_skipped=$((_wf_skipped + 1))
+                    done
+                    ;;
+                O)
+                    print_info "기존 파일을 백업 후 덮어씁니다..."
+                    for filename in "${existing_files[@]}"; do
+                        mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
+                        echo "  ✓ $filename (백업: ${filename}.bak)"
+                        _wf_copied=$((_wf_copied + 1))
+                    done
+                    ;;
+                *)
+                    print_warning "잘못된 선택. 기존 파일을 유지합니다."
+                    for filename in "${existing_files[@]}"; do
+                        echo "  ⏭ $filename (건너뜀)"
+                        _wf_skipped=$((_wf_skipped + 1))
+                    done
+                    ;;
+            esac
+        else
+            print_info "$type 타입의 기존 워크플로우가 없습니다."
+        fi
+    else
+        print_info "$type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
+    fi
+
+    # 타입별 Synology 하위폴더 처리 (선택적)
+    local synology_dir="$project_types_dir/$type/synology"
+    if [ -d "$synology_dir" ]; then
+        if [ "$INCLUDE_SYNOLOGY" = true ]; then
+            print_info "$type Synology 워크플로우 다운로드 중..."
+            for workflow in "$synology_dir"/*.{yaml,yml}; do
+                [ -e "$workflow" ] || continue
+                local filename=$(basename "$workflow")
+                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (Synology $type, 백업: ${filename}.bak)"
+                else
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (Synology $type)"
+                fi
+                _wf_synology_copied=$((_wf_synology_copied + 1))
+                _wf_copied=$((_wf_copied + 1))
+            done
+        else
+            local synology_count=0
+            for f in "$synology_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && synology_count=$((synology_count + 1))
+            done
+            if [ $synology_count -gt 0 ]; then
+                print_info "$type Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
+            fi
+        fi
+    fi
+}
+
+# 멀티타입 안내·체크 헬퍼 — PROJECT_TYPES 배열에 특정 타입 포함 여부
+_contains_type() {
+    local needle=$1
+    local arr=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    local x
+    for x in "${arr[@]}"; do [ "$x" = "$needle" ] && return 0; done
+    return 1
+}
+
 copy_workflows() {
     print_step "프로젝트 타입별 워크플로우 다운로드 중..."
-    print_info "프로젝트 타입: $PROJECT_TYPE"
+    local IFS=','
+    print_info "프로젝트 타입: ${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
 
     mkdir -p "$WORKFLOWS_DIR"
 
-    local copied=0
-    local skipped=0
-    local template_added=0
+    # 멀티타입 순회에서 _copy_workflows_for_type이 공유하는 카운터 (전역)
+    _wf_copied=0
+    _wf_skipped=0
+    _wf_template_added=0
+    _wf_synology_copied=0
     local project_types_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"
 
     # project-types 폴더 존재 확인
@@ -1592,151 +2010,19 @@ copy_workflows() {
 
             cp "$workflow" "$WORKFLOWS_DIR/"
             echo "  ✓ $filename"
-            copied=$((copied + 1))
+            _wf_copied=$((_wf_copied + 1))
         done
     else
         print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
     fi
 
-    # 2. 타입별 워크플로우 처리 (선택적 업데이트)
-    local type_dir="$project_types_dir/$PROJECT_TYPE"
-    if [ -d "$type_dir" ]; then
-        # 먼저 이미 존재하는 파일 목록 수집
-        local existing_files=()
-        local new_files=()
-
-        for workflow in "$type_dir"/*.{yaml,yml}; do
-            [ -e "$workflow" ] || continue
-            local filename=$(basename "$workflow")
-
-            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                existing_files+=("$filename")
-            else
-                new_files+=("$filename")
-            fi
-        done
-
-        # 신규 파일은 바로 복사
-        if [ ${#new_files[@]} -gt 0 ]; then
-            print_info "$PROJECT_TYPE 신규 워크플로우 다운로드 중..."
-            for filename in "${new_files[@]}"; do
-                cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
-                echo "  ✓ $filename (신규)"
-                copied=$((copied + 1))
-            done
-        fi
-
-        # 이미 존재하는 파일 처리
-        if [ ${#existing_files[@]} -gt 0 ]; then
-            echo ""
-            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            print_warning "⚠️  이미 존재하는 타입별 워크플로우: ${#existing_files[@]}개"
-            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            for f in "${existing_files[@]}"; do
-                echo "   • $f"
-            done
-            echo ""
-            print_info "처리 방법을 선택하세요:"
-            echo ""
-            echo "  (T) .template.yaml로 추가"
-            echo "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
-            echo "      → 예: PROJECT-FLUTTER-*.yaml.template.yaml"
-            echo ""
-            echo "  (S) 건너뛰기"
-            echo "      → 기존 파일만 유지, 아무것도 추가 안 함"
-            echo ""
-            echo "  (O) 덮어쓰기 (기존 방식)"
-            echo "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
-            echo ""
-
-            local choice
-            safe_read "선택 [T/S/O]: " choice "-n 1"
-            echo ""
-
-            case "${choice^^}" in
-                T)
-                    # .template.yaml로 추가
-                    print_info "새 버전을 .template.yaml로 추가합니다..."
-                    for filename in "${existing_files[@]}"; do
-                        local template_name="${filename%.yaml}.template.yaml"
-                        # 기존 .template.yaml이 있으면 삭제
-                        rm -f "$WORKFLOWS_DIR/$template_name"
-                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/$template_name"
-                        echo "  ✓ $template_name (참고용 추가)"
-                        template_added=$((template_added + 1))
-                    done
-                    print_info "💡 .template.yaml 파일은 GitHub Actions에서 실행되지 않습니다."
-                    print_info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
-                    ;;
-                S)
-                    # 건너뛰기
-                    print_info "기존 파일을 유지합니다..."
-                    for filename in "${existing_files[@]}"; do
-                        echo "  ⏭ $filename (건너뜀)"
-                        skipped=$((skipped + 1))
-                    done
-                    ;;
-                O)
-                    # 기존 방식 (덮어쓰기)
-                    print_info "기존 파일을 백업 후 덮어씁니다..."
-                    for filename in "${existing_files[@]}"; do
-                        mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
-                        cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
-                        echo "  ✓ $filename (백업: ${filename}.bak)"
-                        copied=$((copied + 1))
-                    done
-                    ;;
-                *)
-                    # 기본값: 건너뛰기
-                    print_warning "잘못된 선택. 기존 파일을 유지합니다."
-                    for filename in "${existing_files[@]}"; do
-                        echo "  ⏭ $filename (건너뜀)"
-                        skipped=$((skipped + 1))
-                    done
-                    ;;
-            esac
-        else
-            print_info "$PROJECT_TYPE 타입의 기존 워크플로우가 없습니다."
-        fi
-    else
-        print_info "$PROJECT_TYPE 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
-    fi
-
-    # 3. Synology 하위폴더 처리 (선택적)
-    local synology_copied=0
-    local synology_dir="$project_types_dir/$PROJECT_TYPE/synology"
-
-    if [ -d "$synology_dir" ]; then
-        if [ "$INCLUDE_SYNOLOGY" = true ]; then
-            print_info "Synology 워크플로우 다운로드 중..."
-            for workflow in "$synology_dir"/*.{yaml,yml}; do
-                [ -e "$workflow" ] || continue
-                local filename=$(basename "$workflow")
-
-                # 이미 존재하는 경우 처리
-                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                    # 기존 파일 백업 후 덮어쓰기
-                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Synology, 백업: ${filename}.bak)"
-                else
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Synology)"
-                fi
-                synology_copied=$((synology_copied + 1))
-                copied=$((copied + 1))
-            done
-        else
-            # Synology 제외됨 - 사용자에게 알림
-            local synology_count=0
-            for f in "$synology_dir"/*.{yaml,yml}; do
-                [ -e "$f" ] && synology_count=$((synology_count + 1))
-            done
-            if [ $synology_count -gt 0 ]; then
-                print_info "Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
-            fi
-        fi
-    fi
+    # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — PROJECT_TYPES 배열 순회
+    #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
+    local _types_to_copy=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    local _t
+    for _t in "${_types_to_copy[@]}"; do
+        _copy_workflows_for_type "$_t" "$project_types_dir"
+    done
 
     # 4. Common Synology 워크플로우 처리 (선택적)
     local common_synology_dir="$project_types_dir/common/synology"
@@ -1755,8 +2041,8 @@ copy_workflows() {
 
                 cp "$workflow" "$WORKFLOWS_DIR/"
                 echo "  ✓ $filename (공통 Synology)"
-                synology_copied=$((synology_copied + 1))
-                copied=$((copied + 1))
+                _wf_synology_copied=$((_wf_synology_copied + 1))
+                _wf_copied=$((_wf_copied + 1))
             done
         else
             local common_syn_count=0
@@ -1771,23 +2057,35 @@ copy_workflows() {
 
     # 결과 요약
     echo ""
-    print_success "워크플로우 처리 완료 (타입: $PROJECT_TYPE)"
-    echo "   📥 복사됨: $copied 개"
-    if [ $synology_copied -gt 0 ]; then
-        echo "   🗄️ Synology: $synology_copied 개"
+    local _types_summary
+    local IFS=','
+    _types_summary="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
+    print_success "워크플로우 처리 완료 (타입: $_types_summary)"
+    echo "   📥 복사됨: $_wf_copied 개"
+    if [ $_wf_synology_copied -gt 0 ]; then
+        echo "   🗄️ Synology: $_wf_synology_copied 개"
     fi
-    if [ $template_added -gt 0 ]; then
-        echo "   📄 참고용 추가 (.template.yaml): $template_added 개"
+    if [ $_wf_template_added -gt 0 ]; then
+        echo "   📄 참고용 추가 (.template.yaml): $_wf_template_added 개"
     fi
-    if [ $skipped -gt 0 ]; then
-        echo "   ⏭ 건너뜀: $skipped 개"
+    if [ $_wf_skipped -gt 0 ]; then
+        echo "   ⏭ 건너뜀: $_wf_skipped 개"
     fi
 
     # 복사된 워크플로우 수를 전역 변수로 저장 (최종 요약에서 사용)
-    WORKFLOWS_COPIED=$copied
+    WORKFLOWS_COPIED=$_wf_copied
 
-    # CI/CD 워크플로우 안내
-    if [ "$PROJECT_TYPE" = "spring" ]; then
+    # 멀티타입 CI 트리거 충돌 경고 — 여러 *-CI.yaml이 같은 push에 동시 발화
+    if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+        echo ""
+        print_warning "⚠️  멀티타입 주의: 여러 타입의 CI/CD 워크플로우가 같은 push에 동시 실행됩니다."
+        print_warning "   각 워크플로우의 paths: 필터를 디렉토리별로 수동 추가해 분리하길 권장합니다."
+        print_warning "   배포 워크플로우는 PROJECT_NAME/CONTAINER_NAME/DEPLOY_PORT를 타입별로 다르게 설정하세요."
+    fi
+
+    # CI/CD 워크플로우 안내 — PROJECT_TYPES 배열에 spring 포함 시
+    if _contains_type "spring"; then
         echo ""
         print_info "🔐 Spring CI/CD 워크플로우 사용 시 GitHub Secrets 설정:"
         echo "     Repository > Settings > Secrets and variables > Actions"
@@ -2308,8 +2606,12 @@ execute_integration() {
 
     # CLI 모드에서만 자동 감지 및 확인 (interactive 모드에서는 이미 감지 완료, skills 모드는 프로젝트 정보 불필요)
     if [ "$IS_INTERACTIVE_MODE" = false ] && [ "$MODE" != "skills" ]; then
-        if [ -z "$PROJECT_TYPE" ]; then
-            PROJECT_TYPE=$(detect_project_type)
+        # --type으로 PROJECT_TYPES가 안 채워졌으면 멀티 자동 감지
+        if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+            local _detected_csv
+            _detected_csv=$(detect_project_types)
+            IFS=',' read -ra PROJECT_TYPES <<< "$_detected_csv"
+            PROJECT_TYPE="${PROJECT_TYPES[0]}"
         fi
 
         if [ -z "$VERSION" ]; then
@@ -2323,7 +2625,15 @@ execute_integration() {
         # CLI 모드에서만 통합 정보 표시
         print_question_header "🪐" "통합 정보"
 
-        print_to_user "🔭 프로젝트 타입  : $PROJECT_TYPE"
+        local _cli_types
+        local IFS=','
+        _cli_types="${PROJECT_TYPES[*]}"
+        unset IFS
+        if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+            print_to_user "🔭 프로젝트 타입  : $_cli_types (멀티)"
+        else
+            print_to_user "🔭 프로젝트 타입  : $PROJECT_TYPE"
+        fi
         print_to_user "🌙 초기 버전     : v$VERSION"
         print_to_user "🌿 Default 브랜치 : $DETECTED_BRANCH"
         print_to_user "💫 통합 모드     : $MODE"
@@ -2374,7 +2684,7 @@ execute_integration() {
             copy_workflows
             copy_scripts
             copy_config_folder
-            copy_util_modules "$PROJECT_TYPE"
+            for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_issue_templates
             copy_discussion_templates
             copy_coderabbit_config
@@ -2393,7 +2703,7 @@ execute_integration() {
             copy_workflows
             copy_scripts
             copy_config_folder
-            copy_util_modules "$PROJECT_TYPE"
+            for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_setup_guide
             ;;
         issues)
@@ -3210,9 +3520,14 @@ print_summary() {
         return
     fi
 
+    local _summary_types
+    local IFS=','
+    _summary_types="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
+
     echo "" >&2
     echo "추가된 파일:" >&2
-    echo "  📄 version.yml (버전: $VERSION, 타입: $PROJECT_TYPE)" >&2
+    echo "  📄 version.yml (버전: $VERSION, 타입: $_summary_types)" >&2
     echo "  📝 README.md (버전 섹션 추가)" >&2
     echo "" >&2
     echo "추가된 워크플로우:" >&2
@@ -3233,8 +3548,17 @@ print_summary() {
                 existing_workflows+=("$filename")
             elif [[ "$filename" =~ ^${WORKFLOW_COMMON_PREFIX}- ]]; then
                 common_workflows+=("$filename")
-            elif [[ "$filename" =~ ^${WORKFLOW_PREFIX}-$(echo "$PROJECT_TYPE" | tr '[:lower:]' '[:upper:]')- ]]; then
-                type_workflows+=("$filename")
+            else
+                # PROJECT_TYPES 배열 순회 — 어떤 타입 prefix와 매칭되는지 검사
+                local _check_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+                local _ct
+                for _ct in "${_check_types[@]}"; do
+                    local _prefix="^${WORKFLOW_PREFIX}-$(echo "$_ct" | tr '[:lower:]' '[:upper:]')-"
+                    if [[ "$filename" =~ $_prefix ]]; then
+                        type_workflows+=("$filename")
+                        break
+                    fi
+                done
             fi
         done
     fi
@@ -3269,21 +3593,25 @@ print_summary() {
     echo "     └─ changelog_manager.py" >&2
     echo "" >&2
     
-    # util 모듈 정보 표시
+    # util 모듈 정보 표시 — PROJECT_TYPES 배열 순회
     if [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
         echo "  🧙 유틸리티 모듈:" >&2
-        if [ -d ".github/util/$PROJECT_TYPE" ]; then
-            for dir in ".github/util/$PROJECT_TYPE"/*/; do
-                [ -d "$dir" ] || continue
-                local module_name=$(basename "$dir")
-                echo "     ├─ $module_name" >&2
-            done
-        fi
+        local _ut_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+        local _ut
+        for _ut in "${_ut_types[@]}"; do
+            if [ -d ".github/util/$_ut" ]; then
+                for dir in ".github/util/$_ut"/*/; do
+                    [ -d "$dir" ] || continue
+                    local module_name=$(basename "$dir")
+                    echo "     ├─ $module_name ($_ut)" >&2
+                done
+            fi
+        done
         echo "" >&2
     fi
 
-    # 프로젝트 타입별 안내
-    if [ "$PROJECT_TYPE" = "spring" ]; then
+    # 프로젝트 타입별 안내 — 배열에 spring 포함 시
+    if _contains_type "spring"; then
         echo "  💡 Spring 프로젝트 추가 설정:" >&2
         echo "     • build.gradle의 버전 정보가 자동 동기화됩니다" >&2
         echo "     • CI/CD 워크플로우에서 GitHub Secrets 설정이 필요합니다" >&2
@@ -3291,8 +3619,8 @@ print_summary() {
         echo "" >&2
     fi
 
-    # Flutter util 모듈 안내
-    if [ "$PROJECT_TYPE" = "flutter" ] && [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
+    # Flutter util 모듈 안내 — 배열에 flutter 포함 시
+    if _contains_type "flutter" && [ -n "$UTIL_MODULES_COPIED" ] && [ "$UTIL_MODULES_COPIED" -gt 0 ]; then
         echo "  💡 Flutter 배포 마법사 사용법:" >&2
         echo "     • iOS TestFlight: .github/util/flutter/ios-testflight-setup-wizard/index.html" >&2
         echo "     • Android Play Store: .github/util/flutter/android-playstore-setup-wizard/index.html" >&2

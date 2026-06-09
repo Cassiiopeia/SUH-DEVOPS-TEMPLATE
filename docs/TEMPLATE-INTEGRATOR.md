@@ -10,6 +10,7 @@
 - [설치 방법](#설치-방법)
 - [통합 모드](#통합-모드)
 - [CLI 옵션](#cli-옵션)
+- [멀티 프로젝트 타입](#멀티-프로젝트-타입)
 - [사용 예시](#사용-예시)
 
 ---
@@ -89,6 +90,47 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 | `node` | Node.js / Express |
 | `python` | FastAPI / Django / Flask |
 | `basic` | 범용 (버전 관리만) |
+
+> `--type`에 csv로 여러 타입을 동시에 지정할 수 있습니다. 자세한 내용은 [멀티 프로젝트 타입](#멀티-프로젝트-타입)을 참고하세요.
+
+---
+
+## 멀티 프로젝트 타입
+
+하나의 레포에 여러 타입이 공존하는 경우(예: Spring 백엔드 + React 프론트 + Python AI 모듈) `--type`에 csv로 지정합니다.
+
+```bash
+# macOS/Linux
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+  --mode full --type spring,react,python --version 1.0.0 --force
+
+# Windows
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -Type 'spring,react,python' -Version '1.0.0' -Force
+```
+
+### 동작 방식
+
+- **자동 감지 시 다중 선택**: `--type`을 생략하면 일치하는 모든 타입을 감지해 다중 선택 메뉴로 표시합니다. `Space`로 토글, `Enter`로 csv 확정합니다.
+- **version.yml 저장 형식**: 선택한 타입은 `version.yml`의 `project_types` 배열에 저장됩니다.
+  ```yaml
+  project_types: ["spring", "react", "python"]
+  project_type: "spring"   # project_types[0] 자동 미러 (직접 수정 금지)
+  ```
+- **하위 호환**: 단일 타입도 `project_types: ["react"]` 형태로 통일되며, 단수 `project_type` 키만 있는 기존 version.yml도 100% 그대로 동작합니다.
+
+### CI 트리거 주의
+
+멀티타입 레포에서는 여러 타입의 `*-CI.yaml`이 같은 main push에 **동시에 발화**합니다. 디렉토리별로 분리하려면 각 워크플로우의 `paths:` 필터를 수동으로 추가하세요.
+
+```yaml
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'    # Spring CI 만 이 경로 변경 시 발화
+```
+
+배포 워크플로우(SYNOLOGY-CICD 등)도 타입별로 `PROJECT_NAME` / `CONTAINER_NAME` / `DEPLOY_PORT`를 서로 다른 값으로 설정해야 합니다. 자세한 내용은 [SYNOLOGY-DEPLOYMENT-GUIDE.md](SYNOLOGY-DEPLOYMENT-GUIDE.md)를 참고하세요.
 
 ---
 

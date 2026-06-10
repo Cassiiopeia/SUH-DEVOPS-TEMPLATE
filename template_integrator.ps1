@@ -326,88 +326,91 @@ function Invoke-LegacyNumericMenu {
         }
     }
 
-    # ── 다중 선택 ── 번호 토글식
-    $selected = New-Object 'bool[]' $n
+    # ── 다중 선택 ── 입력한 번호 = 최종 선택 (덮어쓰기 방식, 토글 아님)
+    #  "1,2,8"을 입력하면 정확히 1,2,8만 선택된다. 기존 선택은 입력으로 대체된다.
+    $preValues = @()
     if ($Preselect) {
-        $pre = $Preselect.Split(',') | ForEach-Object { $_.Trim() }
-        for ($i = 0; $i -lt $n; $i++) {
-            if ($pre -contains $Options[$i].Value) { $selected[$i] = $true }
+        foreach ($p in $Preselect.Split(',')) {
+            $p = $p.Trim()
+            if ($p) { $preValues += $p }
         }
     }
 
+    # 목록 출력 (preselect는 현재값으로 [✓] 표시해 무엇이 기본인지 보여줌)
     Write-Host ""
     Write-Host $Prompt
-
-    # 현재 선택 상태를 한 줄씩(번호 + 체크 + 라벨) 새로 출력하는 렌더러.
-    # 제자리 갱신(SetCursorPosition)을 쓰지 않으므로 iex 실행 환경에서도 안 깨진다.
-    $render = {
-        Write-Host ""
-        for ($i = 0; $i -lt $n; $i++) {
-            $opt = $Options[$i]
-            $mark = if ($selected[$i]) { "[✓]" } else { "[ ]" }
-            $line = "  {0} {1}) {2,-16} {3}" -f $mark, ($i + 1), $opt.Value, $opt.Label
-            if ($selected[$i] -and $useColor) {
-                Write-Host $line -ForegroundColor Green
-            } else {
-                Write-Host $line
-            }
+    Write-Host ""
+    for ($i = 0; $i -lt $n; $i++) {
+        $opt = $Options[$i]
+        $mark = if ($preValues -contains $opt.Value) { "[✓]" } else { "[ ]" }
+        $line = "  {0} {1,2}) {2,-18} {3}" -f $mark, ($i + 1), $opt.Value, $opt.Label
+        if (($preValues -contains $opt.Value) -and $useColor) {
+            Write-Host $line -ForegroundColor Green
+        } else {
+            Write-Host $line
         }
-        Write-Host ""
-        Write-Host "  번호 입력=토글 · 여러 개는 1,3,5 · a=전체토글 · Enter=확정" -ForegroundColor DarkGray
+    }
+    Write-Host ""
+    if ($preValues.Count -gt 0) {
+        Write-Host ("  번호를 입력하세요 (여러 개는 1,3,5 · a=전체 · 그냥 Enter=현재값 [{0}] 유지)" -f ($preValues -join ',')) -ForegroundColor DarkGray
+    } else {
+        Write-Host "  번호를 입력하세요 (여러 개는 1,3,5 · a=전체)" -ForegroundColor DarkGray
     }
 
-    & $render
     while ($true) {
         try {
             $input = Read-Host "선택"
         } catch {
-            # stdin redirect → preselect 있으면 그걸로, 없으면 취소
-            if ($Preselect) { return $Preselect }
-            return $null
+            # stdin redirect → preselect 있으면 그걸로, 없으면 첫 옵션
+            if ($preValues.Count -gt 0) { return ($preValues -join ',') }
+            return $Options[0].Value
         }
         $input = "$input".Trim()
 
-        # Enter(빈 입력) = 확정
+        # 빈 입력(Enter) — preselect 있으면 그걸 그대로 확정
         if (-not $input) {
-            $picked = @()
-            for ($i = 0; $i -lt $n; $i++) { if ($selected[$i]) { $picked += $Options[$i].Value } }
-            if ($picked.Count -eq 0) {
-                Write-Host "  최소 1개는 선택해야 합니다." -ForegroundColor Red
-                continue
-            }
-            return ($picked -join ',')
-        }
-
-        # a = 전체 토글
-        if ($input -eq 'a' -or $input -eq 'A') {
-            $allOn = $true
-            for ($i = 0; $i -lt $n; $i++) { if (-not $selected[$i]) { $allOn = $false; break } }
-            for ($i = 0; $i -lt $n; $i++) { $selected[$i] = -not $allOn }
-            & $render
+            if ($preValues.Count -gt 0) { return ($preValues -join ',') }
+            Write-Host "  최소 1개는 선택해야 합니다. 번호를 입력하세요." -ForegroundColor Red
             continue
         }
 
-        # 콤마/공백으로 여러 번호·이름 토글
+        # a = 전체 선택
+        if ($input -eq 'a' -or $input -eq 'A') {
+            $all = @()
+            for ($i = 0; $i -lt $n; $i++) { $all += $Options[$i].Value }
+            return ($all -join ',')
+        }
+
+        # 입력한 번호/이름 = 최종 선택. 순서는 옵션 순서대로 정렬, 중복 제거.
+        $chosenIdx = New-Object 'bool[]' $n
         $bad = @()
         foreach ($p in ($input -split '[,\s]+')) {
             $p = $p.Trim()
             if (-not $p) { continue }
             $hit = $false
             if ($p -match '^\d+$' -and [int]$p -ge 1 -and [int]$p -le $n) {
-                $idx = [int]$p - 1
-                $selected[$idx] = -not $selected[$idx]
+                $chosenIdx[[int]$p - 1] = $true
                 $hit = $true
             } else {
                 for ($i = 0; $i -lt $n; $i++) {
-                    if ($Options[$i].Value -eq $p) { $selected[$i] = -not $selected[$i]; $hit = $true; break }
+                    if ($Options[$i].Value -eq $p) { $chosenIdx[$i] = $true; $hit = $true; break }
                 }
             }
             if (-not $hit) { $bad += $p }
         }
-        & $render
+
         if ($bad.Count -gt 0) {
-            Write-Host ("  무시된 입력: {0}" -f ($bad -join ', ')) -ForegroundColor Red
+            Write-Host ("  잘못된 입력: {0} — 1~{1} 중에서 다시 입력하세요." -f ($bad -join ', '), $n) -ForegroundColor Red
+            continue
         }
+
+        $picked = @()
+        for ($i = 0; $i -lt $n; $i++) { if ($chosenIdx[$i]) { $picked += $Options[$i].Value } }
+        if ($picked.Count -eq 0) {
+            Write-Host "  최소 1개는 선택해야 합니다." -ForegroundColor Red
+            continue
+        }
+        return ($picked -join ',')
     }
 }
 

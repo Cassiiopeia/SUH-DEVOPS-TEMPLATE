@@ -1,14 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-10T00:35:27Z",
-    "currentVersion": "3.0.103",
+    "lastUpdated": "2026-06-10T08:36:21Z",
+    "currentVersion": "3.0.107",
     "projectType": "basic",
-    "totalReleases": 132,
+    "totalReleases": 133,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.107",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-10",
+      "pr_number": 357,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * Windows 설치 마법사에서 메뉴가 줄줄이 쌓이며 깨지던 문제 해결\n  * 항목 선택 중 입력 오류로 설치가 멈추던 문제 해결\n  * 여러 항목을 고를 때 입력한 번호만 정확히 선택되도록 수정\n\n* **개선**\n  * Windows 설치 마법사 메뉴 선택 방식이 더 안정적으로 동작합니다",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows 설치 마법사에서 메뉴가 줄줄이 쌓이며 깨지던 문제 해결",
+            "항목 선택 중 입력 오류로 설치가 멈추던 문제 해결",
+            "여러 항목을 고를 때 입력한 번호만 정확히 선택되도록 수정"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "Windows 설치 마법사 메뉴 선택 방식이 더 안정적으로 동작합니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.103",
       "project_type": "basic",

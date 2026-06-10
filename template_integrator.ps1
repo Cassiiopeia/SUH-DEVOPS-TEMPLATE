@@ -293,12 +293,35 @@ function Invoke-InteractiveMenu {
     }
     Write-Host ""
 
-    $startTop = [Console]::CursorTop
     $width = [Console]::WindowWidth
     if ($width -lt 20) { $width = 80 }
 
+    # 커서가 콘솔(버퍼) 하단 근처에 있으면, 메뉴 n줄을 그릴 때 스크롤이 발생해
+    # 고정 좌표 SetCursorPosition($startTop)이 버퍼 경계를 벗어나 ArgumentOutOfRange로
+    # 터진다. 이를 막기 위해 메뉴 줄 수만큼 미리 빈 줄을 출력해 스크롤을 먼저 유도한 뒤,
+    # 스크롤이 안정된 실제 시작 위치를 startTop으로 잡는다.
+    for ($i = 0; $i -lt $n; $i++) { Write-Host "" }
+    $bufferH = [Console]::BufferHeight
+    $startTop = [Console]::CursorTop - $n
+    if ($startTop -lt 0) { $startTop = 0 }
+    if ($startTop -ge $bufferH) { $startTop = $bufferH - 1 }
+
+    # 버퍼 경계를 벗어나지 않게 클램프한 안전 SetCursorPosition. 그래도 실패하면 무시.
+    $safeSetCursor = {
+        param([int]$x, [int]$y)
+        try {
+            $h = [Console]::BufferHeight
+            $w = [Console]::BufferWidth
+            if ($y -lt 0) { $y = 0 }
+            if ($y -ge $h) { $y = $h - 1 }
+            if ($x -lt 0) { $x = 0 }
+            if ($x -ge $w) { $x = $w - 1 }
+            [Console]::SetCursorPosition($x, $y)
+        } catch { }
+    }
+
     $renderMenu = {
-        [Console]::SetCursorPosition(0, $startTop)
+        & $safeSetCursor 0 $startTop
         for ($i = 0; $i -lt $n; $i++) {
             $opt = $Options[$i]
             $num = $i + 1
@@ -366,7 +389,7 @@ function Invoke-InteractiveMenu {
                     }
                 }
                 'Enter' {
-                    [Console]::SetCursorPosition(0, $startTop + $n)
+                    & $safeSetCursor 0 ($startTop + $n)
                     if ($Multi) {
                         # 선택된 값들을 csv로 반환, 0개면 $null
                         $picked = @()
@@ -377,11 +400,11 @@ function Invoke-InteractiveMenu {
                     return $Options[$cursor].Value
                 }
                 'Escape' {
-                    [Console]::SetCursorPosition(0, $startTop + $n)
+                    & $safeSetCursor 0 ($startTop + $n)
                     return $null
                 }
                 'Q' {
-                    [Console]::SetCursorPosition(0, $startTop + $n)
+                    & $safeSetCursor 0 ($startTop + $n)
                     return $null
                 }
                 default {

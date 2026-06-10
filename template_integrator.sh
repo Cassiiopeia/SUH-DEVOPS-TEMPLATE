@@ -1751,15 +1751,33 @@ get_current_template_version() {
 }
 
 # Synology 워크플로우 포함 여부 질문
+# 인자로 여러 type_dir를 받을 수 있다 (멀티타입). 각 타입의 synology 폴더 +
+# 공통 synology 폴더를 모두 합산해 한 번만 질문한다.
 ask_synology_option() {
-    local type_dir="$1"
-    local synology_dir="$type_dir/synology"
-    local common_synology_dir="$(dirname "$type_dir")/common/synology"
+    local type_dirs=("$@")
+    [ ${#type_dirs[@]} -eq 0 ] && return
 
-    # 타입별/공통 synology 폴더 모두 없으면 건너뛰기
-    if [ ! -d "$synology_dir" ] && [ ! -d "$common_synology_dir" ]; then
-        return
-    fi
+    # 검사 대상 synology 폴더 목록 구성 (타입별 + 공통, 중복 제거)
+    local synology_dirs=()
+    local _seen=""
+    local _td
+    for _td in "${type_dirs[@]}"; do
+        local _sd="$_td/synology"
+        if [[ ",$_seen," != *",$_sd,"* ]]; then
+            synology_dirs+=("$_sd"); _seen="$_seen,$_sd"
+        fi
+        local _csd="$(dirname "$_td")/common/synology"
+        if [[ ",$_seen," != *",$_csd,"* ]]; then
+            synology_dirs+=("$_csd"); _seen="$_seen,$_csd"
+        fi
+    done
+
+    # synology 폴더가 하나도 존재하지 않으면 건너뛰기
+    local _any_dir=false
+    for _sd in "${synology_dirs[@]}"; do
+        [ -d "$_sd" ] && _any_dir=true && break
+    done
+    [ "$_any_dir" = false ] && return
 
     # 이미 CLI로 지정된 경우 건너뛰기
     if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
@@ -1780,18 +1798,14 @@ ask_synology_option() {
         return
     fi
 
-    # synology 폴더 내 파일 개수 확인 (타입별 + 공통)
+    # synology 폴더 내 파일 개수 확인 (전체 대상 폴더 합산)
     local synology_files=0
-    if [ -d "$synology_dir" ]; then
-        for f in "$synology_dir"/*.{yaml,yml}; do
+    for _sd in "${synology_dirs[@]}"; do
+        [ -d "$_sd" ] || continue
+        for f in "$_sd"/*.{yaml,yml}; do
             [ -e "$f" ] && synology_files=$((synology_files + 1))
         done
-    fi
-    if [ -d "$common_synology_dir" ]; then
-        for f in "$common_synology_dir"/*.{yaml,yml}; do
-            [ -e "$f" ] && synology_files=$((synology_files + 1))
-        done
-    fi
+    done
 
     if [ $synology_files -eq 0 ]; then
         return
@@ -1803,20 +1817,16 @@ ask_synology_option() {
     print_to_user "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
     print_to_user ""
     print_to_user "   포함되는 워크플로우:"
-    if [ -d "$synology_dir" ]; then
-        for f in "$synology_dir"/*.{yaml,yml}; do
+    for _sd in "${synology_dirs[@]}"; do
+        [ -d "$_sd" ] || continue
+        local _is_common=""
+        [[ "$_sd" == *"/common/synology" ]] && _is_common=" (공통)"
+        for f in "$_sd"/*.{yaml,yml}; do
             [ -e "$f" ] || continue
             local fname=$(basename "$f")
-            print_to_user "     • $fname"
+            print_to_user "     • $fname$_is_common"
         done
-    fi
-    if [ -d "$common_synology_dir" ]; then
-        for f in "$common_synology_dir"/*.{yaml,yml}; do
-            [ -e "$f" ] || continue
-            local fname=$(basename "$f")
-            print_to_user "     • $fname (공통)"
-        done
-    fi
+    done
     print_to_user ""
     print_to_user "  Y/y - 예, 포함"
     print_to_user "  N/n - 아니오, 제외 (기본)"
@@ -2589,9 +2599,14 @@ interactive_mode() {
     MODE="$_mode_selected"
 
     # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
+    # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
     if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-        local type_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$PROJECT_TYPE"
-        ask_synology_option "$type_dir"
+        local _syn_dirs=()
+        local _st
+        for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+            _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+        done
+        ask_synology_option "${_syn_dirs[@]}"
     fi
 }
 
@@ -2670,9 +2685,14 @@ execute_integration() {
         download_template
 
         # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
+        # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
         if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-            local type_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$PROJECT_TYPE"
-            ask_synology_option "$type_dir"
+            local _syn_dirs=()
+            local _st
+            for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+                _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+            done
+            ask_synology_option "${_syn_dirs[@]}"
         fi
     fi
 

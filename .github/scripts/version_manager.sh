@@ -175,6 +175,9 @@ read_version_config() {
         "react-native-expo")
             VERSION_FILE="app.json"
             ;;
+        "python")
+            VERSION_FILE="pyproject.toml"
+            ;;
         "basic"|*)
             VERSION_FILE="version.yml"
             ;;
@@ -356,6 +359,10 @@ get_project_file_version() {
             # JSON: jq 사용
             project_version=$(jq -r '.expo.version // ""' "$VERSION_FILE")
             ;;
+        "python")
+            # TOML: sed 유지 (파서 없음)
+            project_version=$(sed -nE "s/^version[[:space:]]*=[[:space:]]*\"([0-9]+\.[0-9]+\.[0-9]+)\".*/\1/p" "$VERSION_FILE" | head -1)
+            ;;
         *)
             project_version="$CURRENT_VERSION"
             ;;
@@ -395,9 +402,9 @@ sync_versions() {
                 CURRENT_VERSION="$higher_version"
             fi
 
-            # 프로젝트 파일 업데이트
+            # 프로젝트 파일 업데이트 (멀티타입이면 모든 타입 파일 순회)
             if [ "$higher_version" != "$project_version" ]; then
-                update_project_file_version "$higher_version"
+                sync_all_project_files "$higher_version"
             fi
 
             echo "$higher_version"
@@ -406,6 +413,12 @@ sync_versions() {
             echo "$yml_version"
         fi
     else
+        # primary 기준 버전은 일치하지만, 멀티타입에서는 비-primary 타입 파일이
+        # 어긋나 있을 수 있으므로 항상 전 타입을 yml 버전으로 정합화한다.
+        if [ -n "${PROJECT_TYPES_CSV:-}" ]; then
+            log_info "멀티타입 — 전 타입 파일을 version.yml 버전으로 정합화: $yml_version"
+            sync_all_project_files "$yml_version"
+        fi
         log_success "버전이 이미 동기화되어 있음: $yml_version"
         echo "$yml_version"
     fi
@@ -465,6 +478,11 @@ update_project_file_version() {
         "react-native-expo")
             # JSON: jq 사용
             jq ".expo.version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
+            ;;
+        "python")
+            # TOML: sed 유지 (파서 없음)
+            sed -i.bak "s/^version = \"[^\"]*\"/version = \"$new_version\"/" "$VERSION_FILE"
+            rm -f "${VERSION_FILE}.bak"
             ;;
     esac
 

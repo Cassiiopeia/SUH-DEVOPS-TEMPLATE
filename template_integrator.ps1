@@ -1502,7 +1502,11 @@ function Get-CurrentTemplateVersion {
 }
 
 function Ask-SynologyOption {
-    param([string]$TypeDir)
+    # 여러 TypeDir를 받을 수 있다 (멀티타입). 각 타입의 synology 폴더 +
+    # 공통 synology 폴더를 모두 합산해 한 번만 질문한다.
+    param([string[]]$TypeDirs)
+
+    if (-not $TypeDirs -or $TypeDirs.Count -eq 0) { return }
 
     # 비대화형 환경 감지 (파이프라인, 리디렉션, 비대화형 세션 등)
     $isNonInteractive = $false
@@ -1524,13 +1528,19 @@ function Ask-SynologyOption {
         return
     }
 
-    $synologyDir = Join-Path $TypeDir "synology"
-    $commonSynologyDir = Join-Path (Split-Path $TypeDir -Parent) "common\synology"
-
-    # 타입별/공통 synology 폴더 모두 없으면 건너뛰기
-    if (-not (Test-Path $synologyDir) -and -not (Test-Path $commonSynologyDir)) {
-        return
+    # 검사 대상 synology 폴더 목록 구성 (타입별 + 공통, 중복 제거)
+    $synologyDirs = New-Object System.Collections.Generic.List[string]
+    foreach ($td in $TypeDirs) {
+        $sd = Join-Path $td "synology"
+        if (-not $synologyDirs.Contains($sd)) { $synologyDirs.Add($sd) }
+        $csd = Join-Path (Split-Path $td -Parent) "common\synology"
+        if (-not $synologyDirs.Contains($csd)) { $synologyDirs.Add($csd) }
     }
+
+    # synology 폴더가 하나도 존재하지 않으면 건너뛰기
+    $anyDir = $false
+    foreach ($d in $synologyDirs) { if (Test-Path $d) { $anyDir = $true; break } }
+    if (-not $anyDir) { return }
 
     # CLI 파라미터로 이미 지정된 경우
     if ($Synology) {
@@ -1555,23 +1565,20 @@ function Ask-SynologyOption {
         return
     }
 
-    # synology 폴더 내 파일 개수 확인 (타입별 + 공통)
-    $synologyFiles = @()
-    $commonSynologyFiles = @()
-    if (Test-Path $synologyDir) {
-        $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-        $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-        if ($yamlFiles) { $synologyFiles += $yamlFiles }
-        if ($ymlFiles) { $synologyFiles += $ymlFiles }
-    }
-    if (Test-Path $commonSynologyDir) {
-        $yamlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-        $ymlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-        if ($yamlFiles) { $commonSynologyFiles += $yamlFiles }
-        if ($ymlFiles) { $commonSynologyFiles += $ymlFiles }
+    # synology 폴더 내 파일 목록 수집 (전체 대상 폴더 합산, 타입별/공통 구분)
+    $typeFiles = @()
+    $commonFiles = @()
+    foreach ($d in $synologyDirs) {
+        if (-not (Test-Path $d)) { continue }
+        $yamlFiles = Get-ChildItem -Path $d -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $d -Filter "*.yml" -ErrorAction SilentlyContinue
+        $found = @()
+        if ($yamlFiles) { $found += $yamlFiles }
+        if ($ymlFiles) { $found += $ymlFiles }
+        if ($d -like "*\common\synology") { $commonFiles += $found } else { $typeFiles += $found }
     }
 
-    $totalSynologyCount = $synologyFiles.Count + $commonSynologyFiles.Count
+    $totalSynologyCount = $typeFiles.Count + $commonFiles.Count
     if ($totalSynologyCount -eq 0) {
         return
     }
@@ -1582,10 +1589,10 @@ function Ask-SynologyOption {
     Write-Host "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
     Write-Host ""
     Write-Host "   포함되는 워크플로우:"
-    foreach ($f in $synologyFiles) {
+    foreach ($f in $typeFiles) {
         Write-Host "     • $($f.Name)"
     }
-    foreach ($f in $commonSynologyFiles) {
+    foreach ($f in $commonFiles) {
         Write-Host "     • $($f.Name) (공통)"
     }
     Write-Host ""
@@ -2425,9 +2432,11 @@ function Start-InteractiveMode {
     $script:Mode = $_modeSelected
 
     # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
+    # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
     if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
-        $typeDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$($script:ProjectType)"
-        Ask-SynologyOption $typeDir
+        $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+        $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+        Ask-SynologyOption $typeDirs
     }
 }
 
@@ -2494,9 +2503,11 @@ function Start-Integration {
         Download-Template
 
         # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
+        # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
         if ($Mode -eq "full" -or $Mode -eq "workflows") {
-            $typeDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$($script:ProjectType)"
-            Ask-SynologyOption $typeDir
+            $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+            $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+            Ask-SynologyOption $typeDirs
         }
     }
 

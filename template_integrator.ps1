@@ -248,9 +248,38 @@ function Read-SingleKey {
     param([string]$Prompt)
 
     Write-Host $Prompt -NoNewline
-    $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    Write-Host ""
-    return $key.Character.ToString().ToUpper()
+
+    # stdin이 redirect된 비대화형 환경(원격 iex 실행 등)에서는 RawUI.ReadKey가
+    # 예외를 던져 ErrorActionPreference=Stop으로 스크립트 전체가 죽는다.
+    # IsInputRedirected면 즉시 줄 입력(Read-Host)으로 폴백하고, 그래도 실패하면
+    # 빈 문자열을 반환해 호출측(Ask-YesNo/Ask-YesNoEdit)이 기본값을 쓰게 한다.
+    if ([Console]::IsInputRedirected) {
+        try {
+            $line = Read-Host
+            if ([string]::IsNullOrWhiteSpace($line)) { return "" }
+            return $line.Trim().Substring(0, 1).ToUpper()
+        } catch {
+            Write-Host ""
+            return ""
+        }
+    }
+
+    try {
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        Write-Host ""
+        if ($null -eq $key.Character) { return "" }
+        return $key.Character.ToString().ToUpper()
+    } catch {
+        # RawUI.ReadKey 미지원 호스트 → 줄 입력 폴백
+        try {
+            $line = Read-Host
+            if ([string]::IsNullOrWhiteSpace($line)) { return "" }
+            return $line.Trim().Substring(0, 1).ToUpper()
+        } catch {
+            Write-Host ""
+            return ""
+        }
+    }
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -269,6 +298,24 @@ function Invoke-InteractiveMenu {
     if ($n -eq 0) {
         [Console]::Error.WriteLine("Invoke-InteractiveMenu: 옵션이 없습니다")
         return $null
+    }
+
+    # 런타임 probe — 이 콘솔에서 커서 좌표 제어가 실제로 동작하는지 검사한다.
+    # 원격 `iex (DownloadString)` 실행처럼 입력은 TTY지만 출력 좌표 제어가
+    # 먹히지 않는 환경에서는 SetCursorPosition이 (a)예외를 던지거나 (b)예외 없이
+    # 무시되어, 메뉴가 제자리 갱신되지 못하고 줄줄이 쌓인다. (a)는 try/catch로,
+    # (b)는 "이동 후 CursorTop이 실제로 바뀌었는지" 검증으로 잡는다. probe가
+    # 실패하면 호출측이 숫자 입력 메뉴로 폴백하도록 "__NO_TTY__" 신호를 반환한다.
+    try {
+        Write-Host ""                              # probe용 빈 줄 1개 확보
+        $probeBase = [Console]::CursorTop
+        if ($probeBase -lt 1) { return "__NO_TTY__" }
+        [Console]::SetCursorPosition(0, $probeBase - 1)   # 한 줄 위로 이동 시도
+        $moved = ([Console]::CursorTop -eq $probeBase - 1)
+        [Console]::SetCursorPosition(0, $probeBase)       # 원위치 복귀
+        if (-not $moved) { return "__NO_TTY__" }          # 좌표 제어가 무시되는 환경
+    } catch {
+        return "__NO_TTY__"
     }
 
     $useColor = -not $env:NO_COLOR
@@ -296,10 +343,10 @@ function Invoke-InteractiveMenu {
     $width = [Console]::WindowWidth
     if ($width -lt 20) { $width = 80 }
 
-    # 커서가 콘솔(버퍼) 하단 근처에 있으면, 메뉴 n줄을 그릴 때 스크롤이 발생해
-    # 고정 좌표 SetCursorPosition($startTop)이 버퍼 경계를 벗어나 ArgumentOutOfRange로
-    # 터진다. 이를 막기 위해 메뉴 줄 수만큼 미리 빈 줄을 출력해 스크롤을 먼저 유도한 뒤,
-    # 스크롤이 안정된 실제 시작 위치를 startTop으로 잡는다.
+    # 메뉴 n줄을 그릴 공간을 먼저 확보한다. 커서가 버퍼 하단 근처면 Write-Host로
+    # 스크롤이 일어나므로, n줄을 출력해 스크롤을 먼저 유도한 뒤 그 직후 위치에서
+    # n줄 위를 startTop으로 잡으면 SetCursorPosition이 버퍼 경계를 넘지 않는다.
+    # (probe를 통과한 환경이므로 좌표 제어 자체는 정상 동작한다.)
     for ($i = 0; $i -lt $n; $i++) { Write-Host "" }
     $bufferH = [Console]::BufferHeight
     $startTop = [Console]::CursorTop - $n
@@ -503,16 +550,24 @@ function Invoke-ChooseMenu {
 
     $isTty = (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
     if ($isTty) {
+        # 커서 메뉴를 시도한다. Invoke-InteractiveMenu는 내부 probe로 좌표 제어가
+        # 실제 동작하는지 검사해, 안 되는 환경(원격 iex 실행 등)이면 "__NO_TTY__"를
+        # 반환한다. 그 경우 아래 숫자 입력 메뉴로 폴백한다.
         if ($Multi) {
-            return Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex -Multi -Preselect $Preselect
+            $res = Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex -Multi -Preselect $Preselect
+        } else {
+            $res = Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex
         }
-        return Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex
-    } else {
-        if ($Multi) {
-            return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options -Multi -Preselect $Preselect
+        if ($res -ne "__NO_TTY__") {
+            return $res
         }
-        return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options
+        # probe 실패 → 숫자 메뉴로 폴백 (아래로 진행)
     }
+
+    if ($Multi) {
+        return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options -Multi -Preselect $Preselect
+    }
+    return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options
 }
 
 function Ask-YesNo {

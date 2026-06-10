@@ -283,195 +283,7 @@ function Read-SingleKey {
 }
 
 # ─────────────────────────────────────────────────────────────
-# 인터랙티브 메뉴 (TTY 전용) — 화살표/숫자/Enter/ESC
-# ─────────────────────────────────────────────────────────────
-function Invoke-InteractiveMenu {
-    param(
-        [Parameter(Mandatory=$true)][string]$Prompt,
-        [Parameter(Mandatory=$true)][hashtable[]]$Options,
-        [int]$DefaultIndex = 0,
-        [switch]$Multi,
-        [string]$Preselect = ""
-    )
-
-    $n = $Options.Count
-    if ($n -eq 0) {
-        [Console]::Error.WriteLine("Invoke-InteractiveMenu: 옵션이 없습니다")
-        return $null
-    }
-
-    # 런타임 probe — 이 콘솔에서 커서 좌표 제어가 실제로 동작하는지 검사한다.
-    # 원격 `iex (DownloadString)` 실행처럼 입력은 TTY지만 출력 좌표 제어가
-    # 먹히지 않는 환경에서는 SetCursorPosition이 (a)예외를 던지거나 (b)예외 없이
-    # 무시되어, 메뉴가 제자리 갱신되지 못하고 줄줄이 쌓인다. (a)는 try/catch로,
-    # (b)는 "이동 후 CursorTop이 실제로 바뀌었는지" 검증으로 잡는다. probe가
-    # 실패하면 호출측이 숫자 입력 메뉴로 폴백하도록 "__NO_TTY__" 신호를 반환한다.
-    try {
-        Write-Host ""                              # probe용 빈 줄 1개 확보
-        $probeBase = [Console]::CursorTop
-        if ($probeBase -lt 1) { return "__NO_TTY__" }
-        [Console]::SetCursorPosition(0, $probeBase - 1)   # 한 줄 위로 이동 시도
-        $moved = ([Console]::CursorTop -eq $probeBase - 1)
-        [Console]::SetCursorPosition(0, $probeBase)       # 원위치 복귀
-        if (-not $moved) { return "__NO_TTY__" }          # 좌표 제어가 무시되는 환경
-    } catch {
-        return "__NO_TTY__"
-    }
-
-    $useColor = -not $env:NO_COLOR
-
-    $cursor = $DefaultIndex
-    if ($cursor -lt 0 -or $cursor -ge $n) { $cursor = 0 }
-
-    # multi 선택 상태 — preselect csv를 초기 선택값으로 반영
-    $selected = New-Object 'bool[]' $n
-    if ($Multi -and $Preselect) {
-        $pre = $Preselect.Split(',') | ForEach-Object { $_.Trim() }
-        for ($i = 0; $i -lt $n; $i++) {
-            if ($pre -contains $Options[$i].Value) { $selected[$i] = $true }
-        }
-    }
-
-    Write-Host ""
-    if ($Multi) {
-        Write-Host ("{0} (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC 취소):" -f $Prompt)
-    } else {
-        Write-Host ("{0} (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):" -f $Prompt)
-    }
-    Write-Host ""
-
-    $width = [Console]::WindowWidth
-    if ($width -lt 20) { $width = 80 }
-
-    # 메뉴 n줄을 그릴 공간을 먼저 확보한다. 커서가 버퍼 하단 근처면 Write-Host로
-    # 스크롤이 일어나므로, n줄을 출력해 스크롤을 먼저 유도한 뒤 그 직후 위치에서
-    # n줄 위를 startTop으로 잡으면 SetCursorPosition이 버퍼 경계를 넘지 않는다.
-    # (probe를 통과한 환경이므로 좌표 제어 자체는 정상 동작한다.)
-    for ($i = 0; $i -lt $n; $i++) { Write-Host "" }
-    $bufferH = [Console]::BufferHeight
-    $startTop = [Console]::CursorTop - $n
-    if ($startTop -lt 0) { $startTop = 0 }
-    if ($startTop -ge $bufferH) { $startTop = $bufferH - 1 }
-
-    # 버퍼 경계를 벗어나지 않게 클램프한 안전 SetCursorPosition. 그래도 실패하면 무시.
-    $safeSetCursor = {
-        param([int]$x, [int]$y)
-        try {
-            $h = [Console]::BufferHeight
-            $w = [Console]::BufferWidth
-            if ($y -lt 0) { $y = 0 }
-            if ($y -ge $h) { $y = $h - 1 }
-            if ($x -lt 0) { $x = 0 }
-            if ($x -ge $w) { $x = $w - 1 }
-            [Console]::SetCursorPosition($x, $y)
-        } catch { }
-    }
-
-    $renderMenu = {
-        & $safeSetCursor 0 $startTop
-        for ($i = 0; $i -lt $n; $i++) {
-            $opt = $Options[$i]
-            $num = $i + 1
-            # multi: [✓]/[ ] 선택표시, single: [•]/[ ] 커서표시
-            if ($Multi) {
-                if ($selected[$i]) { $indicator = "[✓]" } else { $indicator = "[ ]" }
-            } else {
-                if ($i -eq $cursor) { $indicator = "[•]" } else { $indicator = "[ ]" }
-            }
-            if ($i -eq $cursor) {
-                $line = "> {0} {1}) {2}    {3}" -f $indicator, $num, $opt.Value, $opt.Label
-            } else {
-                $line = "  {0} {1}) {2}    {3}" -f $indicator, $num, $opt.Value, $opt.Label
-            }
-            # 줄 끝까지 빈공간으로 채워 이전 잔재 제거
-            if ($line.Length -lt ($width - 1)) {
-                $line = $line.PadRight($width - 1)
-            } else {
-                $line = $line.Substring(0, $width - 1)
-            }
-
-            if ($i -eq $cursor -and $useColor) {
-                Write-Host $line -ForegroundColor Cyan
-            } elseif ($Multi -and $selected[$i] -and $useColor) {
-                Write-Host $line -ForegroundColor Green
-            } else {
-                Write-Host $line
-            }
-        }
-    }
-
-    [Console]::CursorVisible = $false
-
-    try {
-        & $renderMenu
-        while ($true) {
-            $key = [Console]::ReadKey($true)
-            switch ($key.Key) {
-                'UpArrow' {
-                    $cursor--
-                    if ($cursor -lt 0) { $cursor = $n - 1 }
-                }
-                'DownArrow' {
-                    $cursor++
-                    if ($cursor -ge $n) { $cursor = 0 }
-                }
-                'K' {
-                    $cursor--
-                    if ($cursor -lt 0) { $cursor = $n - 1 }
-                }
-                'J' {
-                    $cursor++
-                    if ($cursor -ge $n) { $cursor = 0 }
-                }
-                'Spacebar' {
-                    # multi 모드에서만 현재 항목 선택 토글
-                    if ($Multi) { $selected[$cursor] = -not $selected[$cursor] }
-                }
-                'A' {
-                    # multi 모드 전체토글 — 전부 켜져있으면 다 끄고, 아니면 다 켬
-                    if ($Multi) {
-                        $allOn = $true
-                        for ($i = 0; $i -lt $n; $i++) { if (-not $selected[$i]) { $allOn = $false; break } }
-                        for ($i = 0; $i -lt $n; $i++) { $selected[$i] = -not $allOn }
-                    }
-                }
-                'Enter' {
-                    & $safeSetCursor 0 ($startTop + $n)
-                    if ($Multi) {
-                        # 선택된 값들을 csv로 반환, 0개면 $null
-                        $picked = @()
-                        for ($i = 0; $i -lt $n; $i++) { if ($selected[$i]) { $picked += $Options[$i].Value } }
-                        if ($picked.Count -eq 0) { return $null }
-                        return ($picked -join ',')
-                    }
-                    return $Options[$cursor].Value
-                }
-                'Escape' {
-                    & $safeSetCursor 0 ($startTop + $n)
-                    return $null
-                }
-                'Q' {
-                    & $safeSetCursor 0 ($startTop + $n)
-                    return $null
-                }
-                default {
-                    $ch = $key.KeyChar
-                    if ($ch -ge '1' -and $ch -le '9') {
-                        $jump = [int]([string]$ch) - 1
-                        if ($jump -lt $n) { $cursor = $jump }
-                    }
-                }
-            }
-            & $renderMenu
-        }
-    }
-    finally {
-        [Console]::CursorVisible = $true
-    }
-}
-
-# ─────────────────────────────────────────────────────────────
-# 비TTY fallback — 기존 숫자 입력 방식
+# 메뉴 — 숫자 입력 / 번호 토글 방식 (iex·파일실행·CI 어디서나 안전)
 # ─────────────────────────────────────────────────────────────
 function Invoke-LegacyNumericMenu {
     param(
@@ -484,60 +296,123 @@ function Invoke-LegacyNumericMenu {
     $n = $Options.Count
     if ($n -eq 0) { return $null }
 
+    $useColor = -not $env:NO_COLOR
+
+    # ── 단일 선택 ── 유효한 번호가 들어올 때까지 재시도
+    if (-not $Multi) {
+        Write-Host ""
+        Write-Host $Prompt
+        Write-Host ""
+        for ($i = 0; $i -lt $n; $i++) {
+            $opt = $Options[$i]
+            Write-Host ("  {0}) {1,-20} - {2}" -f ($i + 1), $opt.Value, $opt.Label)
+        }
+        Write-Host ""
+        while ($true) {
+            try {
+                $choice = Read-Host "선택 (1-$n)"
+            } catch {
+                return $Options[0].Value   # stdin redirect → 첫 옵션
+            }
+            $choice = "$choice".Trim()
+            if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $n) {
+                return $Options[[int]$choice - 1].Value
+            }
+            # 이름으로도 허용
+            for ($i = 0; $i -lt $n; $i++) {
+                if ($Options[$i].Value -eq $choice) { return $Options[$i].Value }
+            }
+            Write-Host "잘못된 입력입니다. 1~$n 중 하나를 입력하세요." -ForegroundColor Red
+        }
+    }
+
+    # ── 다중 선택 ── 번호 토글식
+    $selected = New-Object 'bool[]' $n
+    if ($Preselect) {
+        $pre = $Preselect.Split(',') | ForEach-Object { $_.Trim() }
+        for ($i = 0; $i -lt $n; $i++) {
+            if ($pre -contains $Options[$i].Value) { $selected[$i] = $true }
+        }
+    }
+
     Write-Host ""
     Write-Host $Prompt
-    Write-Host ""
-    for ($i = 0; $i -lt $n; $i++) {
-        $opt = $Options[$i]
-        Write-Host ("  {0}) {1,-20} - {2}" -f ($i + 1), $opt.Value, $opt.Label)
-    }
-    Write-Host ""
 
-    $promptMsg = if ($Multi) {
-        if ($Preselect) { "여러 항목 선택 (csv, 예: 1,3,5 또는 spring,react) [기본: $Preselect]" }
-        else { "여러 항목 선택 (csv, 예: 1,3,5 또는 spring,react)" }
-    } else { "선택 (1-$n)" }
-
-    try {
-        $choice = Read-Host $promptMsg
-    } catch {
-        # stdin redirect 환경에서 Read-Host 실패 → preselect 또는 첫 옵션
-        if ($Multi -and $Preselect) { return $Preselect }
-        return $Options[0].Value
-    }
-
-    if ($Multi) {
-        # 빈 입력 + preselect → preselect 사용
-        if (-not $choice -and $Preselect) { return $Preselect }
-        # csv 파싱 — 숫자/이름 혼용 허용
-        $resolved = @()
-        foreach ($p in $choice.Split(',')) {
-            $p = $p.Trim()
-            if (-not $p) { continue }
-            if ($p -match '^\d+$' -and [int]$p -ge 1 -and [int]$p -le $n) {
-                $resolved += $Options[[int]$p - 1].Value
+    # 현재 선택 상태를 한 줄씩(번호 + 체크 + 라벨) 새로 출력하는 렌더러.
+    # 제자리 갱신(SetCursorPosition)을 쓰지 않으므로 iex 실행 환경에서도 안 깨진다.
+    $render = {
+        Write-Host ""
+        for ($i = 0; $i -lt $n; $i++) {
+            $opt = $Options[$i]
+            $mark = if ($selected[$i]) { "[✓]" } else { "[ ]" }
+            $line = "  {0} {1}) {2,-16} {3}" -f $mark, ($i + 1), $opt.Value, $opt.Label
+            if ($selected[$i] -and $useColor) {
+                Write-Host $line -ForegroundColor Green
             } else {
-                for ($i = 0; $i -lt $n; $i++) {
-                    if ($Options[$i].Value -eq $p) { $resolved += $p; break }
-                }
+                Write-Host $line
             }
         }
-        if ($resolved.Count -eq 0) {
-            Write-Host "유효한 선택이 없습니다."
-            return $null
-        }
-        return ($resolved -join ',')
+        Write-Host ""
+        Write-Host "  번호 입력=토글 · 여러 개는 1,3,5 · a=전체토글 · Enter=확정" -ForegroundColor DarkGray
     }
 
-    if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $n) {
-        return $Options[[int]$choice - 1].Value
+    & $render
+    while ($true) {
+        try {
+            $input = Read-Host "선택"
+        } catch {
+            # stdin redirect → preselect 있으면 그걸로, 없으면 취소
+            if ($Preselect) { return $Preselect }
+            return $null
+        }
+        $input = "$input".Trim()
+
+        # Enter(빈 입력) = 확정
+        if (-not $input) {
+            $picked = @()
+            for ($i = 0; $i -lt $n; $i++) { if ($selected[$i]) { $picked += $Options[$i].Value } }
+            if ($picked.Count -eq 0) {
+                Write-Host "  최소 1개는 선택해야 합니다." -ForegroundColor Red
+                continue
+            }
+            return ($picked -join ',')
+        }
+
+        # a = 전체 토글
+        if ($input -eq 'a' -or $input -eq 'A') {
+            $allOn = $true
+            for ($i = 0; $i -lt $n; $i++) { if (-not $selected[$i]) { $allOn = $false; break } }
+            for ($i = 0; $i -lt $n; $i++) { $selected[$i] = -not $allOn }
+            & $render
+            continue
+        }
+
+        # 콤마/공백으로 여러 번호·이름 토글
+        $bad = @()
+        foreach ($p in ($input -split '[,\s]+')) {
+            $p = $p.Trim()
+            if (-not $p) { continue }
+            $hit = $false
+            if ($p -match '^\d+$' -and [int]$p -ge 1 -and [int]$p -le $n) {
+                $idx = [int]$p - 1
+                $selected[$idx] = -not $selected[$idx]
+                $hit = $true
+            } else {
+                for ($i = 0; $i -lt $n; $i++) {
+                    if ($Options[$i].Value -eq $p) { $selected[$i] = -not $selected[$i]; $hit = $true; break }
+                }
+            }
+            if (-not $hit) { $bad += $p }
+        }
+        & $render
+        if ($bad.Count -gt 0) {
+            Write-Host ("  무시된 입력: {0}" -f ($bad -join ', ')) -ForegroundColor Red
+        }
     }
-    Write-Host "잘못된 입력입니다."
-    return $null
 }
 
 # ─────────────────────────────────────────────────────────────
-# 통합 entry point — TTY면 Invoke-InteractiveMenu, 아니면 fallback
+# 통합 entry point — 숫자/토글 입력 메뉴로 위임
 # ─────────────────────────────────────────────────────────────
 function Invoke-ChooseMenu {
     param(
@@ -548,22 +423,10 @@ function Invoke-ChooseMenu {
         [string]$Preselect = ""
     )
 
-    $isTty = (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
-    if ($isTty) {
-        # 커서 메뉴를 시도한다. Invoke-InteractiveMenu는 내부 probe로 좌표 제어가
-        # 실제 동작하는지 검사해, 안 되는 환경(원격 iex 실행 등)이면 "__NO_TTY__"를
-        # 반환한다. 그 경우 아래 숫자 입력 메뉴로 폴백한다.
-        if ($Multi) {
-            $res = Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex -Multi -Preselect $Preselect
-        } else {
-            $res = Invoke-InteractiveMenu -Prompt $Prompt -Options $Options -DefaultIndex $DefaultIndex
-        }
-        if ($res -ne "__NO_TTY__") {
-            return $res
-        }
-        # probe 실패 → 숫자 메뉴로 폴백 (아래로 진행)
-    }
-
+    # 메뉴는 항상 숫자 입력 방식(Invoke-LegacyNumericMenu)으로 통일한다.
+    # 화살표+커서 좌표 제어 메뉴는 원격 iex 실행 환경에서 SetCursorPosition이
+    # 먹히지 않아 줄이 쌓이는 문제가 있어 제거했다. 숫자/토글 입력 방식은
+    # 화면 재배치가 없어 iex·파일실행·CI 어디서나 안정적으로 동작한다.
     if ($Multi) {
         return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options -Multi -Preselect $Preselect
     }
@@ -919,9 +782,9 @@ function Detect-DefaultBranch {
 # ===================================================================
 
 function Show-ProjectTypeMenu {
-    # 현재 ProjectTypes를 preselect csv로 — 멀티 선택 메뉴(Space 토글)
+    # 현재 ProjectTypes를 preselect csv로 — 번호 토글 멀티 선택 메뉴
     $preselect = ($script:ProjectTypes -join ',')
-    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요 (멀티 가능 — Space로 토글)" -Options @(
+    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요 (여러 개 가능)" -Options @(
         @{Value='spring';            Label='Spring Boot 백엔드'},
         @{Value='flutter';           Label='Flutter 모바일 앱'},
         @{Value='next';              Label='Next.js 웹 앱'},

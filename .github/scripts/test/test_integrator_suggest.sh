@@ -131,6 +131,33 @@ mkdir -p mobile
 printf '{"dependencies":{"react-native":"0.73"}}\n' > mobile/package.json
 chk "서브폴더 react-native 추천" "$(suggest_types_by_scan)" "react-native"
 
+echo "=== (20) 하위폴더 멀티모듈 spring: server/settings.gradle → server (passQL 회귀) ==="
+new_workdir
+mkdir -p server/app server/domain
+echo "rootProject.name='demo'" > server/settings.gradle
+echo "version='0.0.1'" > server/build.gradle
+echo "version='0.0.1'" > server/app/build.gradle
+echo "version='0.0.1'" > server/domain/build.gradle
+chk "하위폴더 멀티모듈 → server 하나" "$(find_type_path_candidates spring)" "server"
+
+echo "=== (21) android settings.gradle은 spring 후보에서 제외 ==="
+new_workdir
+mkdir -p server/api app/android
+echo "rootProject.name='demo'" > server/settings.gradle
+echo "version='0.0.1'" > server/build.gradle
+echo "version='0.0.1'" > server/api/build.gradle
+echo "rootProject.name='app'" > app/android/settings.gradle  # Flutter/RN → 제외 대상
+chk "android settings 제외 → server만" "$(find_type_path_candidates spring)" "server"
+
+echo "=== (22) 멀티모듈 2개: server/settings + infra/settings → 둘 다 후보 ==="
+new_workdir
+mkdir -p server infra
+echo "rootProject.name='s'" > server/settings.gradle
+echo "version='0.0.1'" > server/build.gradle
+echo "rootProject.name='i'" > infra/settings.gradle
+echo "version='0.0.1'" > infra/build.gradle
+chk "멀티모듈 2개 후보(정렬)" "$(find_type_path_candidates spring)" "$(printf 'infra\nserver')"
+
 echo ""
 echo "=== 결과: PASS=$PASS FAIL=$FAIL ==="
 [ "$FAIL" -eq 0 ]

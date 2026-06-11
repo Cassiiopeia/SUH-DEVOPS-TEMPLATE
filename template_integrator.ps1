@@ -807,9 +807,27 @@ function Get-ExistingMarkerInDir {
 function Find-TypePathCandidates {
     param([string]$ProjType)
 
-    # 멀티모듈 스프링: 루트 settings.gradle(.kts) 있으면 후보를 "." 하나로 고정
-    if ($ProjType -eq "spring" -and ((Test-Path "settings.gradle" -PathType Leaf) -or (Test-Path "settings.gradle.kts" -PathType Leaf))) {
-        return @(".")
+    # 멀티모듈 스프링: settings.gradle(.kts)이 있는 폴더 = 멀티모듈 루트로 축약.
+    # 루트뿐 아니라 server/ 같은 하위 폴더도 Depth 2까지 탐색해 그 폴더를 후보로 잡는다.
+    # version_manager가 해당 폴더 아래 모든 build.gradle을 일괄 갱신하므로 하위 모듈을 펼치지 않는다.
+    # android/ 폴더의 settings.gradle(Flutter/RN)은 spring 모듈이 아니므로 제외.
+    if ($ProjType -eq "spring") {
+        $root = (Get-Location).Path
+        $mmFiles = @(Get-ChildItem -Path . -Recurse -Depth 2 -File -ErrorAction SilentlyContinue |
+            Where-Object { ($_.Name -eq "settings.gradle" -or $_.Name -eq "settings.gradle.kts") -and
+                           $_.FullName -notmatch $script:PathExcludeRegex })
+        if ($mmFiles.Count -gt 0) {
+            $mmDirs = @()
+            foreach ($f in $mmFiles) {
+                $dir = Split-Path -Parent $f.FullName
+                $rel = $dir.Substring($root.Length).TrimStart('\').TrimStart('/')
+                if ([string]::IsNullOrEmpty($rel)) { $rel = "." } else { $rel = $rel.Replace('\', '/') }
+                if ($mmDirs -notcontains $rel) { $mmDirs += $rel }
+            }
+            # settings.gradle 발견 시: 그 폴더(들)만 후보로 반환. 단일이면 자동확정, 복수면 메뉴 선택.
+            return ($mmDirs | Sort-Object)
+        }
+        # settings.gradle 전혀 없음 → 단일 모듈. 아래 build.gradle 탐색 폴백으로 진행.
     }
 
     $markerNames = @()
@@ -1476,18 +1494,47 @@ function Create-VersionYml {
             }
         }
         
-        Print-Warning "version.yml이 이미 존재합니다"
+        # version 보존: version.yml이 버전 관리의 single source of truth.
+        # 기존 version.yml의 version을 최우선으로 읽어 유지하고, 없을 때만 감지값($Version) 폴백.
+        foreach ($line in $lines) {
+            if ($line -match '^\s*#') { continue }
+            if ($line -match '^version:\s*["'']?([0-9][0-9.]*)') {
+                $Version = $matches[1]
+                Print-Info "기존 version 보존: $Version"
+                break
+            }
+        }
+
+        # 덮어쓰기 확인 — version.yml 갱신은 통합에 필수.
+        # Y=업데이트하고 계속(기본) / N=통합 전체 취소 (반쪽 상태 방지)
         if (-not $Force) {
+            Write-Host ""
+            Print-SeparatorLine
+            Write-Host " 🔄 version.yml 업데이트 — 안전합니다, 필수입니다"
             Print-SeparatorLine
             Write-Host ""
-            Write-Host "version.yml을 덮어쓰시겠습니까?"
-            Write-Host "  Y/y - 예, 덮어쓰기"
-            Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
+            Write-Host "  기존 version.yml을 최신 템플릿 구조로 갱신합니다."
+            Write-Host "  이 단계는 통합에 반드시 필요합니다."
             Write-Host ""
-            
-            if (-not (Ask-YesNo "선택" "N")) {
-                Print-Info "version.yml 생성 건너뜁니다"
-                return
+            Write-Host "  ✅ 유지되는 값 (그대로 보존)"
+            Write-Host ("       {0,-14} {1,-11} {2}" -f "version", $Version, "롤백 없음")
+            Write-Host ("       {0,-14} {1,-11} {2}" -f "version_code", $existingVersionCode, "스토어 빌드번호 안전")
+            Write-Host ""
+            Write-Host "  📝 갱신되는 것"
+            Write-Host "       구조 · 주석 · project_paths · metadata"
+            Write-Host ""
+            Write-Host "  ⚠️  업데이트하지 않으면 구버전 구조가 남아"
+            Write-Host "       최신 워크플로우의 버전 자동증가 · 체인지로그 · 배포"
+            Write-Host "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
+            Write-Host ""
+            Write-Host "     Y   업데이트하고 계속  (권장 · 기본)"
+            Write-Host "     N   통합 취소"
+            Write-Host ""
+
+            # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            if (-not (Ask-YesNo "  선택" "Y")) {
+                Print-Error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
+                exit 0
             }
         }
     }

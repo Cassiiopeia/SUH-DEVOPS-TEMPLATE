@@ -1112,11 +1112,23 @@ existing_marker_in_dir() {
 # maxdepth 3 + 잡음 폴더 제외 + 타입별 오탐 필터 (스펙 §4.2~4.3)
 find_type_path_candidates() {
     local t=$1
-    # 멀티모듈 스프링: 루트에 settings.gradle(.kts) 있으면 버전은 루트에서 관리 →
-    # 후보를 "." 하나로 고정 (version_manager가 . 아래 모든 build.gradle을 일괄 갱신)
-    if [ "$t" = "spring" ] && { [ -f "settings.gradle" ] || [ -f "settings.gradle.kts" ]; }; then
-        echo "."
-        return 0
+    # 멀티모듈 스프링: settings.gradle(.kts)이 있는 폴더 = 멀티모듈 루트로 축약.
+    # 루트뿐 아니라 server/ 같은 하위 폴더도 maxdepth 3까지 탐색해 그 폴더를 후보로 잡는다.
+    # version_manager가 해당 폴더 아래 모든 build.gradle을 일괄 갱신하므로 하위 모듈을 후보로 펼치지 않는다.
+    # android/ 폴더의 settings.gradle(Flutter/RN)은 spring 모듈이 아니므로 prune으로 제외.
+    if [ "$t" = "spring" ]; then
+        local _mm
+        _mm=$(find . -maxdepth 3 \
+            \( -name node_modules -o -name .git -o -name build -o -name dist \
+               -o -name .gradle -o -name android -o -name ios \) -prune \
+            -o -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print 2>/dev/null \
+            | sed 's#/settings\.gradle\(\.kts\)\{0,1\}$##; s#^\./##; s#^$#.#' | sort -u)
+        # settings.gradle 발견 시: 그 폴더(들)만 후보로 반환. 단일이면 자동확정, 복수면 메뉴 선택.
+        if [ -n "$_mm" ]; then
+            echo "$_mm"
+            return 0
+        fi
+        # settings.gradle 전혀 없음 → 단일 모듈. 아래 build.gradle 탐색 폴백으로 진행.
     fi
     local names=""
     case "$t" in
@@ -1880,21 +1892,59 @@ create_version_yml() {
         if ! [[ "$existing_version_code" =~ ^[0-9]+$ ]] || [ "$existing_version_code" -le 0 ]; then
             existing_version_code=1
         fi
-        
+
         print_info "기존 version_code 감지: $existing_version_code"
-        
-        print_warning "version.yml이 이미 존재합니다"
+
+        # version 보존: version.yml이 버전 관리의 single source of truth.
+        # 기존 version.yml의 version을 최우선으로 읽어 유지하고, 없을 때만 감지값($version) 폴백.
+        local _existing_version=""
+        if command -v yq >/dev/null 2>&1; then
+            _existing_version=$(yq -r '.version // ""' version.yml 2>/dev/null || echo "")
+            [ "$_existing_version" = "null" ] && _existing_version=""
+        else
+            # 주석(#)이 아닌 실제 version 라인에서만 추출 (x.y.z 형식)
+            _existing_version=$(grep -E '^version:[[:space:]]*' version.yml 2>/dev/null \
+                | sed 's/version:[[:space:]]*["'\'']*\([0-9][0-9.]*\)["'\'']*.*/\1/' | head -1)
+        fi
+        if [ -n "$_existing_version" ]; then
+            version="$_existing_version"
+            print_info "기존 version 보존: $version"
+        fi
+
+        # 덮어쓰기 확인 — version.yml 갱신은 통합에 필수.
+        # Y=업데이트하고 계속(기본) / N=통합 전체 취소 (반쪽 상태 방지)
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+            print_to_user ""
+            print_separator_line
+            print_to_user " 🔄 version.yml 업데이트 — 안전합니다, 필수입니다"
             print_separator_line
             print_to_user ""
-            print_to_user "version.yml을 덮어쓰시겠습니까?"
-            print_to_user "  Y/y - 예, 덮어쓰기"
-            print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+            print_to_user "  기존 version.yml을 최신 템플릿 구조로 갱신합니다."
+            print_to_user "  이 단계는 통합에 반드시 필요합니다."
             print_to_user ""
-            
-            if ! ask_yes_no "선택: " "N"; then
-                print_info "version.yml 생성 건너뜁니다"
-                return
+            print_to_user "  ✅ 유지되는 값 (그대로 보존)"
+            # printf로 컬럼 정렬한 문자열을 만들어 safe_echo(print_to_user)로 출력 — 출력 대상 일관성 유지
+            local _row
+            printf -v _row "       %-14s %-11s %s" "version" "$version" "롤백 없음"
+            print_to_user "$_row"
+            printf -v _row "       %-14s %-11s %s" "version_code" "$existing_version_code" "스토어 빌드번호 안전"
+            print_to_user "$_row"
+            print_to_user ""
+            print_to_user "  📝 갱신되는 것"
+            print_to_user "       구조 · 주석 · project_paths · metadata"
+            print_to_user ""
+            print_to_user "  ⚠️  업데이트하지 않으면 구버전 구조가 남아"
+            print_to_user "       최신 워크플로우의 버전 자동증가 · 체인지로그 · 배포"
+            print_to_user "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
+            print_to_user ""
+            print_to_user "     Y   업데이트하고 계속  (권장 · 기본)"
+            print_to_user "     N   통합 취소"
+            print_to_user ""
+
+            # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            if ! ask_yes_no "  선택 (Y/N, 기본: Y): " "Y"; then
+                print_error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
+                exit 0
             fi
         fi
     fi

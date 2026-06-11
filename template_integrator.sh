@@ -4068,5 +4068,7 @@ main() {
     execute_integration
 }
 
-# 스크립트 실행
-main "$@"
+# 스크립트 실행 (source될 때는 main을 돌리지 않음 — 함수 단위 테스트 가능)
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi

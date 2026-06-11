@@ -314,6 +314,19 @@ interactive_menu() {
     trap 'printf "\033[?25h" >&2; return 130' INT
     printf "\033[?25l" >&2
 
+    # ── 스크롤 안전 커서 앵커 ──
+    # 문제: 메뉴를 화면 하단에서 그리면 출력이 터미널을 스크롤시킨다. 그러면 ESC7로 저장한
+    #       절대좌표가 위로 밀려 무효화되고, redraw마다 잔상이 누적돼 "점점 늘어나는" 버그가 됐다.
+    # 해법: 메뉴가 차지할 만큼(wrap 여유 포함) 빈 줄을 먼저 출력해 스크롤을 '미리' 일으킨 뒤,
+    #       그만큼 커서를 되올려(ESC[<rows>A) 그 지점을 앵커로 저장(ESC7)한다. 이 앵커는 이미
+    #       화면 안쪽이라 이후 redraw는 스크롤을 유발하지 않아 좌표가 안정적이다.
+    # 여유: 가장 긴 라벨이 wrap되는 경우까지 대비해 항목당 1줄 여유(=n*2) 확보.
+    local _reserve=$(( n * 2 + 1 ))
+    local _r
+    for ((_r = 0; _r < _reserve; _r++)); do printf "\n" >&2; done
+    printf "\033[%dA" "$_reserve" >&2
+    printf "\0337" >&2
+
     _interactive_menu_render() {
         local i value label num indicator
         for i in $(seq 0 $((n - 1))); do
@@ -333,23 +346,33 @@ interactive_menu() {
                     indicator="[ ]"
                 fi
             fi
+            # label이 비어 있으면 value만 출력(예/아니오 같은 단순 선택지). 있으면 'value    label(dim)'.
             if [ "$i" -eq "$cursor" ]; then
-                printf "%s> %s %d) %s    %s%s%s%s\n" \
-                    "$C_CYAN" "$indicator" "$num" "$value" \
-                    "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
+                if [ -n "$label" ]; then
+                    printf "%s> %s %d) %s    %s%s%s%s\n" \
+                        "$C_CYAN" "$indicator" "$num" "$value" \
+                        "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
+                else
+                    printf "%s> %s %d) %s%s\n" \
+                        "$C_CYAN" "$indicator" "$num" "$value" "$C_RESET" >&2
+                fi
             else
-                printf "  %s %d) %s    %s%s%s\n" \
-                    "$indicator" "$num" "$value" \
-                    "$C_DIM" "$label" "$C_RESET" >&2
+                if [ -n "$label" ]; then
+                    printf "  %s %d) %s    %s%s%s\n" \
+                        "$indicator" "$num" "$value" \
+                        "$C_DIM" "$label" "$C_RESET" >&2
+                else
+                    printf "  %s %d) %s\n" \
+                        "$indicator" "$num" "$value" >&2
+                fi
             fi
         done
     }
 
     _interactive_menu_clear() {
-        local i
-        for i in $(seq 1 "$n"); do
-            printf "\033[1A\033[2K" >&2
-        done
+        # 저장한 시작 지점으로 복원(ESC 8) 후 거기서 화면 끝까지 삭제(ESC[J).
+        # 기존 "n줄 위로(ESC[1A)" 방식은 wrap된 줄을 1줄로 오인해 잔상이 남았다 → 폐기.
+        printf "\0338\033[J" >&2
     }
 
     _interactive_menu_render
@@ -582,17 +605,41 @@ choose_menu() {
 ask_yes_no() {
     local prompt="$1"
     local default="${2:-N}"  # 기본값 N
+
+    # 프롬프트 끝의 입력 안내 군더더기 제거 — choose_menu가 자체 안내(↑↓/Enter)를 붙이므로
+    # "(Y/N, 기본: Y)", "(Y=예 / N=직접입력)", "선택:" 같은 Y/N식 꼬리표가 남으면 중복·모순돼 보인다.
+    local _title
+    _title=$(printf '%s' "$prompt" | sed -E \
+        -e 's/[[:space:]]*\([^)]*[YyNn][^)]*\)[[:space:]]*//g' \
+        -e 's/[[:space:]]*:[[:space:]]*$//' \
+        -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//')
+    # "선택"만 남는 무의미한 제목 방어
+    case "$_title" in ""|"선택") _title="진행하시겠습니까?" ;; esac
+
+    # TTY 대화형 → 화살표 메뉴(choose_menu). 기본값이 첫 항목 = 커서 초기 위치.
+    # value를 '예'/'아니오'로 두고 label은 비워, 메뉴에 '1) 예 / 2) 아니오'만 깔끔히 표시.
+    # (value/label 둘 다 두면 'yes 예'처럼 중복돼 보였던 문제 해결)
+    if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
+        local _ans _rc
+        if [[ "$default" =~ ^[Yy]$ ]]; then
+            _ans=$(choose_menu "$_title" "예|" "아니오|"); _rc=$?
+        else
+            _ans=$(choose_menu "$_title" "아니오|" "예|"); _rc=$?
+        fi
+        # choose_menu가 실패(ESC 취소 등) → 반환 1(=No/취소)
+        [ "$_rc" -ne 0 ] && return 1
+        [ "$_ans" = "예" ] && return 0
+        return 1
+    fi
+
+    # 비TTY / FORCE — 기존 텍스트 입력 폴백 (한 글자 Y/N)
     local reply
-    
     while true; do
         if safe_read "$prompt" reply "-n 1"; then
             print_to_user ""
-            
-            # Enter 키 처리
             if [[ -z "$reply" ]]; then
                 reply="$default"
             fi
-            
             if [[ "$reply" =~ ^[Yy]$ ]]; then
                 return 0
             elif [[ "$reply" =~ ^[Nn]$ ]]; then
@@ -1286,7 +1333,8 @@ resolve_project_paths() {
         if [ "$_count" -eq 1 ]; then
             print_to_user ""
             print_to_user "  $_prog 🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
-            if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? (Y=예 / N=직접입력): " "Y"; then
+            # '아니오' 선택 시 _chosen 미설정 → 아래 직접입력 루프로 진행
+            if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? — 아니오 선택 시 직접 입력" "Y"; then
                 _chosen="$_candidates"
             fi
         elif [ "$_count" -gt 1 ]; then
@@ -1616,17 +1664,24 @@ detect_and_confirm_project() {
         print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
         print_to_user ""
         
-        # 사용자 확인
-        print_to_user "이 정보가 맞습니까?"
-        print_to_user "  Y/y - 예, 계속 진행"
-        print_to_user "  E/e - 수정하기"
-        print_to_user "  N/n - 아니오, 취소"
-        print_to_user ""
-        
-        # Y/N/E 입력 받기
+        # 사용자 확인 — 화살표 3지선 메뉴 (TTY 대화형). 비TTY/FORCE는 기존 키 입력 폴백.
         local user_choice
-        user_choice=$(ask_yes_no_edit)
-        
+        if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
+            # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
+            local _confirm_label
+            _confirm_label=$(choose_menu "이 정보가 맞습니까?" \
+                "예, 계속 진행|" \
+                "수정하기|" \
+                "아니오, 취소|")
+            case "$_confirm_label" in
+                예*)  user_choice="yes" ;;
+                수정*) user_choice="edit" ;;
+                *)    user_choice="no" ;;   # 취소 또는 ESC
+            esac
+        else
+            user_choice=$(ask_yes_no_edit)
+        fi
+
         case "$user_choice" in
             "yes")
                 confirmed=true
@@ -1653,12 +1708,22 @@ detect_and_confirm_project() {
 handle_project_edit_menu() {
     print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
 
-    local edit_choice
-    edit_choice=$(choose_menu "어떤 항목을 수정하시겠습니까?" \
-        "type|Project Type" \
-        "version|Version" \
-        "branch|Default Branch (기본 브랜치)" \
-        "done|모두 맞음, 계속")
+    # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
+    local _edit_label
+    _edit_label=$(choose_menu "어떤 항목을 수정하시겠습니까?" \
+        "프로젝트 타입|" \
+        "버전|" \
+        "기본 브랜치|" \
+        "모두 맞음, 계속|")
+
+    local edit_choice=""
+    case "$_edit_label" in
+        프로젝트\ 타입*) edit_choice="type" ;;
+        버전*)           edit_choice="version" ;;
+        기본\ 브랜치*)   edit_choice="branch" ;;
+        모두\ 맞음*)     edit_choice="done" ;;
+        *)               edit_choice="" ;;
+    esac
 
     if [ -z "$edit_choice" ]; then
         print_warning "수정 메뉴가 취소되었습니다."
@@ -2272,12 +2337,8 @@ check_breaking_changes() {
     if [ ${#critical_changes[@]} -gt 0 ]; then
         print_warning "CRITICAL 변경사항이 있습니다."
         print_to_user ""
-        print_to_user "계속 진행하시겠습니까?"
-        print_to_user "  Y/y - 예, 계속 진행"
-        print_to_user "  N/n - 아니오, 취소"
-        print_to_user ""
 
-        if ! ask_yes_no "선택: " "N"; then
+        if ! ask_yes_no "계속 진행하시겠습니까?" "N"; then
             print_info "취소되었습니다"
             exit 0
         fi
@@ -2392,11 +2453,8 @@ ask_synology_option() {
         done
     done
     print_to_user ""
-    print_to_user "  Y/y - 예, 포함"
-    print_to_user "  N/n - 아니오, 제외 (기본)"
-    print_to_user ""
 
-    if ask_yes_no "선택: " "N"; then
+    if ask_yes_no "Synology 워크플로우를 포함할까요?" "N"; then
         INCLUDE_SYNOLOGY=true
         print_info "Synology 워크플로우를 포함합니다"
     else
@@ -2786,12 +2844,8 @@ copy_coderabbit_config() {
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_separator_line
             print_to_user ""
-            print_to_user ".coderabbit.yaml을 덮어쓰시겠습니까?"
-            print_to_user "  Y/y - 예, 덮어쓰기"
-            print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
-            print_to_user ""
-            
-            if ! ask_yes_no "선택: " "N"; then
+
+            if ! ask_yes_no ".coderabbit.yaml을 덮어쓸까요?" "N"; then
                 print_info ".coderabbit.yaml 다운로드 건너뜁니다"
                 return
             fi
@@ -3044,12 +3098,7 @@ copy_util_modules() {
 
     # 사용자 확인 (force 모드가 아니고 TTY 가용 시)
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "이 유틸리티 모듈을 다운로드하시겠습니까?"
-        print_to_user "  Y/y - 예, 다운로드하기"
-        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
-        print_to_user ""
-
-        if ! ask_yes_no "선택: " "N"; then
+        if ! ask_yes_no "이 유틸리티 모듈을 다운로드할까요?" "N"; then
             print_info "util 모듈 다운로드 건너뜁니다"
             return
         fi
@@ -3138,22 +3187,32 @@ interactive_mode() {
         exit 1
     fi
     
-    # 프로젝트 감지 및 확인
-    detect_and_confirm_project
-
-    # 템플릿 다운로드 (모드 선택 전 필요 — 모드 선택 후 Synology 질문에서 사용)
-    download_template
-
+    # ── 1) 모드 선택 먼저 (사용자 의도부터 파악) ──
+    # 사용자가 무엇을 하려는지 먼저 묻고, 모드에 따라 필요한 정보만 수집한다.
+    # (예: skills/issues 모드는 프로젝트 타입·버전·Synology·경로가 전혀 필요 없음)
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
 
-    local _mode_selected
-    _mode_selected=$(choose_menu "어떤 기능을 통합하시겠습니까?" \
-        "full|전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" \
-        "version|버전 관리 시스템만" \
-        "workflows|GitHub Actions 워크플로우만" \
-        "issues|이슈/PR 템플릿만" \
-        "skills|Agent Skill 설치 (Claude, Cursor, Gemini, Codex)" \
-        "cancel|취소")
+    # 라벨에 영어 키(full/version…)가 보이지 않도록, 사용자에게는 한국어 설명만 노출한다.
+    # choose_menu는 value를 표시하므로 value 자리에 한국어 라벨을 두고 반환값을 케이스로 매핑.
+    local _mode_label
+    _mode_label=$(choose_menu "무엇을 설치할까요?" \
+        "전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿 (처음이라면 추천)|" \
+        "버전 관리만 — 버전 자동 증가·동기화 시스템만 설치|" \
+        "워크플로우만 — 빌드·배포 GitHub Actions만 설치|" \
+        "이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치|" \
+        "AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치|" \
+        "취소|")
+
+    # 한국어 라벨 → 내부 모드 키 매핑
+    local _mode_selected=""
+    case "$_mode_label" in
+        전체\ 설치*)        _mode_selected="full" ;;
+        버전\ 관리만*)      _mode_selected="version" ;;
+        워크플로우만*)      _mode_selected="workflows" ;;
+        이슈*PR\ 템플릿만*) _mode_selected="issues" ;;
+        AI\ 스킬만*)        _mode_selected="skills" ;;
+        *)                  _mode_selected="cancel" ;;
+    esac
 
     if [ -z "$_mode_selected" ] || [ "$_mode_selected" = "cancel" ]; then
         print_info "취소되었습니다"
@@ -3162,16 +3221,32 @@ interactive_mode() {
 
     MODE="$_mode_selected"
 
-    # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
-    # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
-    if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-        local _syn_dirs=()
-        local _st
-        for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
-            _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
-        done
-        ask_synology_option "${_syn_dirs[@]}"
-    fi
+    # 템플릿 다운로드 (모드별 수집·복사에서 사용)
+    download_template
+
+    # ── 2) 모드별 필요 정보만 수집 ──
+    # 수집 매트릭스: full=타입/버전/Synology/경로, version=타입/버전/경로,
+    #               workflows=타입/Synology, issues=없음, skills=없음
+    case "$MODE" in
+        skills|issues)
+            # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
+            ;;
+        *)
+            # full/version/workflows → 프로젝트 타입·버전·브랜치 감지 + 확인
+            # (Synology·경로는 confirm 직전에 모아 확인 화면에 함께 표시)
+            detect_and_confirm_project
+
+            # Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
+            if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
+                local _syn_dirs=()
+                local _st
+                for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+                    _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+                done
+                ask_synology_option "${_syn_dirs[@]}"
+            fi
+            ;;
+    esac
 }
 
 # 통합 실행
@@ -3222,12 +3297,7 @@ execute_integration() {
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         if [ "$FORCE_MODE" = false ]; then
             if [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "이 정보로 통합을 진행하시겠습니까?"
-                print_to_user "  Y/y - 예, 계속 진행"
-                print_to_user "  N/n - 아니오, 취소"
-                print_to_user ""
-
-                if ! ask_yes_no "선택: " "Y"; then
+                if ! ask_yes_no "이 정보로 통합을 진행할까요?" "Y"; then
                     print_info "취소되었습니다"
                     exit 0
                 fi
@@ -3421,25 +3491,84 @@ offer_ide_tools_install() {
     fi
     echo "" >&2
 
-    # ─── Claude Code 섹션 ───
+    # ── 2단계 통합 라우터 ──
+    # 1단계: 현재 상태(위에서 출력 완료) + 동작 선택(설치·업데이트 / 제거 / 건너뛰기)
+    # 2단계: 그 동작을 적용할 IDE 멀티셀렉트 → 선택된 IDE만 기존 관리 로직 호출
+    # 기존 IDE별 실행 로직은 _manage_*_section 함수로 보존(검증된 동작 유지), 라우터가 호출만 한다.
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        # 감지된(=관리 가능한) IDE만 후보로 구성
+        # IDE 후보 — value는 매핑 키(고유명사라 그대로), label은 비워 'Claude Code'만 깔끔히 표시.
+        local _ide_opts=()
+        _ide_opts+=("Claude Code|")
+        _ide_opts+=("Cursor|")
+        if command -v gemini &> /dev/null; then _ide_opts+=("Gemini CLI|"); else _ide_opts+=("Gemini CLI (미감지)|"); fi
+        if command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; then _ide_opts+=("Codex CLI|"); else _ide_opts+=("Codex CLI (미감지)|"); fi
+
+        local _action_label
+        _action_label=$(choose_menu "AI 스킬을 어떻게 할까요?" \
+            "설치 / 업데이트 — 최신 상태로 맞추기|" \
+            "제거 — 설치된 스킬 삭제하기|" \
+            "그대로 두기|")
+        local _action=""
+        case "$_action_label" in
+            설치*)   _action="apply" ;;
+            제거*)   _action="remove" ;;
+            *)       _action="skip" ;;
+        esac
+
+        case "$_action" in
+            apply)
+                # 감지된 IDE 전체를 기본 체크 (미감지 항목은 preselect에서 제외)
+                # value가 'Claude Code' 등 표시명이므로 매핑도 표시명 기준.
+                local _pre="Claude Code,Cursor"
+                command -v gemini &> /dev/null && _pre="$_pre,Gemini CLI"
+                { command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; } && _pre="$_pre,Codex CLI"
+                local _targets
+                _targets=$(choose_menu --multi --preselect="$_pre" "설치 / 업데이트할 IDE를 고르세요" "${_ide_opts[@]}")
+                [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
+                case ",$_targets," in *,Claude\ Code,*) _manage_claude_section "$claude_available" "$installed_scope" "$installed_version" ;; esac
+                case ",$_targets," in *,Cursor,*)       _manage_cursor_section ;; esac
+                case ",$_targets," in *,Gemini\ CLI,*)  _manage_gemini_extension ;; esac
+                case ",$_targets," in *,Codex\ CLI,*)   _manage_codex_skills ;; esac
+                ;;
+            remove)
+                # 제거: 전체 후보 제시 후 미설치는 각 섹션이 no-op 처리
+                local _targets
+                _targets=$(choose_menu --multi "제거할 IDE를 고르세요" "${_ide_opts[@]}")
+                [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
+                case ",$_targets," in *,Claude\ Code,*) _remove_claude_section "$claude_available" "$installed_scope" ;; esac
+                case ",$_targets," in *,Cursor,*)       _remove_cursor_section ;; esac
+                case ",$_targets," in *,Gemini\ CLI,*)  _remove_gemini_section ;; esac
+                case ",$_targets," in *,Codex\ CLI,*)   _remove_codex_section ;; esac
+                ;;
+            *)
+                print_info "IDE Skills 변경 없이 건너뜁니다"
+                ;;
+        esac
+        return
+    fi
+
+    # ── FORCE / 비TTY — 기존 순차 흐름 유지 (자동 설치/업데이트) ──
+    _manage_claude_section "$claude_available" "$installed_scope" "$installed_version"
+    _manage_cursor_section
+    _manage_gemini_extension
+    _manage_codex_skills
+}
+
+# ── Claude Code 플러그인 관리 (기존 섹션 로직 보존) ──
+_manage_claude_section() {
+    local claude_available="$1"
+    local installed_scope="$2"
+    local installed_version="$3"
+
     print_step "[ Claude Code 플러그인 관리 ]"
     echo "" >&2
 
     if [ "$claude_available" = true ]; then
         if [ -n "$installed_scope" ]; then
-            local update_label="업데이트 (최신 버전으로)"
-            if [ -n "$TEMPLATE_VERSION" ] && [ "$installed_version" = "$TEMPLATE_VERSION" ]; then
-                update_label="업데이트 (이미 최신 — 재적용)"
-            fi
-
+            # 설치돼 있음 → 업데이트(최신화). 라우터에서 이미 동작을 정했으므로 추가 메뉴 없이 바로 실행.
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                local choice
-                choice=$(choose_menu "Claude Code 플러그인 (cassiiopeia)" \
-                    "update|${update_label}" \
-                    "reinstall|재설치 (scope 변경)" \
-                    "delete|삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installed_scope})" \
-                    "skip|건너뛰기")
-
+                local choice=update
                 case "$choice" in
                     update)
                         print_step "플러그인 업데이트 중..."
@@ -3505,24 +3634,12 @@ offer_ide_tools_install() {
                 fi
             fi
         else
-            # 미설치 → scope 선택 후 신규 설치
+            # 미설치 → 신규 설치. 라우터에서 이미 설치 의사 확인됨 → scope만 묻고 바로 설치.
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-                print_to_user "  설치 시 /cassiiopeia:suh-analyze, /cassiiopeia:suh-review 등 19+ 스킬 사용 가능"
-                print_to_user ""
-                print_to_user "  Y/y - 예, 설치하기 (추천)"
-                print_to_user "  N/n - 아니오, 건너뛰기"
-                print_to_user ""
-
-                if ask_yes_no "선택: " "Y"; then
-                    local scope
-                    scope=$(_ask_claude_scope)
-                    _do_claude_plugin_install "$scope"
-                else
-                    print_info "Claude Code 플러그인 설치 건너뜁니다"
-                    echo "  수동 설치: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-                    echo "             claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-                fi
+                print_info "Claude Code 플러그인(DevOps Skills) 설치 — 설치 후 /cassiiopeia:suh-* 19+ 스킬 사용 가능"
+                local scope
+                scope=$(_ask_claude_scope)
+                _do_claude_plugin_install "$scope"
             else
                 _do_claude_plugin_install "user"
             fi
@@ -3531,8 +3648,10 @@ offer_ide_tools_install() {
         echo "  💡 Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
         echo "                         claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
     fi
+}
 
-    # ─── Cursor 섹션 ───
+# ── Cursor Skills 관리 (기존 섹션 로직 보존) ──
+_manage_cursor_section() {
     # Cursor는 마켓플레이스 미지원 — 파일 직접 복사로 관리한다.
     # scope 개념:
     #   user    = ~/.cursor/skills/      (모든 프로젝트 공통)
@@ -3574,78 +3693,39 @@ offer_ide_tools_install() {
         echo "" >&2
 
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            local cursor_choice
-            cursor_choice=$(choose_menu "Cursor Skills 관리" \
-                "update|업데이트 (기존 scope 유지)" \
-                "install|신규 설치 (다른 scope에 추가)" \
-                "delete|삭제" \
-                "skip|건너뛰기")
-
-            case "$cursor_choice" in
-                update)
-                    # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
-                    local target_scope
-                    if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
-                        target_scope=$(_ask_cursor_scope "$cursor_user_ver" "$cursor_proj_ver")
-                    elif [ -n "$cursor_user_ver" ]; then
-                        target_scope="user"
-                    else
-                        target_scope="project"
-                    fi
-                    local src
-                    src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
-                    if [ -z "$src" ]; then
-                        print_warning "사용 가능한 소스가 없습니다."
-                    else
-                        _do_cursor_skills_copy "$target_scope" "$src"
-                    fi
-                    ;;
-                install)
-                    # 신규 설치: scope 자유 선택 (다른 scope에 추가)
-                    local target_scope
-                    target_scope=$(_ask_cursor_scope "" "")
-                    local src
-                    src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
-                    if [ -z "$src" ]; then
-                        print_warning "사용 가능한 소스가 없습니다."
-                    else
-                        _do_cursor_skills_copy "$target_scope" "$src"
-                    fi
-                    ;;
-                delete)
-                    _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
-                    ;;
-                *)
-                    print_info "Cursor Skills 변경 없이 건너뜁니다"
-                    ;;
-            esac
+            # 라우터에서 '설치/업데이트' 선택됨 → 기존 설치 scope 유지하며 최신화 (추가 메뉴 없음).
+            local target_scope
+            if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
+                target_scope=$(_ask_cursor_scope "$cursor_user_ver" "$cursor_proj_ver")
+            elif [ -n "$cursor_user_ver" ]; then
+                target_scope="user"
+            else
+                target_scope="project"
+            fi
+            local src
+            src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+            if [ -z "$src" ]; then
+                print_warning "사용 가능한 소스가 없습니다."
+            else
+                _do_cursor_skills_copy "$target_scope" "$src"
+            fi
         else
             # FORCE 모드: project scope, 원격 우선
             local src="${skills_src_remote:-$skills_src_local}"
             [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     else
-        # 미설치 → 설치
+        # 미설치 → 설치. 라우터에서 이미 설치 의사 확인됨 → scope·소스만 묻고 바로 복사.
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user "Cursor IDE Skills를 설치하시겠습니까?"
-            print_to_user "  /analyze, /review 등 20개 스킬 사용 가능 (마켓플레이스 미지원 — 파일 직접 복사)"
-            print_to_user ""
-            print_to_user "  Y/y - 예, 설치하기 (추천)"
-            print_to_user "  N/n - 아니오, 건너뛰기"
-            print_to_user ""
-
-            if ask_yes_no "선택: " "Y"; then
-                local target_scope
-                target_scope=$(_ask_cursor_scope "" "")
-                local src
-                src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
-                if [ -z "$src" ]; then
-                    print_warning "사용 가능한 소스가 없습니다. 건너뜁니다."
-                else
-                    _do_cursor_skills_copy "$target_scope" "$src"
-                fi
+            print_info "Cursor IDE Skills 설치 — /analyze, /review 등 20개 스킬 (파일 직접 복사)"
+            local target_scope
+            target_scope=$(_ask_cursor_scope "" "")
+            local src
+            src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+            if [ -z "$src" ]; then
+                print_warning "사용 가능한 소스가 없습니다. 건너뜁니다."
             else
-                print_info "Cursor Skills 설치 건너뜁니다"
+                _do_cursor_skills_copy "$target_scope" "$src"
             fi
         else
             # FORCE 모드: project scope, 원격 우선
@@ -3653,12 +3733,69 @@ offer_ide_tools_install() {
             [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     fi
+}
 
-    # ─── Gemini CLI 섹션 ───
-    _manage_gemini_extension
+# ── 제거 섹션 (2단계 라우터의 'remove' 동작에서 호출) ──
+# 미설치 IDE면 안내만 하고 no-op. 설치돼 있으면 삭제 실행.
+_remove_claude_section() {
+    local claude_available="$1"
+    local installed_scope="$2"
+    echo "" >&2
+    print_step "[ Claude Code 플러그인 제거 ]"
+    if [ "$claude_available" != true ] || [ -z "$installed_scope" ]; then
+        print_info "  설치된 Claude Code 플러그인이 없어 건너뜁니다"
+        return
+    fi
+    print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
+    if claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
+        print_success "플러그인 uninstall 완료"
+        _remove_claude_plugin_data
+    else
+        print_warning "삭제 실패. 수동으로 실행해주세요:"
+        echo "    claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
+    fi
+}
 
-    # ─── Codex CLI 섹션 ───
-    _manage_codex_skills
+_remove_cursor_section() {
+    echo "" >&2
+    print_step "[ Cursor Skills 제거 ]"
+    local cursor_user_ver="" cursor_proj_ver=""
+    [ -f "${HOME}/.cursor/skills/cursor-skills-meta.json" ] && cursor_user_ver=$(grep '"version"' "${HOME}/.cursor/skills/cursor-skills-meta.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+    [ -f ".cursor/skills/cursor-skills-meta.json" ] && cursor_proj_ver=$(grep '"version"' ".cursor/skills/cursor-skills-meta.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+    if [ -z "$cursor_user_ver" ] && [ -z "$cursor_proj_ver" ]; then
+        print_info "  설치된 Cursor Skills가 없어 건너뜁니다"
+        return
+    fi
+    # 기존 삭제 헬퍼 재사용 (user/project 선택 처리 포함)
+    _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
+}
+
+_remove_gemini_section() {
+    echo "" >&2
+    print_step "[ Gemini CLI Extension 제거 ]"
+    if ! command -v gemini &> /dev/null; then
+        print_info "  gemini CLI 미감지 — 건너뜁니다"
+        return
+    fi
+    if gemini extensions uninstall cassiiopeia 2>/dev/null; then
+        print_success "Gemini CLI extension 제거 완료"
+    else
+        print_info "  제거할 Gemini extension이 없거나 실패 — 수동: gemini extensions uninstall cassiiopeia"
+    fi
+}
+
+_remove_codex_section() {
+    echo "" >&2
+    print_step "[ Codex CLI Plugin 제거 ]"
+    local codex_target="${HOME}/.agents/skills/cassiiopeia"
+    # native fallback 심링크/디렉토리 제거
+    if [ -L "$codex_target" ] || [ -d "$codex_target" ]; then
+        rm -rf "$codex_target" && print_success "Codex native skills 제거 완료 (${codex_target})"
+    else
+        print_info "  제거할 Codex skills가 없어 건너뜁니다"
+    fi
+    command -v codex &> /dev/null && \
+        print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -3924,17 +4061,7 @@ _manage_gemini_extension() {
         return
     fi
 
-    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "Gemini CLI extension을 설치/업데이트하시겠습니까?"
-        print_to_user "  Y/y - 예, 설치 또는 업데이트"
-        print_to_user "  N/n - 아니오, 건너뛰기"
-        print_to_user ""
-        if ! ask_yes_no "선택: " "Y"; then
-            print_info "Gemini CLI extension 변경 없이 건너뜁니다"
-            return
-        fi
-    fi
-
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
     print_step "Gemini CLI extension 업데이트 중..."
     if gemini extensions update cassiiopeia 2>/dev/null; then
         print_success "Gemini CLI extension 업데이트 완료"
@@ -3958,21 +4085,9 @@ _manage_codex_skills() {
     echo "" >&2
 
     if command -v codex &> /dev/null; then
-        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
-            print_to_user "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-            print_to_user "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
-            print_to_user "  Y/y - 예, 등록 또는 업데이트"
-            print_to_user "  N/n - 아니오, 건너뜁니다"
-            print_to_user ""
-            if ask_yes_no "선택: " "Y"; then
-                _do_codex_marketplace_register
-                return
-            fi
-        else
-            _do_codex_marketplace_register
-            return
-        fi
+        # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 등록/업데이트.
+        _do_codex_marketplace_register
+        return
     else
         print_warning "codex CLI가 감지되지 않았습니다."
         print_info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
@@ -4003,12 +4118,8 @@ _do_codex_native_skills_fallback() {
     local target="${target_dir}/cassiiopeia"
 
     if [ "$mode" != "auto" ] && [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "Codex native skills fallback을 설치/업데이트하시겠습니까?"
-        print_to_user "  설치 경로: ${target}"
-        print_to_user "  Y/y - 예, 설치 또는 업데이트"
-        print_to_user "  N/n - 아니오, 건너뛰기"
-        print_to_user ""
-        if ! ask_yes_no "선택: " "Y"; then
+        print_info "  설치 경로: ${target}"
+        if ! ask_yes_no "Codex native skills fallback을 설치/업데이트할까요?" "Y"; then
             print_info "Codex native skills fallback 변경 없이 건너뜁니다"
             return
         fi

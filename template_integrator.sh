@@ -1435,14 +1435,63 @@ print_question_header() {
 
 # 프로젝트 타입 선택 메뉴
 show_project_type_menu() {
-    # 현재 PROJECT_TYPES를 preselect csv로 — 멀티 선택 메뉴(Space 토글)
-    local _preselect
+    # ── 레포 스캔 → 추천 로그 (append-only) ──
+    # 1) 마커 기반 감지 (basic이면 마커 없음)
+    local _detected_csv
+    _detected_csv=$(detect_project_types 2>/dev/null)
+
+    print_to_user "" >&2
+    print_to_user "🔍 이 레포를 살펴봤습니다:" >&2
+
+    local _marker_csv=""
+    if [ -n "$_detected_csv" ] && [ "$_detected_csv" != "basic" ]; then
+        _marker_csv="$_detected_csv"
+        local _mt
+        local IFS=','
+        for _mt in $_detected_csv; do
+            unset IFS
+            print_to_user "   • $(marker_for_type "$_mt") 발견 → $_mt 추천 (자동 선택됨)" >&2
+            IFS=','
+        done
+        unset IFS
+    else
+        # 2) 마커 없음 → 확장자 스캔 추천 (안내만)
+        local _scan_csv
+        _scan_csv=$(suggest_types_by_scan)
+        if [ -n "$_scan_csv" ]; then
+            local _st
+            local IFS=','
+            for _st in $_scan_csv; do
+                unset IFS
+                print_to_user "   • $_st 관련 파일 발견 → $_st 가능성 (직접 골라주세요)" >&2
+                IFS=','
+            done
+            unset IFS
+        else
+            print_to_user "   • 마커 파일을 찾지 못했습니다 — 직접 선택하세요" >&2
+        fi
+    fi
+
+    # 현재 version.yml 값 안내
+    local _cur
     local IFS=','
-    _preselect="${PROJECT_TYPES[*]:-}"
+    _cur="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
     unset IFS
+    print_to_user "   • 현재 값: ${_cur:-basic}" >&2
+    print_to_user "" >&2
+
+    # ── preselect: 마커 추천이 있으면 그것, 없으면 현재값 ──
+    local _preselect
+    if [ -n "$_marker_csv" ]; then
+        _preselect="$_marker_csv"
+    else
+        local IFS=','
+        _preselect="${PROJECT_TYPES[*]:-}"
+        unset IFS
+    fi
 
     local selected
-    selected=$(choose_menu --multi --preselect="$_preselect" "프로젝트 타입을 선택하세요 (멀티 가능 — Space로 토글)" \
+    selected=$(choose_menu --multi --preselect="$_preselect" "프로젝트 타입을 선택하세요" \
         "spring|Spring Boot 백엔드" \
         "flutter|Flutter 모바일 앱" \
         "next|Next.js 웹 앱" \
@@ -1455,7 +1504,6 @@ show_project_type_menu() {
 
     if [ -z "$selected" ]; then
         print_error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
-        # 기존 PROJECT_TYPES csv 반환 (호출측이 사용)
         local IFS=','
         echo "${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
         unset IFS

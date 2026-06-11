@@ -283,16 +283,20 @@ print_to_user() {
 # 인터랙티브 메뉴 (TTY 전용) — 화살표/숫자/Enter/ESC
 # 사용법: selected=$(interactive_menu "prompt" "value1|label1" "value2|label2" ...)
 # stdout: 선택된 value
-# exit:   0=확정, 1=취소
+# exit:   0=확정, 1=취소(ESC)
+# 옵션: --cancel-label=라벨 → 하단 안내의 ESC 동작 표기(기본 "취소").
+#       하위 메뉴는 "뒤로", 최상위는 "취소"로 호출자가 지정한다.
 # ─────────────────────────────────────────────────────────────
 interactive_menu() {
-    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값)
+    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값), --cancel-label=라벨
     local multi=false
     local preselect_csv=""
+    local cancel_label="취소"
     while [[ "$1" == --* ]]; do
         case "$1" in
             --multi) multi=true; shift ;;
             --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            --cancel-label=*) cancel_label="${1#--cancel-label=}"; shift ;;
             *) break ;;
         esac
     done
@@ -341,9 +345,9 @@ interactive_menu() {
     fi
 
     if [ "$multi" = true ]; then
-        printf "\n%s (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+        printf "\n%s (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC %s):\n\n" "$prompt" "$cancel_label" >&2
     else
-        printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+        printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC %s):\n\n" "$prompt" "$cancel_label" >&2
     fi
 
     local cursor=0
@@ -520,13 +524,15 @@ interactive_menu() {
 # 사용법: selected=$(legacy_numeric_menu "prompt" "value1|label1" ...)
 # ─────────────────────────────────────────────────────────────
 legacy_numeric_menu() {
-    # 옵션 파싱 — interactive_menu와 동일한 --multi/--preselect 지원
+    # 옵션 파싱 — interactive_menu와 동일한 --multi/--preselect/--cancel-label 지원
+    # (--cancel-label은 비TTY 텍스트 메뉴에선 표기 의미가 없어 파싱만 하고 무시)
     local multi=false
     local preselect_csv=""
     while [[ "$1" == --* ]]; do
         case "$1" in
             --multi) multi=true; shift ;;
             --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            --cancel-label=*) shift ;;
             *) break ;;
         esac
     done
@@ -1013,8 +1019,53 @@ classify_package_json() {
     fi
 }
 
+# 모드 키 → 확인 화면용 한국어 라벨
+_mode_display_label() {
+    case "$1" in
+        full)      echo "전체 설치 (버전관리 + 워크플로우 + 이슈·PR 템플릿)" ;;
+        version)   echo "버전 관리만" ;;
+        workflows) echo "워크플로우만" ;;
+        issues)    echo "이슈·PR 템플릿만" ;;
+        skills)    echo "AI 스킬만" ;;
+        *)         echo "$1" ;;
+    esac
+}
+
 detect_project_types() {
     print_step "프로젝트 타입 자동 감지 중..."
+
+    # ── 0) 기존 version.yml의 project_types 최우선 ──
+    # 이미 통합된 프로젝트(멀티타입 포함)는 version.yml에 타입이 저장돼 있다.
+    # 루트에 마커가 없어도(모노레포: 타입이 server/·app/ 하위) 기존 설정을 그대로 이어받아야
+    # basic으로 잘못 재감지되지 않는다. (version 보존과 동일 철학 — version.yml이 source of truth)
+    if [ -f "version.yml" ]; then
+        local _existing_types=""
+        if command -v yq >/dev/null 2>&1; then
+            _existing_types=$(yq -r '.project_types // [] | join(",")' version.yml 2>/dev/null)
+            [ "$_existing_types" = "null" ] && _existing_types=""
+            if [ -z "$_existing_types" ]; then
+                _existing_types=$(yq -r '.project_type // ""' version.yml 2>/dev/null)
+                [ "$_existing_types" = "null" ] && _existing_types=""
+            fi
+        else
+            # yq 없음: project_types 라인에서 ["a","b"] 안의 토큰 추출
+            local _line
+            _line=$(grep -E '^project_types:' version.yml 2>/dev/null | head -1)
+            if [ -n "$_line" ]; then
+                _existing_types=$(echo "$_line" | grep -oE '"[a-z-]+"' | tr -d '"' | paste -sd, -)
+            fi
+            if [ -z "$_existing_types" ]; then
+                _existing_types=$(grep -E '^project_type:' version.yml 2>/dev/null | head -1 | sed 's/.*"\([a-z-]*\)".*/\1/')
+            fi
+        fi
+        # version.yml에 타입이 명시돼 있으면(basic 포함) 그것이 source of truth → 그대로 사용.
+        # 값이 아예 없을 때만 아래 파일 스캔으로 새로 감지한다.
+        if [ -n "$_existing_types" ]; then
+            print_info "기존 version.yml 타입 사용: $_existing_types"
+            echo "$_existing_types"
+            return
+        fi
+    fi
 
     local detected=()
 
@@ -1385,7 +1436,9 @@ resolve_project_paths() {
             print_to_user "    m) 직접 입력"
             local _sel=""
             while true; do
-                safe_read "  선택: " _sel ""
+                # set -e 가드: ESC(return 2)로 함수가 죽지 않게 || true. 빈값이면 아래서 재입력 안내.
+                _sel=""
+                safe_read "  선택: " _sel "" || true
                 if [ "$_sel" = "m" ] || [ "$_sel" = "M" ]; then
                     break
                 fi
@@ -1408,7 +1461,8 @@ resolve_project_paths() {
                 _prompt="$_prompt, 현재값: $_existing"
             fi
             _prompt="$_prompt): "
-            safe_read "$_prompt" _input ""
+            # set -e 가드: ESC(return 2)로 함수가 죽지 않게 || true. 빈값이면 아래서 기존값/루트로 폴백.
+            safe_read "$_prompt" _input "" || true
             # 정규화: 공백 제거, 백슬래시→슬래시, 끝 슬래시·앞 ./ 제거
             _input=$(echo "$_input" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#\\#/#g; s#/$##; s#^\./##')
             if [ -z "$_input" ]; then
@@ -1640,8 +1694,9 @@ show_project_type_menu() {
         unset IFS
     fi
 
-    local selected
-    selected=$(choose_menu --multi --preselect="$_preselect" "프로젝트 타입을 선택하세요" \
+    # 하위 메뉴이므로 ESC는 '뒤로'. set -e 환경에서 ESC(비-0)가 함수를 죽이지 않도록 || true 가드.
+    local selected=""
+    selected=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_preselect" "프로젝트 타입을 선택하세요" \
         "spring|Spring Boot 백엔드" \
         "flutter|Flutter 모바일 앱" \
         "next|Next.js 웹 앱" \
@@ -1650,10 +1705,10 @@ show_project_type_menu() {
         "react-native-expo|React Native Expo 앱" \
         "node|Node.js 프로젝트" \
         "python|Python 프로젝트" \
-        "basic|기타 프로젝트")
+        "basic|기타 프로젝트") || true
 
     if [ -z "$selected" ]; then
-        print_error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
+        print_info "타입 선택을 취소했습니다. 기존 값을 유지합니다."
         local IFS=','
         echo "${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
         unset IFS
@@ -1699,18 +1754,31 @@ detect_and_confirm_project() {
         fi
         print_to_user "       🌙 Version          : $VERSION"
         print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
+        # 모드  : 무엇을 설치하는지 (확인 화면에서 한눈에)
+        [ -n "$MODE" ] && print_to_user "       💫 통합 모드        : $(_mode_display_label "$MODE")"
+        # Synology : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
+        if [ "$INCLUDE_SYNOLOGY" = true ]; then
+            print_to_user "       🗄️ Synology         : 포함"
+        elif [ "$INCLUDE_SYNOLOGY" = false ]; then
+            print_to_user "       🗄️ Synology         : 제외"
+        fi
+        # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
+        if [ -n "$PROJECT_PATHS_CSV" ]; then
+            print_to_user "       📁 프로젝트 경로    : $(echo "$PROJECT_PATHS_CSV" | sed 's/=/→/g; s/,/, /g')"
+        fi
         print_to_user ""
-        
+
         # 사용자 확인 — 화살표 3지선 메뉴 (TTY 대화형). 비TTY/FORCE는 기존 키 입력 폴백.
         local user_choice
         if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
             # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
-            local _confirm_label _confirm_rc
+            local _confirm_label _confirm_rc=0
+            # set -e 환경: choose_menu가 ESC로 비-0 반환 시 함수가 즉시 중단되지 않도록
+            # || 로 종료코드를 받아 stay(머무름) 분기로 안전하게 흘려보낸다.
             _confirm_label=$(choose_menu "이 정보가 맞습니까?" \
                 "예, 계속 진행|" \
                 "수정하기|" \
-                "아니오, 취소|")
-            _confirm_rc=$?
+                "아니오, 취소|") || _confirm_rc=$?
             if [ "$_confirm_rc" -ne 0 ]; then
                 # ESC — 여기는 최상위 확인 화면이라 더 뒤로 갈 단계가 없다.
                 # 의도치 않은 종료를 막기 위해 그 자리에 머문다(루프 재출력).
@@ -1739,8 +1807,10 @@ detect_and_confirm_project() {
                 exit 0
                 ;;
             "edit")
-                handle_project_edit_menu
-                # 루프 계속 - 다시 확인 질문으로
+                # handle_project_edit_menu는 '뒤로'(ESC) 시 return 1을 준다.
+                # set -e 환경에서 그 비-0 반환이 이 함수를 죽이지 않도록 || true로 흡수.
+                # 어느 경우든 확인 루프를 계속 돌아 다시 확인 화면을 보여준다.
+                handle_project_edit_menu || true
                 ;;
             "stay")
                 # ESC 등으로 인한 중립 상태 — 종료하지 않고 확인 화면을 다시 보여준다
@@ -1754,115 +1824,123 @@ detect_and_confirm_project() {
 }
 
 # 프로젝트 정보 수정 메뉴
+# 루프 구조: 항목을 고쳐도 메뉴로 되돌아와 다른 항목을 이어서 수정할 수 있다.
+# '모두 맞음, 계속' 또는 ESC(뒤로) → 상위 확인 화면으로 복귀.
+# set -e 환경: 메뉴/입력이 ESC로 비-0 반환해도 함수가 죽지 않도록 모두 || 로 코드를 받는다.
 handle_project_edit_menu() {
-    print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
+    while true; do
+        print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
 
-    # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
-    local _edit_label
-    _edit_label=$(choose_menu "어떤 항목을 수정하시겠습니까?" \
-        "프로젝트 타입|" \
-        "버전|" \
-        "기본 브랜치|" \
-        "모두 맞음, 계속|")
+        # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
+        # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로) 표기.
+        local _edit_label _menu_rc=0
+        _edit_label=$(choose_menu --cancel-label="뒤로" "어떤 항목을 수정하시겠습니까?" \
+            "프로젝트 타입|" \
+            "버전|" \
+            "기본 브랜치|" \
+            "모두 맞음, 계속|") || _menu_rc=$?
 
-    local edit_choice=""
-    case "$_edit_label" in
-        프로젝트\ 타입*) edit_choice="type" ;;
-        버전*)           edit_choice="version" ;;
-        기본\ 브랜치*)   edit_choice="branch" ;;
-        모두\ 맞음*)     edit_choice="done" ;;
-        *)               edit_choice="" ;;
-    esac
+        local edit_choice=""
+        if [ "$_menu_rc" -ne 0 ]; then
+            # ESC → 상위 확인 화면으로 뒤로
+            edit_choice="back"
+        else
+            case "$_edit_label" in
+                프로젝트\ 타입*) edit_choice="type" ;;
+                버전*)           edit_choice="version" ;;
+                기본\ 브랜치*)   edit_choice="branch" ;;
+                모두\ 맞음*)     edit_choice="done" ;;
+                *)               edit_choice="back" ;;
+            esac
+        fi
 
-    if [ -z "$edit_choice" ]; then
-        print_warning "수정 메뉴가 취소되었습니다."
-        return 1
-    fi
+        case "$edit_choice" in
+            type)
+                local _old_csv
+                local IFS=','
+                _old_csv="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+                unset IFS
 
-    case "$edit_choice" in
-        type)
-            local _old_csv
-            local IFS=','
-            _old_csv="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
-            unset IFS
+                local _new_csv
+                _new_csv=$(show_project_type_menu) || _new_csv=""
+                if [ -n "$_new_csv" ]; then
+                    IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
+                    PROJECT_TYPE="${PROJECT_TYPES[0]}"
+                    if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+                        print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
+                    else
+                        print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                    fi
 
-            local _new_csv
-            _new_csv=$(show_project_type_menu)
-            if [ -n "$_new_csv" ]; then
-                IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
-                PROJECT_TYPE="${PROJECT_TYPES[0]}"
-                if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
-                    print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
+                    # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
+                    # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
+                    local _old_sorted _new_sorted
+                    _old_sorted=$(printf '%s\n' "$_old_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
+                    _new_sorted=$(printf '%s\n' "$_new_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
+                    if [ "$_new_sorted" != "$_old_sorted" ]; then
+                        PROJECT_PATHS_CSV=""   # 새 타입 기준으로 다시 잡도록 초기화
+                        resolve_project_paths
+                    fi
+                fi
+                print_to_user ""
+                ;;
+            version)
+                local new_version _rc=0
+                print_to_user ""
+                safe_read "새 버전을 입력하세요 (예: 1.0.0, ESC=뒤로): " new_version "" || _rc=$?
+                if [ "$_rc" -eq 2 ]; then
+                    # ESC → 이전 메뉴로 돌아감(기존 값 유지)
+                    print_info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    print_to_user ""
+                elif [ "$_rc" -eq 0 ]; then
+                    print_to_user ""
+                    if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        VERSION="$new_version"
+                        print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                    else
+                        print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                    fi
+                    print_to_user ""
                 else
-                    print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                    print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                    print_to_user ""
                 fi
-
-                # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
-                # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
-                local _old_sorted _new_sorted
-                _old_sorted=$(printf '%s\n' "$_old_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
-                _new_sorted=$(printf '%s\n' "$_new_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
-                if [ "$_new_sorted" != "$_old_sorted" ]; then
-                    PROJECT_PATHS_CSV=""   # 새 타입 기준으로 다시 잡도록 초기화
-                    resolve_project_paths
-                fi
-            fi
-            print_to_user ""
-            ;;
-        version)
-            local new_version _rc
-            print_to_user ""
-            safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""
-            _rc=$?
-            if [ "$_rc" -eq 2 ]; then
-                # ESC → 취소, 기존 값 유지하고 수정 메뉴로 복귀
-                print_info "취소되었습니다. 기존 값을 유지합니다."
+                ;;
+            branch)
+                local new_branch _rc=0
                 print_to_user ""
-            elif [ "$_rc" -eq 0 ]; then
+                print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
                 print_to_user ""
-                if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                    VERSION="$new_version"
-                    print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop, ESC=뒤로): " new_branch "" || _rc=$?
+                if [ "$_rc" -eq 2 ]; then
+                    # ESC → 이전 메뉴로 돌아감(기존 값 유지)
+                    print_info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    print_to_user ""
+                elif [ "$_rc" -eq 0 ]; then
+                    print_to_user ""
+                    if [ -n "$new_branch" ]; then
+                        DETECTED_BRANCH="$new_branch"
+                        print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                    else
+                        print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+                    fi
+                    print_to_user ""
                 else
-                    print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                    print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                    print_to_user ""
                 fi
+                ;;
+            done)
+                print_success "프로젝트 정보 확인 완료"
                 print_to_user ""
-            else
-                print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
-                print_to_user ""
-            fi
-            ;;
-        branch)
-            local new_branch _rc
-            print_to_user ""
-            print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
-            print_to_user ""
-            safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""
-            _rc=$?
-            if [ "$_rc" -eq 2 ]; then
-                # ESC → 취소, 기존 값 유지하고 수정 메뉴로 복귀
-                print_info "취소되었습니다. 기존 값을 유지합니다."
-                print_to_user ""
-            elif [ "$_rc" -eq 0 ]; then
-                print_to_user ""
-                if [ -n "$new_branch" ]; then
-                    DETECTED_BRANCH="$new_branch"
-                    print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
-                else
-                    print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-                fi
-                print_to_user ""
-            else
-                print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
-                print_to_user ""
-            fi
-            ;;
-        done)
-            print_success "프로젝트 정보 확인 완료"
-            print_to_user ""
-            return 0
-            ;;
-    esac
+                return 0
+                ;;
+            back)
+                # ESC/취소 → 상위 확인 화면으로 복귀(변경 없이)
+                return 1
+                ;;
+        esac
+    done
 }
 
 # 템플릿 다운로드
@@ -3255,25 +3333,31 @@ interactive_mode() {
 
     # 라벨에 영어 키(full/version…)가 보이지 않도록, 사용자에게는 한국어 설명만 노출한다.
     # choose_menu는 value를 표시하므로 value 자리에 한국어 라벨을 두고 반환값을 케이스로 매핑.
-    local _mode_label
+    # 최상위 첫 화면이라 ESC는 '취소'(종료). set -e 환경에서 ESC(비-0)가 함수를
+    # 죽여 안내 없이 끝나지 않도록 || 로 코드를 받아 cancel로 매핑한다.
+    local _mode_label _mode_rc=0
     _mode_label=$(choose_menu "무엇을 설치할까요?" \
         "전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿 (처음이라면 추천)|" \
         "버전 관리만 — 버전 자동 증가·동기화 시스템만 설치|" \
         "워크플로우만 — 빌드·배포 GitHub Actions만 설치|" \
         "이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치|" \
         "AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치|" \
-        "취소|")
+        "취소|") || _mode_rc=$?
 
-    # 한국어 라벨 → 내부 모드 키 매핑
+    # 한국어 라벨 → 내부 모드 키 매핑 (ESC=비-0 → cancel)
     local _mode_selected=""
-    case "$_mode_label" in
-        전체\ 설치*)        _mode_selected="full" ;;
-        버전\ 관리만*)      _mode_selected="version" ;;
-        워크플로우만*)      _mode_selected="workflows" ;;
-        이슈*PR\ 템플릿만*) _mode_selected="issues" ;;
-        AI\ 스킬만*)        _mode_selected="skills" ;;
-        *)                  _mode_selected="cancel" ;;
-    esac
+    if [ "$_mode_rc" -ne 0 ]; then
+        _mode_selected="cancel"
+    else
+        case "$_mode_label" in
+            전체\ 설치*)        _mode_selected="full" ;;
+            버전\ 관리만*)      _mode_selected="version" ;;
+            워크플로우만*)      _mode_selected="workflows" ;;
+            이슈*PR\ 템플릿만*) _mode_selected="issues" ;;
+            AI\ 스킬만*)        _mode_selected="skills" ;;
+            *)                  _mode_selected="cancel" ;;
+        esac
+    fi
 
     if [ -z "$_mode_selected" ] || [ "$_mode_selected" = "cancel" ]; then
         print_info "취소되었습니다"
@@ -3293,11 +3377,20 @@ interactive_mode() {
             # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
             ;;
         *)
-            # full/version/workflows → 프로젝트 타입·버전·브랜치 감지 + 확인
-            # (Synology·경로는 confirm 직전에 모아 확인 화면에 함께 표시)
-            detect_and_confirm_project
+            # full/version/workflows → 타입·버전·브랜치 감지 → Synology·경로 수집 → 최종 확인
+            # 순서가 핵심: Synology·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다.
 
-            # Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
+            # 1) 타입/버전/브랜치 먼저 감지 (확인은 아직 안 함)
+            if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+                local _detected_csv
+                _detected_csv=$(detect_project_types)
+                IFS=',' read -ra PROJECT_TYPES <<< "$_detected_csv"
+                PROJECT_TYPE="${PROJECT_TYPES[0]}"
+            fi
+            [ -z "$VERSION" ] && VERSION=$(detect_version)
+            [ -z "$DETECTED_BRANCH" ] && DETECTED_BRANCH=$(detect_default_branch)
+
+            # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
             if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
                 local _syn_dirs=()
                 local _st
@@ -3306,6 +3399,14 @@ interactive_mode() {
                 done
                 ask_synology_option "${_syn_dirs[@]}"
             fi
+
+            # 3) 경로: full/version 모드에서 멀티경로 확정
+            if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
+                resolve_project_paths
+            fi
+
+            # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인 (수정/취소 가능)
+            detect_and_confirm_project
             ;;
     esac
 }
@@ -3392,7 +3493,8 @@ execute_integration() {
     fi
 
     # 타입별 경로 확정 — version.yml에 project_paths 기록 (full/version 모드만)
-    if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
+    # interactive 모드는 확인 화면 전에 이미 수집했으므로 중복 호출 방지.
+    if { [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; } && [ "$IS_INTERACTIVE_MODE" = false ]; then
         resolve_project_paths
     fi
 
@@ -3565,17 +3667,22 @@ offer_ide_tools_install() {
         if command -v gemini &> /dev/null; then _ide_opts+=("Gemini CLI|"); else _ide_opts+=("Gemini CLI (미감지)|"); fi
         if command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; then _ide_opts+=("Codex CLI|"); else _ide_opts+=("Codex CLI (미감지)|"); fi
 
-        local _action_label
-        _action_label=$(choose_menu "AI 스킬을 어떻게 할까요?" \
+        # ESC는 '그대로 두기'와 동일(건너뛰기). set -e 가드 || 로 비-0 흡수.
+        local _action_label _action_rc=0
+        _action_label=$(choose_menu --cancel-label="건너뛰기" "AI 스킬을 어떻게 할까요?" \
             "설치 / 업데이트 — 최신 상태로 맞추기|" \
             "제거 — 설치된 스킬 삭제하기|" \
-            "그대로 두기|")
+            "그대로 두기|") || _action_rc=$?
         local _action=""
-        case "$_action_label" in
-            설치*)   _action="apply" ;;
-            제거*)   _action="remove" ;;
-            *)       _action="skip" ;;
-        esac
+        if [ "$_action_rc" -ne 0 ]; then
+            _action="skip"
+        else
+            case "$_action_label" in
+                설치*)   _action="apply" ;;
+                제거*)   _action="remove" ;;
+                *)       _action="skip" ;;
+            esac
+        fi
 
         case "$_action" in
             apply)
@@ -3584,8 +3691,9 @@ offer_ide_tools_install() {
                 local _pre="Claude Code,Cursor"
                 command -v gemini &> /dev/null && _pre="$_pre,Gemini CLI"
                 { command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; } && _pre="$_pre,Codex CLI"
-                local _targets
-                _targets=$(choose_menu --multi --preselect="$_pre" "설치 / 업데이트할 IDE를 고르세요" "${_ide_opts[@]}")
+                # ESC/무선택 → 건너뛰기. set -e 가드 || true.
+                local _targets=""
+                _targets=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_pre" "설치 / 업데이트할 IDE를 고르세요" "${_ide_opts[@]}") || true
                 [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
                 case ",$_targets," in *,Claude\ Code,*) _manage_claude_section "$claude_available" "$installed_scope" "$installed_version" ;; esac
                 case ",$_targets," in *,Cursor,*)       _manage_cursor_section ;; esac
@@ -3594,8 +3702,9 @@ offer_ide_tools_install() {
                 ;;
             remove)
                 # 제거: 전체 후보 제시 후 미설치는 각 섹션이 no-op 처리
-                local _targets
-                _targets=$(choose_menu --multi "제거할 IDE를 고르세요" "${_ide_opts[@]}")
+                # ESC/무선택 → 건너뛰기. set -e 가드 || true.
+                local _targets=""
+                _targets=$(choose_menu --multi --cancel-label="뒤로" "제거할 IDE를 고르세요" "${_ide_opts[@]}") || true
                 [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
                 case ",$_targets," in *,Claude\ Code,*) _remove_claude_section "$claude_available" "$installed_scope" ;; esac
                 case ",$_targets," in *,Cursor,*)       _remove_cursor_section ;; esac

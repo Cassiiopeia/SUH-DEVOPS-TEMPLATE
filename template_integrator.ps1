@@ -679,8 +679,50 @@ function Get-PackageJsonType {
     }
 }
 
+# 모드 키 → 확인 화면용 한국어 라벨 (sh _mode_display_label과 동일)
+function Get-ModeDisplayLabel {
+    param([string]$ModeKey)
+    switch ($ModeKey) {
+        'full'      { return '전체 설치 (버전관리 + 워크플로우 + 이슈·PR 템플릿)' }
+        'version'   { return '버전 관리만' }
+        'workflows' { return '워크플로우만' }
+        'issues'    { return '이슈·PR 템플릿만' }
+        'skills'    { return 'AI 스킬만' }
+        default     { return $ModeKey }
+    }
+}
+
 function Detect-ProjectTypes {
     Print-Step "프로젝트 타입 자동 감지 중..."
+
+    # ── 0) 기존 version.yml의 project_types 최우선 (sh와 동일) ──
+    # 이미 통합된 프로젝트(멀티타입 포함)는 version.yml에 타입이 저장돼 있다.
+    # 루트에 마커가 없어도(모노레포) 기존 설정을 그대로 이어받아 basic 오감지를 막는다.
+    if (Test-Path "version.yml") {
+        $existingTypes = ""
+        $lines = Get-Content "version.yml" -ErrorAction SilentlyContinue
+        foreach ($line in $lines) {
+            if ($line -match '^\s*#') { continue }
+            if ($line -match '^project_types:') {
+                # ["spring","flutter"] → spring,flutter
+                $tokens = [regex]::Matches($line, '"([a-z\-]+)"') | ForEach-Object { $_.Groups[1].Value }
+                if ($tokens.Count -gt 0) { $existingTypes = ($tokens -join ',') }
+                break
+            }
+        }
+        # 배열이 없으면 단수 project_type 폴백
+        if (-not $existingTypes) {
+            foreach ($line in $lines) {
+                if ($line -match '^\s*#') { continue }
+                if ($line -match '^project_type:\s*"?([a-z\-]+)"?') { $existingTypes = $matches[1]; break }
+            }
+        }
+        # version.yml에 타입이 명시돼 있으면(basic 포함) source of truth → 그대로 사용
+        if ($existingTypes) {
+            Print-Info "기존 version.yml 타입 사용: $existingTypes"
+            return $existingTypes
+        }
+    }
 
     # PowerShell 5.1 호환: null += 방지 위해 빈 배열로 초기화
     $detected = @()
@@ -1212,75 +1254,89 @@ function Show-ProjectTypeMenu {
 # ===================================================================
 
 function Edit-ProjectInfo {
-    Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
+    # 루프 구조(sh handle_project_edit_menu와 대칭): 항목을 고쳐도 메뉴로 되돌아와
+    # 다른 항목을 이어서 수정할 수 있다. '모두 맞음, 계속' 또는 '뒤로' → 확인 화면으로 복귀.
+    # ps1은 숫자 입력 메뉴라 ESC 키가 없어 '뒤로'를 명시적 항목으로 제공한다.
+    while ($true) {
+        Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
 
-    $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
-        @{Value='type';    Label='프로젝트 타입'},
-        @{Value='version'; Label='버전'},
-        @{Value='branch';  Label='기본 브랜치'},
-        @{Value='done';    Label='모두 맞음, 계속'}
-    )
+        $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
+            @{Value='type';    Label='프로젝트 타입'},
+            @{Value='version'; Label='버전'},
+            @{Value='branch';  Label='기본 브랜치'},
+            @{Value='done';    Label='모두 맞음, 계속'},
+            @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
+        )
 
-    if (-not $editChoice) {
-        Write-Host "수정 메뉴가 취소되었습니다."
-        return
-    }
-
-    switch ($editChoice) {
-        'type' {
-            $oldCsv = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
-            $newCsv = Show-ProjectTypeMenu
-            if ($newCsv) {
-                $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-                $script:ProjectType = $script:ProjectTypes[0]
-                if ($script:ProjectTypes.Count -gt 1) {
-                    Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
-                } else {
-                    Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
-                }
-                # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
-                # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
-                $oldSorted = (($oldCsv -split ',' | Sort-Object) -join ',')
-                $newSorted = (($newCsv -split ',' | Sort-Object) -join ',')
-                if ($newSorted -ne $oldSorted) {
-                    $script:ProjectPaths = [ordered]@{}
-                    Resolve-ProjectPaths
-                }
-            }
-            Write-Host ""
-        }
-        'version' {
-            Write-Host ""
-            $newVersion = Read-UserInput "새 버전을 입력하세요 (예: 1.0.0)"
-            Write-Host ""
-
-            if ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
-                $script:ProjectVersion = $newVersion
-                Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
-            } else {
-                Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-            }
-            Write-Host ""
-        }
-        'branch' {
-            Write-Host ""
-            Write-Host "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
-            Write-Host ""
-            $newBranch = Read-UserInput "기본 브랜치 이름을 입력하세요 (예: main, develop)"
-            Write-Host ""
-
-            if (![string]::IsNullOrWhiteSpace($newBranch)) {
-                $script:DetectedBranch = $newBranch
-                Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
-            } else {
-                Print-Error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-            }
-            Write-Host ""
-        }
-        'done' {
-            Print-Success "프로젝트 정보 확인 완료"
-            Write-Host ""
+        if (-not $editChoice) {
+            # 입력 불가 등 → 안전하게 뒤로
             return
+        }
+
+        switch ($editChoice) {
+            'type' {
+                $oldCsv = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+                $newCsv = Show-ProjectTypeMenu
+                if ($newCsv) {
+                    $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                    $script:ProjectType = $script:ProjectTypes[0]
+                    if ($script:ProjectTypes.Count -gt 1) {
+                        Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
+                    } else {
+                        Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
+                    }
+                    # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
+                    # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
+                    $oldSorted = (($oldCsv -split ',' | Sort-Object) -join ',')
+                    $newSorted = (($newCsv -split ',' | Sort-Object) -join ',')
+                    if ($newSorted -ne $oldSorted) {
+                        $script:ProjectPaths = [ordered]@{}
+                        Resolve-ProjectPaths
+                    }
+                }
+                Write-Host ""
+            }
+            'version' {
+                Write-Host ""
+                # 빈 입력(그냥 Enter)은 '뒤로'(기존 값 유지)로 취급 — sh의 ESC=뒤로와 동작 대칭.
+                $newVersion = Read-UserInput "새 버전을 입력하세요 (예: 1.0.0, 그냥 Enter=뒤로)"
+                Write-Host ""
+
+                if ([string]::IsNullOrWhiteSpace($newVersion)) {
+                    Print-Info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                } elseif ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
+                    $script:ProjectVersion = $newVersion
+                    Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
+                } else {
+                    Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                }
+                Write-Host ""
+            }
+            'branch' {
+                Write-Host ""
+                Write-Host "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+                Write-Host ""
+                # 빈 입력(그냥 Enter)은 '뒤로'(기존 값 유지)로 취급.
+                $newBranch = Read-UserInput "기본 브랜치 이름을 입력하세요 (예: main, develop, 그냥 Enter=뒤로)"
+                Write-Host ""
+
+                if (![string]::IsNullOrWhiteSpace($newBranch)) {
+                    $script:DetectedBranch = $newBranch
+                    Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
+                } else {
+                    Print-Info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                }
+                Write-Host ""
+            }
+            'done' {
+                Print-Success "프로젝트 정보 확인 완료"
+                Write-Host ""
+                return
+            }
+            'back' {
+                # 변경 없이 상위 확인 화면으로 복귀
+                return
+            }
         }
     }
 }
@@ -1318,8 +1374,16 @@ function Detect-AndConfirmProject {
         }
         Write-Host "       🌙 Version          : $($script:ProjectVersion)"
         Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
+        # 모드 / Synology / 멀티경로 (값이 있을 때만 — sh와 동일)
+        if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
+        if ($script:IncludeSynology -eq $true)  { Write-Host "       🗄️ Synology         : 포함" }
+        elseif ($script:IncludeSynology -eq $false) { Write-Host "       🗄️ Synology         : 제외" }
+        if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
+            $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
+            Write-Host "       📁 프로젝트 경로    : $pathPairs"
+        }
         Write-Host ""
-        
+
         # 사용자 확인
         Write-Host "이 정보가 맞습니까?"
         Write-Host "  Y/y - 예, 계속 진행"
@@ -2841,15 +2905,32 @@ function Start-InteractiveMode {
             # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
         }
         default {
-            # full/version/workflows → 프로젝트 타입·버전·브랜치 감지 + 확인
-            Detect-AndConfirmProject
+            # full/version/workflows → 타입·버전·브랜치 감지 → Synology·경로 수집 → 최종 확인
+            # 순서가 핵심: Synology·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다. (sh와 동일)
 
-            # Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
+            # 1) 타입/버전/브랜치 먼저 감지 (확인은 아직 안 함)
+            if ($script:ProjectTypes.Count -eq 0) {
+                $detectedCsv = Detect-ProjectTypes
+                $script:ProjectTypes = @($detectedCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                $script:ProjectType = $script:ProjectTypes[0]
+            }
+            if ([string]::IsNullOrWhiteSpace($script:ProjectVersion)) { $script:ProjectVersion = Detect-Version }
+            if ([string]::IsNullOrWhiteSpace($script:DetectedBranch)) { $script:DetectedBranch = Detect-DefaultBranch }
+
+            # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만
             if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
                 $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
                 $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
                 Ask-SynologyOption $typeDirs
             }
+
+            # 3) 경로: full/version 모드에서 멀티경로 확정
+            if ($script:Mode -eq "full" -or $script:Mode -eq "version") {
+                Resolve-ProjectPaths
+            }
+
+            # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인
+            Detect-AndConfirmProject
         }
     }
 }
@@ -2922,7 +3003,8 @@ function Start-Integration {
     }
 
     # 타입별 경로 확정 — version.yml에 project_paths 기록 (full/version 모드만)
-    if ($Mode -eq "full" -or $Mode -eq "version") {
+    # interactive 모드는 확인 화면 전에 이미 수집했으므로 중복 호출 방지. (sh와 동일)
+    if (($Mode -eq "full" -or $Mode -eq "version") -and -not $script:IsInteractiveMode) {
         Resolve-ProjectPaths
     }
 

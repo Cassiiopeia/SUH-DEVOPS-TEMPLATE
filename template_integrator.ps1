@@ -651,6 +651,23 @@ function Detect-ProjectType {
 # 프로젝트 타입 멀티 감지 — 모든 일치 타입을 csv로 반환 (sh detect_project_types 포팅)
 # ===================================================================
 
+# package.json 경로 → react/next/node/react-native(-expo) 판별 (sh classify_package_json 대응)
+function Get-PackageJsonType {
+    param([string]$PjPath)
+    if (-not (Test-Path $PjPath -PathType Leaf)) { return "" }
+    $content = Get-Content $PjPath -Raw
+    if ($content -match "@react-native|react-native") {
+        if ($content -match "expo") { return "react-native-expo" }
+        return "react-native"
+    } elseif ($content -match '"next"') {
+        return "next"
+    } elseif ($content -match '"react"') {
+        return "react"
+    } else {
+        return "node"
+    }
+}
+
 function Detect-ProjectTypes {
     Print-Step "프로젝트 타입 자동 감지 중..."
 
@@ -695,29 +712,50 @@ function Detect-ProjectTypes {
     return ($detected -join ',')
 }
 
-# 마커 파일이 없을 때 확장자·특징 파일 빈도로 타입을 추천 (스캔 추천)
-# 반환: 추천 타입 csv (예: "python,node"), 추천 없으면 빈 문자열
+# 마커 파일이 없을 때 타입 추천 (스캔 추천) — 반환: csv (메뉴 순서 정렬), 없으면 ""
 function Get-SuggestedTypesByScan {
-    $files = @(Get-ChildItem -Path . -Recurse -Depth 2 -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch $script:PathExcludeRegex })
+    $found = @()
 
-    $dart   = @($files | Where-Object { $_.Extension -eq '.dart' }).Count
-    $java   = @($files | Where-Object { $_.Extension -eq '.java' }).Count
-    $kt     = @($files | Where-Object { $_.Extension -eq '.kt' }).Count
-    $gradle = @($files | Where-Object { $_.Extension -eq '.gradle' }).Count
-    $tsx    = @($files | Where-Object { $_.Extension -eq '.tsx' }).Count
-    $jsx    = @($files | Where-Object { $_.Extension -eq '.jsx' }).Count
-    $py     = @($files | Where-Object { $_.Extension -eq '.py' }).Count
-    $ts     = @($files | Where-Object { $_.Extension -eq '.ts' }).Count
-    $js     = @($files | Where-Object { $_.Extension -eq '.js' }).Count
+    # ── 1) 마커 우선 스캔 ──
+    foreach ($mt in @('flutter','spring','python','react-native-expo')) {
+        $cand = @(Find-TypePathCandidates $mt)
+        if ($cand.Count -gt 0) { $found += $mt }
+    }
+    # package.json 계열 — 디렉터리별 내용 판별
+    $pjCand = @(Find-TypePathCandidates 'react')
+    foreach ($d in $pjCand) {
+        if ([string]::IsNullOrEmpty($d)) { continue }
+        if ($d -eq ".") { $pj = "package.json" } else { $pj = "$d/package.json" }
+        $ptype = Get-PackageJsonType $pj
+        if ($ptype) { $found += $ptype }
+    }
 
+    # ── 2) 마커 없으면 확장자 폴백 ──
+    if ($found.Count -eq 0) {
+        $files = @(Get-ChildItem -Path . -Recurse -Depth 2 -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch $script:PathExcludeRegex })
+        $dart   = @($files | Where-Object { $_.Extension -eq '.dart' }).Count
+        $java   = @($files | Where-Object { $_.Extension -eq '.java' }).Count
+        $kt     = @($files | Where-Object { $_.Extension -eq '.kt' }).Count
+        $gradle = @($files | Where-Object { $_.Extension -eq '.gradle' }).Count
+        $tsx    = @($files | Where-Object { $_.Extension -eq '.tsx' }).Count
+        $jsx    = @($files | Where-Object { $_.Extension -eq '.jsx' }).Count
+        $py     = @($files | Where-Object { $_.Extension -eq '.py' }).Count
+        $ts     = @($files | Where-Object { $_.Extension -eq '.ts' }).Count
+        $js     = @($files | Where-Object { $_.Extension -eq '.js' }).Count
+        if ($dart -ge 1) { $found += 'flutter' }
+        if (($java + $kt + $gradle) -ge 3) { $found += 'spring' }
+        if (($tsx + $jsx) -ge 3) { $found += 'react' }
+        if ($py -ge 3) { $found += 'python' }
+        if ($found.Count -eq 0 -and ($ts + $js) -ge 3) { $found += 'node' }
+    }
+
+    # ── 3) 메뉴 순서 정렬 + 중복 제거 ──
+    $order = @('spring','flutter','next','react','react-native','react-native-expo','node','python','basic')
     $out = @()
-    if ($dart -ge 1) { $out += 'flutter' }
-    if (($java + $kt + $gradle) -ge 3) { $out += 'spring' }
-    if (($tsx + $jsx) -ge 3) { $out += 'react' }
-    if ($py -ge 3) { $out += 'python' }
-    if ($out.Count -eq 0 -and ($ts + $js) -ge 3) { $out += 'node' }
-
+    foreach ($o in $order) {
+        if ($found -contains $o -and $out -notcontains $o) { $out += $o }
+    }
     return ($out -join ',')
 }
 
@@ -768,6 +806,11 @@ function Get-ExistingMarkerInDir {
 # Depth 2 = 루트 포함 3단계 (bash find -maxdepth 3 대응) + 잡음 폴더 제외 + 타입별 오탐 필터
 function Find-TypePathCandidates {
     param([string]$ProjType)
+
+    # 멀티모듈 스프링: 루트 settings.gradle(.kts) 있으면 후보를 "." 하나로 고정
+    if ($ProjType -eq "spring" -and ((Test-Path "settings.gradle" -PathType Leaf) -or (Test-Path "settings.gradle.kts" -PathType Leaf))) {
+        return @(".")
+    }
 
     $markerNames = @()
     switch ($ProjType) {

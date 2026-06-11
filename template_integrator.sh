@@ -216,20 +216,57 @@ print_question() {
 }
 
 # 안전한 read 함수 (/dev/tty 사용)
+# 반환: 0=정상 입력, 1=TTY 없음(비대화형), 2=ESC로 취소
+# ESC 처리: 자유텍스트 입력($options 빈값)에서만 동작. 첫 키를 raw 모드로 한 글자
+#           읽어 ESC면 취소(2)로 반환한다. 일반 문자면 그 글자를 첫 글자로 삼고
+#           나머지를 라인으로 읽어 합쳐 기존 줄 입력과 동일하게 동작시킨다.
+#           (read -r 한 줄 입력은 ESC가 리터럴 '^['로 박혀 취소로 인식되지 못했던
+#            버그를 해결 — 버전/브랜치 입력 중 ESC가 ^[^[로 찍히던 문제)
 safe_read() {
     local prompt="$1"
     local varname="$2"
     local options="$3"
-    
+
     if [ "$TTY_AVAILABLE" = true ]; then
         printf "%s" "$prompt" > /dev/tty
-        
+
         if [ "$options" = "-n 1" ]; then
             IFS= read -r -n 1 "$varname" < /dev/tty
         elif [ -n "$options" ]; then
             IFS= read -r $options "$varname" < /dev/tty
         else
-            IFS= read -r "$varname" < /dev/tty
+            # 첫 키를 raw 1바이트로 읽어 ESC 여부 판별
+            local _first
+            IFS= read -rsn1 _first < /dev/tty || { printf "%s" "" > /dev/tty; return 1; }
+
+            if [ "$_first" = $'\e' ]; then
+                # ESC 뒤 시퀀스(화살표 등)를 정수 타임아웃으로 흡수.
+                # 추가 바이트가 있으면 화살표 등 → 취소 아님(빈값으로 처리), 없으면 진짜 ESC.
+                local _b1
+                if IFS= read -rsn1 -t 1 _b1 < /dev/tty 2>/dev/null && [ -n "$_b1" ]; then
+                    IFS= read -rsn1 -t 1 _ < /dev/tty 2>/dev/null || true
+                    printf "\n" > /dev/tty
+                    printf -v "$varname" '%s' ""
+                    return 0
+                fi
+                # 단독 ESC → 취소
+                printf "\n" > /dev/tty
+                printf -v "$varname" '%s' ""
+                return 2
+            fi
+
+            if [ "$_first" = $'\n' ] || [ "$_first" = $'\r' ] || [ -z "$_first" ]; then
+                # 즉시 Enter → 빈 입력
+                printf "\n" > /dev/tty
+                printf -v "$varname" '%s' ""
+                return 0
+            fi
+
+            # 일반 문자 → 첫 글자 echo 후 나머지 라인 읽어 합침
+            printf "%s" "$_first" > /dev/tty
+            local _rest
+            IFS= read -r _rest < /dev/tty || _rest=""
+            printf -v "$varname" '%s' "${_first}${_rest}"
         fi
         return 0
     else
@@ -246,16 +283,20 @@ print_to_user() {
 # 인터랙티브 메뉴 (TTY 전용) — 화살표/숫자/Enter/ESC
 # 사용법: selected=$(interactive_menu "prompt" "value1|label1" "value2|label2" ...)
 # stdout: 선택된 value
-# exit:   0=확정, 1=취소
+# exit:   0=확정, 1=취소(ESC)
+# 옵션: --cancel-label=라벨 → 하단 안내의 ESC 동작 표기(기본 "취소").
+#       하위 메뉴는 "뒤로", 최상위는 "취소"로 호출자가 지정한다.
 # ─────────────────────────────────────────────────────────────
 interactive_menu() {
-    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값)
+    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값), --cancel-label=라벨
     local multi=false
     local preselect_csv=""
+    local cancel_label="취소"
     while [[ "$1" == --* ]]; do
         case "$1" in
             --multi) multi=true; shift ;;
             --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            --cancel-label=*) cancel_label="${1#--cancel-label=}"; shift ;;
             *) break ;;
         esac
     done
@@ -304,15 +345,28 @@ interactive_menu() {
     fi
 
     if [ "$multi" = true ]; then
-        printf "\n%s (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+        printf "\n%s (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC %s):\n\n" "$prompt" "$cancel_label" >&2
     else
-        printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC 취소):\n\n" "$prompt" >&2
+        printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC %s):\n\n" "$prompt" "$cancel_label" >&2
     fi
 
     local cursor=0
 
     trap 'printf "\033[?25h" >&2; return 130' INT
     printf "\033[?25l" >&2
+
+    # ── 스크롤 안전 커서 앵커 ──
+    # 문제: 메뉴를 화면 하단에서 그리면 출력이 터미널을 스크롤시킨다. 그러면 ESC7로 저장한
+    #       절대좌표가 위로 밀려 무효화되고, redraw마다 잔상이 누적돼 "점점 늘어나는" 버그가 됐다.
+    # 해법: 메뉴가 차지할 만큼(wrap 여유 포함) 빈 줄을 먼저 출력해 스크롤을 '미리' 일으킨 뒤,
+    #       그만큼 커서를 되올려(ESC[<rows>A) 그 지점을 앵커로 저장(ESC7)한다. 이 앵커는 이미
+    #       화면 안쪽이라 이후 redraw는 스크롤을 유발하지 않아 좌표가 안정적이다.
+    # 여유: 가장 긴 라벨이 wrap되는 경우까지 대비해 항목당 1줄 여유(=n*2) 확보.
+    local _reserve=$(( n * 2 + 1 ))
+    local _r
+    for ((_r = 0; _r < _reserve; _r++)); do printf "\n" >&2; done
+    printf "\033[%dA" "$_reserve" >&2
+    printf "\0337" >&2
 
     _interactive_menu_render() {
         local i value label num indicator
@@ -333,23 +387,33 @@ interactive_menu() {
                     indicator="[ ]"
                 fi
             fi
+            # label이 비어 있으면 value만 출력(예/아니오 같은 단순 선택지). 있으면 'value    label(dim)'.
             if [ "$i" -eq "$cursor" ]; then
-                printf "%s> %s %d) %s    %s%s%s%s\n" \
-                    "$C_CYAN" "$indicator" "$num" "$value" \
-                    "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
+                if [ -n "$label" ]; then
+                    printf "%s> %s %d) %s    %s%s%s%s\n" \
+                        "$C_CYAN" "$indicator" "$num" "$value" \
+                        "$C_DIM" "$label" "$C_RESET" "$C_RESET" >&2
+                else
+                    printf "%s> %s %d) %s%s\n" \
+                        "$C_CYAN" "$indicator" "$num" "$value" "$C_RESET" >&2
+                fi
             else
-                printf "  %s %d) %s    %s%s%s\n" \
-                    "$indicator" "$num" "$value" \
-                    "$C_DIM" "$label" "$C_RESET" >&2
+                if [ -n "$label" ]; then
+                    printf "  %s %d) %s    %s%s%s\n" \
+                        "$indicator" "$num" "$value" \
+                        "$C_DIM" "$label" "$C_RESET" >&2
+                else
+                    printf "  %s %d) %s\n" \
+                        "$indicator" "$num" "$value" >&2
+                fi
             fi
         done
     }
 
     _interactive_menu_clear() {
-        local i
-        for i in $(seq 1 "$n"); do
-            printf "\033[1A\033[2K" >&2
-        done
+        # 저장한 시작 지점으로 복원(ESC 8) 후 거기서 화면 끝까지 삭제(ESC[J).
+        # 기존 "n줄 위로(ESC[1A)" 방식은 wrap된 줄을 1줄로 오인해 잔상이 남았다 → 폐기.
+        printf "\0338\033[J" >&2
     }
 
     _interactive_menu_render
@@ -460,13 +524,15 @@ interactive_menu() {
 # 사용법: selected=$(legacy_numeric_menu "prompt" "value1|label1" ...)
 # ─────────────────────────────────────────────────────────────
 legacy_numeric_menu() {
-    # 옵션 파싱 — interactive_menu와 동일한 --multi/--preselect 지원
+    # 옵션 파싱 — interactive_menu와 동일한 --multi/--preselect/--cancel-label 지원
+    # (--cancel-label은 비TTY 텍스트 메뉴에선 표기 의미가 없어 파싱만 하고 무시)
     local multi=false
     local preselect_csv=""
     while [[ "$1" == --* ]]; do
         case "$1" in
             --multi) multi=true; shift ;;
             --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
+            --cancel-label=*) shift ;;
             *) break ;;
         esac
     done
@@ -582,17 +648,41 @@ choose_menu() {
 ask_yes_no() {
     local prompt="$1"
     local default="${2:-N}"  # 기본값 N
+
+    # 프롬프트 끝의 입력 안내 군더더기 제거 — choose_menu가 자체 안내(↑↓/Enter)를 붙이므로
+    # "(Y/N, 기본: Y)", "(Y=예 / N=직접입력)", "선택:" 같은 Y/N식 꼬리표가 남으면 중복·모순돼 보인다.
+    local _title
+    _title=$(printf '%s' "$prompt" | sed -E \
+        -e 's/[[:space:]]*\([^)]*[YyNn][^)]*\)[[:space:]]*//g' \
+        -e 's/[[:space:]]*:[[:space:]]*$//' \
+        -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//')
+    # "선택"만 남는 무의미한 제목 방어
+    case "$_title" in ""|"선택") _title="진행하시겠습니까?" ;; esac
+
+    # TTY 대화형 → 화살표 메뉴(choose_menu). 기본값이 첫 항목 = 커서 초기 위치.
+    # value를 '예'/'아니오'로 두고 label은 비워, 메뉴에 '1) 예 / 2) 아니오'만 깔끔히 표시.
+    # (value/label 둘 다 두면 'yes 예'처럼 중복돼 보였던 문제 해결)
+    if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
+        local _ans _rc
+        if [[ "$default" =~ ^[Yy]$ ]]; then
+            _ans=$(choose_menu "$_title" "예|" "아니오|"); _rc=$?
+        else
+            _ans=$(choose_menu "$_title" "아니오|" "예|"); _rc=$?
+        fi
+        # choose_menu가 실패(ESC 취소 등) → 반환 1(=No/취소)
+        [ "$_rc" -ne 0 ] && return 1
+        [ "$_ans" = "예" ] && return 0
+        return 1
+    fi
+
+    # 비TTY / FORCE — 기존 텍스트 입력 폴백 (한 글자 Y/N)
     local reply
-    
     while true; do
         if safe_read "$prompt" reply "-n 1"; then
             print_to_user ""
-            
-            # Enter 키 처리
             if [[ -z "$reply" ]]; then
                 reply="$default"
             fi
-            
             if [[ "$reply" =~ ^[Yy]$ ]]; then
                 return 0
             elif [[ "$reply" =~ ^[Nn]$ ]]; then
@@ -909,8 +999,73 @@ detect_project_type() {
 # 프로젝트 타입 자동 감지 (멀티 — 모든 일치 타입을 csv로 반환)
 # detect_project_type(단수)은 첫 일치 하나만 반환하지만, 모노레포는 여러 타입이
 # 공존할 수 있으므로 전부 감지해 사용자가 다중 선택 메뉴로 확정하게 한다.
+# package.json 경로를 받아 react/next/node/react-native(-expo) 중 하나로 판별
+# detect_project_types의 인라인 판별 로직을 추출 — 서브폴더 package.json에도 재사용
+classify_package_json() {
+    local pj=$1
+    [ -f "$pj" ] || { echo ""; return; }
+    if grep -q "@react-native" "$pj" || grep -q "react-native" "$pj"; then
+        if grep -q "expo" "$pj"; then
+            echo "react-native-expo"
+        else
+            echo "react-native"
+        fi
+    elif grep -q "\"next\"" "$pj"; then
+        echo "next"
+    elif grep -q "\"react\"" "$pj"; then
+        echo "react"
+    else
+        echo "node"
+    fi
+}
+
+# 모드 키 → 확인 화면용 한국어 라벨
+_mode_display_label() {
+    case "$1" in
+        full)      echo "전체 설치 (버전관리 + 워크플로우 + 이슈·PR 템플릿)" ;;
+        version)   echo "버전 관리만" ;;
+        workflows) echo "워크플로우만" ;;
+        issues)    echo "이슈·PR 템플릿만" ;;
+        skills)    echo "AI 스킬만" ;;
+        *)         echo "$1" ;;
+    esac
+}
+
 detect_project_types() {
-    print_step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+    print_step "프로젝트 타입 자동 감지 중..."
+
+    # ── 0) 기존 version.yml의 project_types 최우선 ──
+    # 이미 통합된 프로젝트(멀티타입 포함)는 version.yml에 타입이 저장돼 있다.
+    # 루트에 마커가 없어도(모노레포: 타입이 server/·app/ 하위) 기존 설정을 그대로 이어받아야
+    # basic으로 잘못 재감지되지 않는다. (version 보존과 동일 철학 — version.yml이 source of truth)
+    if [ -f "version.yml" ]; then
+        local _existing_types=""
+        if command -v yq >/dev/null 2>&1; then
+            _existing_types=$(yq -r '.project_types // [] | join(",")' version.yml 2>/dev/null)
+            [ "$_existing_types" = "null" ] && _existing_types=""
+            if [ -z "$_existing_types" ]; then
+                _existing_types=$(yq -r '.project_type // ""' version.yml 2>/dev/null)
+                [ "$_existing_types" = "null" ] && _existing_types=""
+            fi
+        else
+            # yq 없음: project_types 라인에서 ["a","b"] 안의 토큰 추출
+            local _line
+            _line=$(grep -E '^project_types:' version.yml 2>/dev/null | head -1)
+            if [ -n "$_line" ]; then
+                _existing_types=$(echo "$_line" | grep -oE '"[a-z-]+"' | tr -d '"' | paste -sd, -)
+            fi
+            if [ -z "$_existing_types" ]; then
+                _existing_types=$(grep -E '^project_type:' version.yml 2>/dev/null | head -1 | sed 's/.*"\([a-z-]*\)".*/\1/')
+            fi
+        fi
+        # version.yml에 타입이 명시돼 있으면(basic 포함) 그것이 source of truth → 그대로 사용.
+        # 값이 아예 없을 때만 아래 파일 스캔으로 새로 감지한다.
+        if [ -n "$_existing_types" ]; then
+            print_info "기존 version.yml 타입 사용: $_existing_types"
+            echo "$_existing_types"
+            return
+        fi
+    fi
 
     local detected=()
 
@@ -953,6 +1108,69 @@ detect_project_types() {
     # csv로 stdout 출력
     local IFS=','
     echo "${detected[*]}"
+}
+
+# 마커 파일이 없을 때(=detect_project_types가 basic) 타입을 추천 (스캔 추천)
+# stdout: 추천 타입 csv (메뉴 정의 순서 정렬), 추천 없으면 빈 문자열. 안내용(강제 아님).
+suggest_types_by_scan() {
+    local _found=""   # 공백 구분 누적, 마지막에 정렬
+
+    # ── 1) 마커 우선 스캔 — 모든 마커 타입에 find_type_path_candidates ──
+    # package.json 계열은 같은 마커라 내용으로 판별한다.
+    local _mt _cand _d _ptype
+    for _mt in flutter spring python react-native-expo; do
+        _cand=$(find_type_path_candidates "$_mt")
+        [ -n "$_cand" ] && _found="$_found $_mt"
+    done
+
+    # package.json 계열 — react/next/node/react-native를 디렉터리별 내용으로 판별
+    _cand=$(find_type_path_candidates react)   # react 토큰 = package.json 검색
+    if [ -n "$_cand" ]; then
+        while IFS= read -r _d; do
+            [ -z "$_d" ] && continue
+            local _pj
+            if [ "$_d" = "." ]; then _pj="package.json"; else _pj="$_d/package.json"; fi
+            _ptype=$(classify_package_json "$_pj")
+            [ -n "$_ptype" ] && _found="$_found $_ptype"
+        done <<< "$_cand"
+    fi
+
+    # ── 2) 마커가 전혀 없으면 확장자 빈도 폴백 ──
+    if [ -z "$_found" ]; then
+        local _files
+        _files=$(find . -maxdepth 3 \
+            \( -name node_modules -o -name .git -o -name build -o -name dist \
+               -o -name .dart_tool -o -name android -o -name ios -o -name .gradle \
+               -o -name venv -o -name .venv -o -name __pycache__ \) -prune \
+            -o -type f -print 2>/dev/null)
+        local _dart _java _kt _gradle _tsx _jsx _py _ts _js
+        _dart=$(printf '%s\n' "$_files"   | grep -c '\.dart$' || true)
+        _java=$(printf '%s\n' "$_files"   | grep -c '\.java$' || true)
+        _kt=$(printf '%s\n' "$_files"     | grep -c '\.kt$' || true)
+        _gradle=$(printf '%s\n' "$_files" | grep -c '\.gradle$' || true)
+        _tsx=$(printf '%s\n' "$_files"    | grep -c '\.tsx$' || true)
+        _jsx=$(printf '%s\n' "$_files"    | grep -c '\.jsx$' || true)
+        _py=$(printf '%s\n' "$_files"     | grep -c '\.py$' || true)
+        _ts=$(printf '%s\n' "$_files"     | grep -c '\.ts$' || true)
+        _js=$(printf '%s\n' "$_files"     | grep -c '\.js$' || true)
+        [ "$_dart" -ge 1 ] && _found="$_found flutter"
+        [ $((_java + _kt + _gradle)) -ge 3 ] && _found="$_found spring"
+        [ $((_tsx + _jsx)) -ge 3 ] && _found="$_found react"
+        [ "$_py" -ge 3 ] && _found="$_found python"
+        if [ -z "$_found" ] && [ $((_ts + _js)) -ge 3 ]; then
+            _found="node"
+        fi
+    fi
+
+    # ── 3) 메뉴 정의 순서로 정렬 + 중복 제거 → csv ──
+    local _order="spring flutter next react react-native react-native-expo node python basic"
+    local _o _out=""
+    for _o in $_order; do
+        case " $_found " in
+            *" $_o "*) _out="${_out:+$_out,}$_o" ;;
+        esac
+    done
+    echo "$_out"
 }
 
 # ===================================================================
@@ -1029,6 +1247,24 @@ existing_marker_in_dir() {
 # maxdepth 3 + 잡음 폴더 제외 + 타입별 오탐 필터 (스펙 §4.2~4.3)
 find_type_path_candidates() {
     local t=$1
+    # 멀티모듈 스프링: settings.gradle(.kts)이 있는 폴더 = 멀티모듈 루트로 축약.
+    # 루트뿐 아니라 server/ 같은 하위 폴더도 maxdepth 3까지 탐색해 그 폴더를 후보로 잡는다.
+    # version_manager가 해당 폴더 아래 모든 build.gradle을 일괄 갱신하므로 하위 모듈을 후보로 펼치지 않는다.
+    # android/ 폴더의 settings.gradle(Flutter/RN)은 spring 모듈이 아니므로 prune으로 제외.
+    if [ "$t" = "spring" ]; then
+        local _mm
+        _mm=$(find . -maxdepth 3 \
+            \( -name node_modules -o -name .git -o -name build -o -name dist \
+               -o -name .gradle -o -name android -o -name ios \) -prune \
+            -o -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print 2>/dev/null \
+            | sed 's#/settings\.gradle\(\.kts\)\{0,1\}$##; s#^\./##; s#^$#.#' | sort -u)
+        # settings.gradle 발견 시: 그 폴더(들)만 후보로 반환. 단일이면 자동확정, 복수면 메뉴 선택.
+        if [ -n "$_mm" ]; then
+            echo "$_mm"
+            return 0
+        fi
+        # settings.gradle 전혀 없음 → 단일 모듈. 아래 build.gradle 탐색 폴백으로 진행.
+    fi
     local names=""
     case "$t" in
         flutter)            names="pubspec.yaml" ;;
@@ -1125,7 +1361,11 @@ resolve_project_paths() {
     print_to_user "       레포 루트에 바로 있으면 → \".\""
     print_to_user ""
 
+    local _total=${#_targets[@]}
+    local _idx=0
     for _t in "${_targets[@]}"; do
+        _idx=$((_idx + 1))
+        local _prog="[$_idx/$_total]"
         # 1) --paths로 이미 지정됨 → 최우선
         local _preset
         _preset=$(get_path_for_type "$_t")
@@ -1180,13 +1420,14 @@ resolve_project_paths() {
         # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
         if [ "$_count" -eq 1 ]; then
             print_to_user ""
-            print_to_user "  🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
-            if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? (Y=예 / N=직접입력): " "Y"; then
+            print_to_user "  $_prog 🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
+            # '아니오' 선택 시 _chosen 미설정 → 아래 직접입력 루프로 진행
+            if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? — 아니오 선택 시 직접 입력" "Y"; then
                 _chosen="$_candidates"
             fi
         elif [ "$_count" -gt 1 ]; then
             print_to_user ""
-            print_to_user "  🔍 $_t: 후보 ${_count}개 발견"
+            print_to_user "  $_prog 🔍 $_t: 후보 ${_count}개 발견"
             local _i=1 _c
             while IFS= read -r _c; do
                 print_to_user "    $_i) $_c  ($_c/$(existing_marker_in_dir "$_t" "$_c"))"
@@ -1195,7 +1436,9 @@ resolve_project_paths() {
             print_to_user "    m) 직접 입력"
             local _sel=""
             while true; do
-                safe_read "  선택: " _sel ""
+                # set -e 가드: ESC(return 2)로 함수가 죽지 않게 || true. 빈값이면 아래서 재입력 안내.
+                _sel=""
+                safe_read "  선택: " _sel "" || true
                 if [ "$_sel" = "m" ] || [ "$_sel" = "M" ]; then
                     break
                 fi
@@ -1207,7 +1450,7 @@ resolve_project_paths() {
             done
         else
             print_to_user ""
-            print_warning "  $_t: 프로젝트를 찾지 못했습니다 (maxdepth 3)."
+            print_warning "  $_prog $_t: 프로젝트를 찾지 못했습니다 (maxdepth 3)."
         fi
 
         # ── 직접 입력 (위에서 미확정 시) ──
@@ -1218,7 +1461,8 @@ resolve_project_paths() {
                 _prompt="$_prompt, 현재값: $_existing"
             fi
             _prompt="$_prompt): "
-            safe_read "$_prompt" _input ""
+            # set -e 가드: ESC(return 2)로 함수가 죽지 않게 || true. 빈값이면 아래서 기존값/루트로 폴백.
+            safe_read "$_prompt" _input "" || true
             # 정규화: 공백 제거, 백슬래시→슬래시, 끝 슬래시·앞 ./ 제거
             _input=$(echo "$_input" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#\\#/#g; s#/$##; s#^\./##')
             if [ -z "$_input" ]; then
@@ -1395,14 +1639,64 @@ print_question_header() {
 
 # 프로젝트 타입 선택 메뉴
 show_project_type_menu() {
-    # 현재 PROJECT_TYPES를 preselect csv로 — 멀티 선택 메뉴(Space 토글)
-    local _preselect
-    local IFS=','
-    _preselect="${PROJECT_TYPES[*]:-}"
-    unset IFS
+    # ── 레포 스캔 → 추천 로그 (append-only) ──
+    # 1) 마커 기반 감지 (basic이면 마커 없음)
+    local _detected_csv
+    _detected_csv=$(detect_project_types 2>/dev/null)
 
-    local selected
-    selected=$(choose_menu --multi --preselect="$_preselect" "프로젝트 타입을 선택하세요 (멀티 가능 — Space로 토글)" \
+    print_to_user "" >&2
+    print_to_user "🔍 이 레포를 살펴봤습니다:" >&2
+
+    local _marker_csv=""
+    if [ -n "$_detected_csv" ] && [ "$_detected_csv" != "basic" ]; then
+        _marker_csv="$_detected_csv"
+        local _mt
+        local IFS=','
+        for _mt in $_detected_csv; do
+            unset IFS
+            print_to_user "   • $(marker_for_type "$_mt") 발견 → $_mt 추천 (자동 선택됨)" >&2
+            IFS=','
+        done
+        unset IFS
+    else
+        # 2) 마커 없음 → 확장자 스캔 추천 (안내만)
+        local _scan_csv
+        _scan_csv=$(suggest_types_by_scan)
+        if [ -n "$_scan_csv" ]; then
+            local _st
+            local IFS=','
+            for _st in $_scan_csv; do
+                unset IFS
+                print_to_user "   • $_st 관련 파일 발견 → $_st 가능성 (직접 골라주세요)" >&2
+                IFS=','
+            done
+            unset IFS
+        else
+            print_to_user "   • 마커 파일을 찾지 못했습니다 — 직접 선택하세요" >&2
+        fi
+    fi
+
+    # 현재 version.yml 값 안내
+    local _cur
+    local IFS=','
+    _cur="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+    unset IFS
+    print_to_user "   • 현재 값: ${_cur:-basic}" >&2
+    print_to_user "" >&2
+
+    # ── preselect: 마커 추천이 있으면 그것, 없으면 현재값 ──
+    local _preselect
+    if [ -n "$_marker_csv" ]; then
+        _preselect="$_marker_csv"
+    else
+        local IFS=','
+        _preselect="${PROJECT_TYPES[*]:-}"
+        unset IFS
+    fi
+
+    # 하위 메뉴이므로 ESC는 '뒤로'. set -e 환경에서 ESC(비-0)가 함수를 죽이지 않도록 || true 가드.
+    local selected=""
+    selected=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_preselect" "프로젝트 타입을 선택하세요" \
         "spring|Spring Boot 백엔드" \
         "flutter|Flutter 모바일 앱" \
         "next|Next.js 웹 앱" \
@@ -1411,11 +1705,10 @@ show_project_type_menu() {
         "react-native-expo|React Native Expo 앱" \
         "node|Node.js 프로젝트" \
         "python|Python 프로젝트" \
-        "basic|기타 프로젝트")
+        "basic|기타 프로젝트") || true
 
     if [ -z "$selected" ]; then
-        print_error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
-        # 기존 PROJECT_TYPES csv 반환 (호출측이 사용)
+        print_info "타입 선택을 취소했습니다. 기존 값을 유지합니다."
         local IFS=','
         echo "${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
         unset IFS
@@ -1461,19 +1754,48 @@ detect_and_confirm_project() {
         fi
         print_to_user "       🌙 Version          : $VERSION"
         print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
+        # 모드  : 무엇을 설치하는지 (확인 화면에서 한눈에)
+        [ -n "$MODE" ] && print_to_user "       💫 통합 모드        : $(_mode_display_label "$MODE")"
+        # Synology : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
+        if [ "$INCLUDE_SYNOLOGY" = true ]; then
+            print_to_user "       🗄️ Synology         : 포함"
+        elif [ "$INCLUDE_SYNOLOGY" = false ]; then
+            print_to_user "       🗄️ Synology         : 제외"
+        fi
+        # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
+        if [ -n "$PROJECT_PATHS_CSV" ]; then
+            print_to_user "       📁 프로젝트 경로    : $(echo "$PROJECT_PATHS_CSV" | sed 's/=/→/g; s/,/, /g')"
+        fi
         print_to_user ""
-        
-        # 사용자 확인
-        print_to_user "이 정보가 맞습니까?"
-        print_to_user "  Y/y - 예, 계속 진행"
-        print_to_user "  E/e - 수정하기"
-        print_to_user "  N/n - 아니오, 취소"
-        print_to_user ""
-        
-        # Y/N/E 입력 받기
+
+        # 사용자 확인 — 화살표 3지선 메뉴 (TTY 대화형). 비TTY/FORCE는 기존 키 입력 폴백.
         local user_choice
-        user_choice=$(ask_yes_no_edit)
-        
+        if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
+            # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
+            local _confirm_label _confirm_rc=0
+            # set -e 환경: choose_menu가 ESC로 비-0 반환 시 함수가 즉시 중단되지 않도록
+            # || 로 종료코드를 받아 stay(머무름) 분기로 안전하게 흘려보낸다.
+            _confirm_label=$(choose_menu "이 정보가 맞습니까?" \
+                "예, 계속 진행|" \
+                "수정하기|" \
+                "아니오, 취소|") || _confirm_rc=$?
+            if [ "$_confirm_rc" -ne 0 ]; then
+                # ESC — 여기는 최상위 확인 화면이라 더 뒤로 갈 단계가 없다.
+                # 의도치 않은 종료를 막기 위해 그 자리에 머문다(루프 재출력).
+                # 실제 종료는 '아니오, 취소'를 명시적으로 골라야만 한다.
+                user_choice="stay"
+            else
+                case "$_confirm_label" in
+                    예*)  user_choice="yes" ;;
+                    수정*) user_choice="edit" ;;
+                    아니오*) user_choice="no" ;;   # 명시적 취소만 종료
+                    *)    user_choice="stay" ;;
+                esac
+            fi
+        else
+            user_choice=$(ask_yes_no_edit)
+        fi
+
         case "$user_choice" in
             "yes")
                 confirmed=true
@@ -1485,8 +1807,13 @@ detect_and_confirm_project() {
                 exit 0
                 ;;
             "edit")
-                handle_project_edit_menu
-                # 루프 계속 - 다시 확인 질문으로
+                # handle_project_edit_menu는 '뒤로'(ESC) 시 return 1을 준다.
+                # set -e 환경에서 그 비-0 반환이 이 함수를 죽이지 않도록 || true로 흡수.
+                # 어느 경우든 확인 루프를 계속 돌아 다시 확인 화면을 보여준다.
+                handle_project_edit_menu || true
+                ;;
+            "stay")
+                # ESC 등으로 인한 중립 상태 — 종료하지 않고 확인 화면을 다시 보여준다
                 ;;
             *)
                 print_error "예상치 못한 오류가 발생했습니다"
@@ -1497,78 +1824,123 @@ detect_and_confirm_project() {
 }
 
 # 프로젝트 정보 수정 메뉴
+# 루프 구조: 항목을 고쳐도 메뉴로 되돌아와 다른 항목을 이어서 수정할 수 있다.
+# '모두 맞음, 계속' 또는 ESC(뒤로) → 상위 확인 화면으로 복귀.
+# set -e 환경: 메뉴/입력이 ESC로 비-0 반환해도 함수가 죽지 않도록 모두 || 로 코드를 받는다.
 handle_project_edit_menu() {
-    print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
+    while true; do
+        print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
 
-    local edit_choice
-    edit_choice=$(choose_menu "어떤 항목을 수정하시겠습니까?" \
-        "type|Project Type" \
-        "version|Version" \
-        "branch|Default Branch (기본 브랜치)" \
-        "done|모두 맞음, 계속")
+        # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
+        # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로) 표기.
+        local _edit_label _menu_rc=0
+        _edit_label=$(choose_menu --cancel-label="뒤로" "어떤 항목을 수정하시겠습니까?" \
+            "프로젝트 타입|" \
+            "버전|" \
+            "기본 브랜치|" \
+            "모두 맞음, 계속|") || _menu_rc=$?
 
-    if [ -z "$edit_choice" ]; then
-        print_warning "수정 메뉴가 취소되었습니다."
-        return 1
-    fi
+        local edit_choice=""
+        if [ "$_menu_rc" -ne 0 ]; then
+            # ESC → 상위 확인 화면으로 뒤로
+            edit_choice="back"
+        else
+            case "$_edit_label" in
+                프로젝트\ 타입*) edit_choice="type" ;;
+                버전*)           edit_choice="version" ;;
+                기본\ 브랜치*)   edit_choice="branch" ;;
+                모두\ 맞음*)     edit_choice="done" ;;
+                *)               edit_choice="back" ;;
+            esac
+        fi
 
-    case "$edit_choice" in
-        type)
-            local _new_csv
-            _new_csv=$(show_project_type_menu)
-            if [ -n "$_new_csv" ]; then
-                IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
-                PROJECT_TYPE="${PROJECT_TYPES[0]}"
-                if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
-                    print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
-                else
-                    print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
-                fi
-            fi
-            print_to_user ""
-            ;;
-        version)
-            local new_version
-            print_to_user ""
-            if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
-                print_to_user ""
-                if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                    VERSION="$new_version"
-                    print_success "Version이 '$VERSION'(으)로 변경되었습니다"
-                else
-                    print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-                fi
-                print_to_user ""
-            else
-                print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
-                print_to_user ""
-            fi
-            ;;
-        branch)
-            local new_branch
-            print_to_user ""
-            print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
-            print_to_user ""
-            if safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""; then
-                print_to_user ""
-                if [ -n "$new_branch" ]; then
-                    DETECTED_BRANCH="$new_branch"
-                    print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
-                else
-                    print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+        case "$edit_choice" in
+            type)
+                local _old_csv
+                local IFS=','
+                _old_csv="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+                unset IFS
+
+                local _new_csv
+                _new_csv=$(show_project_type_menu) || _new_csv=""
+                if [ -n "$_new_csv" ]; then
+                    IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
+                    PROJECT_TYPE="${PROJECT_TYPES[0]}"
+                    if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+                        print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
+                    else
+                        print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                    fi
+
+                    # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
+                    # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
+                    local _old_sorted _new_sorted
+                    _old_sorted=$(printf '%s\n' "$_old_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
+                    _new_sorted=$(printf '%s\n' "$_new_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
+                    if [ "$_new_sorted" != "$_old_sorted" ]; then
+                        PROJECT_PATHS_CSV=""   # 새 타입 기준으로 다시 잡도록 초기화
+                        resolve_project_paths
+                    fi
                 fi
                 print_to_user ""
-            else
-                print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                ;;
+            version)
+                local new_version _rc=0
                 print_to_user ""
-            fi
-            ;;
-        done)
-            print_success "프로젝트 정보 확인 완료"
-            print_to_user ""
-            return 0
-            ;;
-    esac
+                safe_read "새 버전을 입력하세요 (예: 1.0.0, ESC=뒤로): " new_version "" || _rc=$?
+                if [ "$_rc" -eq 2 ]; then
+                    # ESC → 이전 메뉴로 돌아감(기존 값 유지)
+                    print_info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    print_to_user ""
+                elif [ "$_rc" -eq 0 ]; then
+                    print_to_user ""
+                    if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        VERSION="$new_version"
+                        print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                    else
+                        print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                    fi
+                    print_to_user ""
+                else
+                    print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                    print_to_user ""
+                fi
+                ;;
+            branch)
+                local new_branch _rc=0
+                print_to_user ""
+                print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+                print_to_user ""
+                safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop, ESC=뒤로): " new_branch "" || _rc=$?
+                if [ "$_rc" -eq 2 ]; then
+                    # ESC → 이전 메뉴로 돌아감(기존 값 유지)
+                    print_info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    print_to_user ""
+                elif [ "$_rc" -eq 0 ]; then
+                    print_to_user ""
+                    if [ -n "$new_branch" ]; then
+                        DETECTED_BRANCH="$new_branch"
+                        print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                    else
+                        print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+                    fi
+                    print_to_user ""
+                else
+                    print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                    print_to_user ""
+                fi
+                ;;
+            done)
+                print_success "프로젝트 정보 확인 완료"
+                print_to_user ""
+                return 0
+                ;;
+            back)
+                # ESC/취소 → 상위 확인 화면으로 복귀(변경 없이)
+                return 1
+                ;;
+        esac
+    done
 }
 
 # 템플릿 다운로드
@@ -1724,21 +2096,59 @@ create_version_yml() {
         if ! [[ "$existing_version_code" =~ ^[0-9]+$ ]] || [ "$existing_version_code" -le 0 ]; then
             existing_version_code=1
         fi
-        
+
         print_info "기존 version_code 감지: $existing_version_code"
-        
-        print_warning "version.yml이 이미 존재합니다"
+
+        # version 보존: version.yml이 버전 관리의 single source of truth.
+        # 기존 version.yml의 version을 최우선으로 읽어 유지하고, 없을 때만 감지값($version) 폴백.
+        local _existing_version=""
+        if command -v yq >/dev/null 2>&1; then
+            _existing_version=$(yq -r '.version // ""' version.yml 2>/dev/null || echo "")
+            [ "$_existing_version" = "null" ] && _existing_version=""
+        else
+            # 주석(#)이 아닌 실제 version 라인에서만 추출 (x.y.z 형식)
+            _existing_version=$(grep -E '^version:[[:space:]]*' version.yml 2>/dev/null \
+                | sed 's/version:[[:space:]]*["'\'']*\([0-9][0-9.]*\)["'\'']*.*/\1/' | head -1)
+        fi
+        if [ -n "$_existing_version" ]; then
+            version="$_existing_version"
+            print_info "기존 version 보존: $version"
+        fi
+
+        # 덮어쓰기 확인 — version.yml 갱신은 통합에 필수.
+        # Y=업데이트하고 계속(기본) / N=통합 전체 취소 (반쪽 상태 방지)
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+            print_to_user ""
+            print_separator_line
+            print_to_user " 🔄 version.yml 업데이트 — 안전합니다, 필수입니다"
             print_separator_line
             print_to_user ""
-            print_to_user "version.yml을 덮어쓰시겠습니까?"
-            print_to_user "  Y/y - 예, 덮어쓰기"
-            print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
+            print_to_user "  기존 version.yml을 최신 템플릿 구조로 갱신합니다."
+            print_to_user "  이 단계는 통합에 반드시 필요합니다."
             print_to_user ""
-            
-            if ! ask_yes_no "선택: " "N"; then
-                print_info "version.yml 생성 건너뜁니다"
-                return
+            print_to_user "  ✅ 유지되는 값 (그대로 보존)"
+            # printf로 컬럼 정렬한 문자열을 만들어 safe_echo(print_to_user)로 출력 — 출력 대상 일관성 유지
+            local _row
+            printf -v _row "       %-14s %-11s %s" "version" "$version" "롤백 없음"
+            print_to_user "$_row"
+            printf -v _row "       %-14s %-11s %s" "version_code" "$existing_version_code" "스토어 빌드번호 안전"
+            print_to_user "$_row"
+            print_to_user ""
+            print_to_user "  📝 갱신되는 것"
+            print_to_user "       구조 · 주석 · project_paths · metadata"
+            print_to_user ""
+            print_to_user "  ⚠️  업데이트하지 않으면 구버전 구조가 남아"
+            print_to_user "       최신 워크플로우의 버전 자동증가 · 체인지로그 · 배포"
+            print_to_user "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
+            print_to_user ""
+            print_to_user "     Y   업데이트하고 계속  (권장 · 기본)"
+            print_to_user "     N   통합 취소"
+            print_to_user ""
+
+            # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            if ! ask_yes_no "  선택 (Y/N, 기본: Y): " "Y"; then
+                print_error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
+                exit 0
             fi
         fi
     fi
@@ -2066,12 +2476,8 @@ check_breaking_changes() {
     if [ ${#critical_changes[@]} -gt 0 ]; then
         print_warning "CRITICAL 변경사항이 있습니다."
         print_to_user ""
-        print_to_user "계속 진행하시겠습니까?"
-        print_to_user "  Y/y - 예, 계속 진행"
-        print_to_user "  N/n - 아니오, 취소"
-        print_to_user ""
 
-        if ! ask_yes_no "선택: " "N"; then
+        if ! ask_yes_no "계속 진행하시겠습니까?" "N"; then
             print_info "취소되었습니다"
             exit 0
         fi
@@ -2186,11 +2592,8 @@ ask_synology_option() {
         done
     done
     print_to_user ""
-    print_to_user "  Y/y - 예, 포함"
-    print_to_user "  N/n - 아니오, 제외 (기본)"
-    print_to_user ""
 
-    if ask_yes_no "선택: " "N"; then
+    if ask_yes_no "Synology 워크플로우를 포함할까요?" "N"; then
         INCLUDE_SYNOLOGY=true
         print_info "Synology 워크플로우를 포함합니다"
     else
@@ -2580,12 +2983,8 @@ copy_coderabbit_config() {
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_separator_line
             print_to_user ""
-            print_to_user ".coderabbit.yaml을 덮어쓰시겠습니까?"
-            print_to_user "  Y/y - 예, 덮어쓰기"
-            print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
-            print_to_user ""
-            
-            if ! ask_yes_no "선택: " "N"; then
+
+            if ! ask_yes_no ".coderabbit.yaml을 덮어쓸까요?" "N"; then
                 print_info ".coderabbit.yaml 다운로드 건너뜁니다"
                 return
             fi
@@ -2838,12 +3237,7 @@ copy_util_modules() {
 
     # 사용자 확인 (force 모드가 아니고 TTY 가용 시)
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "이 유틸리티 모듈을 다운로드하시겠습니까?"
-        print_to_user "  Y/y - 예, 다운로드하기"
-        print_to_user "  N/n - 아니오, 건너뛰기 (기본)"
-        print_to_user ""
-
-        if ! ask_yes_no "선택: " "N"; then
+        if ! ask_yes_no "이 유틸리티 모듈을 다운로드할까요?" "N"; then
             print_info "util 모듈 다운로드 건너뜁니다"
             return
         fi
@@ -2932,22 +3326,38 @@ interactive_mode() {
         exit 1
     fi
     
-    # 프로젝트 감지 및 확인
-    detect_and_confirm_project
-
-    # 템플릿 다운로드 (모드 선택 전 필요 — 모드 선택 후 Synology 질문에서 사용)
-    download_template
-
+    # ── 1) 모드 선택 먼저 (사용자 의도부터 파악) ──
+    # 사용자가 무엇을 하려는지 먼저 묻고, 모드에 따라 필요한 정보만 수집한다.
+    # (예: skills/issues 모드는 프로젝트 타입·버전·Synology·경로가 전혀 필요 없음)
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
 
-    local _mode_selected
-    _mode_selected=$(choose_menu "어떤 기능을 통합하시겠습니까?" \
-        "full|전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)" \
-        "version|버전 관리 시스템만" \
-        "workflows|GitHub Actions 워크플로우만" \
-        "issues|이슈/PR 템플릿만" \
-        "skills|Agent Skill 설치 (Claude, Cursor, Gemini, Codex)" \
-        "cancel|취소")
+    # 라벨에 영어 키(full/version…)가 보이지 않도록, 사용자에게는 한국어 설명만 노출한다.
+    # choose_menu는 value를 표시하므로 value 자리에 한국어 라벨을 두고 반환값을 케이스로 매핑.
+    # 최상위 첫 화면이라 ESC는 '취소'(종료). set -e 환경에서 ESC(비-0)가 함수를
+    # 죽여 안내 없이 끝나지 않도록 || 로 코드를 받아 cancel로 매핑한다.
+    local _mode_label _mode_rc=0
+    _mode_label=$(choose_menu "무엇을 설치할까요?" \
+        "전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿 (처음이라면 추천)|" \
+        "버전 관리만 — 버전 자동 증가·동기화 시스템만 설치|" \
+        "워크플로우만 — 빌드·배포 GitHub Actions만 설치|" \
+        "이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치|" \
+        "AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치|" \
+        "취소|") || _mode_rc=$?
+
+    # 한국어 라벨 → 내부 모드 키 매핑 (ESC=비-0 → cancel)
+    local _mode_selected=""
+    if [ "$_mode_rc" -ne 0 ]; then
+        _mode_selected="cancel"
+    else
+        case "$_mode_label" in
+            전체\ 설치*)        _mode_selected="full" ;;
+            버전\ 관리만*)      _mode_selected="version" ;;
+            워크플로우만*)      _mode_selected="workflows" ;;
+            이슈*PR\ 템플릿만*) _mode_selected="issues" ;;
+            AI\ 스킬만*)        _mode_selected="skills" ;;
+            *)                  _mode_selected="cancel" ;;
+        esac
+    fi
 
     if [ -z "$_mode_selected" ] || [ "$_mode_selected" = "cancel" ]; then
         print_info "취소되었습니다"
@@ -2956,16 +3366,49 @@ interactive_mode() {
 
     MODE="$_mode_selected"
 
-    # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
-    # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
-    if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-        local _syn_dirs=()
-        local _st
-        for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
-            _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
-        done
-        ask_synology_option "${_syn_dirs[@]}"
-    fi
+    # 템플릿 다운로드 (모드별 수집·복사에서 사용)
+    download_template
+
+    # ── 2) 모드별 필요 정보만 수집 ──
+    # 수집 매트릭스: full=타입/버전/Synology/경로, version=타입/버전/경로,
+    #               workflows=타입/Synology, issues=없음, skills=없음
+    case "$MODE" in
+        skills|issues)
+            # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
+            ;;
+        *)
+            # full/version/workflows → 타입·버전·브랜치 감지 → Synology·경로 수집 → 최종 확인
+            # 순서가 핵심: Synology·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다.
+
+            # 1) 타입/버전/브랜치 먼저 감지 (확인은 아직 안 함)
+            if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
+                local _detected_csv
+                _detected_csv=$(detect_project_types)
+                IFS=',' read -ra PROJECT_TYPES <<< "$_detected_csv"
+                PROJECT_TYPE="${PROJECT_TYPES[0]}"
+            fi
+            [ -z "$VERSION" ] && VERSION=$(detect_version)
+            [ -z "$DETECTED_BRANCH" ] && DETECTED_BRANCH=$(detect_default_branch)
+
+            # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
+            if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
+                local _syn_dirs=()
+                local _st
+                for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+                    _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+                done
+                ask_synology_option "${_syn_dirs[@]}"
+            fi
+
+            # 3) 경로: full/version 모드에서 멀티경로 확정
+            if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
+                resolve_project_paths
+            fi
+
+            # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인 (수정/취소 가능)
+            detect_and_confirm_project
+            ;;
+    esac
 }
 
 # 통합 실행
@@ -3016,12 +3459,7 @@ execute_integration() {
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         if [ "$FORCE_MODE" = false ]; then
             if [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "이 정보로 통합을 진행하시겠습니까?"
-                print_to_user "  Y/y - 예, 계속 진행"
-                print_to_user "  N/n - 아니오, 취소"
-                print_to_user ""
-
-                if ! ask_yes_no "선택: " "Y"; then
+                if ! ask_yes_no "이 정보로 통합을 진행할까요?" "Y"; then
                     print_info "취소되었습니다"
                     exit 0
                 fi
@@ -3055,7 +3493,8 @@ execute_integration() {
     fi
 
     # 타입별 경로 확정 — version.yml에 project_paths 기록 (full/version 모드만)
-    if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
+    # interactive 모드는 확인 화면 전에 이미 수집했으므로 중복 호출 방지.
+    if { [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; } && [ "$IS_INTERACTIVE_MODE" = false ]; then
         resolve_project_paths
     fi
 
@@ -3215,25 +3654,91 @@ offer_ide_tools_install() {
     fi
     echo "" >&2
 
-    # ─── Claude Code 섹션 ───
+    # ── 2단계 통합 라우터 ──
+    # 1단계: 현재 상태(위에서 출력 완료) + 동작 선택(설치·업데이트 / 제거 / 건너뛰기)
+    # 2단계: 그 동작을 적용할 IDE 멀티셀렉트 → 선택된 IDE만 기존 관리 로직 호출
+    # 기존 IDE별 실행 로직은 _manage_*_section 함수로 보존(검증된 동작 유지), 라우터가 호출만 한다.
+    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        # 감지된(=관리 가능한) IDE만 후보로 구성
+        # IDE 후보 — value는 매핑 키(고유명사라 그대로), label은 비워 'Claude Code'만 깔끔히 표시.
+        local _ide_opts=()
+        _ide_opts+=("Claude Code|")
+        _ide_opts+=("Cursor|")
+        if command -v gemini &> /dev/null; then _ide_opts+=("Gemini CLI|"); else _ide_opts+=("Gemini CLI (미감지)|"); fi
+        if command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; then _ide_opts+=("Codex CLI|"); else _ide_opts+=("Codex CLI (미감지)|"); fi
+
+        # ESC는 '그대로 두기'와 동일(건너뛰기). set -e 가드 || 로 비-0 흡수.
+        local _action_label _action_rc=0
+        _action_label=$(choose_menu --cancel-label="건너뛰기" "AI 스킬을 어떻게 할까요?" \
+            "설치 / 업데이트 — 최신 상태로 맞추기|" \
+            "제거 — 설치된 스킬 삭제하기|" \
+            "그대로 두기|") || _action_rc=$?
+        local _action=""
+        if [ "$_action_rc" -ne 0 ]; then
+            _action="skip"
+        else
+            case "$_action_label" in
+                설치*)   _action="apply" ;;
+                제거*)   _action="remove" ;;
+                *)       _action="skip" ;;
+            esac
+        fi
+
+        case "$_action" in
+            apply)
+                # 감지된 IDE 전체를 기본 체크 (미감지 항목은 preselect에서 제외)
+                # value가 'Claude Code' 등 표시명이므로 매핑도 표시명 기준.
+                local _pre="Claude Code,Cursor"
+                command -v gemini &> /dev/null && _pre="$_pre,Gemini CLI"
+                { command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; } && _pre="$_pre,Codex CLI"
+                # ESC/무선택 → 건너뛰기. set -e 가드 || true.
+                local _targets=""
+                _targets=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_pre" "설치 / 업데이트할 IDE를 고르세요" "${_ide_opts[@]}") || true
+                [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
+                case ",$_targets," in *,Claude\ Code,*) _manage_claude_section "$claude_available" "$installed_scope" "$installed_version" ;; esac
+                case ",$_targets," in *,Cursor,*)       _manage_cursor_section ;; esac
+                case ",$_targets," in *,Gemini\ CLI,*)  _manage_gemini_extension ;; esac
+                case ",$_targets," in *,Codex\ CLI,*)   _manage_codex_skills ;; esac
+                ;;
+            remove)
+                # 제거: 전체 후보 제시 후 미설치는 각 섹션이 no-op 처리
+                # ESC/무선택 → 건너뛰기. set -e 가드 || true.
+                local _targets=""
+                _targets=$(choose_menu --multi --cancel-label="뒤로" "제거할 IDE를 고르세요" "${_ide_opts[@]}") || true
+                [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
+                case ",$_targets," in *,Claude\ Code,*) _remove_claude_section "$claude_available" "$installed_scope" ;; esac
+                case ",$_targets," in *,Cursor,*)       _remove_cursor_section ;; esac
+                case ",$_targets," in *,Gemini\ CLI,*)  _remove_gemini_section ;; esac
+                case ",$_targets," in *,Codex\ CLI,*)   _remove_codex_section ;; esac
+                ;;
+            *)
+                print_info "IDE Skills 변경 없이 건너뜁니다"
+                ;;
+        esac
+        return
+    fi
+
+    # ── FORCE / 비TTY — 기존 순차 흐름 유지 (자동 설치/업데이트) ──
+    _manage_claude_section "$claude_available" "$installed_scope" "$installed_version"
+    _manage_cursor_section
+    _manage_gemini_extension
+    _manage_codex_skills
+}
+
+# ── Claude Code 플러그인 관리 (기존 섹션 로직 보존) ──
+_manage_claude_section() {
+    local claude_available="$1"
+    local installed_scope="$2"
+    local installed_version="$3"
+
     print_step "[ Claude Code 플러그인 관리 ]"
     echo "" >&2
 
     if [ "$claude_available" = true ]; then
         if [ -n "$installed_scope" ]; then
-            local update_label="업데이트 (최신 버전으로)"
-            if [ -n "$TEMPLATE_VERSION" ] && [ "$installed_version" = "$TEMPLATE_VERSION" ]; then
-                update_label="업데이트 (이미 최신 — 재적용)"
-            fi
-
+            # 설치돼 있음 → 업데이트(최신화). 라우터에서 이미 동작을 정했으므로 추가 메뉴 없이 바로 실행.
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                local choice
-                choice=$(choose_menu "Claude Code 플러그인 (cassiiopeia)" \
-                    "update|${update_label}" \
-                    "reinstall|재설치 (scope 변경)" \
-                    "delete|삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installed_scope})" \
-                    "skip|건너뛰기")
-
+                local choice=update
                 case "$choice" in
                     update)
                         print_step "플러그인 업데이트 중..."
@@ -3299,24 +3804,12 @@ offer_ide_tools_install() {
                 fi
             fi
         else
-            # 미설치 → scope 선택 후 신규 설치
+            # 미설치 → 신규 설치. 라우터에서 이미 설치 의사 확인됨 → scope만 묻고 바로 설치.
             if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-                print_to_user "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-                print_to_user "  설치 시 /cassiiopeia:suh-analyze, /cassiiopeia:suh-review 등 19+ 스킬 사용 가능"
-                print_to_user ""
-                print_to_user "  Y/y - 예, 설치하기 (추천)"
-                print_to_user "  N/n - 아니오, 건너뛰기"
-                print_to_user ""
-
-                if ask_yes_no "선택: " "Y"; then
-                    local scope
-                    scope=$(_ask_claude_scope)
-                    _do_claude_plugin_install "$scope"
-                else
-                    print_info "Claude Code 플러그인 설치 건너뜁니다"
-                    echo "  수동 설치: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
-                    echo "             claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
-                fi
+                print_info "Claude Code 플러그인(DevOps Skills) 설치 — 설치 후 /cassiiopeia:suh-* 19+ 스킬 사용 가능"
+                local scope
+                scope=$(_ask_claude_scope)
+                _do_claude_plugin_install "$scope"
             else
                 _do_claude_plugin_install "user"
             fi
@@ -3325,8 +3818,10 @@ offer_ide_tools_install() {
         echo "  💡 Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
         echo "                         claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
     fi
+}
 
-    # ─── Cursor 섹션 ───
+# ── Cursor Skills 관리 (기존 섹션 로직 보존) ──
+_manage_cursor_section() {
     # Cursor는 마켓플레이스 미지원 — 파일 직접 복사로 관리한다.
     # scope 개념:
     #   user    = ~/.cursor/skills/      (모든 프로젝트 공통)
@@ -3368,78 +3863,39 @@ offer_ide_tools_install() {
         echo "" >&2
 
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            local cursor_choice
-            cursor_choice=$(choose_menu "Cursor Skills 관리" \
-                "update|업데이트 (기존 scope 유지)" \
-                "install|신규 설치 (다른 scope에 추가)" \
-                "delete|삭제" \
-                "skip|건너뛰기")
-
-            case "$cursor_choice" in
-                update)
-                    # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
-                    local target_scope
-                    if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
-                        target_scope=$(_ask_cursor_scope "$cursor_user_ver" "$cursor_proj_ver")
-                    elif [ -n "$cursor_user_ver" ]; then
-                        target_scope="user"
-                    else
-                        target_scope="project"
-                    fi
-                    local src
-                    src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
-                    if [ -z "$src" ]; then
-                        print_warning "사용 가능한 소스가 없습니다."
-                    else
-                        _do_cursor_skills_copy "$target_scope" "$src"
-                    fi
-                    ;;
-                install)
-                    # 신규 설치: scope 자유 선택 (다른 scope에 추가)
-                    local target_scope
-                    target_scope=$(_ask_cursor_scope "" "")
-                    local src
-                    src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
-                    if [ -z "$src" ]; then
-                        print_warning "사용 가능한 소스가 없습니다."
-                    else
-                        _do_cursor_skills_copy "$target_scope" "$src"
-                    fi
-                    ;;
-                delete)
-                    _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
-                    ;;
-                *)
-                    print_info "Cursor Skills 변경 없이 건너뜁니다"
-                    ;;
-            esac
+            # 라우터에서 '설치/업데이트' 선택됨 → 기존 설치 scope 유지하며 최신화 (추가 메뉴 없음).
+            local target_scope
+            if [ -n "$cursor_user_ver" ] && [ -n "$cursor_proj_ver" ]; then
+                target_scope=$(_ask_cursor_scope "$cursor_user_ver" "$cursor_proj_ver")
+            elif [ -n "$cursor_user_ver" ]; then
+                target_scope="user"
+            else
+                target_scope="project"
+            fi
+            local src
+            src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+            if [ -z "$src" ]; then
+                print_warning "사용 가능한 소스가 없습니다."
+            else
+                _do_cursor_skills_copy "$target_scope" "$src"
+            fi
         else
             # FORCE 모드: project scope, 원격 우선
             local src="${skills_src_remote:-$skills_src_local}"
             [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     else
-        # 미설치 → 설치
+        # 미설치 → 설치. 라우터에서 이미 설치 의사 확인됨 → scope·소스만 묻고 바로 복사.
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user "Cursor IDE Skills를 설치하시겠습니까?"
-            print_to_user "  /analyze, /review 등 20개 스킬 사용 가능 (마켓플레이스 미지원 — 파일 직접 복사)"
-            print_to_user ""
-            print_to_user "  Y/y - 예, 설치하기 (추천)"
-            print_to_user "  N/n - 아니오, 건너뛰기"
-            print_to_user ""
-
-            if ask_yes_no "선택: " "Y"; then
-                local target_scope
-                target_scope=$(_ask_cursor_scope "" "")
-                local src
-                src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
-                if [ -z "$src" ]; then
-                    print_warning "사용 가능한 소스가 없습니다. 건너뜁니다."
-                else
-                    _do_cursor_skills_copy "$target_scope" "$src"
-                fi
+            print_info "Cursor IDE Skills 설치 — /analyze, /review 등 20개 스킬 (파일 직접 복사)"
+            local target_scope
+            target_scope=$(_ask_cursor_scope "" "")
+            local src
+            src=$(_ask_cursor_skills_src "$skills_src_remote" "$skills_src_local")
+            if [ -z "$src" ]; then
+                print_warning "사용 가능한 소스가 없습니다. 건너뜁니다."
             else
-                print_info "Cursor Skills 설치 건너뜁니다"
+                _do_cursor_skills_copy "$target_scope" "$src"
             fi
         else
             # FORCE 모드: project scope, 원격 우선
@@ -3447,12 +3903,69 @@ offer_ide_tools_install() {
             [ -n "$src" ] && _do_cursor_skills_copy "project" "$src" "force"
         fi
     fi
+}
 
-    # ─── Gemini CLI 섹션 ───
-    _manage_gemini_extension
+# ── 제거 섹션 (2단계 라우터의 'remove' 동작에서 호출) ──
+# 미설치 IDE면 안내만 하고 no-op. 설치돼 있으면 삭제 실행.
+_remove_claude_section() {
+    local claude_available="$1"
+    local installed_scope="$2"
+    echo "" >&2
+    print_step "[ Claude Code 플러그인 제거 ]"
+    if [ "$claude_available" != true ] || [ -z "$installed_scope" ]; then
+        print_info "  설치된 Claude Code 플러그인이 없어 건너뜁니다"
+        return
+    fi
+    print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
+    if claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
+        print_success "플러그인 uninstall 완료"
+        _remove_claude_plugin_data
+    else
+        print_warning "삭제 실패. 수동으로 실행해주세요:"
+        echo "    claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installed_scope}" >&2
+    fi
+}
 
-    # ─── Codex CLI 섹션 ───
-    _manage_codex_skills
+_remove_cursor_section() {
+    echo "" >&2
+    print_step "[ Cursor Skills 제거 ]"
+    local cursor_user_ver="" cursor_proj_ver=""
+    [ -f "${HOME}/.cursor/skills/cursor-skills-meta.json" ] && cursor_user_ver=$(grep '"version"' "${HOME}/.cursor/skills/cursor-skills-meta.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+    [ -f ".cursor/skills/cursor-skills-meta.json" ] && cursor_proj_ver=$(grep '"version"' ".cursor/skills/cursor-skills-meta.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/' | head -1)
+    if [ -z "$cursor_user_ver" ] && [ -z "$cursor_proj_ver" ]; then
+        print_info "  설치된 Cursor Skills가 없어 건너뜁니다"
+        return
+    fi
+    # 기존 삭제 헬퍼 재사용 (user/project 선택 처리 포함)
+    _ask_cursor_delete "$cursor_user_ver" "$cursor_proj_ver"
+}
+
+_remove_gemini_section() {
+    echo "" >&2
+    print_step "[ Gemini CLI Extension 제거 ]"
+    if ! command -v gemini &> /dev/null; then
+        print_info "  gemini CLI 미감지 — 건너뜁니다"
+        return
+    fi
+    if gemini extensions uninstall cassiiopeia 2>/dev/null; then
+        print_success "Gemini CLI extension 제거 완료"
+    else
+        print_info "  제거할 Gemini extension이 없거나 실패 — 수동: gemini extensions uninstall cassiiopeia"
+    fi
+}
+
+_remove_codex_section() {
+    echo "" >&2
+    print_step "[ Codex CLI Plugin 제거 ]"
+    local codex_target="${HOME}/.agents/skills/cassiiopeia"
+    # native fallback 심링크/디렉토리 제거
+    if [ -L "$codex_target" ] || [ -d "$codex_target" ]; then
+        rm -rf "$codex_target" && print_success "Codex native skills 제거 완료 (${codex_target})"
+    else
+        print_info "  제거할 Codex skills가 없어 건너뜁니다"
+    fi
+    command -v codex &> /dev/null && \
+        print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -3718,17 +4231,7 @@ _manage_gemini_extension() {
         return
     fi
 
-    if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "Gemini CLI extension을 설치/업데이트하시겠습니까?"
-        print_to_user "  Y/y - 예, 설치 또는 업데이트"
-        print_to_user "  N/n - 아니오, 건너뛰기"
-        print_to_user ""
-        if ! ask_yes_no "선택: " "Y"; then
-            print_info "Gemini CLI extension 변경 없이 건너뜁니다"
-            return
-        fi
-    fi
-
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
     print_step "Gemini CLI extension 업데이트 중..."
     if gemini extensions update cassiiopeia 2>/dev/null; then
         print_success "Gemini CLI extension 업데이트 완료"
@@ -3752,21 +4255,9 @@ _manage_codex_skills() {
     echo "" >&2
 
     if command -v codex &> /dev/null; then
-        if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-            print_to_user "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
-            print_to_user "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-            print_to_user "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
-            print_to_user "  Y/y - 예, 등록 또는 업데이트"
-            print_to_user "  N/n - 아니오, 건너뜁니다"
-            print_to_user ""
-            if ask_yes_no "선택: " "Y"; then
-                _do_codex_marketplace_register
-                return
-            fi
-        else
-            _do_codex_marketplace_register
-            return
-        fi
+        # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 등록/업데이트.
+        _do_codex_marketplace_register
+        return
     else
         print_warning "codex CLI가 감지되지 않았습니다."
         print_info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
@@ -3797,12 +4288,8 @@ _do_codex_native_skills_fallback() {
     local target="${target_dir}/cassiiopeia"
 
     if [ "$mode" != "auto" ] && [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        print_to_user "Codex native skills fallback을 설치/업데이트하시겠습니까?"
-        print_to_user "  설치 경로: ${target}"
-        print_to_user "  Y/y - 예, 설치 또는 업데이트"
-        print_to_user "  N/n - 아니오, 건너뛰기"
-        print_to_user ""
-        if ! ask_yes_no "선택: " "Y"; then
+        print_info "  설치 경로: ${target}"
+        if ! ask_yes_no "Codex native skills fallback을 설치/업데이트할까요?" "Y"; then
             print_info "Codex native skills fallback 변경 없이 건너뜁니다"
             return
         fi
@@ -4068,5 +4555,7 @@ main() {
     execute_integration
 }
 
-# 스크립트 실행
-main "$@"
+# 스크립트 실행 (source될 때는 main을 돌리지 않음 — 함수 단위 테스트 가능)
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi

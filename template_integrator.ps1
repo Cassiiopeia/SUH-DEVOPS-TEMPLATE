@@ -317,9 +317,12 @@ function Invoke-LegacyNumericMenu {
         Write-Host ""
         Write-Host $Prompt
         Write-Host ""
+        # 화면엔 Label(사용자 친화 한국어)만 표시 — Value(full 등 영어 키)는 노출하지 않는다.
+        # Label이 비어 있으면 Value를 대신 표시(예/아니오 같은 단순 선택지).
         for ($i = 0; $i -lt $n; $i++) {
             $opt = $Options[$i]
-            Write-Host ("  {0}) {1,-20} - {2}" -f ($i + 1), $opt.Value, $opt.Label)
+            $disp = if ([string]::IsNullOrWhiteSpace($opt.Label)) { $opt.Value } else { $opt.Label }
+            Write-Host ("  {0}) {1}" -f ($i + 1), $disp)
         }
         Write-Host ""
         while ($true) {
@@ -357,7 +360,9 @@ function Invoke-LegacyNumericMenu {
     for ($i = 0; $i -lt $n; $i++) {
         $opt = $Options[$i]
         $mark = if ($preValues -contains $opt.Value) { "[✓]" } else { "[ ]" }
-        $line = "  {0} {1,2}) {2,-18} {3}" -f $mark, ($i + 1), $opt.Value, $opt.Label
+        # 화면엔 Label만 표시(영어 키 비노출). Label 비면 Value.
+        $disp = if ([string]::IsNullOrWhiteSpace($opt.Label)) { $opt.Value } else { $opt.Label }
+        $line = "  {0} {1,2}) {2}" -f $mark, ($i + 1), $disp
         if (($preValues -contains $opt.Value) -and $useColor) {
             Write-Host $line -ForegroundColor Green
         } else {
@@ -455,9 +460,15 @@ function Ask-YesNo {
         [string]$Prompt,
         [string]$DefaultValue = "N"
     )
-    
+
+    # 프롬프트 끝의 Y/N식 꼬리표 제거 (sh ask_yes_no와 동일 정책)
+    # "(Y/N, 기본: Y)", "(Y=예 / N=직접입력)", "선택:" 등이 남으면 중복·모순돼 보인다.
+    $_title = $Prompt -replace '\s*\([^)]*[YyNn][^)]*\)\s*', '' -replace '\s*:\s*$', ''
+    $_title = $_title.Trim()
+    if ([string]::IsNullOrWhiteSpace($_title) -or $_title -eq '선택') { $_title = '진행하시겠습니까?' }
+
     while ($true) {
-        $response = Read-SingleKey "$Prompt (Y/N, 기본: $DefaultValue) "
+        $response = Read-SingleKey "$_title (Y/N, 기본: $DefaultValue) "
         
         if ([string]::IsNullOrWhiteSpace($response)) {
             $response = $DefaultValue
@@ -651,8 +662,67 @@ function Detect-ProjectType {
 # 프로젝트 타입 멀티 감지 — 모든 일치 타입을 csv로 반환 (sh detect_project_types 포팅)
 # ===================================================================
 
+# package.json 경로 → react/next/node/react-native(-expo) 판별 (sh classify_package_json 대응)
+function Get-PackageJsonType {
+    param([string]$PjPath)
+    if (-not (Test-Path $PjPath -PathType Leaf)) { return "" }
+    $content = Get-Content $PjPath -Raw
+    if ($content -match "@react-native|react-native") {
+        if ($content -match "expo") { return "react-native-expo" }
+        return "react-native"
+    } elseif ($content -match '"next"') {
+        return "next"
+    } elseif ($content -match '"react"') {
+        return "react"
+    } else {
+        return "node"
+    }
+}
+
+# 모드 키 → 확인 화면용 한국어 라벨 (sh _mode_display_label과 동일)
+function Get-ModeDisplayLabel {
+    param([string]$ModeKey)
+    switch ($ModeKey) {
+        'full'      { return '전체 설치 (버전관리 + 워크플로우 + 이슈·PR 템플릿)' }
+        'version'   { return '버전 관리만' }
+        'workflows' { return '워크플로우만' }
+        'issues'    { return '이슈·PR 템플릿만' }
+        'skills'    { return 'AI 스킬만' }
+        default     { return $ModeKey }
+    }
+}
+
 function Detect-ProjectTypes {
-    Print-Step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+    Print-Step "프로젝트 타입 자동 감지 중..."
+
+    # ── 0) 기존 version.yml의 project_types 최우선 (sh와 동일) ──
+    # 이미 통합된 프로젝트(멀티타입 포함)는 version.yml에 타입이 저장돼 있다.
+    # 루트에 마커가 없어도(모노레포) 기존 설정을 그대로 이어받아 basic 오감지를 막는다.
+    if (Test-Path "version.yml") {
+        $existingTypes = ""
+        $lines = Get-Content "version.yml" -ErrorAction SilentlyContinue
+        foreach ($line in $lines) {
+            if ($line -match '^\s*#') { continue }
+            if ($line -match '^project_types:') {
+                # ["spring","flutter"] → spring,flutter
+                $tokens = [regex]::Matches($line, '"([a-z\-]+)"') | ForEach-Object { $_.Groups[1].Value }
+                if ($tokens.Count -gt 0) { $existingTypes = ($tokens -join ',') }
+                break
+            }
+        }
+        # 배열이 없으면 단수 project_type 폴백
+        if (-not $existingTypes) {
+            foreach ($line in $lines) {
+                if ($line -match '^\s*#') { continue }
+                if ($line -match '^project_type:\s*"?([a-z\-]+)"?') { $existingTypes = $matches[1]; break }
+            }
+        }
+        # version.yml에 타입이 명시돼 있으면(basic 포함) source of truth → 그대로 사용
+        if ($existingTypes) {
+            Print-Info "기존 version.yml 타입 사용: $existingTypes"
+            return $existingTypes
+        }
+    }
 
     # PowerShell 5.1 호환: null += 방지 위해 빈 배열로 초기화
     $detected = @()
@@ -693,6 +763,53 @@ function Detect-ProjectTypes {
     Print-Info "감지된 타입: $($detected -join ' ')"
 
     return ($detected -join ',')
+}
+
+# 마커 파일이 없을 때 타입 추천 (스캔 추천) — 반환: csv (메뉴 순서 정렬), 없으면 ""
+function Get-SuggestedTypesByScan {
+    $found = @()
+
+    # ── 1) 마커 우선 스캔 ──
+    foreach ($mt in @('flutter','spring','python','react-native-expo')) {
+        $cand = @(Find-TypePathCandidates $mt)
+        if ($cand.Count -gt 0) { $found += $mt }
+    }
+    # package.json 계열 — 디렉터리별 내용 판별
+    $pjCand = @(Find-TypePathCandidates 'react')
+    foreach ($d in $pjCand) {
+        if ([string]::IsNullOrEmpty($d)) { continue }
+        if ($d -eq ".") { $pj = "package.json" } else { $pj = "$d/package.json" }
+        $ptype = Get-PackageJsonType $pj
+        if ($ptype) { $found += $ptype }
+    }
+
+    # ── 2) 마커 없으면 확장자 폴백 ──
+    if ($found.Count -eq 0) {
+        $files = @(Get-ChildItem -Path . -Recurse -Depth 2 -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch $script:PathExcludeRegex })
+        $dart   = @($files | Where-Object { $_.Extension -eq '.dart' }).Count
+        $java   = @($files | Where-Object { $_.Extension -eq '.java' }).Count
+        $kt     = @($files | Where-Object { $_.Extension -eq '.kt' }).Count
+        $gradle = @($files | Where-Object { $_.Extension -eq '.gradle' }).Count
+        $tsx    = @($files | Where-Object { $_.Extension -eq '.tsx' }).Count
+        $jsx    = @($files | Where-Object { $_.Extension -eq '.jsx' }).Count
+        $py     = @($files | Where-Object { $_.Extension -eq '.py' }).Count
+        $ts     = @($files | Where-Object { $_.Extension -eq '.ts' }).Count
+        $js     = @($files | Where-Object { $_.Extension -eq '.js' }).Count
+        if ($dart -ge 1) { $found += 'flutter' }
+        if (($java + $kt + $gradle) -ge 3) { $found += 'spring' }
+        if (($tsx + $jsx) -ge 3) { $found += 'react' }
+        if ($py -ge 3) { $found += 'python' }
+        if ($found.Count -eq 0 -and ($ts + $js) -ge 3) { $found += 'node' }
+    }
+
+    # ── 3) 메뉴 순서 정렬 + 중복 제거 ──
+    $order = @('spring','flutter','next','react','react-native','react-native-expo','node','python','basic')
+    $out = @()
+    foreach ($o in $order) {
+        if ($found -contains $o -and $out -notcontains $o) { $out += $o }
+    }
+    return ($out -join ',')
 }
 
 # ===================================================================
@@ -742,6 +859,29 @@ function Get-ExistingMarkerInDir {
 # Depth 2 = 루트 포함 3단계 (bash find -maxdepth 3 대응) + 잡음 폴더 제외 + 타입별 오탐 필터
 function Find-TypePathCandidates {
     param([string]$ProjType)
+
+    # 멀티모듈 스프링: settings.gradle(.kts)이 있는 폴더 = 멀티모듈 루트로 축약.
+    # 루트뿐 아니라 server/ 같은 하위 폴더도 Depth 2까지 탐색해 그 폴더를 후보로 잡는다.
+    # version_manager가 해당 폴더 아래 모든 build.gradle을 일괄 갱신하므로 하위 모듈을 펼치지 않는다.
+    # android/ 폴더의 settings.gradle(Flutter/RN)은 spring 모듈이 아니므로 제외.
+    if ($ProjType -eq "spring") {
+        $root = (Get-Location).Path
+        $mmFiles = @(Get-ChildItem -Path . -Recurse -Depth 2 -File -ErrorAction SilentlyContinue |
+            Where-Object { ($_.Name -eq "settings.gradle" -or $_.Name -eq "settings.gradle.kts") -and
+                           $_.FullName -notmatch $script:PathExcludeRegex })
+        if ($mmFiles.Count -gt 0) {
+            $mmDirs = @()
+            foreach ($f in $mmFiles) {
+                $dir = Split-Path -Parent $f.FullName
+                $rel = $dir.Substring($root.Length).TrimStart('\').TrimStart('/')
+                if ([string]::IsNullOrEmpty($rel)) { $rel = "." } else { $rel = $rel.Replace('\', '/') }
+                if ($mmDirs -notcontains $rel) { $mmDirs += $rel }
+            }
+            # settings.gradle 발견 시: 그 폴더(들)만 후보로 반환. 단일이면 자동확정, 복수면 메뉴 선택.
+            return ($mmDirs | Sort-Object)
+        }
+        # settings.gradle 전혀 없음 → 단일 모듈. 아래 build.gradle 탐색 폴백으로 진행.
+    }
 
     $markerNames = @()
     switch ($ProjType) {
@@ -819,7 +959,11 @@ function Resolve-ProjectPaths {
     Write-Host "       레포 루트에 바로 있으면 → `".`""
     Write-Host ""
 
+    $idx = 0
+    $total = $targets.Count
     foreach ($t in $targets) {
+        $idx++
+        $prog = "[$idx/$total]"
         # 1) -Paths로 이미 지정됨 → 최우선
         if ($script:ProjectPaths.Contains($t)) {
             Print-Info "  $t → $($script:ProjectPaths[$t]) (-Paths 지정)"
@@ -874,13 +1018,13 @@ function Resolve-ProjectPaths {
         if ($candidates.Count -eq 1) {
             $c0Marker = Get-ExistingMarkerInDir $t $candidates[0]
             Write-Host ""
-            Write-Host "  🔍 ${t}: $($candidates[0])/$c0Marker 발견"
+            Write-Host "  $prog 🔍 ${t}: $($candidates[0])/$c0Marker 발견"
             if (Ask-YesNo "  $t 경로를 '$($candidates[0])'(으)로 설정할까요? (Y=예 / N=직접입력)" "Y") {
                 $chosen = $candidates[0]
             }
         } elseif ($candidates.Count -gt 1) {
             Write-Host ""
-            Write-Host "  🔍 ${t}: 후보 $($candidates.Count)개 발견"
+            Write-Host "  $prog 🔍 ${t}: 후보 $($candidates.Count)개 발견"
             for ($i = 0; $i -lt $candidates.Count; $i++) {
                 $cMarker = Get-ExistingMarkerInDir $t $candidates[$i]
                 Write-Host "    $($i+1)) $($candidates[$i])  ($($candidates[$i])/$cMarker)"
@@ -898,7 +1042,7 @@ function Resolve-ProjectPaths {
             }
         } else {
             Write-Host ""
-            Print-Warning "  ${t}: 프로젝트를 찾지 못했습니다 (depth 3)."
+            Print-Warning "  $prog ${t}: 프로젝트를 찾지 못했습니다 (depth 3)."
         }
 
         # ── 직접 입력 (위에서 미확정 시) ──
@@ -1054,9 +1198,37 @@ function Detect-DefaultBranch {
 # ===================================================================
 
 function Show-ProjectTypeMenu {
-    # 현재 ProjectTypes를 preselect csv로 — 번호 토글 멀티 선택 메뉴
-    $preselect = ($script:ProjectTypes -join ',')
-    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요 (여러 개 가능)" -Options @(
+    # ── 레포 스캔 → 추천 로그 (append-only) ──
+    $detectedCsv = Detect-ProjectTypes
+    Write-Host ""
+    Write-Host "🔍 이 레포를 살펴봤습니다:"
+
+    $markerCsv = ""
+    if ($detectedCsv -and $detectedCsv -ne "basic") {
+        $markerCsv = $detectedCsv
+        foreach ($mt in ($detectedCsv -split ',')) {
+            Write-Host ("   • {0} 발견 → {1} 추천 (자동 선택됨)" -f (Get-MarkerForType $mt), $mt)
+        }
+    } else {
+        $scanCsv = Get-SuggestedTypesByScan
+        if ($scanCsv) {
+            foreach ($st in ($scanCsv -split ',')) {
+                Write-Host ("   • {0} 관련 파일 발견 → {0} 가능성 (직접 골라주세요)" -f $st)
+            }
+        } else {
+            Write-Host "   • 마커 파일을 찾지 못했습니다 — 직접 선택하세요"
+        }
+    }
+    $curVal = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+    if (-not $curVal) { $curVal = "basic" }
+    Write-Host ("   • 현재 값: {0}" -f $curVal)
+    Write-Host ""
+
+    # ── preselect: 마커 추천이 있으면 그것, 없으면 현재값 ──
+    if ($markerCsv) { $preselect = $markerCsv }
+    else { $preselect = ($script:ProjectTypes -join ',') }
+
+    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요" -Options @(
         @{Value='spring';            Label='Spring Boot 백엔드'},
         @{Value='flutter';           Label='Flutter 모바일 앱'},
         @{Value='next';              Label='Next.js 웹 앱'},
@@ -1070,7 +1242,6 @@ function Show-ProjectTypeMenu {
 
     if (-not $selected) {
         Print-Error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
-        # 기존 ProjectTypes csv 반환 (호출측이 사용)
         if ($script:ProjectTypes.Count -gt 0) { return ($script:ProjectTypes -join ',') }
         return $script:ProjectType
     }
@@ -1083,66 +1254,89 @@ function Show-ProjectTypeMenu {
 # ===================================================================
 
 function Edit-ProjectInfo {
-    Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
+    # 루프 구조(sh handle_project_edit_menu와 대칭): 항목을 고쳐도 메뉴로 되돌아와
+    # 다른 항목을 이어서 수정할 수 있다. '모두 맞음, 계속' 또는 '뒤로' → 확인 화면으로 복귀.
+    # ps1은 숫자 입력 메뉴라 ESC 키가 없어 '뒤로'를 명시적 항목으로 제공한다.
+    while ($true) {
+        Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
 
-    $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
-        @{Value='type';    Label='Project Type'},
-        @{Value='version'; Label='Version'},
-        @{Value='branch';  Label='Default Branch (기본 브랜치)'},
-        @{Value='done';    Label='모두 맞음, 계속'}
-    )
+        $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
+            @{Value='type';    Label='프로젝트 타입'},
+            @{Value='version'; Label='버전'},
+            @{Value='branch';  Label='기본 브랜치'},
+            @{Value='done';    Label='모두 맞음, 계속'},
+            @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
+        )
 
-    if (-not $editChoice) {
-        Write-Host "수정 메뉴가 취소되었습니다."
-        return
-    }
-
-    switch ($editChoice) {
-        'type' {
-            $newCsv = Show-ProjectTypeMenu
-            if ($newCsv) {
-                $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-                $script:ProjectType = $script:ProjectTypes[0]
-                if ($script:ProjectTypes.Count -gt 1) {
-                    Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
-                } else {
-                    Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
-                }
-            }
-            Write-Host ""
-        }
-        'version' {
-            Write-Host ""
-            $newVersion = Read-UserInput "새 버전을 입력하세요 (예: 1.0.0)"
-            Write-Host ""
-
-            if ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
-                $script:ProjectVersion = $newVersion
-                Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
-            } else {
-                Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
-            }
-            Write-Host ""
-        }
-        'branch' {
-            Write-Host ""
-            Write-Host "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
-            Write-Host ""
-            $newBranch = Read-UserInput "기본 브랜치 이름을 입력하세요 (예: main, develop)"
-            Write-Host ""
-
-            if (![string]::IsNullOrWhiteSpace($newBranch)) {
-                $script:DetectedBranch = $newBranch
-                Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
-            } else {
-                Print-Error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
-            }
-            Write-Host ""
-        }
-        'done' {
-            Print-Success "프로젝트 정보 확인 완료"
-            Write-Host ""
+        if (-not $editChoice) {
+            # 입력 불가 등 → 안전하게 뒤로
             return
+        }
+
+        switch ($editChoice) {
+            'type' {
+                $oldCsv = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+                $newCsv = Show-ProjectTypeMenu
+                if ($newCsv) {
+                    $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                    $script:ProjectType = $script:ProjectTypes[0]
+                    if ($script:ProjectTypes.Count -gt 1) {
+                        Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
+                    } else {
+                        Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
+                    }
+                    # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
+                    # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
+                    $oldSorted = (($oldCsv -split ',' | Sort-Object) -join ',')
+                    $newSorted = (($newCsv -split ',' | Sort-Object) -join ',')
+                    if ($newSorted -ne $oldSorted) {
+                        $script:ProjectPaths = [ordered]@{}
+                        Resolve-ProjectPaths
+                    }
+                }
+                Write-Host ""
+            }
+            'version' {
+                Write-Host ""
+                # 빈 입력(그냥 Enter)은 '뒤로'(기존 값 유지)로 취급 — sh의 ESC=뒤로와 동작 대칭.
+                $newVersion = Read-UserInput "새 버전을 입력하세요 (예: 1.0.0, 그냥 Enter=뒤로)"
+                Write-Host ""
+
+                if ([string]::IsNullOrWhiteSpace($newVersion)) {
+                    Print-Info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                } elseif ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
+                    $script:ProjectVersion = $newVersion
+                    Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
+                } else {
+                    Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                }
+                Write-Host ""
+            }
+            'branch' {
+                Write-Host ""
+                Write-Host "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
+                Write-Host ""
+                # 빈 입력(그냥 Enter)은 '뒤로'(기존 값 유지)로 취급.
+                $newBranch = Read-UserInput "기본 브랜치 이름을 입력하세요 (예: main, develop, 그냥 Enter=뒤로)"
+                Write-Host ""
+
+                if (![string]::IsNullOrWhiteSpace($newBranch)) {
+                    $script:DetectedBranch = $newBranch
+                    Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
+                } else {
+                    Print-Info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                }
+                Write-Host ""
+            }
+            'done' {
+                Print-Success "프로젝트 정보 확인 완료"
+                Write-Host ""
+                return
+            }
+            'back' {
+                # 변경 없이 상위 확인 화면으로 복귀
+                return
+            }
         }
     }
 }
@@ -1180,8 +1374,16 @@ function Detect-AndConfirmProject {
         }
         Write-Host "       🌙 Version          : $($script:ProjectVersion)"
         Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
+        # 모드 / Synology / 멀티경로 (값이 있을 때만 — sh와 동일)
+        if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
+        if ($script:IncludeSynology -eq $true)  { Write-Host "       🗄️ Synology         : 포함" }
+        elseif ($script:IncludeSynology -eq $false) { Write-Host "       🗄️ Synology         : 제외" }
+        if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
+            $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
+            Write-Host "       📁 프로젝트 경로    : $pathPairs"
+        }
         Write-Host ""
-        
+
         # 사용자 확인
         Write-Host "이 정보가 맞습니까?"
         Write-Host "  Y/y - 예, 계속 진행"
@@ -1367,18 +1569,47 @@ function Create-VersionYml {
             }
         }
         
-        Print-Warning "version.yml이 이미 존재합니다"
+        # version 보존: version.yml이 버전 관리의 single source of truth.
+        # 기존 version.yml의 version을 최우선으로 읽어 유지하고, 없을 때만 감지값($Version) 폴백.
+        foreach ($line in $lines) {
+            if ($line -match '^\s*#') { continue }
+            if ($line -match '^version:\s*["'']?([0-9][0-9.]*)') {
+                $Version = $matches[1]
+                Print-Info "기존 version 보존: $Version"
+                break
+            }
+        }
+
+        # 덮어쓰기 확인 — version.yml 갱신은 통합에 필수.
+        # Y=업데이트하고 계속(기본) / N=통합 전체 취소 (반쪽 상태 방지)
         if (-not $Force) {
+            Write-Host ""
+            Print-SeparatorLine
+            Write-Host " 🔄 version.yml 업데이트 — 안전합니다, 필수입니다"
             Print-SeparatorLine
             Write-Host ""
-            Write-Host "version.yml을 덮어쓰시겠습니까?"
-            Write-Host "  Y/y - 예, 덮어쓰기"
-            Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
+            Write-Host "  기존 version.yml을 최신 템플릿 구조로 갱신합니다."
+            Write-Host "  이 단계는 통합에 반드시 필요합니다."
             Write-Host ""
-            
-            if (-not (Ask-YesNo "선택" "N")) {
-                Print-Info "version.yml 생성 건너뜁니다"
-                return
+            Write-Host "  ✅ 유지되는 값 (그대로 보존)"
+            Write-Host ("       {0,-14} {1,-11} {2}" -f "version", $Version, "롤백 없음")
+            Write-Host ("       {0,-14} {1,-11} {2}" -f "version_code", $existingVersionCode, "스토어 빌드번호 안전")
+            Write-Host ""
+            Write-Host "  📝 갱신되는 것"
+            Write-Host "       구조 · 주석 · project_paths · metadata"
+            Write-Host ""
+            Write-Host "  ⚠️  업데이트하지 않으면 구버전 구조가 남아"
+            Write-Host "       최신 워크플로우의 버전 자동증가 · 체인지로그 · 배포"
+            Write-Host "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
+            Write-Host ""
+            Write-Host "     Y   업데이트하고 계속  (권장 · 기본)"
+            Write-Host "     N   통합 취소"
+            Write-Host ""
+
+            # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            if (-not (Ask-YesNo "  선택" "Y")) {
+                Print-Error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
+                exit 0
             }
         }
     }
@@ -2641,20 +2872,18 @@ function Start-InteractiveMode {
     
     Print-Banner $templateVersion "Interactive (대화형 모드)"
     
-    # 프로젝트 감지 및 확인
-    Detect-AndConfirmProject
-
-    # 템플릿 다운로드 (모드 선택 전 필요 — 모드 선택 후 Synology 질문에서 사용)
-    Download-Template
-
+    # ── 1) 모드 선택 먼저 (사용자 의도부터 파악) ── (sh와 동일 구조)
+    # 사용자가 무엇을 하려는지 먼저 묻고, 모드에 따라 필요한 정보만 수집한다.
+    # (예: skills/issues 모드는 프로젝트 타입·버전·Synology·경로가 전혀 필요 없음)
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
 
-    $_modeSelected = Invoke-ChooseMenu -Prompt "어떤 기능을 통합하시겠습니까?" -Options @(
-        @{Value='full';      Label='전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)'},
-        @{Value='version';   Label='버전 관리 시스템만'},
-        @{Value='workflows'; Label='GitHub Actions 워크플로우만'},
-        @{Value='issues';    Label='이슈/PR 템플릿만'},
-        @{Value='skills';    Label='Agent Skill 설치 (Claude, Cursor, Gemini, Codex)'},
+    # 라벨은 sh와 동일한 한국어 설명. ps1은 Value/Label 분리라 화면엔 Label만 표시됨(영어 키 비노출).
+    $_modeSelected = Invoke-ChooseMenu -Prompt "무엇을 설치할까요?" -Options @(
+        @{Value='full';      Label='전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿 (처음이라면 추천)'},
+        @{Value='version';   Label='버전 관리만 — 버전 자동 증가·동기화 시스템만 설치'},
+        @{Value='workflows'; Label='워크플로우만 — 빌드·배포 GitHub Actions만 설치'},
+        @{Value='issues';    Label='이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치'},
+        @{Value='skills';    Label='AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치'},
         @{Value='cancel';    Label='취소'}
     )
 
@@ -2665,12 +2894,44 @@ function Start-InteractiveMode {
 
     $script:Mode = $_modeSelected
 
-    # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
-    # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
-    if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
-        $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
-        $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
-        Ask-SynologyOption $typeDirs
+    # 템플릿 다운로드 (모드별 수집·복사에서 사용)
+    Download-Template
+
+    # ── 2) 모드별 필요 정보만 수집 ──
+    # 수집 매트릭스: full=타입/버전/Synology/경로, version=타입/버전/경로,
+    #               workflows=타입/Synology, issues=없음, skills=없음
+    switch ($script:Mode) {
+        { $_ -in @('skills', 'issues') } {
+            # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
+        }
+        default {
+            # full/version/workflows → 타입·버전·브랜치 감지 → Synology·경로 수집 → 최종 확인
+            # 순서가 핵심: Synology·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다. (sh와 동일)
+
+            # 1) 타입/버전/브랜치 먼저 감지 (확인은 아직 안 함)
+            if ($script:ProjectTypes.Count -eq 0) {
+                $detectedCsv = Detect-ProjectTypes
+                $script:ProjectTypes = @($detectedCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                $script:ProjectType = $script:ProjectTypes[0]
+            }
+            if ([string]::IsNullOrWhiteSpace($script:ProjectVersion)) { $script:ProjectVersion = Detect-Version }
+            if ([string]::IsNullOrWhiteSpace($script:DetectedBranch)) { $script:DetectedBranch = Detect-DefaultBranch }
+
+            # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만
+            if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
+                $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+                Ask-SynologyOption $typeDirs
+            }
+
+            # 3) 경로: full/version 모드에서 멀티경로 확정
+            if ($script:Mode -eq "full" -or $script:Mode -eq "version") {
+                Resolve-ProjectPaths
+            }
+
+            # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인
+            Detect-AndConfirmProject
+        }
     }
 }
 
@@ -2717,13 +2978,9 @@ function Start-Integration {
         Write-Host ""
 
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
+        # ps1은 키 입력 방식이라 입력 안내(Y/N)를 유지한다(sh는 화살표라 제거).
         if (-not $Force) {
-            Write-Host "이 정보로 통합을 진행하시겠습니까?"
-            Write-Host "  Y/y - 예, 계속 진행"
-            Write-Host "  N/n - 아니오, 취소"
-            Write-Host ""
-
-            if (-not (Ask-YesNo "선택" "Y")) {
+            if (-not (Ask-YesNo "이 정보로 통합을 진행할까요?" "Y")) {
                 Print-Info "취소되었습니다"
                 exit 0
             }
@@ -2746,7 +3003,8 @@ function Start-Integration {
     }
 
     # 타입별 경로 확정 — version.yml에 project_paths 기록 (full/version 모드만)
-    if ($Mode -eq "full" -or $Mode -eq "version") {
+    # interactive 모드는 확인 화면 전에 이미 수집했으므로 중복 호출 방지. (sh와 동일)
+    if (($Mode -eq "full" -or $Mode -eq "version") -and -not $script:IsInteractiveMode) {
         Resolve-ProjectPaths
     }
 
@@ -2918,7 +3176,64 @@ function Offer-IdeToolsInstall {
     }
     Write-Host ""
 
-    # ─── Claude Code 섹션 ───
+    # ── 2단계 통합 라우터 (sh offer_ide_tools_install과 동일 구조) ──
+    # 1단계: 현재 상태(위에서 출력) + 동작 선택(설치·업데이트/제거/그대로)
+    # 2단계: 그 동작을 적용할 IDE 멀티셀렉트 → 선택된 IDE만 섹션 함수 호출
+    # ps1은 숫자 입력 방식이라 화살표 대신 숫자/토글로 동작하지만 흐름·문구·선택지는 sh와 동일.
+    if (-not $Force) {
+        # IDE 후보 (감지 여부 표시) — Value는 매핑 키, Label은 표시명
+        $ideOpts = @(
+            @{Value='Claude Code'; Label='Claude Code'},
+            @{Value='Cursor';      Label='Cursor'}
+        )
+        if (Get-Command "gemini" -ErrorAction SilentlyContinue) { $ideOpts += @{Value='Gemini CLI'; Label='Gemini CLI'} }
+        else { $ideOpts += @{Value='Gemini CLI'; Label='Gemini CLI (미감지)'} }
+        if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI'} }
+        else { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI (미감지)'} }
+
+        $action = Invoke-ChooseMenu -Prompt "AI 스킬을 어떻게 할까요?" -Options @(
+            @{Value='apply';  Label='설치 / 업데이트 — 최신 상태로 맞추기'},
+            @{Value='remove'; Label='제거 — 설치된 스킬 삭제하기'},
+            @{Value='skip';   Label='그대로 두기'}
+        )
+
+        if ($action -eq 'apply') {
+            # 감지된 IDE 전체 기본 체크 (미감지 항목은 preselect에서 제외)
+            $preParts = @('Claude Code', 'Cursor')
+            if (Get-Command "gemini" -ErrorAction SilentlyContinue) { $preParts += 'Gemini CLI' }
+            if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $preParts += 'Codex CLI' }
+            $targets = Invoke-ChooseMenu -Prompt "설치 / 업데이트할 IDE를 고르세요" -Options $ideOpts -Multi -Preselect ($preParts -join ',')
+            if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
+            $tcsv = ",$($targets -join ','),"
+            if ($tcsv -like '*,Claude Code,*') { Invoke-ClaudeSection $claudeAvailable $installedScope $installedVersion }
+            if ($tcsv -like '*,Cursor,*')      { Invoke-CursorSection }
+            if ($tcsv -like '*,Gemini CLI,*')  { Invoke-GeminiExtensionManage }
+            if ($tcsv -like '*,Codex CLI,*')   { Invoke-CodexSkillsManage }
+        } elseif ($action -eq 'remove') {
+            $targets = Invoke-ChooseMenu -Prompt "제거할 IDE를 고르세요" -Options $ideOpts -Multi
+            if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
+            $tcsv = ",$($targets -join ','),"
+            if ($tcsv -like '*,Claude Code,*') { Remove-ClaudeSection $claudeAvailable $installedScope }
+            if ($tcsv -like '*,Cursor,*')      { Remove-CursorSection }
+            if ($tcsv -like '*,Gemini CLI,*')  { Remove-GeminiSection }
+            if ($tcsv -like '*,Codex CLI,*')   { Remove-CodexSection }
+        } else {
+            Print-Info "IDE Skills 변경 없이 건너뜁니다"
+        }
+        return
+    }
+
+    # ── FORCE — 기존 순차 흐름 유지 (자동 설치/업데이트) ──
+    Invoke-ClaudeSection $claudeAvailable $installedScope $installedVersion
+    Invoke-CursorSection
+    Invoke-GeminiExtensionManage
+    Invoke-CodexSkillsManage
+}
+
+# ── Claude Code 플러그인 관리 (기존 섹션 로직 보존) ──
+function Invoke-ClaudeSection {
+    param([bool]$claudeAvailable, [string]$installedScope, [string]$installedVersion)
+
     Print-Step "[ Claude Code 플러그인 관리 ]"
     Write-Host ""
 
@@ -2938,43 +3253,14 @@ function Offer-IdeToolsInstall {
             Write-Host ""
 
             if (-not $Force) {
-                $updateLabel = if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { "업데이트 (이미 최신 — 재적용)" } else { "업데이트 (최신 버전으로)" }
-
-                $choice = Invoke-ChooseMenu -Prompt "Claude Code 플러그인 (cassiiopeia)" -Options @(
-                    @{Value='update';    Label=$updateLabel},
-                    @{Value='reinstall'; Label='재설치 (scope 변경)'},
-                    @{Value='delete';    Label="삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installedScope})"},
-                    @{Value='skip';      Label='건너뛰기'}
-                )
-
-                if ($choice -eq "update") {
-                    Print-Step "플러그인 업데이트 중..."
-                    $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
-                    if ($LASTEXITCODE -eq 0) {
-                        Print-Success "업데이트 완료 (scope: ${installedScope})"
-                        Invoke-ConfigMigration
-                    } else {
-                        Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
-                    }
-                } elseif ($choice -eq "reinstall") {
-                    Print-Step "기존 플러그인 삭제 중 (scope: ${installedScope})..."
-                    $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
-                    Remove-ClaudePluginData
-                    $newScope = Get-ClaudeScope
-                    Invoke-ClaudePluginInstall $newScope
-                } elseif ($choice -eq "delete") {
-                    Print-Step "플러그인 삭제 중..."
-                    Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
-                    Print-Info "             $env:USERPROFILE\.claude\plugins\data\cassiiopeia@cassiiopeia-marketplace\"
-                    $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
-                    if ($LASTEXITCODE -eq 0) {
-                        Print-Success "플러그인 uninstall 완료"
-                        Remove-ClaudePluginData
-                    } else {
-                        Print-Warning "삭제 실패. 수동 실행: claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
-                    }
+                # 라우터에서 이미 '설치/업데이트' 선택됨 → 추가 메뉴 없이 바로 업데이트.
+                Print-Step "플러그인 업데이트 중..."
+                $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Print-Success "업데이트 완료 (scope: ${installedScope})"
+                    Invoke-ConfigMigration
                 } else {
-                    Print-Info "Claude Code 플러그인 변경 없이 건너뜁니다"
+                    Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
                 }
             } else {
                 Print-Step "플러그인 업데이트 중 (FORCE)..."
@@ -2983,21 +3269,11 @@ function Offer-IdeToolsInstall {
                 Invoke-ConfigMigration
             }
         } else {
+            # 미설치 → 신규 설치. 라우터에서 이미 설치 의사 확인됨 → scope만 묻고 바로 설치.
             if (-not $Force) {
-                Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-                Write-Host "  설치 시 /cassiiopeia:suh-analyze, /cassiiopeia:suh-review 등 19+ 스킬 사용 가능"
-                Write-Host ""
-                Write-Host "  Y/y - 예, 설치하기 (추천)"
-                Write-Host "  N/n - 아니오, 건너뛰기"
-                Write-Host ""
-                if (Ask-YesNo "선택" "Y") {
-                    $scope = Get-ClaudeScope
-                    Invoke-ClaudePluginInstall $scope
-                } else {
-                    Print-Info "Claude Code 플러그인 설치 건너뜁니다"
-                    Write-Host "  수동 설치: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-                    Write-Host "             claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-                }
+                Print-Info "Claude Code 플러그인(DevOps Skills) 설치 — 설치 후 /cassiiopeia:suh-* 19+ 스킬 사용 가능"
+                $scope = Get-ClaudeScope
+                Invoke-ClaudePluginInstall $scope
             } else {
                 Invoke-ClaudePluginInstall "user"
             }
@@ -3006,9 +3282,18 @@ function Offer-IdeToolsInstall {
         Write-Host "  Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
         Write-Host "                      claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
     }
+}
 
-    # ─── Cursor 섹션 ───
+# ── Cursor Skills 관리 (기존 섹션 로직 보존) ──
+function Invoke-CursorSection {
     # scope: user = $env:USERPROFILE\.cursor\skills\  /  project = .cursor\skills\
+    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
+    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
+    $cursorUserVer  = ""
+    $cursorProjVer  = ""
+    if (Test-Path $cursorUserMeta) { try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { } }
+    if (Test-Path $cursorProjMeta) { try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { } }
+
     $skillsSrcRemote = ""
     $skillsSrcLocal  = ""
     $tempSkillsDir   = Join-Path $TEMP_DIR "skills"
@@ -3023,50 +3308,26 @@ function Offer-IdeToolsInstall {
 
     if ($cursorAnyInstalled) {
         if (-not $Force) {
-            $cursorChoice = Invoke-ChooseMenu -Prompt "Cursor Skills 관리" -Options @(
-                @{Value='update';  Label='업데이트 (기존 scope 유지)'},
-                @{Value='install'; Label='신규 설치 (다른 scope에 추가)'},
-                @{Value='delete';  Label='삭제'},
-                @{Value='skip';    Label='건너뛰기'}
-            )
-
-            if ($cursorChoice -eq "update") {
-                # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
-                if ($cursorUserVer -and $cursorProjVer) {
-                    $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
-                } elseif ($cursorUserVer) {
-                    $targetScope = "user"
-                } else {
-                    $targetScope = "project"
-                }
-                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
-                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
-                else { Invoke-CursorSkillsCopy $targetScope $src }
-            } elseif ($cursorChoice -eq "install") {
-                # 신규 설치: scope 자유 선택 (다른 scope에 추가)
-                $targetScope = Get-CursorScope "" ""
-                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
-                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
-                else { Invoke-CursorSkillsCopy $targetScope $src }
-            } elseif ($cursorChoice -eq "delete") {
-                Invoke-CursorDelete $cursorUserVer $cursorProjVer
+            # 라우터에서 '설치/업데이트' 선택됨 → 기존 설치 scope 유지하며 최신화 (추가 메뉴 없음).
+            if ($cursorUserVer -and $cursorProjVer) {
+                $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
+            } elseif ($cursorUserVer) {
+                $targetScope = "user"
             } else {
-                Print-Info "Cursor Skills 변경 없이 건너뜁니다"
+                $targetScope = "project"
             }
+            $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
+            if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
+            else { Invoke-CursorSkillsCopy $targetScope $src }
         } else {
             $src = if ($skillsSrcRemote) { $skillsSrcRemote } else { $skillsSrcLocal }
             if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     } else {
+        # 미설치 → 설치. 라우터에서 이미 설치 의사 확인됨 → scope·소스만 묻고 바로 복사.
         if (-not $Force) {
-            Write-Host "Cursor IDE Skills를 설치하시겠습니까?"
-            Write-Host "  /analyze, /review 등 20개 스킬 사용 가능 (마켓플레이스 미지원 — 파일 직접 복사)"
-            Write-Host ""
-            Write-Host "  Y/y - 예, 설치하기 (추천)"
-            Write-Host "  N/n - 아니오, 건너뛰기"
-            Write-Host ""
-
-            if (Ask-YesNo "선택" "Y") {
+            Print-Info "Cursor IDE Skills 설치 — /analyze, /review 등 20개 스킬 (파일 직접 복사)"
+            if ($true) {
                 $targetScope = Get-CursorScope "" ""
                 $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
                 if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다. 건너뜁니다." }
@@ -3079,9 +3340,67 @@ function Offer-IdeToolsInstall {
             if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     }
+}
 
-    Invoke-GeminiExtensionManage
-    Invoke-CodexSkillsManage
+# ── 제거 섹션 (2단계 라우터의 'remove' 동작에서 호출, sh _remove_*_section과 동일) ──
+function Remove-ClaudeSection {
+    param([bool]$claudeAvailable, [string]$installedScope)
+    Write-Host ""
+    Print-Step "[ Claude Code 플러그인 제거 ]"
+    if (-not $claudeAvailable -or -not $installedScope) {
+        Print-Info "  설치된 Claude Code 플러그인이 없어 건너뜁니다"
+        return
+    }
+    Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
+    $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Print-Success "플러그인 uninstall 완료"
+        Remove-ClaudePluginData
+    } else {
+        Print-Warning "삭제 실패. 수동 실행: claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
+    }
+}
+
+function Remove-CursorSection {
+    Write-Host ""
+    Print-Step "[ Cursor Skills 제거 ]"
+    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
+    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
+    $cursorUserVer = ""; $cursorProjVer = ""
+    if (Test-Path $cursorUserMeta) { try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { } }
+    if (Test-Path $cursorProjMeta) { try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { } }
+    if (-not $cursorUserVer -and -not $cursorProjVer) {
+        Print-Info "  설치된 Cursor Skills가 없어 건너뜁니다"
+        return
+    }
+    Invoke-CursorDelete $cursorUserVer $cursorProjVer
+}
+
+function Remove-GeminiSection {
+    Write-Host ""
+    Print-Step "[ Gemini CLI Extension 제거 ]"
+    if (-not (Get-Command "gemini" -ErrorAction SilentlyContinue)) {
+        Print-Info "  gemini CLI 미감지 — 건너뜁니다"
+        return
+    }
+    $null = & gemini extensions uninstall cassiiopeia 2>&1
+    if ($LASTEXITCODE -eq 0) { Print-Success "Gemini CLI extension 제거 완료" }
+    else { Print-Info "  제거할 Gemini extension이 없거나 실패 — 수동: gemini extensions uninstall cassiiopeia" }
+}
+
+function Remove-CodexSection {
+    Write-Host ""
+    Print-Step "[ Codex CLI Plugin 제거 ]"
+    $codexTarget = Join-Path $env:USERPROFILE ".agents\skills\cassiiopeia"
+    if (Test-Path $codexTarget) {
+        Remove-Item -Recurse -Force $codexTarget -ErrorAction SilentlyContinue
+        Print-Success "Codex native skills 제거 완료 ($codexTarget)"
+    } else {
+        Print-Info "  제거할 Codex skills가 없어 건너뜁니다"
+    }
+    if (Get-Command "codex" -ErrorAction SilentlyContinue) {
+        Print-Info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
+    }
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -3311,17 +3630,7 @@ function Invoke-GeminiExtensionManage {
         return
     }
 
-    if (-not $Force) {
-        Write-Host "Gemini CLI extension을 설치/업데이트하시겠습니까?"
-        Write-Host "  Y/y - 예, 설치 또는 업데이트"
-        Write-Host "  N/n - 아니오, 건너뛰기"
-        Write-Host ""
-        if (-not (Ask-YesNo "선택" "Y")) {
-            Print-Info "Gemini CLI extension 변경 없이 건너뜁니다"
-            return
-        }
-    }
-
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
     Print-Step "Gemini CLI extension 업데이트 중..."
     $null = & gemini extensions update cassiiopeia 2>$null
     if ($LASTEXITCODE -eq 0) {
@@ -3347,21 +3656,9 @@ function Invoke-CodexSkillsManage {
     Write-Host ""
 
     if (Get-Command "codex" -ErrorAction SilentlyContinue) {
-        if (-not $Force) {
-            Write-Host "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
-            Write-Host "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-            Write-Host "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
-            Write-Host "  Y/y - 예, 등록 또는 업데이트"
-            Write-Host "  N/n - 아니오, 건너뜁니다"
-            Write-Host ""
-            if (Ask-YesNo "선택" "Y") {
-                Invoke-CodexMarketplaceRegister
-                return
-            }
-        } else {
-            Invoke-CodexMarketplaceRegister
-            return
-        }
+        # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 등록/업데이트.
+        Invoke-CodexMarketplaceRegister
+        return
     } else {
         Print-Warning "codex CLI가 감지되지 않았습니다."
         Print-Info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"

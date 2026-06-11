@@ -910,7 +910,7 @@ detect_project_type() {
 # detect_project_type(단수)은 첫 일치 하나만 반환하지만, 모노레포는 여러 타입이
 # 공존할 수 있으므로 전부 감지해 사용자가 다중 선택 메뉴로 확정하게 한다.
 detect_project_types() {
-    print_step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+    print_step "프로젝트 타입 자동 감지 중..."
 
     local detected=()
 
@@ -1165,7 +1165,11 @@ resolve_project_paths() {
     print_to_user "       레포 루트에 바로 있으면 → \".\""
     print_to_user ""
 
+    local _total=${#_targets[@]}
+    local _idx=0
     for _t in "${_targets[@]}"; do
+        _idx=$((_idx + 1))
+        local _prog="[$_idx/$_total]"
         # 1) --paths로 이미 지정됨 → 최우선
         local _preset
         _preset=$(get_path_for_type "$_t")
@@ -1220,13 +1224,13 @@ resolve_project_paths() {
         # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
         if [ "$_count" -eq 1 ]; then
             print_to_user ""
-            print_to_user "  🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
+            print_to_user "  $_prog 🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
             if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? (Y=예 / N=직접입력): " "Y"; then
                 _chosen="$_candidates"
             fi
         elif [ "$_count" -gt 1 ]; then
             print_to_user ""
-            print_to_user "  🔍 $_t: 후보 ${_count}개 발견"
+            print_to_user "  $_prog 🔍 $_t: 후보 ${_count}개 발견"
             local _i=1 _c
             while IFS= read -r _c; do
                 print_to_user "    $_i) $_c  ($_c/$(existing_marker_in_dir "$_t" "$_c"))"
@@ -1247,7 +1251,7 @@ resolve_project_paths() {
             done
         else
             print_to_user ""
-            print_warning "  $_t: 프로젝트를 찾지 못했습니다 (maxdepth 3)."
+            print_warning "  $_prog $_t: 프로젝트를 찾지 못했습니다 (maxdepth 3)."
         fi
 
         # ── 직접 입력 (위에서 미확정 시) ──

@@ -1,14 +1,42 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-11T14:35:20Z",
-    "currentVersion": "3.0.115",
+    "lastUpdated": "2026-06-11T14:44:59Z",
+    "currentVersion": "3.0.117",
     "projectType": "basic",
-    "totalReleases": 137,
+    "totalReleases": 138,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.117",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-11",
+      "pr_number": 365,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 설치 마법사에서 화살표를 누르면 갑자기 종료되던 문제 해결\n  * 일부 선택 화면이 옛 방식으로 남아있던 문제 해결\n  * 여러 경로 후보 중 고를 때 화살표로 선택할 수 있습니다\n\n* **개선**\n  * 모든 선택 화면을 화살표 이동 방식으로 통일했습니다\n  * Windows와 macOS에서 동일하게 동작하도록 정비했습니다",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "설치 마법사에서 화살표를 누르면 갑자기 종료되던 문제 해결",
+            "일부 선택 화면이 옛 방식으로 남아있던 문제 해결",
+            "여러 경로 후보 중 고를 때 화살표로 선택할 수 있습니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "모든 선택 화면을 화살표 이동 방식으로 통일했습니다",
+            "Windows와 macOS에서 동일하게 동작하도록 정비했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.115",
       "project_type": "basic",

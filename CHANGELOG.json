@@ -1,14 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-11T14:44:59Z",
-    "currentVersion": "3.0.117",
+    "lastUpdated": "2026-06-11T14:55:21Z",
+    "currentVersion": "3.0.118",
     "projectType": "basic",
-    "totalReleases": 138,
+    "totalReleases": 139,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.118",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-11",
+      "pr_number": 367,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **문서**\n  * 설치 안내 문서의 잘못된 항목을 바로잡았습니다\n  * 지원하는 AI 도구 목록을 최신 상태로 정리했습니다",
+      "parsed_changes": {
+        "문서": {
+          "title": "문서",
+          "items": [
+            "설치 안내 문서의 잘못된 항목을 바로잡았습니다",
+            "지원하는 AI 도구 목록을 최신 상태로 정리했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.117",
       "project_type": "basic",

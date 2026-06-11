@@ -1,14 +1,47 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-10T08:36:21Z",
-    "currentVersion": "3.0.107",
+    "lastUpdated": "2026-06-11T05:14:54Z",
+    "currentVersion": "3.0.109",
     "projectType": "basic",
-    "totalReleases": 133,
+    "totalReleases": 134,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.109",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-11",
+      "pr_number": 359,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 하위 폴더에 나뉘어 있는 프로젝트도 버전 관리가 가능해졌습니다\n  * 여러 종류의 프로젝트가 한 저장소에 함께 있어도 인식합니다\n\n* **버그 수정**\n  * 경로를 입력할 때 띄어쓰기 때문에 거부되던 문제 해결\n  * 일부 프로젝트에서 버전 동기화가 중간에 멈추던 문제 해결\n\n* **개선**\n  * 설정 과정에서 경로를 직접 지정할 수 있게 되었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "하위 폴더에 나뉘어 있는 프로젝트도 버전 관리가 가능해졌습니다",
+            "여러 종류의 프로젝트가 한 저장소에 함께 있어도 인식합니다"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "경로를 입력할 때 띄어쓰기 때문에 거부되던 문제 해결",
+            "일부 프로젝트에서 버전 동기화가 중간에 멈추던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설정 과정에서 경로를 직접 지정할 수 있게 되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.107",
       "project_type": "basic",

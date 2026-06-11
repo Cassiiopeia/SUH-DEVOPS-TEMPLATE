@@ -88,9 +88,8 @@ detect_terminal() {
     # stdin은 파이프지만 /dev/tty 접근 가능한지 확인
     STDIN_MODE=true
     if [ -c /dev/tty ] 2>/dev/null; then
-        # /dev/tty 읽기 테스트
-        if exec 3< /dev/tty 2>/dev/null; then
-            exec 3>&-  # 파일 디스크립터 닫기
+        # /dev/tty 읽기 테스트 — 서브셸로 감싸서 에러 출력 완전 억제
+        if ( exec 3< /dev/tty ) 2>/dev/null; then
             TTY_AVAILABLE=true
         else
             TTY_AVAILABLE=false
@@ -132,9 +131,18 @@ readonly WORKFLOW_TEMPLATE_INIT="PROJECT-TEMPLATE-INITIALIZER.yaml"
 # 출력 함수 (/dev/tty 우선, 없으면 stderr로 폴백하여 명령어 치환 시 데이터 오염 방지)
 
 # 출력 대상 선택 헬퍼 (중복 제거)
+# TTY_AVAILABLE이 true(detect_terminal에서 실제 접근 검증 완료)일 때만 /dev/tty 사용
+# -w 체크만으로는 false positive 발생 가능 (Claude Code 샌드박스 등 특수 환경)
 get_output_target() {
-    if [ -w /dev/tty ] 2>/dev/null; then
+    if [ "$TTY_AVAILABLE" = true ]; then
         echo "/dev/tty"
+    elif [ -w /dev/tty ] 2>/dev/null; then
+        # detect_terminal 호출 전(초기화 단계) 폴백: 실제 쓰기 가능한지 probe
+        if ( echo "" >/dev/tty ) 2>/dev/null; then
+            echo "/dev/tty"
+        else
+            echo "/dev/stderr"
+        fi
     else
         echo "/dev/stderr"
     fi
@@ -1001,6 +1009,22 @@ marker_for_type() {
     esac
 }
 
+# 디렉토리에 실재하는 마커 파일명 반환 (보조 마커 포함) — 없으면 대표 마커 반환 (표시용)
+existing_marker_in_dir() {
+    local t=$1
+    local d=$2
+    local names n
+    case "$t" in
+        spring) names="build.gradle build.gradle.kts pom.xml" ;;
+        python) names="pyproject.toml setup.py requirements.txt" ;;
+        *) names=$(marker_for_type "$t") ;;
+    esac
+    for n in $names; do
+        if [ -f "$d/$n" ]; then echo "$n"; return; fi
+    done
+    marker_for_type "$t"
+}
+
 # 타입별 마커 파일 후보 검색 — 후보 디렉토리 상대경로를 줄단위 출력 (루트는 ".")
 # maxdepth 3 + 잡음 폴더 제외 + 타입별 오탐 필터 (스펙 §4.2~4.3)
 find_type_path_candidates() {
@@ -1051,6 +1075,37 @@ find_type_path_candidates() {
 
 # 선택된 모든 타입의 경로를 감지·확인하여 PROJECT_PATHS_CSV 확정 (스펙 §4)
 resolve_project_paths() {
+    # --paths 사전 검증·정규화: 타입 유효성 + 경로 정규화 (백슬래시→슬래시, 끝 슬래시·앞 ./ 제거)
+    if [ -n "$PROJECT_PATHS_CSV" ]; then
+        local _vpair _vt _vp _vnorm=""
+        local _ifs_bak="${IFS-$' \t\n'}"
+        IFS=','
+        for _vpair in $PROJECT_PATHS_CSV; do
+            IFS="$_ifs_bak"
+            [ -z "$_vpair" ] && { IFS=','; continue; }
+            _vt="${_vpair%%=*}"
+            _vp="${_vpair#*=}"
+            local _valid=false _v
+            for _v in "${VALID_TYPES[@]}"; do
+                [ "$_v" = "$_vt" ] && _valid=true && break
+            done
+            if [ "$_valid" = false ]; then
+                print_error "--paths에 지원하지 않는 타입: '$_vt'"
+                print_error "지원 타입: ${VALID_TYPES[*]}"
+                exit 1
+            fi
+            _vp=$(echo "$_vp" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#\\#/#g; s#/$##; s#^\./##')
+            [ -z "$_vp" ] && _vp="."
+            if [ ! -f "$_vp/$(existing_marker_in_dir "$_vt" "$_vp")" ]; then
+                print_warning "--paths: $_vt=$_vp 경로에 마커 파일이 없습니다 (그대로 기록합니다)"
+            fi
+            _vnorm="${_vnorm:+$_vnorm,}$_vt=$_vp"
+            IFS=','
+        done
+        IFS="$_ifs_bak"
+        PROJECT_PATHS_CSV="$_vnorm"
+    fi
+
     local _all_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
     local _targets=()
     local _t
@@ -1077,13 +1132,12 @@ resolve_project_paths() {
             continue
         fi
 
-        local _marker
-        _marker=$(marker_for_type "$_t")
-
-        # 2) 루트에 마커 존재 → "." 자동 확정 (질문 없이 안내만)
-        if [ -f "$_marker" ]; then
+        # 2) 루트에 마커 존재 → "." 자동 확정 (질문 없이 안내만, 보조 마커 포함)
+        local _root_marker
+        _root_marker=$(existing_marker_in_dir "$_t" ".")
+        if [ -f "$_root_marker" ]; then
             set_path_for_type "$_t" "."
-            print_info "  $_t → . (루트의 $_marker)"
+            print_info "  $_t → . (루트의 $_root_marker)"
             continue
         fi
 
@@ -1124,7 +1178,7 @@ resolve_project_paths() {
         # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
         if [ "$_count" -eq 1 ]; then
             print_to_user ""
-            print_to_user "  🔍 $_t: ${_candidates}/${_marker} 발견"
+            print_to_user "  🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
             if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? (Y=예 / N=직접입력): " "Y"; then
                 _chosen="$_candidates"
             fi
@@ -1133,7 +1187,7 @@ resolve_project_paths() {
             print_to_user "  🔍 $_t: 후보 ${_count}개 발견"
             local _i=1 _c
             while IFS= read -r _c; do
-                print_to_user "    $_i) $_c  ($_c/$_marker)"
+                print_to_user "    $_i) $_c  ($_c/$(existing_marker_in_dir "$_t" "$_c"))"
                 _i=$((_i+1))
             done <<< "$_candidates"
             print_to_user "    m) 직접 입력"
@@ -1164,16 +1218,15 @@ resolve_project_paths() {
             _prompt="$_prompt): "
             safe_read "$_prompt" _input ""
             # 정규화: 공백 제거, 백슬래시→슬래시, 끝 슬래시·앞 ./ 제거
-            _input=$(echo "$_input" | tr -d ' ' | sed 's#\\#/#g; s#/$##; s#^\./##')
+            _input=$(echo "$_input" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#\\#/#g; s#/$##; s#^\./##')
             if [ -z "$_input" ]; then
                 if [ -n "$_existing" ]; then _input="$_existing"; else _input="."; fi
             fi
-            # 검증: 입력 경로에 마커 존재 확인 (python은 보조 마커도 인정)
-            if [ -f "$_input/$_marker" ] \
-               || { [ "$_t" = "python" ] && { [ -f "$_input/setup.py" ] || [ -f "$_input/requirements.txt" ]; }; }; then
+            # 검증: 입력 경로에 마커 존재 확인 (보조 마커 포함)
+            if [ -f "$_input/$(existing_marker_in_dir "$_t" "$_input")" ]; then
                 _chosen="$_input"
             else
-                print_warning "  $_input/$_marker 파일이 없습니다."
+                print_warning "  $_input/$(existing_marker_in_dir "$_t" "$_input") 파일이 없습니다."
                 if ask_yes_no "  그래도 이 경로를 사용할까요? (Y/N): " "N"; then
                     _chosen="$_input"
                 fi
@@ -1194,7 +1247,7 @@ resolve_project_paths() {
         IFS="$_ifs_bak"
         _pt="${_pair%%=*}"
         _pp="${_pair#*=}"
-        _m=$(marker_for_type "$_pt")
+        _m=$(existing_marker_in_dir "$_pt" "${_pp:-.}")
         if [ "$_pp" = "." ]; then _file="$_m"; else _file="$_pp/$_m"; fi
         print_to_user "   $_pt → $_file"
         _lines="${_lines}${_file}|${_pt}"$'\n'
@@ -1699,7 +1752,7 @@ create_version_yml() {
             IFS="$_ifs_bak"
             _pt="${_pair%%=*}"
             _pp="${_pair#*=}"
-            _pm=$(marker_for_type "$_pt")
+            _pm=$(existing_marker_in_dir "$_pt" "${_pp:-.}")
             if [ "$_pp" = "." ]; then _pf="$_pm"; else _pf="$_pp/$_pm"; fi
             _paths_block="${_paths_block}  ${_pt}: \"${_pp}\"   # ${_pf}"$'\n'
             IFS=','

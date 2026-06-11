@@ -1085,6 +1085,8 @@ resolve_project_paths() {
             [ -z "$_vpair" ] && { IFS=','; continue; }
             _vt="${_vpair%%=*}"
             _vp="${_vpair#*=}"
+            # 타입 토큰 앞뒤 공백 트림 — "flutter=app, react=client" 같은 콤마 뒤 공백 허용
+            _vt=$(printf '%s' "$_vt" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
             local _valid=false _v
             for _v in "${VALID_TYPES[@]}"; do
                 [ "$_v" = "$_vt" ] && _valid=true && break

@@ -317,9 +317,12 @@ function Invoke-LegacyNumericMenu {
         Write-Host ""
         Write-Host $Prompt
         Write-Host ""
+        # 화면엔 Label(사용자 친화 한국어)만 표시 — Value(full 등 영어 키)는 노출하지 않는다.
+        # Label이 비어 있으면 Value를 대신 표시(예/아니오 같은 단순 선택지).
         for ($i = 0; $i -lt $n; $i++) {
             $opt = $Options[$i]
-            Write-Host ("  {0}) {1,-20} - {2}" -f ($i + 1), $opt.Value, $opt.Label)
+            $disp = if ([string]::IsNullOrWhiteSpace($opt.Label)) { $opt.Value } else { $opt.Label }
+            Write-Host ("  {0}) {1}" -f ($i + 1), $disp)
         }
         Write-Host ""
         while ($true) {
@@ -357,7 +360,9 @@ function Invoke-LegacyNumericMenu {
     for ($i = 0; $i -lt $n; $i++) {
         $opt = $Options[$i]
         $mark = if ($preValues -contains $opt.Value) { "[✓]" } else { "[ ]" }
-        $line = "  {0} {1,2}) {2,-18} {3}" -f $mark, ($i + 1), $opt.Value, $opt.Label
+        # 화면엔 Label만 표시(영어 키 비노출). Label 비면 Value.
+        $disp = if ([string]::IsNullOrWhiteSpace($opt.Label)) { $opt.Value } else { $opt.Label }
+        $line = "  {0} {1,2}) {2}" -f $mark, ($i + 1), $disp
         if (($preValues -contains $opt.Value) -and $useColor) {
             Write-Host $line -ForegroundColor Green
         } else {
@@ -455,9 +460,15 @@ function Ask-YesNo {
         [string]$Prompt,
         [string]$DefaultValue = "N"
     )
-    
+
+    # 프롬프트 끝의 Y/N식 꼬리표 제거 (sh ask_yes_no와 동일 정책)
+    # "(Y/N, 기본: Y)", "(Y=예 / N=직접입력)", "선택:" 등이 남으면 중복·모순돼 보인다.
+    $_title = $Prompt -replace '\s*\([^)]*[YyNn][^)]*\)\s*', '' -replace '\s*:\s*$', ''
+    $_title = $_title.Trim()
+    if ([string]::IsNullOrWhiteSpace($_title) -or $_title -eq '선택') { $_title = '진행하시겠습니까?' }
+
     while ($true) {
-        $response = Read-SingleKey "$Prompt (Y/N, 기본: $DefaultValue) "
+        $response = Read-SingleKey "$_title (Y/N, 기본: $DefaultValue) "
         
         if ([string]::IsNullOrWhiteSpace($response)) {
             $response = $DefaultValue
@@ -1204,9 +1215,9 @@ function Edit-ProjectInfo {
     Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
 
     $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
-        @{Value='type';    Label='Project Type'},
-        @{Value='version'; Label='Version'},
-        @{Value='branch';  Label='Default Branch (기본 브랜치)'},
+        @{Value='type';    Label='프로젝트 타입'},
+        @{Value='version'; Label='버전'},
+        @{Value='branch';  Label='기본 브랜치'},
         @{Value='done';    Label='모두 맞음, 계속'}
     )
 
@@ -2797,20 +2808,18 @@ function Start-InteractiveMode {
     
     Print-Banner $templateVersion "Interactive (대화형 모드)"
     
-    # 프로젝트 감지 및 확인
-    Detect-AndConfirmProject
-
-    # 템플릿 다운로드 (모드 선택 전 필요 — 모드 선택 후 Synology 질문에서 사용)
-    Download-Template
-
+    # ── 1) 모드 선택 먼저 (사용자 의도부터 파악) ── (sh와 동일 구조)
+    # 사용자가 무엇을 하려는지 먼저 묻고, 모드에 따라 필요한 정보만 수집한다.
+    # (예: skills/issues 모드는 프로젝트 타입·버전·Synology·경로가 전혀 필요 없음)
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
 
-    $_modeSelected = Invoke-ChooseMenu -Prompt "어떤 기능을 통합하시겠습니까?" -Options @(
-        @{Value='full';      Label='전체 통합 (버전관리 + 워크플로우 + 이슈템플릿)'},
-        @{Value='version';   Label='버전 관리 시스템만'},
-        @{Value='workflows'; Label='GitHub Actions 워크플로우만'},
-        @{Value='issues';    Label='이슈/PR 템플릿만'},
-        @{Value='skills';    Label='Agent Skill 설치 (Claude, Cursor, Gemini, Codex)'},
+    # 라벨은 sh와 동일한 한국어 설명. ps1은 Value/Label 분리라 화면엔 Label만 표시됨(영어 키 비노출).
+    $_modeSelected = Invoke-ChooseMenu -Prompt "무엇을 설치할까요?" -Options @(
+        @{Value='full';      Label='전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿 (처음이라면 추천)'},
+        @{Value='version';   Label='버전 관리만 — 버전 자동 증가·동기화 시스템만 설치'},
+        @{Value='workflows'; Label='워크플로우만 — 빌드·배포 GitHub Actions만 설치'},
+        @{Value='issues';    Label='이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치'},
+        @{Value='skills';    Label='AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치'},
         @{Value='cancel';    Label='취소'}
     )
 
@@ -2821,12 +2830,27 @@ function Start-InteractiveMode {
 
     $script:Mode = $_modeSelected
 
-    # Synology 옵션 질문: 워크플로우를 포함하는 모드(full/workflows)에서만 질문
-    # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
-    if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
-        $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
-        $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
-        Ask-SynologyOption $typeDirs
+    # 템플릿 다운로드 (모드별 수집·복사에서 사용)
+    Download-Template
+
+    # ── 2) 모드별 필요 정보만 수집 ──
+    # 수집 매트릭스: full=타입/버전/Synology/경로, version=타입/버전/경로,
+    #               workflows=타입/Synology, issues=없음, skills=없음
+    switch ($script:Mode) {
+        { $_ -in @('skills', 'issues') } {
+            # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
+        }
+        default {
+            # full/version/workflows → 프로젝트 타입·버전·브랜치 감지 + 확인
+            Detect-AndConfirmProject
+
+            # Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
+            if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
+                $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+                Ask-SynologyOption $typeDirs
+            }
+        }
     }
 }
 
@@ -2873,13 +2897,9 @@ function Start-Integration {
         Write-Host ""
 
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
+        # ps1은 키 입력 방식이라 입력 안내(Y/N)를 유지한다(sh는 화살표라 제거).
         if (-not $Force) {
-            Write-Host "이 정보로 통합을 진행하시겠습니까?"
-            Write-Host "  Y/y - 예, 계속 진행"
-            Write-Host "  N/n - 아니오, 취소"
-            Write-Host ""
-
-            if (-not (Ask-YesNo "선택" "Y")) {
+            if (-not (Ask-YesNo "이 정보로 통합을 진행할까요?" "Y")) {
                 Print-Info "취소되었습니다"
                 exit 0
             }
@@ -3074,7 +3094,64 @@ function Offer-IdeToolsInstall {
     }
     Write-Host ""
 
-    # ─── Claude Code 섹션 ───
+    # ── 2단계 통합 라우터 (sh offer_ide_tools_install과 동일 구조) ──
+    # 1단계: 현재 상태(위에서 출력) + 동작 선택(설치·업데이트/제거/그대로)
+    # 2단계: 그 동작을 적용할 IDE 멀티셀렉트 → 선택된 IDE만 섹션 함수 호출
+    # ps1은 숫자 입력 방식이라 화살표 대신 숫자/토글로 동작하지만 흐름·문구·선택지는 sh와 동일.
+    if (-not $Force) {
+        # IDE 후보 (감지 여부 표시) — Value는 매핑 키, Label은 표시명
+        $ideOpts = @(
+            @{Value='Claude Code'; Label='Claude Code'},
+            @{Value='Cursor';      Label='Cursor'}
+        )
+        if (Get-Command "gemini" -ErrorAction SilentlyContinue) { $ideOpts += @{Value='Gemini CLI'; Label='Gemini CLI'} }
+        else { $ideOpts += @{Value='Gemini CLI'; Label='Gemini CLI (미감지)'} }
+        if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI'} }
+        else { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI (미감지)'} }
+
+        $action = Invoke-ChooseMenu -Prompt "AI 스킬을 어떻게 할까요?" -Options @(
+            @{Value='apply';  Label='설치 / 업데이트 — 최신 상태로 맞추기'},
+            @{Value='remove'; Label='제거 — 설치된 스킬 삭제하기'},
+            @{Value='skip';   Label='그대로 두기'}
+        )
+
+        if ($action -eq 'apply') {
+            # 감지된 IDE 전체 기본 체크 (미감지 항목은 preselect에서 제외)
+            $preParts = @('Claude Code', 'Cursor')
+            if (Get-Command "gemini" -ErrorAction SilentlyContinue) { $preParts += 'Gemini CLI' }
+            if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $preParts += 'Codex CLI' }
+            $targets = Invoke-ChooseMenu -Prompt "설치 / 업데이트할 IDE를 고르세요" -Options $ideOpts -Multi -Preselect ($preParts -join ',')
+            if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
+            $tcsv = ",$($targets -join ','),"
+            if ($tcsv -like '*,Claude Code,*') { Invoke-ClaudeSection $claudeAvailable $installedScope $installedVersion }
+            if ($tcsv -like '*,Cursor,*')      { Invoke-CursorSection }
+            if ($tcsv -like '*,Gemini CLI,*')  { Invoke-GeminiExtensionManage }
+            if ($tcsv -like '*,Codex CLI,*')   { Invoke-CodexSkillsManage }
+        } elseif ($action -eq 'remove') {
+            $targets = Invoke-ChooseMenu -Prompt "제거할 IDE를 고르세요" -Options $ideOpts -Multi
+            if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
+            $tcsv = ",$($targets -join ','),"
+            if ($tcsv -like '*,Claude Code,*') { Remove-ClaudeSection $claudeAvailable $installedScope }
+            if ($tcsv -like '*,Cursor,*')      { Remove-CursorSection }
+            if ($tcsv -like '*,Gemini CLI,*')  { Remove-GeminiSection }
+            if ($tcsv -like '*,Codex CLI,*')   { Remove-CodexSection }
+        } else {
+            Print-Info "IDE Skills 변경 없이 건너뜁니다"
+        }
+        return
+    }
+
+    # ── FORCE — 기존 순차 흐름 유지 (자동 설치/업데이트) ──
+    Invoke-ClaudeSection $claudeAvailable $installedScope $installedVersion
+    Invoke-CursorSection
+    Invoke-GeminiExtensionManage
+    Invoke-CodexSkillsManage
+}
+
+# ── Claude Code 플러그인 관리 (기존 섹션 로직 보존) ──
+function Invoke-ClaudeSection {
+    param([bool]$claudeAvailable, [string]$installedScope, [string]$installedVersion)
+
     Print-Step "[ Claude Code 플러그인 관리 ]"
     Write-Host ""
 
@@ -3094,43 +3171,14 @@ function Offer-IdeToolsInstall {
             Write-Host ""
 
             if (-not $Force) {
-                $updateLabel = if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { "업데이트 (이미 최신 — 재적용)" } else { "업데이트 (최신 버전으로)" }
-
-                $choice = Invoke-ChooseMenu -Prompt "Claude Code 플러그인 (cassiiopeia)" -Options @(
-                    @{Value='update';    Label=$updateLabel},
-                    @{Value='reinstall'; Label='재설치 (scope 변경)'},
-                    @{Value='delete';    Label="삭제 (cassiiopeia@cassiiopeia-marketplace, scope: ${installedScope})"},
-                    @{Value='skip';      Label='건너뛰기'}
-                )
-
-                if ($choice -eq "update") {
-                    Print-Step "플러그인 업데이트 중..."
-                    $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
-                    if ($LASTEXITCODE -eq 0) {
-                        Print-Success "업데이트 완료 (scope: ${installedScope})"
-                        Invoke-ConfigMigration
-                    } else {
-                        Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
-                    }
-                } elseif ($choice -eq "reinstall") {
-                    Print-Step "기존 플러그인 삭제 중 (scope: ${installedScope})..."
-                    $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
-                    Remove-ClaudePluginData
-                    $newScope = Get-ClaudeScope
-                    Invoke-ClaudePluginInstall $newScope
-                } elseif ($choice -eq "delete") {
-                    Print-Step "플러그인 삭제 중..."
-                    Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
-                    Print-Info "             $env:USERPROFILE\.claude\plugins\data\cassiiopeia@cassiiopeia-marketplace\"
-                    $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
-                    if ($LASTEXITCODE -eq 0) {
-                        Print-Success "플러그인 uninstall 완료"
-                        Remove-ClaudePluginData
-                    } else {
-                        Print-Warning "삭제 실패. 수동 실행: claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
-                    }
+                # 라우터에서 이미 '설치/업데이트' 선택됨 → 추가 메뉴 없이 바로 업데이트.
+                Print-Step "플러그인 업데이트 중..."
+                $null = & claude plugin update "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Print-Success "업데이트 완료 (scope: ${installedScope})"
+                    Invoke-ConfigMigration
                 } else {
-                    Print-Info "Claude Code 플러그인 변경 없이 건너뜁니다"
+                    Print-Warning "업데이트 실패. 수동 실행: claude plugin update cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
                 }
             } else {
                 Print-Step "플러그인 업데이트 중 (FORCE)..."
@@ -3139,21 +3187,11 @@ function Offer-IdeToolsInstall {
                 Invoke-ConfigMigration
             }
         } else {
+            # 미설치 → 신규 설치. 라우터에서 이미 설치 의사 확인됨 → scope만 묻고 바로 설치.
             if (-not $Force) {
-                Write-Host "Claude Code 플러그인(DevOps Skills)을 설치하시겠습니까?"
-                Write-Host "  설치 시 /cassiiopeia:suh-analyze, /cassiiopeia:suh-review 등 19+ 스킬 사용 가능"
-                Write-Host ""
-                Write-Host "  Y/y - 예, 설치하기 (추천)"
-                Write-Host "  N/n - 아니오, 건너뛰기"
-                Write-Host ""
-                if (Ask-YesNo "선택" "Y") {
-                    $scope = Get-ClaudeScope
-                    Invoke-ClaudePluginInstall $scope
-                } else {
-                    Print-Info "Claude Code 플러그인 설치 건너뜁니다"
-                    Write-Host "  수동 설치: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-                    Write-Host "             claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
-                }
+                Print-Info "Claude Code 플러그인(DevOps Skills) 설치 — 설치 후 /cassiiopeia:suh-* 19+ 스킬 사용 가능"
+                $scope = Get-ClaudeScope
+                Invoke-ClaudePluginInstall $scope
             } else {
                 Invoke-ClaudePluginInstall "user"
             }
@@ -3162,9 +3200,18 @@ function Offer-IdeToolsInstall {
         Write-Host "  Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
         Write-Host "                      claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
     }
+}
 
-    # ─── Cursor 섹션 ───
+# ── Cursor Skills 관리 (기존 섹션 로직 보존) ──
+function Invoke-CursorSection {
     # scope: user = $env:USERPROFILE\.cursor\skills\  /  project = .cursor\skills\
+    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
+    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
+    $cursorUserVer  = ""
+    $cursorProjVer  = ""
+    if (Test-Path $cursorUserMeta) { try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { } }
+    if (Test-Path $cursorProjMeta) { try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { } }
+
     $skillsSrcRemote = ""
     $skillsSrcLocal  = ""
     $tempSkillsDir   = Join-Path $TEMP_DIR "skills"
@@ -3179,50 +3226,26 @@ function Offer-IdeToolsInstall {
 
     if ($cursorAnyInstalled) {
         if (-not $Force) {
-            $cursorChoice = Invoke-ChooseMenu -Prompt "Cursor Skills 관리" -Options @(
-                @{Value='update';  Label='업데이트 (기존 scope 유지)'},
-                @{Value='install'; Label='신규 설치 (다른 scope에 추가)'},
-                @{Value='delete';  Label='삭제'},
-                @{Value='skip';    Label='건너뛰기'}
-            )
-
-            if ($cursorChoice -eq "update") {
-                # 업데이트: 기존 설치 scope 유지 (둘 다 있으면 scope 선택)
-                if ($cursorUserVer -and $cursorProjVer) {
-                    $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
-                } elseif ($cursorUserVer) {
-                    $targetScope = "user"
-                } else {
-                    $targetScope = "project"
-                }
-                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
-                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
-                else { Invoke-CursorSkillsCopy $targetScope $src }
-            } elseif ($cursorChoice -eq "install") {
-                # 신규 설치: scope 자유 선택 (다른 scope에 추가)
-                $targetScope = Get-CursorScope "" ""
-                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
-                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
-                else { Invoke-CursorSkillsCopy $targetScope $src }
-            } elseif ($cursorChoice -eq "delete") {
-                Invoke-CursorDelete $cursorUserVer $cursorProjVer
+            # 라우터에서 '설치/업데이트' 선택됨 → 기존 설치 scope 유지하며 최신화 (추가 메뉴 없음).
+            if ($cursorUserVer -and $cursorProjVer) {
+                $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
+            } elseif ($cursorUserVer) {
+                $targetScope = "user"
             } else {
-                Print-Info "Cursor Skills 변경 없이 건너뜁니다"
+                $targetScope = "project"
             }
+            $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
+            if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
+            else { Invoke-CursorSkillsCopy $targetScope $src }
         } else {
             $src = if ($skillsSrcRemote) { $skillsSrcRemote } else { $skillsSrcLocal }
             if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     } else {
+        # 미설치 → 설치. 라우터에서 이미 설치 의사 확인됨 → scope·소스만 묻고 바로 복사.
         if (-not $Force) {
-            Write-Host "Cursor IDE Skills를 설치하시겠습니까?"
-            Write-Host "  /analyze, /review 등 20개 스킬 사용 가능 (마켓플레이스 미지원 — 파일 직접 복사)"
-            Write-Host ""
-            Write-Host "  Y/y - 예, 설치하기 (추천)"
-            Write-Host "  N/n - 아니오, 건너뛰기"
-            Write-Host ""
-
-            if (Ask-YesNo "선택" "Y") {
+            Print-Info "Cursor IDE Skills 설치 — /analyze, /review 등 20개 스킬 (파일 직접 복사)"
+            if ($true) {
                 $targetScope = Get-CursorScope "" ""
                 $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
                 if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다. 건너뜁니다." }
@@ -3235,9 +3258,67 @@ function Offer-IdeToolsInstall {
             if ($src) { Invoke-CursorSkillsCopy "project" $src }
         }
     }
+}
 
-    Invoke-GeminiExtensionManage
-    Invoke-CodexSkillsManage
+# ── 제거 섹션 (2단계 라우터의 'remove' 동작에서 호출, sh _remove_*_section과 동일) ──
+function Remove-ClaudeSection {
+    param([bool]$claudeAvailable, [string]$installedScope)
+    Write-Host ""
+    Print-Step "[ Claude Code 플러그인 제거 ]"
+    if (-not $claudeAvailable -or -not $installedScope) {
+        Print-Info "  설치된 Claude Code 플러그인이 없어 건너뜁니다"
+        return
+    }
+    Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
+    $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Print-Success "플러그인 uninstall 완료"
+        Remove-ClaudePluginData
+    } else {
+        Print-Warning "삭제 실패. 수동 실행: claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope ${installedScope}"
+    }
+}
+
+function Remove-CursorSection {
+    Write-Host ""
+    Print-Step "[ Cursor Skills 제거 ]"
+    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
+    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
+    $cursorUserVer = ""; $cursorProjVer = ""
+    if (Test-Path $cursorUserMeta) { try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { } }
+    if (Test-Path $cursorProjMeta) { try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { } }
+    if (-not $cursorUserVer -and -not $cursorProjVer) {
+        Print-Info "  설치된 Cursor Skills가 없어 건너뜁니다"
+        return
+    }
+    Invoke-CursorDelete $cursorUserVer $cursorProjVer
+}
+
+function Remove-GeminiSection {
+    Write-Host ""
+    Print-Step "[ Gemini CLI Extension 제거 ]"
+    if (-not (Get-Command "gemini" -ErrorAction SilentlyContinue)) {
+        Print-Info "  gemini CLI 미감지 — 건너뜁니다"
+        return
+    }
+    $null = & gemini extensions uninstall cassiiopeia 2>&1
+    if ($LASTEXITCODE -eq 0) { Print-Success "Gemini CLI extension 제거 완료" }
+    else { Print-Info "  제거할 Gemini extension이 없거나 실패 — 수동: gemini extensions uninstall cassiiopeia" }
+}
+
+function Remove-CodexSection {
+    Write-Host ""
+    Print-Step "[ Codex CLI Plugin 제거 ]"
+    $codexTarget = Join-Path $env:USERPROFILE ".agents\skills\cassiiopeia"
+    if (Test-Path $codexTarget) {
+        Remove-Item -Recurse -Force $codexTarget -ErrorAction SilentlyContinue
+        Print-Success "Codex native skills 제거 완료 ($codexTarget)"
+    } else {
+        Print-Info "  제거할 Codex skills가 없어 건너뜁니다"
+    }
+    if (Get-Command "codex" -ErrorAction SilentlyContinue) {
+        Print-Info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
+    }
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -3467,17 +3548,7 @@ function Invoke-GeminiExtensionManage {
         return
     }
 
-    if (-not $Force) {
-        Write-Host "Gemini CLI extension을 설치/업데이트하시겠습니까?"
-        Write-Host "  Y/y - 예, 설치 또는 업데이트"
-        Write-Host "  N/n - 아니오, 건너뛰기"
-        Write-Host ""
-        if (-not (Ask-YesNo "선택" "Y")) {
-            Print-Info "Gemini CLI extension 변경 없이 건너뜁니다"
-            return
-        }
-    }
-
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
     Print-Step "Gemini CLI extension 업데이트 중..."
     $null = & gemini extensions update cassiiopeia 2>$null
     if ($LASTEXITCODE -eq 0) {
@@ -3503,21 +3574,9 @@ function Invoke-CodexSkillsManage {
     Write-Host ""
 
     if (Get-Command "codex" -ErrorAction SilentlyContinue) {
-        if (-not $Force) {
-            Write-Host "Codex plugin marketplace를 등록/업데이트하시겠습니까?"
-            Write-Host "  codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
-            Write-Host "  등록 후 /plugins에서 cassiiopeia 항목을 확인하세요"
-            Write-Host "  Y/y - 예, 등록 또는 업데이트"
-            Write-Host "  N/n - 아니오, 건너뜁니다"
-            Write-Host ""
-            if (Ask-YesNo "선택" "Y") {
-                Invoke-CodexMarketplaceRegister
-                return
-            }
-        } else {
-            Invoke-CodexMarketplaceRegister
-            return
-        }
+        # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 등록/업데이트.
+        Invoke-CodexMarketplaceRegister
+        return
     } else {
         Print-Warning "codex CLI가 감지되지 않았습니다."
         Print-Info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"

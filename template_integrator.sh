@@ -216,20 +216,57 @@ print_question() {
 }
 
 # 안전한 read 함수 (/dev/tty 사용)
+# 반환: 0=정상 입력, 1=TTY 없음(비대화형), 2=ESC로 취소
+# ESC 처리: 자유텍스트 입력($options 빈값)에서만 동작. 첫 키를 raw 모드로 한 글자
+#           읽어 ESC면 취소(2)로 반환한다. 일반 문자면 그 글자를 첫 글자로 삼고
+#           나머지를 라인으로 읽어 합쳐 기존 줄 입력과 동일하게 동작시킨다.
+#           (read -r 한 줄 입력은 ESC가 리터럴 '^['로 박혀 취소로 인식되지 못했던
+#            버그를 해결 — 버전/브랜치 입력 중 ESC가 ^[^[로 찍히던 문제)
 safe_read() {
     local prompt="$1"
     local varname="$2"
     local options="$3"
-    
+
     if [ "$TTY_AVAILABLE" = true ]; then
         printf "%s" "$prompt" > /dev/tty
-        
+
         if [ "$options" = "-n 1" ]; then
             IFS= read -r -n 1 "$varname" < /dev/tty
         elif [ -n "$options" ]; then
             IFS= read -r $options "$varname" < /dev/tty
         else
-            IFS= read -r "$varname" < /dev/tty
+            # 첫 키를 raw 1바이트로 읽어 ESC 여부 판별
+            local _first
+            IFS= read -rsn1 _first < /dev/tty || { printf "%s" "" > /dev/tty; return 1; }
+
+            if [ "$_first" = $'\e' ]; then
+                # ESC 뒤 시퀀스(화살표 등)를 정수 타임아웃으로 흡수.
+                # 추가 바이트가 있으면 화살표 등 → 취소 아님(빈값으로 처리), 없으면 진짜 ESC.
+                local _b1
+                if IFS= read -rsn1 -t 1 _b1 < /dev/tty 2>/dev/null && [ -n "$_b1" ]; then
+                    IFS= read -rsn1 -t 1 _ < /dev/tty 2>/dev/null || true
+                    printf "\n" > /dev/tty
+                    printf -v "$varname" '%s' ""
+                    return 0
+                fi
+                # 단독 ESC → 취소
+                printf "\n" > /dev/tty
+                printf -v "$varname" '%s' ""
+                return 2
+            fi
+
+            if [ "$_first" = $'\n' ] || [ "$_first" = $'\r' ] || [ -z "$_first" ]; then
+                # 즉시 Enter → 빈 입력
+                printf "\n" > /dev/tty
+                printf -v "$varname" '%s' ""
+                return 0
+            fi
+
+            # 일반 문자 → 첫 글자 echo 후 나머지 라인 읽어 합침
+            printf "%s" "$_first" > /dev/tty
+            local _rest
+            IFS= read -r _rest < /dev/tty || _rest=""
+            printf -v "$varname" '%s' "${_first}${_rest}"
         fi
         return 0
     else
@@ -1668,16 +1705,25 @@ detect_and_confirm_project() {
         local user_choice
         if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
             # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
-            local _confirm_label
+            local _confirm_label _confirm_rc
             _confirm_label=$(choose_menu "이 정보가 맞습니까?" \
                 "예, 계속 진행|" \
                 "수정하기|" \
                 "아니오, 취소|")
-            case "$_confirm_label" in
-                예*)  user_choice="yes" ;;
-                수정*) user_choice="edit" ;;
-                *)    user_choice="no" ;;   # 취소 또는 ESC
-            esac
+            _confirm_rc=$?
+            if [ "$_confirm_rc" -ne 0 ]; then
+                # ESC — 여기는 최상위 확인 화면이라 더 뒤로 갈 단계가 없다.
+                # 의도치 않은 종료를 막기 위해 그 자리에 머문다(루프 재출력).
+                # 실제 종료는 '아니오, 취소'를 명시적으로 골라야만 한다.
+                user_choice="stay"
+            else
+                case "$_confirm_label" in
+                    예*)  user_choice="yes" ;;
+                    수정*) user_choice="edit" ;;
+                    아니오*) user_choice="no" ;;   # 명시적 취소만 종료
+                    *)    user_choice="stay" ;;
+                esac
+            fi
         else
             user_choice=$(ask_yes_no_edit)
         fi
@@ -1695,6 +1741,9 @@ detect_and_confirm_project() {
             "edit")
                 handle_project_edit_menu
                 # 루프 계속 - 다시 확인 질문으로
+                ;;
+            "stay")
+                # ESC 등으로 인한 중립 상태 — 종료하지 않고 확인 화면을 다시 보여준다
                 ;;
             *)
                 print_error "예상치 못한 오류가 발생했습니다"
@@ -1761,9 +1810,15 @@ handle_project_edit_menu() {
             print_to_user ""
             ;;
         version)
-            local new_version
+            local new_version _rc
             print_to_user ""
-            if safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""; then
+            safe_read "새 버전을 입력하세요 (예: 1.0.0): " new_version ""
+            _rc=$?
+            if [ "$_rc" -eq 2 ]; then
+                # ESC → 취소, 기존 값 유지하고 수정 메뉴로 복귀
+                print_info "취소되었습니다. 기존 값을 유지합니다."
+                print_to_user ""
+            elif [ "$_rc" -eq 0 ]; then
                 print_to_user ""
                 if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                     VERSION="$new_version"
@@ -1778,11 +1833,17 @@ handle_project_edit_menu() {
             fi
             ;;
         branch)
-            local new_branch
+            local new_branch _rc
             print_to_user ""
             print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
             print_to_user ""
-            if safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""; then
+            safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop): " new_branch ""
+            _rc=$?
+            if [ "$_rc" -eq 2 ]; then
+                # ESC → 취소, 기존 값 유지하고 수정 메뉴로 복귀
+                print_info "취소되었습니다. 기존 값을 유지합니다."
+                print_to_user ""
+            elif [ "$_rc" -eq 0 ]; then
                 print_to_user ""
                 if [ -n "$new_branch" ]; then
                     DETECTED_BRANCH="$new_branch"

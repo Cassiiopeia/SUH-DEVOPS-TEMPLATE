@@ -1024,22 +1024,17 @@ function Resolve-ProjectPaths {
             }
         } elseif ($candidates.Count -gt 1) {
             Write-Host ""
-            Write-Host "  $prog 🔍 ${t}: 후보 $($candidates.Count)개 발견"
-            for ($i = 0; $i -lt $candidates.Count; $i++) {
-                $cMarker = Get-ExistingMarkerInDir $t $candidates[$i]
-                Write-Host "    $($i+1)) $($candidates[$i])  ($($candidates[$i])/$cMarker)"
+            Write-Host "  $prog 🔍 ${t}: 경로 후보 $($candidates.Count)개 발견"
+            # 후보들 + '직접 입력'을 화살표 메뉴로 (다른 메뉴와 통일). value=경로, 마지막은 직접입력.
+            $candOpts = @()
+            foreach ($cand in $candidates) {
+                $cMarker = Get-ExistingMarkerInDir $t $cand
+                $candOpts += @{Value=$cand; Label=$cMarker}
             }
-            Write-Host "    m) 직접 입력"
-            while ($true) {
-                $sel = Read-UserInput "  선택"
-                if ($sel -eq "m" -or $sel -eq "M") { break }
-                $selNum = 0
-                if ([int]::TryParse($sel, [ref]$selNum) -and $selNum -ge 1 -and $selNum -le $candidates.Count) {
-                    $chosen = $candidates[$selNum - 1]
-                    break
-                }
-                Print-Error "  잘못된 입력입니다. 1-$($candidates.Count) 또는 m을 입력하세요."
-            }
+            $candOpts += @{Value='직접 입력'; Label=''}
+            $sel = Invoke-ChooseMenu -Prompt "  $t 경로를 선택하세요" -Options $candOpts
+            if ($sel -and $sel -ne '직접 입력') { $chosen = $sel }
+            # '직접 입력'이거나 취소면 chosen 미설정 → 아래 직접입력 루프로
         } else {
             Write-Host ""
             Print-Warning "  $prog ${t}: 프로젝트를 찾지 못했습니다 (depth 3)."
@@ -2126,27 +2121,21 @@ function Copy-Workflows-ForType {
         # 이미 존재하는 파일 처리
         if ($existingFiles.Count -gt 0) {
             Write-Host ""
-            Print-Warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            Print-Warning "⚠️  이미 존재하는 타입별 워크플로우($Type): $($existingFiles.Count)개"
-            Print-Warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            Print-Warning "이미 존재하는 타입별 워크플로우($Type): $($existingFiles.Count)개"
             foreach ($workflow in $existingFiles) {
                 Write-Host "   • $($workflow.Name)"
             }
-            Write-Host ""
-            Print-Info "처리 방법을 선택하세요:"
-            Write-Host ""
-            Write-Host "  (T) .template.yaml로 추가"
-            Write-Host "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
-            Write-Host "      → 예: PROJECT-FLUTTER-*.yaml.template.yaml"
-            Write-Host ""
-            Write-Host "  (S) 건너뛰기"
-            Write-Host "      → 기존 파일만 유지, 아무것도 추가 안 함"
-            Write-Host ""
-            Write-Host "  (O) 덮어쓰기 (기존 방식)"
-            Write-Host "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
-            Write-Host ""
 
-            $choice = Read-SingleKey "선택 [T/S/O]: "
+            # 화살표 3지선 메뉴 (다른 메뉴와 통일). FORCE는 기본 'S'(건너뛰기).
+            $choice = "S"
+            if (-not $Force) {
+                $wfLabel = Invoke-ChooseMenu -Prompt "기존 워크플로우를 어떻게 할까요?" -Options @(
+                    @{Value='T'; Label='기존 유지 + 새 버전을 참고용(.template.yaml)으로 추가'},
+                    @{Value='S'; Label='건너뛰기 — 기존 파일만 유지'},
+                    @{Value='O'; Label='덮어쓰기 — 기존 파일을 .bak 백업 후 교체'}
+                )
+                $choice = if ($wfLabel) { $wfLabel } else { "S" }
+            }
             Write-Host ""
 
             switch ($choice.ToUpper()) {

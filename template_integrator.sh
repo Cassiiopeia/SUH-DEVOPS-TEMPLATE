@@ -1427,27 +1427,21 @@ resolve_project_paths() {
             fi
         elif [ "$_count" -gt 1 ]; then
             print_to_user ""
-            print_to_user "  $_prog 🔍 $_t: 후보 ${_count}개 발견"
-            local _i=1 _c
+            print_to_user "  $_prog 🔍 $_t: 경로 후보 ${_count}개 발견"
+            # 후보들 + '직접 입력'을 화살표 메뉴로 (다른 메뉴와 통일). value=후보경로, 마지막은 직접입력 센티넬.
+            local _opts=() _c
             while IFS= read -r _c; do
-                print_to_user "    $_i) $_c  ($_c/$(existing_marker_in_dir "$_t" "$_c"))"
-                _i=$((_i+1))
+                [ -z "$_c" ] && continue
+                _opts+=("$_c|$(existing_marker_in_dir "$_t" "$_c")")   # value=경로, label=마커파일명
             done <<< "$_candidates"
-            print_to_user "    m) 직접 입력"
-            local _sel=""
-            while true; do
-                # set -e 가드: ESC(return 2)로 함수가 죽지 않게 || true. 빈값이면 아래서 재입력 안내.
-                _sel=""
-                safe_read "  선택: " _sel "" || true
-                if [ "$_sel" = "m" ] || [ "$_sel" = "M" ]; then
-                    break
-                fi
-                if [[ "$_sel" =~ ^[0-9]+$ ]] && [ "$_sel" -ge 1 ] && [ "$_sel" -lt "$_i" ]; then
-                    _chosen=$(echo "$_candidates" | sed -n "${_sel}p")
-                    break
-                fi
-                print_error "  잘못된 입력입니다. 1-$((_i-1)) 또는 m을 입력하세요."
-            done
+            _opts+=("직접 입력|")   # value 자체를 한국어로 — 센티넬 노출 방지
+            local _sel
+            _sel=$(choose_menu "  $_t 경로를 선택하세요" "${_opts[@]}") || _sel="직접 입력"
+            if [ "$_sel" = "직접 입력" ] || [ -z "$_sel" ]; then
+                : # _chosen 미설정 → 아래 직접입력 루프로
+            else
+                _chosen="$_sel"
+            fi
         else
             print_to_user ""
             print_warning "  $_prog $_t: 프로젝트를 찾지 못했습니다 (maxdepth 3)."
@@ -2634,33 +2628,31 @@ _copy_workflows_for_type() {
             done
         fi
 
-        # 이미 존재하는 파일 처리 — T/S/O 선택
+        # 이미 존재하는 파일 처리 — 화살표 3지선 메뉴 (다른 메뉴와 통일)
         if [ ${#existing_files[@]} -gt 0 ]; then
-            echo ""
-            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            print_warning "⚠️  이미 존재하는 타입별 워크플로우($type): ${#existing_files[@]}개"
-            print_warning "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "" >&2
+            print_warning "이미 존재하는 타입별 워크플로우($type): ${#existing_files[@]}개"
             for f in "${existing_files[@]}"; do
-                echo "   • $f"
+                print_to_user "   • $f"
             done
-            echo ""
-            print_info "처리 방법을 선택하세요:"
-            echo ""
-            echo "  (T) .template.yaml로 추가"
-            echo "      → 기존 파일 유지 + 새 버전을 참고용으로 추가"
-            echo ""
-            echo "  (S) 건너뛰기"
-            echo "      → 기존 파일만 유지, 아무것도 추가 안 함"
-            echo ""
-            echo "  (O) 덮어쓰기 (기존 방식)"
-            echo "      → 기존 파일을 .bak으로 백업 후 덮어쓰기"
-            echo ""
 
-            local choice
-            safe_read "선택 [T/S/O]: " choice "-n 1"
-            echo ""
+            # choose_menu 화살표 메뉴 (TTY) / FORCE·비TTY는 기본 'skip'
+            local choice="skip"
+            if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
+                local _wf_label
+                _wf_label=$(choose_menu "기존 워크플로우를 어떻게 할까요?" \
+                    "기존 유지 + 새 버전을 참고용(.template.yaml)으로 추가|" \
+                    "건너뛰기 — 기존 파일만 유지|" \
+                    "덮어쓰기 — 기존 파일을 .bak 백업 후 교체|")
+                case "$_wf_label" in
+                    기존\ 유지*) choice="T" ;;
+                    건너뛰기*)   choice="S" ;;
+                    덮어쓰기*)   choice="O" ;;
+                    *)           choice="S" ;;   # ESC/취소 → 안전하게 건너뜀
+                esac
+            fi
 
-            case "${choice^^}" in
+            case "$choice" in
                 T)
                     print_info "새 버전을 .template.yaml로 추가합니다..."
                     for filename in "${existing_files[@]}"; do

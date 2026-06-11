@@ -968,15 +968,15 @@ suggest_types_by_scan() {
         -o -type f -print 2>/dev/null)
 
     local _dart _java _kt _gradle _tsx _jsx _py _ts _js
-    _dart=$(printf '%s\n' "$_files"   | grep -c '\.dart$')
-    _java=$(printf '%s\n' "$_files"   | grep -c '\.java$')
-    _kt=$(printf '%s\n' "$_files"     | grep -c '\.kt$')
-    _gradle=$(printf '%s\n' "$_files" | grep -c '\.gradle$')
-    _tsx=$(printf '%s\n' "$_files"    | grep -c '\.tsx$')
-    _jsx=$(printf '%s\n' "$_files"    | grep -c '\.jsx$')
-    _py=$(printf '%s\n' "$_files"     | grep -c '\.py$')
-    _ts=$(printf '%s\n' "$_files"     | grep -c '\.ts$')
-    _js=$(printf '%s\n' "$_files"     | grep -c '\.js$')
+    _dart=$(printf '%s\n' "$_files"   | grep -c '\.dart$' || true)
+    _java=$(printf '%s\n' "$_files"   | grep -c '\.java$' || true)
+    _kt=$(printf '%s\n' "$_files"     | grep -c '\.kt$' || true)
+    _gradle=$(printf '%s\n' "$_files" | grep -c '\.gradle$' || true)
+    _tsx=$(printf '%s\n' "$_files"    | grep -c '\.tsx$' || true)
+    _jsx=$(printf '%s\n' "$_files"    | grep -c '\.jsx$' || true)
+    _py=$(printf '%s\n' "$_files"     | grep -c '\.py$' || true)
+    _ts=$(printf '%s\n' "$_files"     | grep -c '\.ts$' || true)
+    _js=$(printf '%s\n' "$_files"     | grep -c '\.js$' || true)
 
     local _out=""
     # flutter: .dart 임계 1 (고유 확장자라 오탐 적음)
@@ -1623,7 +1623,11 @@ handle_project_edit_menu() {
                 fi
 
                 # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
-                if [ "$_new_csv" != "$_old_csv" ]; then
+                # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
+                local _old_sorted _new_sorted
+                _old_sorted=$(printf '%s\n' "$_old_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
+                _new_sorted=$(printf '%s\n' "$_new_csv" | tr ',' '\n' | sort | tr '\n' ',' | sed 's/,*$//')
+                if [ "$_new_sorted" != "$_old_sorted" ]; then
                     PROJECT_PATHS_CSV=""   # 새 타입 기준으로 다시 잡도록 초기화
                     resolve_project_paths
                 fi

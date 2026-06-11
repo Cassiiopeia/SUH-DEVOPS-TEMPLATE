@@ -1167,7 +1167,10 @@ function Edit-ProjectInfo {
                     Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
                 }
                 # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
-                if ($newCsv -ne $oldCsv) {
+                # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
+                $oldSorted = (($oldCsv -split ',' | Sort-Object) -join ',')
+                $newSorted = (($newCsv -split ',' | Sort-Object) -join ',')
+                if ($newSorted -ne $oldSorted) {
                     $script:ProjectPaths = [ordered]@{}
                     Resolve-ProjectPaths
                 }

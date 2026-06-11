@@ -167,6 +167,86 @@ docs/, .github/scripts/test/, .github/workflows/test/
 .claude-plugin/, skills/, scripts/
 ```
 
+#### macOS에서 template_integrator 검증하는 법 (실측 정리)
+
+> Mac에는 `pwsh`가 기본 설치되어 있지 않다. `.ps1`은 **Docker로 실제 PowerShell을 돌려** 검증한다. `.sh`는 `expect`로 실제 TTY 동작까지 검증한다. 문법 통과(`bash -n`)만으로는 ESC·메뉴·`set -e` 종료 같은 런타임 버그를 못 잡는다 — 반드시 실제 키 입력을 주입해 동작을 본다.
+
+**1) `.ps1` 구문 검증 — Docker + 실제 PowerShell 파서 (가장 신뢰도 높음)**
+
+```bash
+# PowerShell 이미지는 amd64 전용. ARM Mac에서도 --platform linux/amd64로 돌린다(QEMU).
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work mcr.microsoft.com/powershell:latest \
+  pwsh -NoProfile -Command '$t=$null;$e=$null;[System.Management.Automation.Language.Parser]::ParseFile("/work/template_integrator.ps1",[ref]$t,[ref]$e)|Out-Null; if($e -and $e.Count){"ERRORS:"+$e.Count}else{"PS1_PARSE_OK"}'
+```
+
+- `Parser::ParseFile`은 **실행 없이** 전체 구문을 검사한다(안전). `PS1_PARSE_OK`면 문법 통과.
+- 출력이 파이프(`| grep` 등)에서 사라지면 `> /tmp/out.txt 2>&1` 로 파일에 받아서 읽는다. (Docker stdout 버퍼링 이슈)
+
+**2) `.ps1` 동작 검증 — 함수만 떼어내 입력 주입 (AST 통째 로드 금지)**
+
+- ⚠️ **하지 말 것**: 스크립트 전체를 `Invoke-Expression` 으로 AST 로드 → ARM Mac의 QEMU 에뮬레이션에서 `AccessViolationException`(메모리 폴트)로 죽는다. 실측 확인됨.
+- ✅ **할 것**: 검증할 함수 본문만 `sed -n 'START,ENDp'` 로 잘라 최소 하네스에 붙이고, `Invoke-ChooseMenu`·`Read-UserInput`·`Read-Host` 등 입력 함수를 **배열 주입 스텁**으로 덮어쓴다. `Print-*`·`Detect-*`·외부접근 함수도 스텁.
+
+```bash
+# 예: Edit-ProjectInfo(1256~1342행)만 추출해 입력 시퀀스 주입
+{ cat <<'PS'
+$ErrorActionPreference="Stop"
+$script:ProjectVersion='0.0.187'; $script:ProjectTypes=@('spring')
+function Print-Success{param($m)Write-Host "OK: $m"}; function Print-Info{param($m)Write-Host "INFO: $m"}
+function Print-Error{param($m)Write-Host "ERR: $m"}; function Print-QuestionHeader{param($a,$b)}
+function Show-ProjectTypeMenu{''}; function Resolve-ProjectPaths{}
+$script:__in=@(); $script:__i=0
+function Invoke-ChooseMenu{param($Prompt,$Options,$DefaultIndex,[switch]$Multi,$Preselect) $v=$script:__in[$script:__i];$script:__i++;return $v}
+function Read-UserInput{param($Prompt,$DefaultValue="") $v=$script:__in[$script:__i];$script:__i++;return $v}
+PS
+sed -n '1256,1342p' template_integrator.ps1
+cat <<'PS'
+$script:__in=@('version','9.9.9','done'); $script:__i=0   # 메뉴→버전입력→done
+Edit-ProjectInfo
+Write-Host "RESULT Version=$($script:ProjectVersion)"        # 기대: 9.9.9
+PS
+} > /tmp/ps_min.ps1
+docker run --rm --platform linux/amd64 -v /tmp:/tmp -w /tmp mcr.microsoft.com/powershell:latest pwsh -NoProfile -File /tmp/ps_min.ps1
+```
+
+- 핵심: **PowerShell의 `$ErrorActionPreference="Stop"`은 `throw`(예외)에만 작동한다.** 함수가 `return $false`/비-0을 줘도 안 죽는다 — sh의 `set -e`와 정반대. 그래서 ps1은 return 기반 흐름이 안전하다.
+
+**3) `.sh` 동작 검증 — `expect`로 실제 TTY + ESC 키 주입 (Mac 기본 제공)**
+
+- `.sh`의 메뉴/`safe_read`는 `/dev/tty`를 직접 읽으므로 **pty가 필요**하다. 단순 stdin 파이프로는 ESC·화살표가 검증 안 된다 → `expect` 사용.
+- 스크립트는 끝에서 `[ "${BASH_SOURCE[0]}" = "${0}" ] && main` 가드가 있어 **`source` 하면 main이 안 돈다.** 이를 이용해 함수만 로드하고 감지 함수를 스텁으로 덮어 특정 화면만 격리 실행한다.
+
+```bash
+# 하네스: 실제 스크립트를 source(main 미실행) + 감지 함수 스텁 + 검증할 함수 직접 호출
+cat > /tmp/h.sh <<'SH'
+source "$PWD/template_integrator.sh"
+TTY_AVAILABLE=true; FORCE_MODE=false
+PROJECT_TYPES=(spring); PROJECT_TYPE=spring; VERSION="0.0.187"; DETECTED_BRANCH="main"
+detect_project_types(){ echo "spring"; }; detect_version(){ echo "0.0.187"; }
+detect_default_branch(){ echo "main"; }; resolve_project_paths(){ :; }; show_project_type_menu(){ echo ""; }
+detect_and_confirm_project
+echo "<<END VERSION=$VERSION>>"
+SH
+# expect로 ESC(\033)·숫자·Enter 주입. send "\033" = ESC, send "2\r" = 2 입력
+expect <<'EXP'
+set timeout 8
+spawn bash -c "cd '$env(PWD)' && bash /tmp/h.sh"
+expect "이 정보가 맞습니까?"
+send "2\r"; expect "어떤 항목을 수정"
+send "2\r"; expect "새 버전을 입력"
+after 200; send "\033"                 ;# ESC → '뒤로' 가는지 검증
+expect { "돌아갑니다" {puts ">>>PASS"} "<<END" {puts ">>>FAIL_exited"} }
+EXP
+```
+
+- ESC 직후엔 `after 200`(ms) 정도 텀을 줘야 터미널 시퀀스가 안 깨진다.
+- `expect`가 `spawn id ... not open` = 프로세스가 **종료됨**(= ESC가 의도와 달리 마법사를 끝냄). 정상이면 다음 화면 텍스트가 다시 떠야 한다.
+
+**자주 나오는 함정 (실측)**
+- `set -e` 환경의 sh에서 `var=$(menu_fn)` 단독 라인은 ESC(비-0 반환) 시 **함수 전체가 즉시 종료**된다. 반드시 `var=$(menu_fn) || rc=$?` 또는 `|| true`로 종료코드를 흡수한다. ("ESC 눌렀더니 마법사가 통째로 꺼짐" 버그의 주원인.)
+- `var=$(cmd); rc=$?` 처럼 `;`로 이어 같은 줄에 두면 `set -e` 안전(마지막 명령 `rc=$?`가 성공).
+- 임시 하네스/`.exp` 파일은 검증 후 반드시 정리한다(`rm -f /tmp/h.sh /tmp/ps_min.ps1` 등).
+
 ---
 
 ## 트리거 키워드

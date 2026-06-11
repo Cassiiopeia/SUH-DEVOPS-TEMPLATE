@@ -1602,6 +1602,11 @@ handle_project_edit_menu() {
 
     case "$edit_choice" in
         type)
+            local _old_csv
+            local IFS=','
+            _old_csv="${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
+            unset IFS
+
             local _new_csv
             _new_csv=$(show_project_type_menu)
             if [ -n "$_new_csv" ]; then
@@ -1611,6 +1616,12 @@ handle_project_edit_menu() {
                     print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
                 else
                     print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                fi
+
+                # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
+                if [ "$_new_csv" != "$_old_csv" ]; then
+                    PROJECT_PATHS_CSV=""   # 새 타입 기준으로 다시 잡도록 초기화
+                    resolve_project_paths
                 fi
             fi
             print_to_user ""

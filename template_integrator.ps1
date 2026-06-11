@@ -3102,15 +3102,11 @@ function Offer-IdeToolsInstall {
         } catch { }
     }
 
+    # Cursor는 global(user) 한 곳만 관리
     $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
-    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
     $cursorUserVer  = ""
-    $cursorProjVer  = ""
     if (Test-Path $cursorUserMeta) {
         try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { }
-    }
-    if (Test-Path $cursorProjMeta) {
-        try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { }
     }
 
     # ─── 통합 상태 표시 ───
@@ -3119,49 +3115,46 @@ function Offer-IdeToolsInstall {
     Print-Step "IDE Skills 현재 상태"
     Write-Host ""
 
+    # 상태 표기 통일: scope(user/project) 구분 없이 "skill 설치됨/미설치"로만 안내. (sh와 동일)
+    # Claude Code
     if ($claudeAvailable) {
         if ($installedScope) {
             $cvTag = ""
-            if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { $cvTag = " ✓ 최신버전" }
+            if ($script:templateVersion -and $installedVersion -eq $script:templateVersion) { $cvTag = " ✓ 최신" }
             elseif ($script:templateVersion) { $cvTag = " -> 업데이트 가능: v$($script:templateVersion)" }
-            Print-Info "Claude Code  ${installedScope}   v${installedVersion}${cvTag}"
+            Print-Info "Claude Code : skill 설치됨 (v${installedVersion})${cvTag}"
         } else {
-            Print-Info "Claude Code : 미설치"
+            Print-Info "Claude Code : skill 미설치"
         }
     } else {
-        Print-Info "Claude Code : CLI 미감지 (수동 설치 필요)"
+        Print-Info "Claude Code : skill 미설치 (CLI 없음)"
     }
 
-    if (-not $cursorUserVer -and -not $cursorProjVer) {
-        Print-Info "Cursor      : 미설치"
+    # Cursor — global(user) 한 곳만 확인
+    if (-not $cursorUserVer) {
+        Print-Info "Cursor      : skill 미설치"
     } else {
-        if ($cursorUserVer) {
-            $utag = ""
-            if ($script:templateVersion -and $cursorUserVer -eq $script:templateVersion) { $utag = " ✓ 최신버전" }
-            elseif ($script:templateVersion) { $utag = " -> 업데이트 가능: v$($script:templateVersion)" }
-            Print-Info "Cursor       user   v${cursorUserVer} (~/.cursor/skills/)${utag}"
-        }
-        if ($cursorProjVer) {
-            $ptag = ""
-            if ($script:templateVersion -and $cursorProjVer -eq $script:templateVersion) { $ptag = " ✓ 최신버전" }
-            elseif ($script:templateVersion) { $ptag = " -> 업데이트 가능: v$($script:templateVersion)" }
-            Print-Info "Cursor       project v${cursorProjVer} (.cursor\skills\)${ptag}"
-        }
+        $utag = ""
+        if ($script:templateVersion -and $cursorUserVer -eq $script:templateVersion) { $utag = " ✓ 최신" }
+        elseif ($script:templateVersion) { $utag = " -> 업데이트 가능: v$($script:templateVersion)" }
+        Print-Info "Cursor      : skill 설치됨 (v${cursorUserVer})${utag}"
     }
 
+    # Gemini
     if (Get-Command "gemini" -ErrorAction SilentlyContinue) {
-        Print-Info "Gemini CLI  : CLI 감지 (extension 설치 가능)"
+        Print-Info "Gemini CLI  : 설치 가능 (CLI 감지됨)"
     } else {
-        Print-Info "Gemini CLI  : CLI 미감지 (수동 설치 필요)"
+        Print-Info "Gemini CLI  : skill 미설치 (CLI 없음)"
     }
 
+    # Codex
     $codexTarget = Join-Path $env:USERPROFILE ".agents\skills\cassiiopeia"
-    if (Get-Command "codex" -ErrorAction SilentlyContinue) {
-        Print-Info "Codex CLI   : CLI 감지 (plugin marketplace 등록 가능)"
-    } elseif (Test-Path $codexTarget) {
-        Print-Info "Codex CLI   : fallback native skills 경로 감지 ($codexTarget)"
+    if (Test-Path $codexTarget) {
+        Print-Info "Codex CLI   : skill 설치됨"
+    } elseif (Get-Command "codex" -ErrorAction SilentlyContinue) {
+        Print-Info "Codex CLI   : 설치 가능 (CLI 감지됨)"
     } else {
-        Print-Info "Codex CLI   : CLI 미감지 (fallback native skills 설치 가능)"
+        Print-Info "Codex CLI   : skill 미설치 (CLI 없음)"
     }
     Write-Host ""
 
@@ -3261,7 +3254,7 @@ function Invoke-ClaudeSection {
             # 미설치 → 신규 설치. 라우터에서 이미 설치 의사 확인됨 → scope만 묻고 바로 설치.
             if (-not $Force) {
                 Print-Info "Claude Code 플러그인(DevOps Skills) 설치 — 설치 후 /cassiiopeia:suh-* 19+ 스킬 사용 가능"
-                $scope = Get-ClaudeScope
+                $scope = "user"
                 Invoke-ClaudePluginInstall $scope
             } else {
                 Invoke-ClaudePluginInstall "user"
@@ -3275,60 +3268,37 @@ function Invoke-ClaudeSection {
 
 # ── Cursor Skills 관리 (기존 섹션 로직 보존) ──
 function Invoke-CursorSection {
-    # scope: user = $env:USERPROFILE\.cursor\skills\  /  project = .cursor\skills\
-    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
-    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
-    $cursorUserVer  = ""
-    $cursorProjVer  = ""
-    if (Test-Path $cursorUserMeta) { try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { } }
-    if (Test-Path $cursorProjMeta) { try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { } }
+    # Cursor는 마켓플레이스가 없어 ~/.cursor/skills/에 직접 복사하고,
+    # cursor-skills-meta.json(버전 manifest)을 함께 써서 다음 실행 때 버전을 추적한다.
+    # global(user) 한 곳만 관리한다. (sh와 동일)
+    $cursorMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
+    $cursorVer  = ""
+    if (Test-Path $cursorMeta) { try { $cursorVer = (Get-Content $cursorMeta -Raw | ConvertFrom-Json).version } catch { } }
 
-    $skillsSrcRemote = ""
-    $skillsSrcLocal  = ""
-    $tempSkillsDir   = Join-Path $TEMP_DIR "skills"
-    if (Test-Path $tempSkillsDir) { $skillsSrcRemote = $tempSkillsDir }
-    if (Test-Path "skills")       { $skillsSrcLocal  = "skills" }
+    # 스킬 소스 (원격 우선, 없으면 로컬)
+    $src = Join-Path $TEMP_DIR "skills"
+    if (-not (Test-Path $src)) { $src = "skills" }
+    if (-not (Test-Path $src)) { $src = "" }
 
     Write-Host ""
     Print-Step "[ Cursor Skills 관리 ]"
     Write-Host ""
 
-    $cursorAnyInstalled = $cursorUserVer -or $cursorProjVer
-
-    if ($cursorAnyInstalled) {
-        if (-not $Force) {
-            # 라우터에서 '설치/업데이트' 선택됨 → 기존 설치 scope 유지하며 최신화 (추가 메뉴 없음).
-            if ($cursorUserVer -and $cursorProjVer) {
-                $targetScope = Get-CursorScope $cursorUserVer $cursorProjVer
-            } elseif ($cursorUserVer) {
-                $targetScope = "user"
-            } else {
-                $targetScope = "project"
-            }
-            $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
-            if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다." }
-            else { Invoke-CursorSkillsCopy $targetScope $src }
-        } else {
-            $src = if ($skillsSrcRemote) { $skillsSrcRemote } else { $skillsSrcLocal }
-            if ($src) { Invoke-CursorSkillsCopy "project" $src }
-        }
+    if ($cursorVer) {
+        $utag = ""
+        if ($script:templateVersion -and $cursorVer -eq $script:templateVersion) { $utag = " ✓ 최신" }
+        elseif ($script:templateVersion) { $utag = " -> v$($script:templateVersion)로 업데이트" }
+        Print-Info "  현재: skill 설치됨 (v${cursorVer})${utag}"
     } else {
-        # 미설치 → 설치. 라우터에서 이미 설치 의사 확인됨 → scope·소스만 묻고 바로 복사.
-        if (-not $Force) {
-            Print-Info "Cursor IDE Skills 설치 — /analyze, /review 등 20개 스킬 (파일 직접 복사)"
-            if ($true) {
-                $targetScope = Get-CursorScope "" ""
-                $src = Get-CursorSkillsSrc $skillsSrcRemote $skillsSrcLocal
-                if (-not $src) { Print-Warning "사용 가능한 소스가 없습니다. 건너뜁니다." }
-                else { Invoke-CursorSkillsCopy $targetScope $src }
-            } else {
-                Print-Info "Cursor Skills 설치 건너뜁니다"
-            }
-        } else {
-            $src = if ($skillsSrcRemote) { $skillsSrcRemote } else { $skillsSrcLocal }
-            if ($src) { Invoke-CursorSkillsCopy "project" $src }
-        }
+        Print-Info "  Cursor skill 설치 — /analyze, /review 등 (파일 복사 + 버전 manifest 자동 기록)"
     }
+
+    if (-not $src) {
+        Print-Warning "사용 가능한 스킬 소스가 없습니다."
+        return
+    }
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 질문 없이 global(user)로 바로 복사·최신화.
+    Invoke-CursorSkillsCopy "user" $src
 }
 
 # ── 제거 섹션 (2단계 라우터의 'remove' 동작에서 호출, sh _remove_*_section과 동일) ──
@@ -3353,16 +3323,19 @@ function Remove-ClaudeSection {
 function Remove-CursorSection {
     Write-Host ""
     Print-Step "[ Cursor Skills 제거 ]"
-    $cursorUserMeta = Join-Path $env:USERPROFILE ".cursor\skills\cursor-skills-meta.json"
-    $cursorProjMeta = ".cursor\skills\cursor-skills-meta.json"
-    $cursorUserVer = ""; $cursorProjVer = ""
-    if (Test-Path $cursorUserMeta) { try { $cursorUserVer = (Get-Content $cursorUserMeta -Raw | ConvertFrom-Json).version } catch { } }
-    if (Test-Path $cursorProjMeta) { try { $cursorProjVer = (Get-Content $cursorProjMeta -Raw | ConvertFrom-Json).version } catch { } }
-    if (-not $cursorUserVer -and -not $cursorProjVer) {
+    # global(user) 한 곳만 관리하므로 ~/.cursor/skills/만 확인·삭제한다. (sh와 동일)
+    $cursorDir = Join-Path $env:USERPROFILE ".cursor\skills"
+    $cursorMeta = Join-Path $cursorDir "cursor-skills-meta.json"
+    if (-not (Test-Path $cursorMeta)) {
         Print-Info "  설치된 Cursor Skills가 없어 건너뜁니다"
         return
     }
-    Invoke-CursorDelete $cursorUserVer $cursorProjVer
+    try {
+        Remove-Item -Recurse -Force $cursorDir -ErrorAction Stop
+        Print-Success "Cursor Skills 제거 완료 ($cursorDir)"
+    } catch {
+        Print-Warning "Cursor Skills 제거 실패 — 수동 삭제: $cursorDir"
+    }
 }
 
 function Remove-GeminiSection {
@@ -3394,15 +3367,6 @@ function Remove-CodexSection {
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
 
-# scope 선택 (user / project)
-function Get-ClaudeScope {
-    $scopeChoice = Invoke-ChooseMenu -Prompt "설치 scope를 선택하세요" -Options @(
-        @{Value='user';    Label='모든 프로젝트에서 사용 (추천)'},
-        @{Value='project'; Label='현재 프로젝트에서만 사용'}
-    )
-    if ($scopeChoice -eq "project") { return "project" }
-    return "user"
-}
 
 # 마켓플레이스 등록 + 플러그인 설치
 function Invoke-ClaudePluginInstall {
@@ -3481,12 +3445,12 @@ function Remove-ClaudePluginData {
 
 # ─── Cursor 헬퍼 ────────────────────────────────────────────────
 
-# cursor-skills-meta.json 생성/갱신
-# 인자: $Scope(user|project), $DestDir(설치 경로)
+# cursor-skills-meta.json 생성/갱신 — global(user) 한 곳 기준
+# 인자: $Scope(항상 user), $DestDir(설치 경로 = ~/.cursor/skills)
 function Write-CursorSkillsMeta {
     param(
-        [string]$Scope   = "project",
-        [string]$DestDir = ".cursor\skills"
+        [string]$Scope   = "user",
+        [string]$DestDir = (Join-Path $env:USERPROFILE ".cursor\skills")
     )
     $version   = if ($script:templateVersion) { $script:templateVersion } else { "unknown" }
     $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -3521,89 +3485,23 @@ function Write-CursorSkillsMeta {
     $json | Set-Content -Path $metaFile -Encoding UTF8
 }
 
-# Cursor scope 선택 (user / project)
-function Get-CursorScope {
-    param([string]$UserVer, [string]$ProjVer)
-    $uLabel = if ($UserVer) { "모든 프로젝트 공통 (~\.cursor\skills\) 현재: v${UserVer}" } else { "모든 프로젝트 공통 (~\.cursor\skills\)" }
-    $pLabel = if ($ProjVer) { "현재 프로젝트 전용 (.cursor\skills\) 현재: v${ProjVer}" } else { "현재 프로젝트 전용 (.cursor\skills\)" }
-    $scopeChoice = Invoke-ChooseMenu -Prompt "설치 scope를 선택하세요" -Options @(
-        @{Value='user';    Label=$uLabel},
-        @{Value='project'; Label=$pLabel}
-    )
-    if ($scopeChoice -eq "user") { return "user" }
-    return "project"
-}
 
-# Cursor Skills 실제 복사 실행
+# Cursor Skills 실제 복사 실행 — global(user) 한 곳에만. 첫 인자는 하위호환용.
 function Invoke-CursorSkillsCopy {
     param([string]$Scope, [string]$Src)
-    $dest = if ($Scope -eq "user") { Join-Path $env:USERPROFILE ".cursor\skills" } else { ".cursor\skills" }
-    Print-Step "Cursor Skills 복사 중 (scope: ${Scope})..."
+    $dest = Join-Path $env:USERPROFILE ".cursor\skills"
+    Print-Step "Cursor Skills 복사 중..."
     if (-not (Test-Path $dest)) { New-Item -Path $dest -ItemType Directory -Force | Out-Null }
     try {
         Copy-Item -Path "$Src\*" -Destination "$dest\" -Recurse -Force -ErrorAction Stop
-        Write-CursorSkillsMeta $Scope $dest
-        Print-Success "Cursor Skills 완료 (scope: ${Scope}, 경로: ${dest}\)"
+        # 버전 manifest 자동 기록 → 다음 실행 때 설치 버전 추적 가능
+        Write-CursorSkillsMeta "user" $dest
+        Print-Success "Cursor Skills 설치 완료 ($dest\, v$($script:templateVersion))"
     } catch {
         Print-Warning "Cursor Skills 복사 실패"
     }
 }
 
-# Cursor Skills 삭제 (scope 선택)
-function Invoke-CursorDelete {
-    param([string]$UserVer, [string]$ProjVer)
-
-    $opts = New-Object 'System.Collections.Generic.List[hashtable]'
-    if ($UserVer) {
-        $opts.Add(@{Value='user'; Label="user (~\.cursor\skills\) v${UserVer}"})
-    }
-    if ($ProjVer) {
-        $opts.Add(@{Value='project'; Label=".cursor\skills\ v${ProjVer}"})
-    }
-    if ($UserVer -and $ProjVer) {
-        $opts.Add(@{Value='all'; Label='모두 삭제'})
-    }
-    $opts.Add(@{Value='cancel'; Label='취소'})
-
-    $delChoice = Invoke-ChooseMenu -Prompt "삭제할 scope를 선택하세요" -Options $opts.ToArray()
-
-    $userDest = Join-Path $env:USERPROFILE ".cursor\skills"
-    if ($delChoice -eq "user") {
-        if ($UserVer) {
-            Print-Info "삭제 대상: $userDest (v${UserVer})"
-            Remove-Item -Path $userDest -Recurse -Force -ErrorAction SilentlyContinue
-            Print-Success "user scope Cursor Skills 삭제 완료"
-        } else { Print-Warning "user scope에 설치된 Skills 없음" }
-    } elseif ($delChoice -eq "project") {
-        if ($ProjVer) {
-            Print-Info "삭제 대상: .cursor\skills\ (v${ProjVer})"
-            Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
-            Print-Success "project scope Cursor Skills 삭제 완료"
-        } else { Print-Warning "project scope에 설치된 Skills 없음" }
-    } elseif ($delChoice -eq "all") {
-        Print-Info "삭제 대상: $userDest (v${UserVer}), .cursor\skills\ (v${ProjVer})"
-        Remove-Item -Path $userDest -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path ".cursor\skills" -Recurse -Force -ErrorAction SilentlyContinue
-        Print-Success "모든 Cursor Skills 삭제 완료"
-    } else {
-        Print-Info "삭제 취소"
-    }
-}
-
-# Cursor Skills 복사 소스 선택
-function Get-CursorSkillsSrc {
-    param([string]$RemoteSrc, [string]$LocalSrc)
-    if ($RemoteSrc -and -not $LocalSrc) { return $RemoteSrc }
-    if (-not $RemoteSrc -and $LocalSrc) { return $LocalSrc }
-    if (-not $RemoteSrc -and -not $LocalSrc) { return "" }
-
-    $srcChoice = Invoke-ChooseMenu -Prompt "설치 소스를 선택하세요" -Options @(
-        @{Value='remote'; Label='원격 최신 (repo에서 다운로드, 추천)'},
-        @{Value='local';  Label='로컬 (현재 디렉토리 skills\ 폴더)'}
-    )
-    if ($srcChoice -eq "local") { return $LocalSrc }
-    return $RemoteSrc
-}
 
 # ─── Gemini CLI 헬퍼 ────────────────────────────────────────────
 

@@ -91,6 +91,31 @@ mkdir -p server
 echo "version='0.0.1'" > server/build.gradle
 chk "서브폴더 spring → server" "$(find_type_path_candidates spring)" "server"
 
+echo "=== (14) 서브폴더 react: client/package.json → react 포함 ==="
+new_workdir
+mkdir -p client
+printf '{"dependencies":{"react":"^18"}}\n' > client/package.json
+chk "서브폴더 react 추천" "$(suggest_types_by_scan)" "react"
+
+echo "=== (15) 서브폴더 next: web/package.json → next 포함 ==="
+new_workdir
+mkdir -p web
+printf '{"dependencies":{"next":"14","react":"^18"}}\n' > web/package.json
+chk "서브폴더 next 추천" "$(suggest_types_by_scan)" "next"
+
+echo "=== (16) 혼합 모노레포: app/pubspec + client/package(react) + ai/pyproject ==="
+new_workdir
+mkdir -p app/lib client ai
+printf 'name: demo\n' > app/pubspec.yaml
+printf '{"dependencies":{"react":"^18"}}\n' > client/package.json
+printf '[project]\nname="x"\n' > ai/pyproject.toml
+chk "혼합 모노레포 정렬 추천" "$(suggest_types_by_scan)" "flutter,react,python"
+
+echo "=== (17) 마커 없는 .py 4개 → python (확장자 폴백 유지) ==="
+new_workdir
+for i in 1 2 3 4; do echo "print($i)" > "m$i.py"; done
+chk "확장자 폴백 python" "$(suggest_types_by_scan)" "python"
+
 echo ""
 echo "=== 결과: PASS=$PASS FAIL=$FAIL ==="
 [ "$FAIL" -eq 0 ]

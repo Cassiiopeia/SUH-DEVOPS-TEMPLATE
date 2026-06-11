@@ -975,43 +975,66 @@ detect_project_types() {
     echo "${detected[*]}"
 }
 
-# 마커 파일이 없을 때 확장자·특징 파일 빈도로 타입을 추천 (스캔 추천)
-# stdout: 추천 타입 csv (예: "python,node"), 추천 없으면 빈 문자열
-# detect_project_types가 basic만 반환했을 때 보조로만 쓴다 — 강제 아님(안내용).
+# 마커 파일이 없을 때(=detect_project_types가 basic) 타입을 추천 (스캔 추천)
+# stdout: 추천 타입 csv (메뉴 정의 순서 정렬), 추천 없으면 빈 문자열. 안내용(강제 아님).
 suggest_types_by_scan() {
-    # 잡음 폴더 제외하고 maxdepth 3로 파일을 모아 확장자 카운트
-    local _files
-    _files=$(find . -maxdepth 3 \
-        \( -name node_modules -o -name .git -o -name build -o -name dist \
-           -o -name .dart_tool -o -name android -o -name ios -o -name .gradle \
-           -o -name venv -o -name .venv -o -name __pycache__ \) -prune \
-        -o -type f -print 2>/dev/null)
+    local _found=""   # 공백 구분 누적, 마지막에 정렬
 
-    local _dart _java _kt _gradle _tsx _jsx _py _ts _js
-    _dart=$(printf '%s\n' "$_files"   | grep -c '\.dart$' || true)
-    _java=$(printf '%s\n' "$_files"   | grep -c '\.java$' || true)
-    _kt=$(printf '%s\n' "$_files"     | grep -c '\.kt$' || true)
-    _gradle=$(printf '%s\n' "$_files" | grep -c '\.gradle$' || true)
-    _tsx=$(printf '%s\n' "$_files"    | grep -c '\.tsx$' || true)
-    _jsx=$(printf '%s\n' "$_files"    | grep -c '\.jsx$' || true)
-    _py=$(printf '%s\n' "$_files"     | grep -c '\.py$' || true)
-    _ts=$(printf '%s\n' "$_files"     | grep -c '\.ts$' || true)
-    _js=$(printf '%s\n' "$_files"     | grep -c '\.js$' || true)
+    # ── 1) 마커 우선 스캔 — 모든 마커 타입에 find_type_path_candidates ──
+    # package.json 계열은 같은 마커라 내용으로 판별한다.
+    local _mt _cand _d _ptype
+    for _mt in flutter spring python react-native-expo; do
+        _cand=$(find_type_path_candidates "$_mt")
+        [ -n "$_cand" ] && _found="$_found $_mt"
+    done
 
-    local _out=""
-    # flutter: .dart 임계 1 (고유 확장자라 오탐 적음)
-    [ "$_dart" -ge 1 ] && _out="${_out:+$_out,}flutter"
-    # spring: .java/.kt/.gradle 합산 임계 3
-    [ $((_java + _kt + _gradle)) -ge 3 ] && _out="${_out:+$_out,}spring"
-    # react: .tsx/.jsx 합산 임계 3
-    [ $((_tsx + _jsx)) -ge 3 ] && _out="${_out:+$_out,}react"
-    # python: .py 임계 3
-    [ "$_py" -ge 3 ] && _out="${_out:+$_out,}python"
-    # node: 위 어떤 추천도 없을 때만, .ts/.js 합산 임계 3
-    if [ -z "$_out" ] && [ $((_ts + _js)) -ge 3 ]; then
-        _out="node"
+    # package.json 계열 — react/next/node/react-native를 디렉터리별 내용으로 판별
+    _cand=$(find_type_path_candidates react)   # react 토큰 = package.json 검색
+    if [ -n "$_cand" ]; then
+        while IFS= read -r _d; do
+            [ -z "$_d" ] && continue
+            local _pj
+            if [ "$_d" = "." ]; then _pj="package.json"; else _pj="$_d/package.json"; fi
+            _ptype=$(classify_package_json "$_pj")
+            [ -n "$_ptype" ] && _found="$_found $_ptype"
+        done <<< "$_cand"
     fi
 
+    # ── 2) 마커가 전혀 없으면 확장자 빈도 폴백 ──
+    if [ -z "$_found" ]; then
+        local _files
+        _files=$(find . -maxdepth 3 \
+            \( -name node_modules -o -name .git -o -name build -o -name dist \
+               -o -name .dart_tool -o -name android -o -name ios -o -name .gradle \
+               -o -name venv -o -name .venv -o -name __pycache__ \) -prune \
+            -o -type f -print 2>/dev/null)
+        local _dart _java _kt _gradle _tsx _jsx _py _ts _js
+        _dart=$(printf '%s\n' "$_files"   | grep -c '\.dart$' || true)
+        _java=$(printf '%s\n' "$_files"   | grep -c '\.java$' || true)
+        _kt=$(printf '%s\n' "$_files"     | grep -c '\.kt$' || true)
+        _gradle=$(printf '%s\n' "$_files" | grep -c '\.gradle$' || true)
+        _tsx=$(printf '%s\n' "$_files"    | grep -c '\.tsx$' || true)
+        _jsx=$(printf '%s\n' "$_files"    | grep -c '\.jsx$' || true)
+        _py=$(printf '%s\n' "$_files"     | grep -c '\.py$' || true)
+        _ts=$(printf '%s\n' "$_files"     | grep -c '\.ts$' || true)
+        _js=$(printf '%s\n' "$_files"     | grep -c '\.js$' || true)
+        [ "$_dart" -ge 1 ] && _found="$_found flutter"
+        [ $((_java + _kt + _gradle)) -ge 3 ] && _found="$_found spring"
+        [ $((_tsx + _jsx)) -ge 3 ] && _found="$_found react"
+        [ "$_py" -ge 3 ] && _found="$_found python"
+        if [ -z "$_found" ] && [ $((_ts + _js)) -ge 3 ]; then
+            _found="node"
+        fi
+    fi
+
+    # ── 3) 메뉴 정의 순서로 정렬 + 중복 제거 → csv ──
+    local _order="spring flutter next react react-native react-native-expo node python basic"
+    local _o _out=""
+    for _o in $_order; do
+        case " $_found " in
+            *" $_o "*) _out="${_out:+$_out,}$_o" ;;
+        esac
+    done
     echo "$_out"
 }
 

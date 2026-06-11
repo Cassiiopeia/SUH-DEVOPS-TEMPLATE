@@ -499,7 +499,7 @@ git log origin/deploy..origin/main --pretty=format:"%s" | grep -v "\[skip ci\]" 
 
 > **⚠️ AGENT 필독: 노트 파일을 만든 뒤 fix 5단계(PR 생성)로 곧바로 가지 않고 fix 4.5단계(사용자 승인 게이트)부터 거친다.**
 
-deploy 6단계와 **동일한 고정 구조**로 릴리스 노트 파일을 작성한다 (Write tool로 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장). 구조는 deploy 5단계의 고정 템플릿(`Summary by CodeRabbit` 포함)을 그대로 따른다.
+deploy 6단계와 **동일한 고정 구조**로 릴리스 노트 파일을 작성한다 (Write tool로 `~/.suh-template/tmp/{OWNER}__{REPO}__release_notes.md`에 저장 — deploy 5단계와 동일 위치·파일명 규칙, tmp 폴더 없으면 먼저 생성). 구조는 deploy 5단계의 고정 템플릿(`Summary by CodeRabbit` 포함)을 그대로 따른다.
 
 ### fix 4.5단계: 사용자 승인 게이트
 
@@ -519,15 +519,18 @@ fix 4단계에서 만든 릴리스 노트 파일을 **본문으로 담아** 새 
 # ⚠️ Bash stateless — 5개 변수를 실제 값으로 채운다.
 GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."
 
+# 릴리스 노트 임시 파일 — fix 4단계에서 Write한 그 절대경로와 동일해야 한다.
+NOTES_FILE="$HOME/.suh-template/tmp/${OWNER}__${REPO}__release_notes.md"
+
 TODAY=$(date '+%Y%m%d')
 TITLE="🚀 Deploy ${TODAY} (재시도)"
 
-# create-pr의 body_file에 릴리스 노트 파일 경로를 넘겨 본문 포함 PR 생성 (deploy 6단계와 동일 패턴).
+# create-pr의 body_file에 릴리스 노트 파일 절대경로를 넘겨 본문 포함 PR 생성 (deploy 6단계와 동일 패턴).
 cd "$PROJECT_ROOT/skills/suh-changelog-deploy/scripts"
 CREATE_OUT=$(GITHUB_PAT="$GITHUB_PAT" PYTHONIOENCODING=utf-8 "$PYTHON" changelog_cli.py \
-  create-pr "$OWNER" "$REPO" "$TITLE" "_release_notes.md" "main" "deploy")
+  create-pr "$OWNER" "$REPO" "$TITLE" "$NOTES_FILE" "main" "deploy")
 PR_NUMBER=$(CREATE_OUT="$CREATE_OUT" "$PYTHON" -c "import os,json; print(json.loads(os.environ['CREATE_OUT']).get('number',''))")
-rm -f _release_notes.md
+rm -f "$NOTES_FILE"
 cd "$PROJECT_ROOT"
 
 if [ -z "$PR_NUMBER" ]; then

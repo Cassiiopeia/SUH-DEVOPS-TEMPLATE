@@ -105,6 +105,22 @@ chk "version.yml 증가" "$(yq -r '.version' version.yml)" "0.0.10"
 chk "app/pubspec 증가" "$(yq -r '.version' app/pubspec.yaml | cut -d'+' -f1)" "0.0.10"
 chk "client/package.json 증가" "$(jq -r '.version' client/package.json)" "0.0.10"
 
+echo "=== (6) spring 잘못된 경로 + increment: 경고 + exit 0 ==="
+new_workdir
+cat > version.yml << 'EOF'
+version: "0.0.9"
+version_code: 5
+project_types: ["spring"]
+project_type: "spring"
+project_paths:
+  spring: "nope"
+EOF
+OUT=$(bash "$SCRIPT" increment 2>&1)
+RC=$?
+chk "exit 0" "$RC" "0"
+echo "$OUT" | grep -q "없음" && chk "경고 출력" "1" "1" || chk "경고 출력" "0" "1"
+chk "version.yml 증가" "$(yq -r '.version' version.yml)" "0.0.10"
+
 echo ""
 echo "결과: PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

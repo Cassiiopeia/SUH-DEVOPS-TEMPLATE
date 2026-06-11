@@ -519,11 +519,15 @@ sync_for_type() {
 
     case "$t" in
         "spring")
-            find "$p" -maxdepth 2 -name "build.gradle" -type f 2>/dev/null | while read -r gradle_file; do
-                sed -i.bak "s/version = '[^']*'/version = '$new_version'/g; s/version = \"[^\"]*\"/version = \"$new_version\"/g" "$gradle_file"
-                rm -f "${gradle_file}.bak"
-                log_success "업데이트: $gradle_file"
-            done
+            if [ -d "$p" ]; then
+                find "$p" -maxdepth 2 -name "build.gradle" -type f 2>/dev/null | while read -r gradle_file; do
+                    sed -i.bak "s/version = '[^']*'/version = '$new_version'/g; s/version = \"[^\"]*\"/version = \"$new_version\"/g" "$gradle_file"
+                    rm -f "${gradle_file}.bak"
+                    log_success "업데이트: $gradle_file"
+                done
+            else
+                log_warning "spring: $p 디렉토리 없음 — 건너뜀"
+            fi
             ;;
         "flutter")
             if [ -f "$p/pubspec.yaml" ]; then
@@ -554,17 +558,23 @@ sync_for_type() {
             fi
             ;;
         "react-native")
-            find "$p/ios" -name "Info.plist" -type f 2>/dev/null | while read -r plist_file; do
-                if grep -q "CFBundleShortVersionString" "$plist_file"; then
-                    sed -i.bak '/CFBundleShortVersionString/{n;s/<string>[^<]*<\/string>/<string>'"$new_version"'<\/string>/;}' "$plist_file"
-                    rm -f "${plist_file}.bak"
-                    log_success "업데이트: $plist_file"
-                fi
-            done
+            if [ -d "$p/ios" ]; then
+                find "$p/ios" -name "Info.plist" -type f 2>/dev/null | while read -r plist_file; do
+                    if grep -q "CFBundleShortVersionString" "$plist_file"; then
+                        sed -i.bak '/CFBundleShortVersionString/{n;s/<string>[^<]*<\/string>/<string>'"$new_version"'<\/string>/;}' "$plist_file"
+                        rm -f "${plist_file}.bak"
+                        log_success "업데이트: $plist_file"
+                    fi
+                done
+            else
+                log_warning "react-native: $p/ios 디렉토리 없음 — 건너뜀"
+            fi
             if [ -f "$p/android/app/build.gradle" ]; then
                 sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$new_version\"/" "$p/android/app/build.gradle"
                 rm -f "$p/android/app/build.gradle.bak"
                 log_success "업데이트: $p/android/app/build.gradle"
+            else
+                log_warning "react-native: $p/android/app/build.gradle 없음 — 건너뜀"
             fi
             ;;
         "react-native-expo")

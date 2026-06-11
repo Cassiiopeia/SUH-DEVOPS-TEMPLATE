@@ -79,6 +79,9 @@ param(
     [switch]$NoSynology,
 
     [Parameter(Mandatory=$false)]
+    [string]$Paths = "",
+
+    [Parameter(Mandatory=$false)]
     [switch]$Help
 )
 
@@ -125,6 +128,17 @@ $script:UtilModulesCopied = 0
 $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
 $script:IncludeSynology = $null  # Synology 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
 $script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
+
+# 타입별 프로젝트 경로 (project_paths) — resolve 또는 -Paths로 채워짐
+$script:ProjectPaths = [ordered]@{}
+if (-not [string]::IsNullOrWhiteSpace($Paths)) {
+    foreach ($pair in $Paths.Split(',')) {
+        $kv = $pair.Trim().Split('=', 2)
+        if ($kv.Count -eq 2 -and $kv[0].Trim() -and $kv[1].Trim()) {
+            $script:ProjectPaths[$kv[0].Trim()] = $kv[1].Trim().Replace('\','/').TrimEnd('/') -replace '^\./', ''
+        }
+    }
+}
 
 # ===================================================================
 # 출력 함수 (색상 지원)
@@ -507,6 +521,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Force                확인 없이 즉시 실행
   -Synology             Synology 워크플로우 포함 (기본: 제외)
   -NoSynology           Synology 워크플로우 제외
+  -Paths "T=P,..."      타입별 프로젝트 경로 (모노레포용, 예: -Paths "flutter=app,react=client")
   -Help                 이 도움말 표시
 
 지원 프로젝트 타입:
@@ -678,6 +693,260 @@ function Detect-ProjectTypes {
     Print-Info "감지된 타입: $($detected -join ' ')"
 
     return ($detected -join ',')
+}
+
+# ===================================================================
+# 타입별 프로젝트 경로 (project_paths) 감지·확정
+# ===================================================================
+
+# 검색 제외 폴더 (스펙 §4.3) — 경로에 이 폴더가 들어가면 후보에서 제외
+$script:PathExcludeRegex = '[\\/](node_modules|\.git|build|dist|\.dart_tool|android|ios|\.gradle|venv|\.venv|__pycache__)([\\/]|$)'
+
+# 타입의 대표 마커 파일명 (감지·version.yml 주석용)
+function Get-MarkerForType {
+    param([string]$ProjType)
+    switch ($ProjType) {
+        "flutter" { return "pubspec.yaml" }
+        "react" { return "package.json" }
+        "next" { return "package.json" }
+        "node" { return "package.json" }
+        "react-native" { return "package.json" }
+        "react-native-expo" { return "app.json" }
+        "python" { return "pyproject.toml" }
+        "spring" { return "build.gradle" }
+        default { return "" }
+    }
+}
+
+# 디렉토리에 실재하는 마커 파일명 반환 (보조 마커 포함) — 없으면 대표 마커 반환 (표시용)
+# sh existing_marker_in_dir 포팅: spring/python은 우선순위순으로 실재 파일을 찾는다
+function Get-ExistingMarkerInDir {
+    param(
+        [string]$ProjType,
+        [string]$Dir
+    )
+    $names = @()
+    switch ($ProjType) {
+        "spring" { $names = @("build.gradle", "build.gradle.kts", "pom.xml") }
+        "python" { $names = @("pyproject.toml", "setup.py", "requirements.txt") }
+        default  { $names = @(Get-MarkerForType $ProjType) }
+    }
+    foreach ($n in $names) {
+        if (-not $n) { continue }
+        if (Test-Path (Join-Path $Dir $n) -PathType Leaf) { return $n }
+    }
+    return (Get-MarkerForType $ProjType)
+}
+
+# 타입별 마커 파일 후보 검색 — 후보 디렉토리 상대경로 배열 반환 (루트는 ".")
+# Depth 2 = 루트 포함 3단계 (bash find -maxdepth 3 대응) + 잡음 폴더 제외 + 타입별 오탐 필터
+function Find-TypePathCandidates {
+    param([string]$ProjType)
+
+    $markerNames = @()
+    switch ($ProjType) {
+        "flutter"           { $markerNames = @("pubspec.yaml") }
+        "react"             { $markerNames = @("package.json") }
+        "next"              { $markerNames = @("package.json") }
+        "node"              { $markerNames = @("package.json") }
+        "react-native"      { $markerNames = @("package.json") }
+        "react-native-expo" { $markerNames = @("app.json") }
+        "python"            { $markerNames = @("pyproject.toml", "setup.py", "requirements.txt") }
+        "spring"            { $markerNames = @("build.gradle", "build.gradle.kts", "pom.xml") }
+        default             { return @() }
+    }
+
+    $root = (Get-Location).Path
+    foreach ($name in $markerNames) {
+        $files = @(Get-ChildItem -Path . -Recurse -Depth 2 -Filter $name -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch $script:PathExcludeRegex })
+        if ($files.Count -eq 0) { continue }
+
+        $dirs = @()
+        foreach ($f in $files) {
+            $dir = Split-Path -Parent $f.FullName
+            $rel = $dir.Substring($root.Length).TrimStart('\').TrimStart('/')
+            if ([string]::IsNullOrEmpty($rel)) { $rel = "." } else { $rel = $rel.Replace('\', '/') }
+
+            if ($ProjType -eq "flutter") {
+                # example/ 제외 + lib/ 동반 확인 (오탐 방지)
+                if ($rel -match 'example') { continue }
+                if ($rel -eq ".") { $libDir = "lib" } else { $libDir = "$rel/lib" }
+                if (-not (Test-Path $libDir -PathType Container)) { continue }
+            }
+            if ($ProjType -eq "spring" -and $rel -match 'android') { continue }
+
+            if ($dirs -notcontains $rel) { $dirs += $rel }
+        }
+        # 우선순위 높은 마커에서 후보가 잡히면 그것만 사용 (sh: 먼저 발견되는 마커만)
+        if ($dirs.Count -gt 0) { return ($dirs | Sort-Object) }
+    }
+    return @()
+}
+
+# 선택된 모든 타입의 경로를 감지·확인하여 $script:ProjectPaths 확정 (스펙 §4)
+function Resolve-ProjectPaths {
+    # -Paths 사전 검증·정규화: 타입 유효성 + 경로 정규화 (백슬래시→슬래시, 끝 슬래시·앞 ./ 제거)
+    if ($script:ProjectPaths.Count -gt 0) {
+        $normalized = [ordered]@{}
+        foreach ($key in @($script:ProjectPaths.Keys)) {
+            $vt = "$key".Trim()
+            if ($script:ValidTypes -notcontains $vt) {
+                Print-Error "-Paths에 지원하지 않는 타입: '$vt'"
+                Print-Error "지원 타입: $($script:ValidTypes -join ' ')"
+                exit 1
+            }
+            $vp = "$($script:ProjectPaths[$key])".Trim().Replace('\', '/').TrimEnd('/') -replace '^\./', ''
+            if ([string]::IsNullOrEmpty($vp)) { $vp = "." }
+            $vm = Get-ExistingMarkerInDir $vt $vp
+            if (-not (Test-Path (Join-Path $vp $vm) -PathType Leaf)) {
+                Print-Warning "-Paths: $vt=$vp 경로에 마커 파일이 없습니다 (그대로 기록합니다)"
+            }
+            $normalized[$vt] = $vp
+        }
+        $script:ProjectPaths = $normalized
+    }
+
+    $allTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    $targets = @($allTypes | Where-Object { $_ -ne "basic" })
+    if ($targets.Count -eq 0) { return }  # basic만이면 경로 불필요
+
+    Print-Step "타입별 프로젝트 경로 확인 중..."
+    Write-Host ""
+    Write-Host "💡 경로 = 레포 루트에서 그 프로젝트 폴더까지의 상대경로입니다."
+    Write-Host "   예) 레포루트/app/pubspec.yaml 이면 → `"app`""
+    Write-Host "       레포루트/packages/web/package.json 이면 → `"packages/web`""
+    Write-Host "       레포 루트에 바로 있으면 → `".`""
+    Write-Host ""
+
+    foreach ($t in $targets) {
+        # 1) -Paths로 이미 지정됨 → 최우선
+        if ($script:ProjectPaths.Contains($t)) {
+            Print-Info "  $t → $($script:ProjectPaths[$t]) (-Paths 지정)"
+            continue
+        }
+
+        # 2) 루트에 마커 존재 → "." 자동 확정 (질문 없이 안내만, 보조 마커 포함)
+        $rootMarker = Get-ExistingMarkerInDir $t "."
+        if ($rootMarker -and (Test-Path $rootMarker -PathType Leaf)) {
+            $script:ProjectPaths[$t] = "."
+            Print-Info "  $t → . (루트의 $rootMarker)"
+            continue
+        }
+
+        # 3) 기존 version.yml의 project_paths 값 → 기본 제안값
+        $existing = ""
+        if (Test-Path "version.yml") {
+            $inPaths = $false
+            foreach ($line in (Get-Content "version.yml")) {
+                if ($line -match '^project_paths:') { $inPaths = $true; continue }
+                if ($inPaths) {
+                    if ($line -match "^\s{2}$([regex]::Escape($t)):\s*`"([^`"]*)`"") {
+                        $existing = $matches[1]
+                        break
+                    }
+                    if ($line -match '^[^\s]') { break }  # 다른 최상위 키 → 섹션 종료
+                }
+            }
+        }
+
+        # 4) 후보 검색
+        $candidates = @(Find-TypePathCandidates $t)
+        $chosen = ""
+
+        # ── 비대화형 (-Force): 스펙 §4.5 ──
+        if ($Force) {
+            if ($existing) {
+                $chosen = $existing
+                Print-Info "  $t → $chosen (기존 project_paths 유지)"
+            } elseif ($candidates.Count -eq 1) {
+                $chosen = $candidates[0]
+                Print-Info "  $t → $chosen (자동 감지)"
+            } else {
+                $chosen = "."
+                Print-Warning "  $t → 후보 $($candidates.Count)개로 자동 확정 불가, 루트(.)로 기록 (-Paths `"$t=경로`"로 지정 가능)"
+            }
+            $script:ProjectPaths[$t] = $chosen
+            continue
+        }
+
+        # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
+        if ($candidates.Count -eq 1) {
+            $c0Marker = Get-ExistingMarkerInDir $t $candidates[0]
+            Write-Host ""
+            Write-Host "  🔍 ${t}: $($candidates[0])/$c0Marker 발견"
+            if (Ask-YesNo "  $t 경로를 '$($candidates[0])'(으)로 설정할까요? (Y=예 / N=직접입력)" "Y") {
+                $chosen = $candidates[0]
+            }
+        } elseif ($candidates.Count -gt 1) {
+            Write-Host ""
+            Write-Host "  🔍 ${t}: 후보 $($candidates.Count)개 발견"
+            for ($i = 0; $i -lt $candidates.Count; $i++) {
+                $cMarker = Get-ExistingMarkerInDir $t $candidates[$i]
+                Write-Host "    $($i+1)) $($candidates[$i])  ($($candidates[$i])/$cMarker)"
+            }
+            Write-Host "    m) 직접 입력"
+            while ($true) {
+                $sel = Read-UserInput "  선택"
+                if ($sel -eq "m" -or $sel -eq "M") { break }
+                $selNum = 0
+                if ([int]::TryParse($sel, [ref]$selNum) -and $selNum -ge 1 -and $selNum -le $candidates.Count) {
+                    $chosen = $candidates[$selNum - 1]
+                    break
+                }
+                Print-Error "  잘못된 입력입니다. 1-$($candidates.Count) 또는 m을 입력하세요."
+            }
+        } else {
+            Write-Host ""
+            Print-Warning "  ${t}: 프로젝트를 찾지 못했습니다 (depth 3)."
+        }
+
+        # ── 직접 입력 (위에서 미확정 시) ──
+        while ([string]::IsNullOrEmpty($chosen)) {
+            $promptText = "  $t 상대경로 입력 (예: app, client/web — 루트면 그냥 Enter"
+            if ($existing) { $promptText = "$promptText, 현재값: $existing" }
+            $promptText = "$promptText)"
+            $userInput = Read-UserInput $promptText
+            if ($null -eq $userInput) { $userInput = "" }
+            # 정규화: 앞뒤 공백만 트림(내부 공백 보존), 백슬래시→슬래시, 끝 슬래시·앞 ./ 제거
+            $userInput = $userInput.Trim().Replace('\', '/').TrimEnd('/') -replace '^\./', ''
+            if ([string]::IsNullOrEmpty($userInput)) {
+                if ($existing) { $userInput = $existing } else { $userInput = "." }
+            }
+            # 검증: 입력 경로에 마커 존재 확인 (보조 마커 포함)
+            $inMarker = Get-ExistingMarkerInDir $t $userInput
+            if (Test-Path (Join-Path $userInput $inMarker) -PathType Leaf) {
+                $chosen = $userInput
+            } else {
+                Print-Warning "  $userInput/$inMarker 파일이 없습니다."
+                if (Ask-YesNo "  그래도 이 경로를 사용할까요? (Y/N)" "N") { $chosen = $userInput }
+            }
+        }
+
+        $script:ProjectPaths[$t] = $chosen
+        Print-Success "  $t → $chosen"
+    }
+
+    # ── 요약 + 동일 파일 중복 안내 (스펙 §4.4) ──
+    Write-Host ""
+    Write-Host "📂 타입별 버전 파일 경로 확정:"
+    $fileToTypes = @{}
+    foreach ($key in $script:ProjectPaths.Keys) {
+        $p = $script:ProjectPaths[$key]
+        if ([string]::IsNullOrEmpty($p)) { $p = "." }
+        $m = Get-ExistingMarkerInDir $key $p
+        if ($p -eq ".") { $file = $m } else { $file = "$p/$m" }
+        Write-Host "   $key → $file"
+        if (-not $fileToTypes.ContainsKey($file)) { $fileToTypes[$file] = @() }
+        $fileToTypes[$file] += $key
+    }
+    foreach ($file in $fileToTypes.Keys) {
+        if ($fileToTypes[$file].Count -gt 1) {
+            Print-Warning "  ⚠️ 같은 파일($file)을 여러 타입($($fileToTypes[$file] -join ', '))이 바라봅니다."
+            Print-Warning "     sync 시 같은 버전이 기록되므로 동작엔 문제없지만, 의도한 구성인지 확인하세요."
+        }
+    }
+    Write-Host ""
 }
 
 # ===================================================================
@@ -1127,7 +1396,22 @@ function Create-VersionYml {
         $primaryType = $Type
     }
 
-    $versionYmlContent = @"
+    # project_paths 블록 (Resolve-ProjectPaths가 확정한 값 — 비어있으면 생략)
+    $pathsBlock = ""
+    if ($script:ProjectPaths.Count -gt 0) {
+        $sb = New-Object System.Text.StringBuilder
+        [void]$sb.AppendLine('project_paths:                # 타입별 프로젝트 폴더 (레포 루트 기준 상대경로)')
+        foreach ($key in $script:ProjectPaths.Keys) {
+            $p = $script:ProjectPaths[$key]
+            if ([string]::IsNullOrEmpty($p)) { $p = "." }
+            $m = Get-ExistingMarkerInDir $key $p
+            if ($p -eq ".") { $file = $m } else { $file = "$p/$m" }
+            [void]$sb.AppendLine("  ${key}: `"$p`"   # $file")
+        }
+        $pathsBlock = $sb.ToString()
+    }
+
+    $part1 = @"
 # ===================================================================
 # 프로젝트 버전 관리 파일
 # ===================================================================
@@ -1139,6 +1423,7 @@ function Create-VersionYml {
 # 1. version: "1.0.0" - 사용자에게 표시되는 버전
 # 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
 # 3. project_type: 프로젝트 타입 지정
+# 4. project_paths: 타입별 프로젝트 폴더 (레포 루트 기준 상대경로, 모노레포용)
 #
 # 자동 버전 업데이트:
 # - patch: 자동으로 세 번째 자리 증가 (x.x.x -> x.x.x+1)
@@ -1168,6 +1453,10 @@ version: "$Version"
 version_code: $existingVersionCode  # app build number
 project_types: $typesJson   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
 project_type: "$primaryType"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
+
+"@
+
+    $part2 = @"
 metadata:
   last_updated: "$currentDate"
   last_updated_by: "template_integrator"
@@ -1175,7 +1464,8 @@ metadata:
   integrated_from: "SUH-DEVOPS-TEMPLATE"
   integration_date: "$integrationDate"
 "@
-    
+
+    $versionYmlContent = $part1.TrimEnd("`r", "`n") + "`r`n" + $pathsBlock + $part2
     Set-Content -Path "version.yml" -Value $versionYmlContent -Encoding UTF8
 
     Print-Success "version.yml 생성 완료"
@@ -2453,6 +2743,11 @@ function Start-Integration {
             $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
             Ask-SynologyOption $typeDirs
         }
+    }
+
+    # 타입별 경로 확정 — version.yml에 project_paths 기록 (full/version 모드만)
+    if ($Mode -eq "full" -or $Mode -eq "version") {
+        Resolve-ProjectPaths
     }
 
     # 2. 모드별 통합

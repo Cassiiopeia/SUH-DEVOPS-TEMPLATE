@@ -1,14 +1,35 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-11T14:55:21Z",
-    "currentVersion": "3.0.118",
+    "lastUpdated": "2026-06-11T15:21:48Z",
+    "currentVersion": "3.0.119",
     "projectType": "basic",
-    "totalReleases": 139,
+    "totalReleases": 140,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.119",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-11",
+      "pr_number": 369,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * AI 스킬 설치 상태를 더 알아보기 쉽게 표시합니다\n  * 스킬을 한 곳에 일관되게 설치하도록 단순화했습니다\n  * 설치 화면의 불필요한 선택 단계를 줄였습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "AI 스킬 설치 상태를 더 알아보기 쉽게 표시합니다",
+            "스킬을 한 곳에 일관되게 설치하도록 단순화했습니다",
+            "설치 화면의 불필요한 선택 단계를 줄였습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.118",
       "project_type": "basic",

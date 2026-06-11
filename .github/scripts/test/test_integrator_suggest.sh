@@ -116,6 +116,21 @@ new_workdir
 for i in 1 2 3 4; do echo "print($i)" > "m$i.py"; done
 chk "확장자 폴백 python" "$(suggest_types_by_scan)" "python"
 
+echo "=== (18) 멀티모듈 spring을 suggest_types_by_scan 레벨에서 → spring ==="
+new_workdir
+echo "rootProject.name='demo'" > settings.gradle
+echo "version='0.0.1'" > build.gradle
+mkdir -p api core
+echo "version='0.0.1'" > api/build.gradle
+echo "version='0.0.1'" > core/build.gradle
+chk "멀티모듈 spring 추천" "$(suggest_types_by_scan)" "spring"
+
+echo "=== (19) 서브폴더 react-native: mobile/package.json → react-native 포함 ==="
+new_workdir
+mkdir -p mobile
+printf '{"dependencies":{"react-native":"0.73"}}\n' > mobile/package.json
+chk "서브폴더 react-native 추천" "$(suggest_types_by_scan)" "react-native"
+
 echo ""
 echo "=== 결과: PASS=$PASS FAIL=$FAIL ==="
 [ "$FAIL" -eq 0 ]

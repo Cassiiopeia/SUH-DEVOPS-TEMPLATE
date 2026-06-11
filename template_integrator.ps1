@@ -652,7 +652,7 @@ function Detect-ProjectType {
 # ===================================================================
 
 function Detect-ProjectTypes {
-    Print-Step "프로젝트 타입 자동 감지 중... (멀티 지원)"
+    Print-Step "프로젝트 타입 자동 감지 중..."
 
     # PowerShell 5.1 호환: null += 방지 위해 빈 배열로 초기화
     $detected = @()
@@ -693,6 +693,32 @@ function Detect-ProjectTypes {
     Print-Info "감지된 타입: $($detected -join ' ')"
 
     return ($detected -join ',')
+}
+
+# 마커 파일이 없을 때 확장자·특징 파일 빈도로 타입을 추천 (스캔 추천)
+# 반환: 추천 타입 csv (예: "python,node"), 추천 없으면 빈 문자열
+function Get-SuggestedTypesByScan {
+    $files = @(Get-ChildItem -Path . -Recurse -Depth 2 -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch $script:PathExcludeRegex })
+
+    $dart   = @($files | Where-Object { $_.Extension -eq '.dart' }).Count
+    $java   = @($files | Where-Object { $_.Extension -eq '.java' }).Count
+    $kt     = @($files | Where-Object { $_.Extension -eq '.kt' }).Count
+    $gradle = @($files | Where-Object { $_.Extension -eq '.gradle' }).Count
+    $tsx    = @($files | Where-Object { $_.Extension -eq '.tsx' }).Count
+    $jsx    = @($files | Where-Object { $_.Extension -eq '.jsx' }).Count
+    $py     = @($files | Where-Object { $_.Extension -eq '.py' }).Count
+    $ts     = @($files | Where-Object { $_.Extension -eq '.ts' }).Count
+    $js     = @($files | Where-Object { $_.Extension -eq '.js' }).Count
+
+    $out = @()
+    if ($dart -ge 1) { $out += 'flutter' }
+    if (($java + $kt + $gradle) -ge 3) { $out += 'spring' }
+    if (($tsx + $jsx) -ge 3) { $out += 'react' }
+    if ($py -ge 3) { $out += 'python' }
+    if ($out.Count -eq 0 -and ($ts + $js) -ge 3) { $out += 'node' }
+
+    return ($out -join ',')
 }
 
 # ===================================================================
@@ -819,7 +845,11 @@ function Resolve-ProjectPaths {
     Write-Host "       레포 루트에 바로 있으면 → `".`""
     Write-Host ""
 
+    $idx = 0
+    $total = $targets.Count
     foreach ($t in $targets) {
+        $idx++
+        $prog = "[$idx/$total]"
         # 1) -Paths로 이미 지정됨 → 최우선
         if ($script:ProjectPaths.Contains($t)) {
             Print-Info "  $t → $($script:ProjectPaths[$t]) (-Paths 지정)"
@@ -874,13 +904,13 @@ function Resolve-ProjectPaths {
         if ($candidates.Count -eq 1) {
             $c0Marker = Get-ExistingMarkerInDir $t $candidates[0]
             Write-Host ""
-            Write-Host "  🔍 ${t}: $($candidates[0])/$c0Marker 발견"
+            Write-Host "  $prog 🔍 ${t}: $($candidates[0])/$c0Marker 발견"
             if (Ask-YesNo "  $t 경로를 '$($candidates[0])'(으)로 설정할까요? (Y=예 / N=직접입력)" "Y") {
                 $chosen = $candidates[0]
             }
         } elseif ($candidates.Count -gt 1) {
             Write-Host ""
-            Write-Host "  🔍 ${t}: 후보 $($candidates.Count)개 발견"
+            Write-Host "  $prog 🔍 ${t}: 후보 $($candidates.Count)개 발견"
             for ($i = 0; $i -lt $candidates.Count; $i++) {
                 $cMarker = Get-ExistingMarkerInDir $t $candidates[$i]
                 Write-Host "    $($i+1)) $($candidates[$i])  ($($candidates[$i])/$cMarker)"
@@ -898,7 +928,7 @@ function Resolve-ProjectPaths {
             }
         } else {
             Write-Host ""
-            Print-Warning "  ${t}: 프로젝트를 찾지 못했습니다 (depth 3)."
+            Print-Warning "  $prog ${t}: 프로젝트를 찾지 못했습니다 (depth 3)."
         }
 
         # ── 직접 입력 (위에서 미확정 시) ──
@@ -1054,9 +1084,37 @@ function Detect-DefaultBranch {
 # ===================================================================
 
 function Show-ProjectTypeMenu {
-    # 현재 ProjectTypes를 preselect csv로 — 번호 토글 멀티 선택 메뉴
-    $preselect = ($script:ProjectTypes -join ',')
-    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요 (여러 개 가능)" -Options @(
+    # ── 레포 스캔 → 추천 로그 (append-only) ──
+    $detectedCsv = Detect-ProjectTypes
+    Write-Host ""
+    Write-Host "🔍 이 레포를 살펴봤습니다:"
+
+    $markerCsv = ""
+    if ($detectedCsv -and $detectedCsv -ne "basic") {
+        $markerCsv = $detectedCsv
+        foreach ($mt in ($detectedCsv -split ',')) {
+            Write-Host ("   • {0} 발견 → {1} 추천 (자동 선택됨)" -f (Get-MarkerForType $mt), $mt)
+        }
+    } else {
+        $scanCsv = Get-SuggestedTypesByScan
+        if ($scanCsv) {
+            foreach ($st in ($scanCsv -split ',')) {
+                Write-Host ("   • {0} 관련 파일 발견 → {0} 가능성 (직접 골라주세요)" -f $st)
+            }
+        } else {
+            Write-Host "   • 마커 파일을 찾지 못했습니다 — 직접 선택하세요"
+        }
+    }
+    $curVal = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
+    if (-not $curVal) { $curVal = "basic" }
+    Write-Host ("   • 현재 값: {0}" -f $curVal)
+    Write-Host ""
+
+    # ── preselect: 마커 추천이 있으면 그것, 없으면 현재값 ──
+    if ($markerCsv) { $preselect = $markerCsv }
+    else { $preselect = ($script:ProjectTypes -join ',') }
+
+    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요" -Options @(
         @{Value='spring';            Label='Spring Boot 백엔드'},
         @{Value='flutter';           Label='Flutter 모바일 앱'},
         @{Value='next';              Label='Next.js 웹 앱'},
@@ -1070,7 +1128,6 @@ function Show-ProjectTypeMenu {
 
     if (-not $selected) {
         Print-Error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
-        # 기존 ProjectTypes csv 반환 (호출측이 사용)
         if ($script:ProjectTypes.Count -gt 0) { return ($script:ProjectTypes -join ',') }
         return $script:ProjectType
     }
@@ -1099,6 +1156,7 @@ function Edit-ProjectInfo {
 
     switch ($editChoice) {
         'type' {
+            $oldCsv = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
             $newCsv = Show-ProjectTypeMenu
             if ($newCsv) {
                 $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -1107,6 +1165,11 @@ function Edit-ProjectInfo {
                     Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
                 } else {
                     Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
+                }
+                # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
+                if ($newCsv -ne $oldCsv) {
+                    $script:ProjectPaths = [ordered]@{}
+                    Resolve-ProjectPaths
                 }
             }
             Write-Host ""

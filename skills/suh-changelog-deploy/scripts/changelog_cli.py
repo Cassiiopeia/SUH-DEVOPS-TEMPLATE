@@ -201,10 +201,11 @@ def cmd_list_prs(args) -> int:
 
 
 def _resolve_body_file(body_file: str | None) -> Path | None:
-    """본문 파일 경로 해석 — 절대 경로면 그대로, 상대 경로면 cwd → PROJECT_ROOT/scripts 순서로 탐색.
+    """본문 파일 경로 해석 — 절대 경로면 그대로, 상대 경로면 여러 위치를 순서대로 탐색.
 
-    SKILL.md 절차는 `$PROJECT_ROOT/scripts/_release_notes.md`에 저장하지만 cli는 cwd가
-    `skills/suh-changelog-deploy/scripts`라 단순 상대 경로로는 못 찾는 경로 미스매치를 보강한다.
+    SKILL.md 절차는 `~/.suh-template/tmp/{owner}__{repo}__release_notes.md`(홈, 절대경로)에
+    저장하고 cli에 그 절대경로를 넘긴다. 다만 누군가 파일명만(상대경로) 넘겨도 찾을 수 있도록
+    홈 tmp → PROJECT_ROOT/scripts(구버전 하위호환) → cwd 순으로 보강 탐색한다.
     찾지 못하면 None을 반환한다 (호출자가 본문 없음을 판단).
     """
     if not body_file:
@@ -212,7 +213,12 @@ def _resolve_body_file(body_file: str | None) -> Path | None:
     raw = Path(body_file)
     if raw.is_absolute():
         return raw if raw.exists() else None
-    for candidate in (raw, _PROJECT_ROOT / "scripts" / raw.name, Path.cwd() / raw):
+    for candidate in (
+        raw,
+        Path.home() / ".suh-template" / "tmp" / raw.name,
+        _PROJECT_ROOT / "scripts" / raw.name,
+        Path.cwd() / raw,
+    ):
         if candidate.exists():
             return candidate
     return None
@@ -244,7 +250,10 @@ def cmd_create_pr(args) -> int:
     if args.body_file and not body_path:
         return emit({
             "ok": False, "code": "body_file_not_found",
-            "error": f"본문 파일을 찾을 수 없습니다: {args.body_file} (cwd={Path.cwd()}, PROJECT_ROOT={_PROJECT_ROOT})",
+            "error": (
+                f"본문 파일을 찾을 수 없습니다: {args.body_file} "
+                f"(탐색: 절대경로 | ~/.suh-template/tmp/ | {_PROJECT_ROOT / 'scripts'} | cwd={Path.cwd()})"
+            ),
         })
     body = body_path.read_text(encoding="utf-8") if body_path else ""
     try:

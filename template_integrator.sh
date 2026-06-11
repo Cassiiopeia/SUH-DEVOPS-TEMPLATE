@@ -955,6 +955,46 @@ detect_project_types() {
     echo "${detected[*]}"
 }
 
+# 마커 파일이 없을 때 확장자·특징 파일 빈도로 타입을 추천 (스캔 추천)
+# stdout: 추천 타입 csv (예: "python,node"), 추천 없으면 빈 문자열
+# detect_project_types가 basic만 반환했을 때 보조로만 쓴다 — 강제 아님(안내용).
+suggest_types_by_scan() {
+    # 잡음 폴더 제외하고 maxdepth 3로 파일을 모아 확장자 카운트
+    local _files
+    _files=$(find . -maxdepth 3 \
+        \( -name node_modules -o -name .git -o -name build -o -name dist \
+           -o -name .dart_tool -o -name android -o -name ios -o -name .gradle \
+           -o -name venv -o -name .venv -o -name __pycache__ \) -prune \
+        -o -type f -print 2>/dev/null)
+
+    local _dart _java _kt _gradle _tsx _jsx _py _ts _js
+    _dart=$(printf '%s\n' "$_files"   | grep -c '\.dart$')
+    _java=$(printf '%s\n' "$_files"   | grep -c '\.java$')
+    _kt=$(printf '%s\n' "$_files"     | grep -c '\.kt$')
+    _gradle=$(printf '%s\n' "$_files" | grep -c '\.gradle$')
+    _tsx=$(printf '%s\n' "$_files"    | grep -c '\.tsx$')
+    _jsx=$(printf '%s\n' "$_files"    | grep -c '\.jsx$')
+    _py=$(printf '%s\n' "$_files"     | grep -c '\.py$')
+    _ts=$(printf '%s\n' "$_files"     | grep -c '\.ts$')
+    _js=$(printf '%s\n' "$_files"     | grep -c '\.js$')
+
+    local _out=""
+    # flutter: .dart 임계 1 (고유 확장자라 오탐 적음)
+    [ "$_dart" -ge 1 ] && _out="${_out:+$_out,}flutter"
+    # spring: .java/.kt/.gradle 합산 임계 3
+    [ $((_java + _kt + _gradle)) -ge 3 ] && _out="${_out:+$_out,}spring"
+    # react: .tsx/.jsx 합산 임계 3
+    [ $((_tsx + _jsx)) -ge 3 ] && _out="${_out:+$_out,}react"
+    # python: .py 임계 3
+    [ "$_py" -ge 3 ] && _out="${_out:+$_out,}python"
+    # node: 위 어떤 추천도 없을 때만, .ts/.js 합산 임계 3
+    if [ -z "$_out" ] && [ $((_ts + _js)) -ge 3 ]; then
+        _out="node"
+    fi
+
+    echo "$_out"
+}
+
 # ===================================================================
 # 타입별 프로젝트 경로 (project_paths) 감지·확정
 # ===================================================================

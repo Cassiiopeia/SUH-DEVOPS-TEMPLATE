@@ -51,6 +51,46 @@ mkdir -p node_modules/pkg
 for i in 1 2 3 4; do echo "x" > "node_modules/pkg/m$i.py"; done
 chk "제외 폴더 무시 → 빈 추천" "$(suggest_types_by_scan)" ""
 
+echo "=== (7) classify_package_json: react 의존성 → react ==="
+new_workdir
+printf '{"dependencies":{"react":"^18.0.0"}}\n' > package.json
+chk "react 판별" "$(classify_package_json package.json)" "react"
+
+echo "=== (8) classify_package_json: next 의존성 → next ==="
+new_workdir
+printf '{"dependencies":{"next":"14.0.0","react":"^18"}}\n' > package.json
+chk "next 판별(react보다 우선)" "$(classify_package_json package.json)" "next"
+
+echo "=== (9) classify_package_json: react-native + expo → react-native-expo ==="
+new_workdir
+printf '{"dependencies":{"react-native":"0.73","expo":"~50"}}\n' > package.json
+chk "expo 판별" "$(classify_package_json package.json)" "react-native-expo"
+
+echo "=== (10) classify_package_json: 순수 → node ==="
+new_workdir
+printf '{"dependencies":{"express":"^4"}}\n' > package.json
+chk "node 판별" "$(classify_package_json package.json)" "node"
+
+echo "=== (11) 멀티모듈 spring: settings.gradle 있으면 . 하나 ==="
+new_workdir
+echo "rootProject.name='demo'" > settings.gradle
+echo "version='0.0.1'" > build.gradle
+mkdir -p api core
+echo "version='0.0.1'" > api/build.gradle
+echo "version='0.0.1'" > core/build.gradle
+chk "멀티모듈 → 루트만" "$(find_type_path_candidates spring)" "."
+
+echo "=== (12) 단일모듈 spring: 루트 build.gradle, settings 없음 → . ==="
+new_workdir
+echo "version='0.0.1'" > build.gradle
+chk "단일모듈 → ." "$(find_type_path_candidates spring)" "."
+
+echo "=== (13) 서브폴더 spring: server/build.gradle, settings 없음 → server ==="
+new_workdir
+mkdir -p server
+echo "version='0.0.1'" > server/build.gradle
+chk "서브폴더 spring → server" "$(find_type_path_candidates spring)" "server"
+
 echo ""
 echo "=== 결과: PASS=$PASS FAIL=$FAIL ==="
 [ "$FAIL" -eq 0 ]

@@ -909,6 +909,26 @@ detect_project_type() {
 # 프로젝트 타입 자동 감지 (멀티 — 모든 일치 타입을 csv로 반환)
 # detect_project_type(단수)은 첫 일치 하나만 반환하지만, 모노레포는 여러 타입이
 # 공존할 수 있으므로 전부 감지해 사용자가 다중 선택 메뉴로 확정하게 한다.
+# package.json 경로를 받아 react/next/node/react-native(-expo) 중 하나로 판별
+# detect_project_types의 인라인 판별 로직을 추출 — 서브폴더 package.json에도 재사용
+classify_package_json() {
+    local pj=$1
+    [ -f "$pj" ] || { echo ""; return; }
+    if grep -q "@react-native" "$pj" || grep -q "react-native" "$pj"; then
+        if grep -q "expo" "$pj"; then
+            echo "react-native-expo"
+        else
+            echo "react-native"
+        fi
+    elif grep -q "\"next\"" "$pj"; then
+        echo "next"
+    elif grep -q "\"react\"" "$pj"; then
+        echo "react"
+    else
+        echo "node"
+    fi
+}
+
 detect_project_types() {
     print_step "프로젝트 타입 자동 감지 중..."
 
@@ -1069,6 +1089,12 @@ existing_marker_in_dir() {
 # maxdepth 3 + 잡음 폴더 제외 + 타입별 오탐 필터 (스펙 §4.2~4.3)
 find_type_path_candidates() {
     local t=$1
+    # 멀티모듈 스프링: 루트에 settings.gradle(.kts) 있으면 버전은 루트에서 관리 →
+    # 후보를 "." 하나로 고정 (version_manager가 . 아래 모든 build.gradle을 일괄 갱신)
+    if [ "$t" = "spring" ] && { [ -f "settings.gradle" ] || [ -f "settings.gradle.kts" ]; }; then
+        echo "."
+        return 0
+    fi
     local names=""
     case "$t" in
         flutter)            names="pubspec.yaml" ;;

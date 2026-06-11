@@ -19,15 +19,17 @@ Common routing:
 
 | User intent | Skill |
 |-------------|-------|
-| Create or register a GitHub issue | `skills/issue/SKILL.md` |
-| Commit staged work | `skills/commit/SKILL.md` |
-| Analyze code without editing | `skills/analyze/SKILL.md` |
-| Create an implementation plan | `skills/plan/SKILL.md` |
-| Implement a planned change | `skills/implement/SKILL.md` |
-| Review code or changes | `skills/review/SKILL.md` |
-| Debug failures | `skills/troubleshoot/SKILL.md` |
-| Generate implementation reports | `skills/report/SKILL.md` |
-| Create or improve skills | `skills/skill-creator/SKILL.md` |
+| Create or register a GitHub issue | `skills/suh-issue/SKILL.md` |
+| Commit staged work | `skills/suh-commit/SKILL.md` |
+| Analyze code without editing | `skills/suh-analyze/SKILL.md` |
+| Create an implementation plan | `skills/suh-plan/SKILL.md` |
+| Implement a planned change | `skills/suh-implement/SKILL.md` |
+| Review code or changes | `skills/suh-review/SKILL.md` |
+| Debug failures | `skills/suh-troubleshoot/SKILL.md` |
+| Generate implementation reports | `skills/suh-report/SKILL.md` |
+| Create or improve skills | `skills/suh-skill-creator/SKILL.md` |
+| Query or manage GitHub issues/PRs | `skills/suh-github/SKILL.md` |
+| Deploy (main push → deploy PR) | `skills/suh-changelog-deploy/SKILL.md` |
 
 ## Repository Safety
 

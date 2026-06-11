@@ -63,6 +63,8 @@ template_integrator로 통합 시 자동 안내되지만, 수동으로도 설치
 |-----|----------|----------|
 | **Claude Code** | 플러그인 마켓플레이스 (CLI) | `/cassiiopeia:suh-analyze`, `/cassiiopeia:suh-review` |
 | **Cursor** | `.cursor/skills/` 폴더 복사 | Skills 패널에서 선택 |
+| **Gemini CLI** | `gemini extensions install` | extension 명령 |
+| **Codex CLI** | `codex plugin marketplace add` | `/plugins`에서 확인 |
 
 ### Claude Code
 
@@ -95,12 +97,14 @@ template_integrator 실행 시 Cursor 설치를 선택하면 자동으로 `skill
 
 **프로젝트 생성 즉시 자동 실행**:
 - ✅ `version.yml` 자동 생성 (v0.0.0, basic 타입)
-- ✅ 공통 워크플로우 5개 자동 설치:
+- ✅ 공통 워크플로우 자동 설치 (주요 항목):
   - `PROJECT-COMMON-VERSION-CONTROL.yaml` (버전 자동 관리)
   - `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml` (체인지로그 생성)
   - `PROJECT-COMMON-README-VERSION-UPDATE.yaml` (README 업데이트)
-  - `PROJECT-COMMON-ISSUE-COMMENT.yaml` (이슈 자동화)
+  - `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yml` (이슈 브랜치/커밋 제안)
+  - `PROJECT-COMMON-QA-ISSUE-CREATION-BOT.yaml` (QA 이슈 자동 생성)
   - `PROJECT-COMMON-SYNC-ISSUE-LABELS.yaml` (라벨 동기화)
+  - `PROJECT-COMMON-PROJECTS-SYNC-MANAGER.yaml` (Projects 상태 동기화)
 - ✅ README 버전 섹션 자동 추가
 - ✅ 불필요한 템플릿 파일 자동 삭제
 - ✅ Default 브랜치 자동 감지
@@ -119,7 +123,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 ```
 
 **자동으로 수행되는 작업**:
-- ✅ 프로젝트 타입 자동 감지 (Spring, Flutter, React, Node, Python 등)
+- ✅ 프로젝트 타입 자동 감지 (Spring, Flutter, React, Node, Python 등) — 한 레포에 여러 타입이 섞인 모노레포는 멀티타입으로 함께 인식
 - ✅ 현재 버전 자동 감지 (Git 태그, build.gradle, package.json 등)
 - ✅ 프로젝트 타입에 맞는 워크플로우만 선택 복사
 - ✅ `version.yml` 자동 생성

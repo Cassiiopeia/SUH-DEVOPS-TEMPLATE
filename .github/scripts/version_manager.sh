@@ -105,6 +105,18 @@ parse_project_types() {
     yq -r '.project_types // [] | join(",")' version.yml 2>/dev/null || echo ""
 }
 
+# project_paths.<type> 반환 — 키 없으면 "." (legacy: 루트 기준)
+# 모노레포에서 타입별 프로젝트가 서브폴더에 있을 때 integrator가 기록한 경로
+get_type_path() {
+    local t=$1
+    local p
+    p=$(yq -r ".project_paths.\"${t}\" // \".\"" version.yml 2>/dev/null) || p="."
+    if [ -z "$p" ] || [ "$p" = "null" ]; then
+        p="."
+    fi
+    echo "$p"
+}
+
 # project_type 단수 키를 project_types[0]으로 강제 동기화 (사용자 수동 편집 실수 자동 복구)
 sync_project_type_field() {
     local types_csv=$1
@@ -151,32 +163,35 @@ read_version_config() {
         check_required_tools "$PROJECT_TYPE"
     fi
 
-    # 5. VERSION_FILE — primary 타입(단수 키) 기준 — 기존 동작 유지
+    # 5. VERSION_FILE — primary 타입(단수 키) 기준 + project_paths 경로 prefix
+    #    (project_paths 키 없으면 _ppath="." → "./pubspec.yaml" — 기존 동작과 동일)
+    local _ppath
+    _ppath=$(get_type_path "$PROJECT_TYPE")
     case "$PROJECT_TYPE" in
         "spring")
-            VERSION_FILE="build.gradle"
+            VERSION_FILE="$_ppath/build.gradle"
             ;;
         "flutter")
-            VERSION_FILE="pubspec.yaml"
+            VERSION_FILE="$_ppath/pubspec.yaml"
             ;;
         "react"|"next"|"node")
-            VERSION_FILE="package.json"
+            VERSION_FILE="$_ppath/package.json"
             ;;
         "react-native")
             # iOS 우선, 없으면 Android
             local ios_plist
-            ios_plist=$(find ios -name "Info.plist" -type f 2>/dev/null | head -1 || true)
+            ios_plist=$(find "$_ppath/ios" -name "Info.plist" -type f 2>/dev/null | head -1 || true)
             if [ -n "$ios_plist" ]; then
                 VERSION_FILE="$ios_plist"
             else
-                VERSION_FILE="android/app/build.gradle"
+                VERSION_FILE="$_ppath/android/app/build.gradle"
             fi
             ;;
         "react-native-expo")
-            VERSION_FILE="app.json"
+            VERSION_FILE="$_ppath/app.json"
             ;;
         "python")
-            VERSION_FILE="pyproject.toml"
+            VERSION_FILE="$_ppath/pyproject.toml"
             ;;
         "basic"|*)
             VERSION_FILE="version.yml"
@@ -497,57 +512,67 @@ update_project_file_version() {
 sync_for_type() {
     local t=$1
     local new_version=$2
+    local p
+    p=$(get_type_path "$t")
 
-    log_info "타입별 sync: $t → $new_version"
+    log_info "타입별 sync: $t → $new_version (경로: $p)"
 
     case "$t" in
         "spring")
-            find . -maxdepth 2 -name "build.gradle" -type f 2>/dev/null | while read -r gradle_file; do
+            find "$p" -maxdepth 2 -name "build.gradle" -type f 2>/dev/null | while read -r gradle_file; do
                 sed -i.bak "s/version = '[^']*'/version = '$new_version'/g; s/version = \"[^\"]*\"/version = \"$new_version\"/g" "$gradle_file"
                 rm -f "${gradle_file}.bak"
                 log_success "업데이트: $gradle_file"
             done
             ;;
         "flutter")
-            if [ -f "pubspec.yaml" ]; then
+            if [ -f "$p/pubspec.yaml" ]; then
                 local code
                 code=$(get_version_code)
-                yq -i ".version = \"$new_version+$code\"" pubspec.yaml
-                log_success "업데이트: pubspec.yaml"
+                yq -i ".version = \"$new_version+$code\"" "$p/pubspec.yaml"
+                log_success "업데이트: $p/pubspec.yaml"
+            else
+                log_warning "flutter: $p/pubspec.yaml 없음 — 건너뜀"
             fi
             ;;
         "react"|"next"|"node")
-            if [ -f "package.json" ]; then
-                jq ".version = \"$new_version\"" package.json > tmp.json && mv tmp.json package.json
-                log_success "업데이트: package.json"
+            if [ -f "$p/package.json" ]; then
+                jq ".version = \"$new_version\"" "$p/package.json" > tmp.json && mv tmp.json "$p/package.json"
+                log_success "업데이트: $p/package.json"
+            else
+                log_warning "$t: $p/package.json 없음 — 건너뜀"
             fi
             ;;
         "python")
-            if [ -f "pyproject.toml" ]; then
+            if [ -f "$p/pyproject.toml" ]; then
                 # TOML: sed 유지 (파서 없음)
-                sed -i.bak "s/^version = \"[^\"]*\"/version = \"$new_version\"/" pyproject.toml
-                rm -f pyproject.toml.bak
-                log_success "업데이트: pyproject.toml"
+                sed -i.bak "s/^version = \"[^\"]*\"/version = \"$new_version\"/" "$p/pyproject.toml"
+                rm -f "$p/pyproject.toml.bak"
+                log_success "업데이트: $p/pyproject.toml"
+            else
+                log_warning "python: $p/pyproject.toml 없음 — 건너뜀"
             fi
             ;;
         "react-native")
-            find ios -name "Info.plist" -type f 2>/dev/null | while read -r plist_file; do
+            find "$p/ios" -name "Info.plist" -type f 2>/dev/null | while read -r plist_file; do
                 if grep -q "CFBundleShortVersionString" "$plist_file"; then
                     sed -i.bak '/CFBundleShortVersionString/{n;s/<string>[^<]*<\/string>/<string>'"$new_version"'<\/string>/;}' "$plist_file"
                     rm -f "${plist_file}.bak"
                     log_success "업데이트: $plist_file"
                 fi
             done
-            if [ -f "android/app/build.gradle" ]; then
-                sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$new_version\"/" "android/app/build.gradle"
-                rm -f "android/app/build.gradle.bak"
-                log_success "업데이트: android/app/build.gradle"
+            if [ -f "$p/android/app/build.gradle" ]; then
+                sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$new_version\"/" "$p/android/app/build.gradle"
+                rm -f "$p/android/app/build.gradle.bak"
+                log_success "업데이트: $p/android/app/build.gradle"
             fi
             ;;
         "react-native-expo")
-            if [ -f "app.json" ]; then
-                jq ".expo.version = \"$new_version\"" app.json > tmp.json && mv tmp.json app.json
-                log_success "업데이트: app.json"
+            if [ -f "$p/app.json" ]; then
+                jq ".expo.version = \"$new_version\"" "$p/app.json" > tmp.json && mv tmp.json "$p/app.json"
+                log_success "업데이트: $p/app.json"
+            else
+                log_warning "react-native-expo: $p/app.json 없음 — 건너뜀"
             fi
             ;;
         "basic")

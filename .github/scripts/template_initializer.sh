@@ -459,6 +459,18 @@ cleanup_template_files() {
         echo "  ✓ scripts 폴더 삭제 (마켓플레이스 전용 스크립트)"
     fi
 
+    # pi 패키지 매니페스트 삭제 (마켓플레이스 전용, 일반 프로젝트에서 불필요)
+    if [ -f "package.json" ]; then
+        rm -f package.json
+        echo "  ✓ package.json 삭제 (pi 패키지 매니페스트)"
+    fi
+
+    # pi Persona Harness 삭제 (loader/PERSONA/WORKFLOW, 마켓플레이스 전용)
+    if [ -d "harness" ]; then
+        rm -rf harness
+        echo "  ✓ harness 폴더 삭제 (pi Persona Harness)"
+    fi
+
     # .suh-template.example 폴더 삭제 (템플릿 전용 config 스키마)
     if [ -d ".suh-template.example" ]; then
         rm -rf .suh-template.example

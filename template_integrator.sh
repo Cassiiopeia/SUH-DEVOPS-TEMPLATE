@@ -35,7 +35,7 @@
 #                            • version     - 버전 관리 시스템만
 #                            • workflows   - GitHub Actions 워크플로우만
 #                            • issues      - 이슈/PR 템플릿만
-#                            • skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
+#                            • skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex, PI)
 #                            • interactive - 대화형 선택 (기본값)
 #   -v, --version VERSION    초기 버전 설정 (자동 감지, 수동 지정 가능)
 #   -t, --type TYPE          프로젝트 타입 (자동 감지, 수동 지정 가능)
@@ -755,7 +755,7 @@ ${BLUE}통합 모드:${NC}
   ${GREEN}version${NC}     - 버전 관리 시스템만 (version.yml + scripts)
   ${GREEN}workflows${NC}   - GitHub Actions 워크플로우만
   ${GREEN}issues${NC}      - 이슈/PR 템플릿만
-  ${GREEN}skills${NC}      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
+  ${GREEN}skills${NC}      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex, PI)
   ${GREEN}interactive${NC} - 대화형 선택 (기본값, 추천)
 
 ${BLUE}옵션:${NC}
@@ -1984,6 +1984,8 @@ download_template() {
         ".agents"           # Codex 마켓플레이스 메타데이터
         ".cursor"           # Cursor 스킬 복사본
         "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
+        "package.json"      # pi 패키지 매니페스트 (마켓플레이스 전용)
+        "harness"           # pi Persona Harness (loader/PERSONA/WORKFLOW, 마켓플레이스 전용)
     )
     # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (offer_ide_tools_install에서 사용 후 정리)
 
@@ -3337,7 +3339,7 @@ interactive_mode() {
         "버전 관리만 — 버전 자동 증가·동기화 시스템만 설치|" \
         "워크플로우만 — 빌드·배포 GitHub Actions만 설치|" \
         "이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치|" \
-        "AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치|" \
+        "AI 스킬만 — Claude·Cursor·Gemini·Codex·PI용 스킬만 설치|" \
         "취소|") || _mode_rc=$?
 
     # 한국어 라벨 → 내부 모드 키 매핑 (ESC=비-0 → cancel)
@@ -3642,6 +3644,23 @@ offer_ide_tools_install() {
     else
         print_info "Codex CLI   : skill 미설치 (CLI 없음)"
     fi
+
+    # PI — git package. 'pi list'에 우리 패키지가 잡히면 설치됨으로 본다.
+    if command -v pi &> /dev/null; then
+        if _pi_is_installed; then
+            print_info "PI          : skill 설치됨"
+        else
+            print_info "PI          : 설치 가능 (CLI 감지됨)"
+        fi
+        # Persona Harness 상태 — skill과 독립
+        if _pi_harness_enabled; then
+            print_info "PI Harness   : 활성화됨 (Persona/Workflow 주입)"
+        else
+            print_info "PI Harness   : 비활성화"
+        fi
+    else
+        print_info "PI          : skill 미설치 (CLI 없음)"
+    fi
     echo "" >&2
 
     # ── 2단계 통합 라우터 ──
@@ -3656,6 +3675,10 @@ offer_ide_tools_install() {
         _ide_opts+=("Cursor|")
         if command -v gemini &> /dev/null; then _ide_opts+=("Gemini CLI|"); else _ide_opts+=("Gemini CLI (미감지)|"); fi
         if command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; then _ide_opts+=("Codex CLI|"); else _ide_opts+=("Codex CLI (미감지)|"); fi
+        if command -v pi &> /dev/null; then _ide_opts+=("PI|"); else _ide_opts+=("PI (미감지)|"); fi
+        # PI Persona Harness — skill과 독립. skill은 두고 harness만 켜고/끌 수 있는 별도 항목.
+        # PI 패키지가 설치돼 harness loader가 있을 때만 후보로 노출.
+        if command -v pi &> /dev/null && [ -f "$(_pi_harness_loader_path)" ]; then _ide_opts+=("PI Persona Harness|"); fi
 
         # ESC는 '그대로 두기'와 동일(건너뛰기). set -e 가드 || 로 비-0 흡수.
         local _action_label _action_rc=0
@@ -3681,6 +3704,7 @@ offer_ide_tools_install() {
                 local _pre="Claude Code,Cursor"
                 command -v gemini &> /dev/null && _pre="$_pre,Gemini CLI"
                 { command -v codex &> /dev/null || [ -e "${HOME}/.agents/skills/cassiiopeia" ]; } && _pre="$_pre,Codex CLI"
+                command -v pi &> /dev/null && _pre="$_pre,PI"
                 # ESC/무선택 → 건너뛰기. set -e 가드 || true.
                 local _targets=""
                 _targets=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_pre" "설치 / 업데이트할 IDE를 고르세요" "${_ide_opts[@]}") || true
@@ -3689,6 +3713,8 @@ offer_ide_tools_install() {
                 case ",$_targets," in *,Cursor,*)       _manage_cursor_section ;; esac
                 case ",$_targets," in *,Gemini\ CLI,*)  _manage_gemini_extension ;; esac
                 case ",$_targets," in *,Codex\ CLI,*)   _manage_codex_skills ;; esac
+                case ",$_targets," in *,PI,*)           _manage_pi_section ;; esac
+                case ",$_targets," in *,PI\ Persona\ Harness,*) _pi_harness_toggle ;; esac
                 ;;
             remove)
                 # 제거: 전체 후보 제시 후 미설치는 각 섹션이 no-op 처리
@@ -3700,6 +3726,9 @@ offer_ide_tools_install() {
                 case ",$_targets," in *,Cursor,*)       _remove_cursor_section ;; esac
                 case ",$_targets," in *,Gemini\ CLI,*)  _remove_gemini_section ;; esac
                 case ",$_targets," in *,Codex\ CLI,*)   _remove_codex_section ;; esac
+                case ",$_targets," in *,PI,*)           _remove_pi_section ;; esac
+                # PI skill은 두고 harness만 해제 (PI 항목과 별개로 단독 선택 가능)
+                case ",$_targets," in *,PI\ Persona\ Harness,*) _pi_harness_remove_only ;; esac
                 ;;
             *)
                 print_info "IDE Skills 변경 없이 건너뜁니다"
@@ -3713,6 +3742,7 @@ offer_ide_tools_install() {
     _manage_cursor_section
     _manage_gemini_extension
     _manage_codex_skills
+    _manage_pi_section
 }
 
 # ── Claude Code 플러그인 관리 (기존 섹션 로직 보존) ──
@@ -3907,6 +3937,31 @@ _remove_codex_section() {
     fi
     command -v codex &> /dev/null && \
         print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
+}
+
+_remove_pi_section() {
+    echo "" >&2
+    print_step "[ PI 패키지 제거 ]"
+    if ! command -v pi &> /dev/null; then
+        print_info "  pi CLI 미감지 — 건너뜁니다"
+        return
+    fi
+    if ! _pi_is_installed; then
+        print_info "  설치된 PI 패키지가 없어 건너뜁니다"
+        return
+    fi
+    print_info "  pi remove ${PI_PACKAGE_URL}"
+    pi remove "$PI_PACKAGE_URL" 2>/dev/null || true
+    if _pi_is_installed; then
+        print_warning "  제거 후에도 패키지가 남아있습니다 — 'pi list'로 확인하세요."
+    else
+        print_success "PI 패키지 제거 완료"
+    fi
+    # package 클론이 사라지면 등록된 harness loader 경로가 허공을 가리킨다 — 같이 해제
+    if _pi_harness_enabled; then
+        print_info "  Persona Harness 등록도 함께 해제"
+        _pi_harness_remove
+    fi
 }
 
 # ─── Claude Code 헬퍼 ───────────────────────────────────────────
@@ -4117,6 +4172,248 @@ _do_codex_native_skills_fallback() {
     print_success "Codex native skills 설치 완료 (${target} -> ${skills_dir})"
 }
 
+# ─── PI 헬퍼 ────────────────────────────────────────────────────
+# pi는 native `pi install <git-url>` 사용. raw 다운로드 X.
+# 패키지의 skill은 복사되지 않고, settings의 packages에 등록된 패키지 경로를
+# pi가 startup마다 직접 스캔한다. 따라서 설치 검증은 폴더 존재가 아니라 'pi list' 출력으로 한다.
+PI_PACKAGE_URL="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+
+# 실제로 동작하는 python 경로를 찾는다. Windows의 'python3'는 Microsoft Store
+# stub일 수 있어(command -v는 성공하지만 실행 시 Exit 49) 실제 실행으로 걸러낸다.
+# 못 찾으면 빈 문자열 출력 + 비-0 반환.
+_pi_python() {
+    local c pth
+    for c in python3 python py; do
+        pth=$(command -v "$c" 2>/dev/null) || continue
+        if "$pth" -c "import sys; sys.exit(0)" 2>/dev/null; then
+            echo "$pth"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# pi 패키지가 설치돼 있는지: 'pi list' 출력에 우리 레포가 잡히면 true.
+# pi.ps1/pi는 일부 출력을 stderr로 보내므로 2>&1로 합쳐서 본다.
+_pi_is_installed() {
+    command -v pi &> /dev/null || return 1
+    local out
+    out=$(pi list 2>&1 || true)
+    case "$out" in
+        *SUH-DEVOPS-TEMPLATE*|*cassiiopeia*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# pi 클론 경로(harness loader가 사는 곳). pi 표준 클론 위치: ~/.pi/agent/git/<host>/<owner>/<repo>
+_pi_clone_dir() {
+    echo "${HOME}/.pi/agent/git/github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+}
+_pi_harness_loader_path() {
+    echo "$(_pi_clone_dir)/harness/harness-loader.ts"
+}
+_pi_settings_path() {
+    echo "${HOME}/.pi/agent/settings.json"
+}
+
+# settings.json의 extensions 배열에 harness loader가 등록돼 있는가
+_pi_harness_enabled() {
+    local settings loader py
+    settings="$(_pi_settings_path)"
+    loader="$(_pi_harness_loader_path)"
+    [ -f "$settings" ] || return 1
+    py=$(_pi_python) || return 1
+    PI_SETTINGS="$settings" PI_LOADER="$loader" "$py" - <<'PYEOF'
+import json, os, sys
+try:
+    with open(os.environ["PI_SETTINGS"], encoding="utf-8") as f:
+        s = json.load(f)
+    exts = s.get("extensions") or []
+    sys.exit(0 if os.environ["PI_LOADER"] in exts else 1)
+except Exception:
+    sys.exit(1)
+PYEOF
+}
+
+# extensions 배열에 harness loader 추가 (중복 방지). 성공 0.
+_pi_harness_add() {
+    local settings loader py
+    settings="$(_pi_settings_path)"
+    loader="$(_pi_harness_loader_path)"
+    if [ ! -f "$settings" ]; then
+        print_warning "  PI settings.json이 없습니다 — PI를 한 번 실행한 뒤 다시 시도하세요."
+        return 1
+    fi
+    if [ ! -f "$loader" ]; then
+        print_warning "  harness loader가 없습니다: ${loader}"
+        print_warning "  먼저 PI 패키지를 설치/업데이트하세요."
+        return 1
+    fi
+    py=$(_pi_python) || {
+        print_warning "  python을 찾을 수 없어 harness 등록을 건너뜁니다."
+        return 1
+    }
+    PI_SETTINGS="$settings" PI_LOADER="$loader" "$py" - <<'PYEOF'
+import json, os, sys
+p = os.environ["PI_SETTINGS"]; loader = os.environ["PI_LOADER"]
+try:
+    with open(p, encoding="utf-8") as f:
+        s = json.load(f)
+except Exception:
+    s = {}
+exts = [e for e in (s.get("extensions") or []) if e]
+if loader not in exts:
+    exts.append(loader)
+s["extensions"] = exts
+with open(p, "w", encoding="utf-8") as f:
+    json.dump(s, f, ensure_ascii=False, indent=2)
+sys.exit(0)
+PYEOF
+}
+
+# extensions 배열에서 harness loader 제거. 성공 0.
+_pi_harness_remove() {
+    local settings loader py
+    settings="$(_pi_settings_path)"
+    loader="$(_pi_harness_loader_path)"
+    [ -f "$settings" ] || return 0
+    py=$(_pi_python) || return 1
+    PI_SETTINGS="$settings" PI_LOADER="$loader" "$py" - <<'PYEOF'
+import json, os, sys
+p = os.environ["PI_SETTINGS"]; loader = os.environ["PI_LOADER"]
+try:
+    with open(p, encoding="utf-8") as f:
+        s = json.load(f)
+except Exception:
+    sys.exit(0)
+if "extensions" in s:
+    s["extensions"] = [e for e in (s.get("extensions") or []) if e and e != loader]
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(s, f, ensure_ascii=False, indent=2)
+sys.exit(0)
+PYEOF
+    print_success "  Persona Harness 해제 완료 — PI 재시작 후 적용됩니다."
+}
+
+# Persona Harness 설치 제안 (PI 설치/업데이트 직후 호출).
+# 이미 활성화돼 있으면 그대로 두고, 꺼져 있을 때만 켤지 묻는다.
+# (해제는 PI 제거 흐름 _remove_pi_section에서 함께 처리하므로 여기선 켜기만 다룬다.)
+# 비TTY/FORCE면 자동 스킵.
+_pi_harness_offer() {
+    # 이미 활성화돼 있으면 설치 흐름에서 더 묻지 않는다.
+    if _pi_harness_enabled; then
+        print_info "  Persona Harness: 이미 활성화됨 (유지)"
+        return
+    fi
+    if [ ! -f "$(_pi_harness_loader_path)" ]; then
+        print_info "  harness loader가 아직 없어 건너뜁니다 (PI 패키지 설치 후 재시도)."
+        return
+    fi
+    # 비대화형이면 묻지 않고 skill만 사용 (보수적 기본값).
+    if [ "$FORCE_MODE" = true ] || [ "$TTY_AVAILABLE" != true ]; then
+        print_info "  Persona Harness: 비활성화 (비대화형 — skill만 사용)"
+        return
+    fi
+
+    print_step "(PI 전용) Persona Harness 활성화"
+    _pi_harness_print_desc
+    print_info "  나중에 켜고/끄려면 [설치/업데이트] 또는 [제거] 메뉴의 'PI Persona Harness' 항목을 쓰세요."
+
+    if ask_yes_no "Persona Harness를 활성화할까요?" "N"; then
+        if _pi_harness_add; then
+            print_success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
+        fi
+    else
+        print_info "  → 건너뜀 (skill만 사용)"
+    fi
+}
+
+# harness 개념 설명 출력 (토글/단독 메뉴에서 재사용)
+_pi_harness_print_desc() {
+    print_info "  Persona Harness는 PI가 대화를 시작할 때마다 '전문가 페르소나'와 'SDLC 워크플로우'를"
+    print_info "  시스템 프롬프트에 자동 주입하는 기능입니다."
+    print_info "  • 페르소나(PERSONA): 아키텍트·개발자·리뷰어 등 전문가 역할을 AI에 부여해 답변 품질을 끌어올림"
+    print_info "  • 워크플로우(WORKFLOW): 요구분석→설계→구현→검증 단계를 따르도록 행동 지침을 부여"
+    print_info "  skill과는 독립적으로 동작합니다 (skill은 그대로 두고 harness만 켜고/끌 수 있습니다)."
+}
+
+# [설치/업데이트] 메뉴에서 'PI Persona Harness' 단독 선택 시 — 현재 상태 토글.
+# skill은 건드리지 않고 harness 등록만 켜거나 끈다.
+_pi_harness_toggle() {
+    echo "" >&2
+    print_step "[ PI Persona Harness 관리 ]"
+    if ! command -v pi &> /dev/null; then
+        print_warning "  pi CLI 미감지 — 건너뜁니다"
+        return
+    fi
+    if [ ! -f "$(_pi_harness_loader_path)" ]; then
+        print_warning "  harness loader가 없습니다 — 먼저 [설치/업데이트]에서 PI를 설치하세요."
+        return
+    fi
+    _pi_harness_print_desc
+    if _pi_harness_enabled; then
+        print_info "  현재 상태: 활성화"
+        if ask_yes_no "Persona Harness를 비활성화할까요? (PI skill은 유지됩니다)" "N"; then
+            _pi_harness_remove
+        else
+            print_info "  → 활성화 상태 유지"
+        fi
+    else
+        print_info "  현재 상태: 비활성화"
+        if ask_yes_no "Persona Harness를 활성화할까요?" "N"; then
+            if _pi_harness_add; then
+                print_success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
+            fi
+        else
+            print_info "  → 비활성화 상태 유지 (skill만 사용)"
+        fi
+    fi
+}
+
+# [제거] 메뉴에서 'PI Persona Harness' 단독 선택 시 — harness만 해제, PI skill은 보존.
+_pi_harness_remove_only() {
+    echo "" >&2
+    print_step "[ PI Persona Harness 해제 ]"
+    if ! _pi_harness_enabled; then
+        print_info "  Persona Harness가 활성화돼 있지 않아 건너뜁니다"
+        return
+    fi
+    print_info "  PI skill은 그대로 두고 harness 등록만 해제합니다."
+    _pi_harness_remove
+}
+
+_manage_pi_section() {
+    echo "" >&2
+    print_step "[ PI 패키지 관리 ]"
+    echo "" >&2
+
+    if ! command -v pi &> /dev/null; then
+        print_warning "pi CLI가 감지되지 않았습니다. 설치 후 수동으로 실행하세요:"
+        echo "    pi install ${PI_PACKAGE_URL}" >&2
+        return
+    fi
+
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
+    if _pi_is_installed; then
+        print_step "PI 패키지 업데이트 중..."
+        pi update "$PI_PACKAGE_URL" 2>/dev/null || pi install "$PI_PACKAGE_URL" 2>/dev/null || true
+    else
+        print_step "PI 패키지 설치 중..."
+        pi install "$PI_PACKAGE_URL" 2>/dev/null || true
+    fi
+
+    if _pi_is_installed; then
+        print_success "PI 패키지 설치 / 업데이트 완료"
+        print_info "  → 'pi' 재실행 후 'pi list' 로 확인"
+        print_info "  → 채팅창에서 /suh-analyze, /suh-review 등으로 호출하세요."
+        # skill 설치와 별개로, harness는 opt-in으로만 켠다.
+        _pi_harness_offer
+    else
+        print_warning "PI 설치/업데이트 실패 — 수동으로 실행해주세요:"
+        echo "    pi install ${PI_PACKAGE_URL}" >&2
+    fi
+}
+
 # 완료 요약
 print_summary() {
     echo "" >&2
@@ -4158,7 +4455,7 @@ print_summary() {
             echo "  ✅ 이슈/PR/Discussion 템플릿" >&2
             ;;
         skills)
-            echo "  ✅ Agent Skill 설치 (Claude, Cursor, Gemini, Codex)" >&2
+            echo "  ✅ Agent Skill 설치 (Claude, Cursor, Gemini, Codex, PI)" >&2
             ;;
     esac
 

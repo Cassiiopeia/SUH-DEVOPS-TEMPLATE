@@ -1,14 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-12T08:23:26Z",
-    "currentVersion": "3.0.121",
+    "lastUpdated": "2026-06-12T08:35:00Z",
+    "currentVersion": "3.0.122",
     "projectType": "basic",
-    "totalReleases": 142,
+    "totalReleases": 143,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.122",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-12",
+      "pr_number": 375,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * AI 코딩 도우미가 더 일관되고 정확한 결과를 내도록 개선\n  * 계획·분석·구현 단계마다 자체 검증을 강화해 품질이 균일해짐",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "AI 코딩 도우미가 더 일관되고 정확한 결과를 내도록 개선",
+            "계획·분석·구현 단계마다 자체 검증을 강화해 품질이 균일해짐"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.121",
       "project_type": "basic",

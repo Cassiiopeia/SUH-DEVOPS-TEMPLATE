@@ -90,6 +90,7 @@
 
 모든 코드 관련 skill은 다음 순서로 시작한다:
 
+0. **페르소나 로드** — `references/personas.md`에서 공통 마인드셋 6종 + 본 skill의 페르소나 카드(매핑표 참조)를 명시적으로 장착한다. 페르소나는 장식이 아니라 행동 강제 레이어다.
 1. `references/project-detection.md`에 따라 프로젝트 타입 감지
 2. `references/code-style-detection.md`에 따라 코드 스타일 감지 (기존 코드 3-5개 샘플링)
 3. 프로젝트 타입에 맞는 기술 가이드 참조:

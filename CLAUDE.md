@@ -164,8 +164,29 @@ CLAUDE.md, CONTRIBUTING.md, LICENSE
 CHANGELOG.md, CHANGELOG.json
 template_integrator.sh / .ps1
 docs/, .github/scripts/test/, .github/workflows/test/
-.claude-plugin/, skills/, scripts/
+.claude-plugin/, .codex-plugin/, .agents/, .cursor/, skills/, scripts/
+package.json, harness/         # pi 패키지 매니페스트 + Persona Harness
 ```
+
+#### ⚠️ 레포 루트에 "마켓플레이스/템플릿 전용" 파일·폴더를 추가할 때 (agent 필독)
+
+이 레포는 **두 정체성**을 동시에 가진다 — 이 점이 일반 레포와 다른 핵심이다.
+
+1. **템플릿 레포**: GitHub "Use this template"로 새 프로젝트를 만들면 `.github/scripts/template_initializer.sh`가 마켓플레이스/템플릿 전용 파일을 **삭제**한다.
+2. **마법사 배포원**: `template_integrator.sh` / `.ps1`이 기존 프로젝트에 템플릿을 통합할 때 그 파일들을 **복사 대상에서 제외**한다.
+
+따라서 레포 루트에 새 파일/폴더를 추가했는데 그게 **이 레포에서만 의미 있고 사용자 프로젝트로 흘러가면 안 되는 것**(플러그인 매니페스트, skill, pi 패키지 파일, 내부 문서 등)이라면, **아래 3곳(+필요 시 4번째)을 반드시 함께 수정**한다. 한 곳만 고치면 새 프로젝트가 오염되거나 마법사가 불필요한 파일을 복사한다 — 실제로 자주 빠뜨리는 함정이다.
+
+| # | 파일 | 수정할 위치 | 동작 |
+|---|------|------------|------|
+| 1 | `.github/scripts/template_initializer.sh` | `cleanup_template_files()` 함수 | `[ -f / -d ]` 가드 + `rm -f / -rf` 한 블록 추가 (**삭제**) |
+| 2 | `template_integrator.sh` | `plugin_items_to_remove=( ... )` 배열 | 파일/폴더명 추가 (**복사 제외**) |
+| 3 | `template_integrator.ps1` | `$pluginItemsToRemove = @( ... )` 배열 | 파일/폴더명 추가 (**복사 제외**) |
+| 4 | `.github/workflows/PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml` | 버전 동기화 step + `git add` | 버전 필드가 있는 매니페스트(`package.json` 등)면 동기화 step 추가 |
+
+> **체크 순서**: 새 루트 파일 추가 → "이게 사용자 프로젝트에도 필요한가?" 자문 → **아니오면 위 1·2·3을 모두 수정**. 버전을 `version.yml`과 맞춰야 하는 매니페스트면 4번도 추가. 수정 후 `bash -n template_integrator.sh`, PowerShell 파서로 `.ps1`, `bash -n .github/scripts/template_initializer.sh`를 각각 돌려 문법을 확인한다.
+>
+> **반대로**, 추가한 게 사용자 프로젝트에도 같이 가야 하는 공통 자산(워크플로우·스크립트·설정)이라면 위 목록에 넣지 않는다 — 제외하면 통합 대상 프로젝트가 그 기능을 못 받는다.
 
 #### macOS에서 template_integrator 검증하는 법 (실측 정리)
 
@@ -320,7 +341,9 @@ skills/
 ├── {skill-name}/SKILL.md
 ├── config.json.example       # 전체 config 구조 예시 (모든 skill_id 섹션 포함)
 └── references/
-    ├── common-rules.md       # 절대 규칙, 커밋 컨벤션
+    ├── common-rules.md       # 절대 규칙, 커밋 컨벤션, 작업 시작 프로토콜(페르소나 로드 포함)
+    ├── personas.md           # 5 전문가 페르소나 + 6 마인드셋 (harness/PERSONA.md single source) — 코드 스킬이 시작 시 로드
+    ├── self-review-checklist.md # plan/analyze/implement 산출물 제출 전 자체검토 + Devil's Advocate 게이트
     ├── config-rules.md       # config 경로·스키마·읽기/쓰기 표준
     ├── mcp-subcommand-rules.md # suh_command 서브커맨드 MCP-style 설계 표준 (JSON+next, 코드 템플릿)
     ├── doc-output-path.md
@@ -337,7 +360,7 @@ skills/
 2. **config 경로·스키마는 `references/config-rules.md` 참조** — skill 내 직접 기술 금지
 3. **GitHub API는 curl 직접 호출** — `gh` CLI, Python CLI 모두 금지
 4. **OS 호환성**: Python 실행 시 `PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)` 패턴 사용
-5. **skill 시작 시 필독**: `references/common-rules.md` → (config 필요 시) `references/config-rules.md` → (기술별) `tech-*.md`
+5. **skill 시작 시 필독**: `references/common-rules.md` → (코드 스킬이면) `references/personas.md`에서 자기 페르소나 로드 → (config 필요 시) `references/config-rules.md` → (기술별) `tech-*.md`
 6. **Python 행동 로직은 재사용 스크립트 파일 + MCP-style 표준** — 아래 "Python 행동 스크립트 표준" 절을 따른다. SKILL.md에 긴 Python heredoc 인라인 금지.
 
 ### Python 행동 스크립트 표준 (필수)

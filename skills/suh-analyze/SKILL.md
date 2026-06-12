@@ -19,6 +19,8 @@ description: "Analyze Mode (HOW 구체화) - plan 문서(WHAT)를 기반으로 '
 
 `references/common-rules.md`의 **작업 시작 프로토콜** + **분석 전용 스킬 규칙** 적용.
 
+**페르소나 로드 (필수, 이중)**: `references/personas.md`에서 공통 마인드셋 6종 + **System Architect**(주) + **Reviewer**(부) 카드를 장착한다. 한 스킬 안에서 context-switching한다 — Architect로 HOW를 설계하고, 그다음 Reviewer로 전환해 그 계획을 '신뢰할 수 없는 외부인의 취약한 코드'로 보고 **적대적으로 깬다**(Red Team Mindset). "정상 동작한다"가 아니라 "어떻게 깨지는가"를 본다.
+
 ## 절대 규칙
 
 - **코드 수정 금지.** Read/Grep/Glob/Bash(읽기)만. 마지막 analyze 문서 1개 작성만 허용.
@@ -73,6 +75,7 @@ plan.md를 읽고 다음을 정리:
 - [ ] 비슷한 기존 패턴이 코드베이스에 있는가? (있으면 그 스타일 따라야 함)
 - [ ] 관련 테스트가 있는가? 어디에?
 - [ ] 데이터 모델/스키마 변경이 있는가?
+- [ ] **Pre-mortem**: "이 변경 계획이 미래에 깨진다면 원인은 무엇일까?" — 호출자 영향·동시성·하위호환·경계값을 능동적으로 탐색했는가? (이 답은 §4 위험&완화 + §7 `[REVIEW_LOG]`의 입력이 된다)
 
 > 탐색 범위가 크면 Explore 서브에이전트에 위임. 메인 컨텍스트에 raw grep 결과 쌓지 말 것.
 
@@ -152,14 +155,15 @@ public void methodName() {
 - `path/to/File.java:42` — `methodName()`: 현재 X를 한다
 - `path/to/Other.java:88` — `otherMethod()`: Y 역할
 
-## 4. 위험 & 완화
+## 4. 위험 & 완화 [RISK]
 
-- **위험**: {예: 기존 호출자 영향} → **완화**: {예: 하위 호환 오버로드 추가}
+- **[RISK]**: {Red Team이 찾은 결함/edge case. 예: 기존 호출자 영향, 동시성 경합} → **완화**: {예: 하위 호환 오버로드 추가}
 
 ## 5. 검증 방법
 
 - [ ] {입력값 또는 시나리오} → {기대 결과}
 - [ ] {회귀 확인 대상} — {확인 명령}
+- [ ] {파괴적 검증: invalid input/경계값} → {기대되는 안전한 실패}
 
 ## 6. 다음 단계
 
@@ -169,6 +173,16 @@ public void methodName() {
 **2. Inline** — 현재 세션에서 순차 실행
 
 병렬 태스크 있음: Task {N}, Task {M} → Subagent-Driven 선택 시 병렬 dispatch 가능.
+
+## 7. [REVIEW_LOG] — Reviewer 적대적 검증
+> Devil's Advocate. Reviewer 페르소나로 전환해 위 HOW 계획을 적대적으로 공격한다. 최소 1개 기록 (Stop-and-Think Gate — 비어 있으면 제출 불가).
+- **[REVIEW_LOG]**: {이 계획의 결함/우회 가능 시나리오/극한 조건 실패 1개 이상. "정상 동작 확인"이 아니라 "어떻게 깨지는가". 발견 시 §1 표·§2 태스크에 반영했는가?}
+> ⚡ Fast-Track: 단순 작업이면 "리스크 없음 — 단순 작업 (Fast-Track)" 한 줄로 갈음.
+
+## 8. [ALTERNATIVES_CONSIDERED] — 기각한 대안
+> 채택한 HOW 외에 고려했다가 기각한 구현 대안. 최소 1개 (Stop-and-Think Gate). analyze는 HOW 단계이므로 구현 수준 대안 비교가 정당하다.
+- **기각 대안 1**: {대안 HOW} → **기각 이유**: {왜 채택안이 더 나은가}
+> ⚡ Fast-Track: 단순 작업이면 "단일 자명 해법 — Fast-Track" 한 줄로 갈음.
 ````
 
 파일 저장 전 `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜** 적용.
@@ -206,6 +220,8 @@ public void methodName() {
 | plan.md 안 읽고 analyze 작성 | Phase 0에서 반드시 Read |
 | 코드 안 읽고 영향 범위 추정 | Read/Grep으로 호출자 직접 확인 |
 | 모든 태스크 순차로만 표시 | 독립 태스크는 `[병렬]` 표시 |
+| `[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]` 비우고 제출 | Devil's Advocate — 결함 1개 + 기각 대안 1개 의무 |
+| 자기 계획을 "잘 됐다"고 통과 | Red Team — "어떻게 깨지는가"로 적대 검증 |
 
 ## 다음 단계
 

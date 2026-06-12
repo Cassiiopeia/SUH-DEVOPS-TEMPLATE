@@ -1,0 +1,10 @@
+{
+  "name": "cassiiopeia",
+  "version": "3.0.120",
+  "description": "SUH-DEVOPS-TEMPLATE skill 묶음 (Claude Code / Cursor / Gemini / Codex / pi 공용)",
+  "keywords": ["pi-package"],
+  "private": true,
+  "pi": {
+    "skills": ["./skills"]
+  }
+}

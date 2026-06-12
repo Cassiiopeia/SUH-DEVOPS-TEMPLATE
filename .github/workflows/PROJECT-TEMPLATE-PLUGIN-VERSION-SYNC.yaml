@@ -12,6 +12,7 @@
 # - .codex-plugin/plugin.json
 # - .agents/plugins/marketplace.json (Codex marketplace source metadata, no version field)
 # - gemini-extension.json
+# - package.json (pi 패키지 매니페스트)
 #
 # 트리거: deploy 브랜치 push 시
 # (VERSION-CONTROL이 GITHUB_TOKEN으로 version.yml을 변경하면
@@ -133,12 +134,30 @@ jobs:
 
           echo "✅ Gemini extension 버전 동기화: $VERSION"
 
+      - name: pi package.json 버전 동기화
+        run: |
+          PI_PACKAGE_FILE="package.json"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          if [ ! -f "$PI_PACKAGE_FILE" ]; then
+            echo "⚠️ $PI_PACKAGE_FILE 파일이 없습니다. 건너뜁니다."
+            exit 0
+          fi
+
+          if command -v jq &> /dev/null; then
+            jq --arg v "$VERSION" '.version = $v' "$PI_PACKAGE_FILE" > tmp.json && mv tmp.json "$PI_PACKAGE_FILE"
+          else
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$PI_PACKAGE_FILE"
+          fi
+
+          echo "✅ pi package.json 버전 동기화: $VERSION"
+
       - name: 변경사항 커밋
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          git add .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json gemini-extension.json
+          git add .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json gemini-extension.json package.json
 
           if git diff --staged --quiet; then
             echo "ℹ️ 플러그인 버전이 이미 동기화되어 있습니다."

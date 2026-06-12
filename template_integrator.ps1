@@ -30,7 +30,7 @@
 #                            • version     - 버전 관리 시스템만
 #                            • workflows   - GitHub Actions 워크플로우만
 #                            • issues      - 이슈/PR 템플릿만
-#                            • skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
+#                            • skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex, PI)
 #                            • interactive - 대화형 선택 (기본값)
 #   -Version <VERSION>       초기 버전 설정 (자동 감지, 수동 지정 가능)
 #   -Type <TYPE>             프로젝트 타입 (자동 감지, 수동 지정 가능)
@@ -128,6 +128,7 @@ $script:UtilModulesCopied = 0
 $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
 $script:IncludeSynology = $null  # Synology 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
 $script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
+$script:PiPackageUrl = "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"  # pi install/update/remove 대상
 
 # 타입별 프로젝트 경로 (project_paths) — resolve 또는 -Paths로 채워짐
 $script:ProjectPaths = [ordered]@{}
@@ -679,7 +680,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   version     - 버전 관리 시스템만 (version.yml + scripts)
   workflows   - GitHub Actions 워크플로우만
   issues      - 이슈/PR 템플릿만
-  skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex)
+  skills      - Agent Skill 설치만 (Claude, Cursor, Gemini, Codex, PI)
   interactive - 대화형 선택 (기본값, 추천)
 
 옵션:
@@ -1604,7 +1605,9 @@ function Download-Template {
         ".codex-plugin",    # Codex 플러그인 메타데이터
         ".agents",          # Codex 마켓플레이스 메타데이터
         ".cursor",          # Cursor 스킬 복사본
-        "scripts"           # 플러그인 스크립트 (마켓플레이스 전용)
+        "scripts",          # 플러그인 스크립트 (마켓플레이스 전용)
+        "package.json",     # pi 패키지 매니페스트 (마켓플레이스 전용)
+        "harness"           # pi Persona Harness (loader/PERSONA/WORKFLOW, 마켓플레이스 전용)
     )
     # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (Offer-IdeToolsInstall에서 사용 후 정리)
 
@@ -3027,7 +3030,7 @@ function Start-InteractiveMode {
         @{Value='version';   Label='버전 관리만 — 버전 자동 증가·동기화 시스템만 설치'},
         @{Value='workflows'; Label='워크플로우만 — 빌드·배포 GitHub Actions만 설치'},
         @{Value='issues';    Label='이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치'},
-        @{Value='skills';    Label='AI 스킬만 — Claude·Cursor·Gemini·Codex용 스킬만 설치'},
+        @{Value='skills';    Label='AI 스킬만 — Claude·Cursor·Gemini·Codex·PI용 스킬만 설치'},
         @{Value='cancel';    Label='취소'}
     )
 
@@ -3311,6 +3314,23 @@ function Offer-IdeToolsInstall {
     } else {
         Print-Info "Codex CLI   : skill 미설치 (CLI 없음)"
     }
+
+    # PI — git package. 'pi list'에 우리 패키지가 잡히면 설치됨으로 본다.
+    if (Test-PiCli) {
+        if (Test-PiInstalled) {
+            Print-Info "PI          : skill 설치됨"
+        } else {
+            Print-Info "PI          : 설치 가능 (CLI 감지됨)"
+        }
+        # Persona Harness 상태 — skill과 독립
+        if (Test-PiHarnessEnabled) {
+            Print-Info "PI Harness   : 활성화됨 (Persona/Workflow 주입)"
+        } else {
+            Print-Info "PI Harness   : 비활성화"
+        }
+    } else {
+        Print-Info "PI          : skill 미설치 (CLI 없음)"
+    }
     Write-Host ""
 
     # ── 2단계 통합 라우터 (sh offer_ide_tools_install과 동일 구조) ──
@@ -3327,6 +3347,11 @@ function Offer-IdeToolsInstall {
         else { $ideOpts += @{Value='Gemini CLI'; Label='Gemini CLI (미감지)'} }
         if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI'} }
         else { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI (미감지)'} }
+        if (Test-PiCli) { $ideOpts += @{Value='PI'; Label='PI'} }
+        else { $ideOpts += @{Value='PI'; Label='PI (미감지)'} }
+        # PI Persona Harness — skill과 독립. skill은 두고 harness만 켜고/끌 수 있는 별도 항목.
+        # PI 패키지가 설치돼 harness loader가 있을 때만 후보로 노출.
+        if ((Test-PiCli) -and (Test-Path (Get-PiHarnessLoaderPath))) { $ideOpts += @{Value='PI Persona Harness'; Label='PI Persona Harness'} }
 
         $action = Invoke-ChooseMenu -CancelLabel "건너뛰기" -Prompt "AI 스킬을 어떻게 할까요?" -Options @(
             @{Value='apply';  Label='설치 / 업데이트 — 최신 상태로 맞추기'},
@@ -3339,6 +3364,7 @@ function Offer-IdeToolsInstall {
             $preParts = @('Claude Code', 'Cursor')
             if (Get-Command "gemini" -ErrorAction SilentlyContinue) { $preParts += 'Gemini CLI' }
             if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $preParts += 'Codex CLI' }
+            if (Test-PiCli) { $preParts += 'PI' }
             $targets = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "설치 / 업데이트할 IDE를 고르세요" -Options $ideOpts -Multi -Preselect ($preParts -join ',')
             if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
             $tcsv = ",$($targets -join ','),"
@@ -3346,6 +3372,8 @@ function Offer-IdeToolsInstall {
             if ($tcsv -like '*,Cursor,*')      { Invoke-CursorSection }
             if ($tcsv -like '*,Gemini CLI,*')  { Invoke-GeminiExtensionManage }
             if ($tcsv -like '*,Codex CLI,*')   { Invoke-CodexSkillsManage }
+            if ($tcsv -like '*,PI,*')          { Invoke-PiSection }
+            if ($tcsv -like '*,PI Persona Harness,*') { Invoke-PiHarnessToggle }
         } elseif ($action -eq 'remove') {
             $targets = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "제거할 IDE를 고르세요" -Options $ideOpts -Multi
             if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
@@ -3354,6 +3382,9 @@ function Offer-IdeToolsInstall {
             if ($tcsv -like '*,Cursor,*')      { Remove-CursorSection }
             if ($tcsv -like '*,Gemini CLI,*')  { Remove-GeminiSection }
             if ($tcsv -like '*,Codex CLI,*')   { Remove-CodexSection }
+            if ($tcsv -like '*,PI,*')          { Remove-PiSection }
+            # PI skill은 두고 harness만 해제 (PI 항목과 별개로 단독 선택 가능)
+            if ($tcsv -like '*,PI Persona Harness,*') { Remove-PiHarnessOnly }
         } else {
             Print-Info "IDE Skills 변경 없이 건너뜁니다"
         }
@@ -3365,6 +3396,7 @@ function Offer-IdeToolsInstall {
     Invoke-CursorSection
     Invoke-GeminiExtensionManage
     Invoke-CodexSkillsManage
+    Invoke-PiSection
 }
 
 # ── Claude Code 플러그인 관리 (기존 섹션 로직 보존) ──
@@ -3517,6 +3549,31 @@ function Remove-CodexSection {
     }
     if (Get-Command "codex" -ErrorAction SilentlyContinue) {
         Print-Info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
+    }
+}
+
+function Remove-PiSection {
+    Write-Host ""
+    Print-Step "[ PI 패키지 제거 ]"
+    if (-not (Test-PiCli)) {
+        Print-Info "  pi CLI 미감지 — 건너뜁니다"
+        return
+    }
+    if (-not (Test-PiInstalled)) {
+        Print-Info "  설치된 PI 패키지가 없어 건너뜁니다"
+        return
+    }
+    Print-Info "  pi remove $Script:PiPackageUrl"
+    cmd /c "pi remove `"$Script:PiPackageUrl`" 2>&1" | Out-Null
+    if (Test-PiInstalled) {
+        Print-Warning "  제거 후에도 패키지가 남아있습니다 — 'pi list'로 확인하세요."
+    } else {
+        Print-Success "PI 패키지 제거 완료"
+    }
+    # package 클론이 사라지면 등록된 harness loader 경로가 허공을 가리킨다 — 같이 해제
+    if (Test-PiHarnessEnabled) {
+        Print-Info "  Persona Harness 등록도 함께 해제"
+        [void](Remove-PiHarnessExtension)
     }
 }
 
@@ -3799,6 +3856,227 @@ function Invoke-CodexNativeSkillsFallback {
     }
 }
 
+# ─── PI 헬퍼 ────────────────────────────────────────────────────
+# pi는 native `pi install <git-url>` 사용. raw 다운로드 X.
+# 패키지의 skill은 복사되지 않고, settings의 packages에 등록된 패키지 경로를
+# pi가 startup마다 직접 스캔한다. 따라서 설치 검증은 폴더 존재가 아니라 'pi list' 출력으로 한다.
+
+# pi.ps1은 내부에서 node를 호출하며 버전을 stderr로 출력한다. PS 5.1 + $ErrorActionPreference='Stop'
+# 환경에서 `& pi --version 2>$null`은 NativeCommandError가 terminating error로 격상돼 실패한다.
+# → cmd /c로 호출해 stderr를 stdout에 합쳐 받아 ErrorRecord 래핑을 회피한다(Gemini 패턴과 동일).
+function Test-PiCli {
+    try {
+        $out = cmd /c "pi --version 2>&1"
+        return ($LASTEXITCODE -eq 0 -and $out -match '\d+\.\d+\.\d+')
+    } catch {
+        return $false
+    }
+}
+
+# pi 패키지가 설치돼 있는지: 'pi list' 출력에 우리 레포가 잡히면 true.
+function Test-PiInstalled {
+    if (-not (Test-PiCli)) { return $false }
+    try {
+        $output = cmd /c "pi list 2>&1" | Out-String
+        return ($output -match 'SUH-DEVOPS-TEMPLATE' -or $output -match 'cassiiopeia')
+    } catch {
+        return $false
+    }
+}
+
+# pi 표준 클론 위치: ~/.pi/agent/git/<host>/<owner>/<repo>
+function Get-PiCloneDir {
+    return Join-Path $env:USERPROFILE ".pi\agent\git\github.com\Cassiiopeia\SUH-DEVOPS-TEMPLATE"
+}
+function Get-PiHarnessLoaderPath {
+    return Join-Path (Get-PiCloneDir) "harness\harness-loader.ts"
+}
+function Get-PiSettingsPath {
+    return Join-Path $env:USERPROFILE ".pi\agent\settings.json"
+}
+
+# settings.json의 extensions 배열에 harness loader가 등록돼 있는가
+function Test-PiHarnessEnabled {
+    $settingsPath = Get-PiSettingsPath
+    if (-not (Test-Path $settingsPath)) { return $false }
+    try {
+        $s = Get-Content -Raw $settingsPath -ErrorAction Stop | ConvertFrom-Json
+        return (@($s.extensions) -contains (Get-PiHarnessLoaderPath))
+    } catch {
+        return $false
+    }
+}
+
+# extensions 배열에 harness loader 추가 (중복 방지). 성공 $true.
+function Add-PiHarnessExtension {
+    $settingsPath = Get-PiSettingsPath
+    if (-not (Test-Path $settingsPath)) {
+        Print-Warning "  PI settings.json이 없습니다 — PI를 한 번 실행한 뒤 다시 시도하세요."
+        return $false
+    }
+    $loader = Get-PiHarnessLoaderPath
+    if (-not (Test-Path $loader)) {
+        Print-Warning "  harness loader가 없습니다: $loader"
+        Print-Warning "  먼저 PI 패키지를 설치/업데이트하세요."
+        return $false
+    }
+    try {
+        $s = Get-Content -Raw $settingsPath -ErrorAction Stop | ConvertFrom-Json
+    } catch {
+        Print-Warning "  settings.json 파싱 실패 — 직접 확인 필요: $settingsPath"
+        return $false
+    }
+    $exts = @(@($s.extensions) | Where-Object { $_ })
+    if ($exts -contains $loader) { return $true }
+    $exts = @($exts) + $loader
+    if ($null -eq $s.PSObject.Properties['extensions']) {
+        $s | Add-Member -NotePropertyName extensions -NotePropertyValue @()
+    }
+    $s.extensions = $exts
+    # BOM 없는 UTF-8 — pi(node)는 BOM이 있으면 파싱에 실패할 수 있다
+    [System.IO.File]::WriteAllText($settingsPath, ($s | ConvertTo-Json -Depth 10))
+    return $true
+}
+
+# extensions 배열에서 harness loader 제거. 성공 $true.
+function Remove-PiHarnessExtension {
+    $settingsPath = Get-PiSettingsPath
+    if (-not (Test-Path $settingsPath)) { return $true }
+    try {
+        $s = Get-Content -Raw $settingsPath -ErrorAction Stop | ConvertFrom-Json
+    } catch {
+        Print-Warning "  settings.json 파싱 실패 — 직접 확인 필요: $settingsPath"
+        return $false
+    }
+    $loader = Get-PiHarnessLoaderPath
+    if ($null -eq $s.PSObject.Properties['extensions']) { return $true }
+    $s.extensions = @(@($s.extensions) | Where-Object { $_ -and $_ -ne $loader })
+    [System.IO.File]::WriteAllText($settingsPath, ($s | ConvertTo-Json -Depth 10))
+    Print-Success "  Persona Harness 해제 완료 — PI 재시작 후 적용됩니다."
+    return $true
+}
+
+# Persona Harness 설치 제안 (PI 설치/업데이트 직후 호출).
+# 이미 활성화돼 있으면 그대로 두고, 꺼져 있을 때만 켤지 묻는다.
+# (해제는 PI 제거 흐름 Remove-PiSection에서 함께 처리하므로 여기선 켜기만 다룬다.)
+# FORCE/비대화형이면 자동 스킵.
+function Offer-PiHarness {
+    # 이미 활성화돼 있으면 설치 흐름에서 더 묻지 않는다.
+    if (Test-PiHarnessEnabled) {
+        Print-Info "  Persona Harness: 이미 활성화됨 (유지)"
+        return
+    }
+    if (-not (Test-Path (Get-PiHarnessLoaderPath))) {
+        Print-Info "  harness loader가 아직 없어 건너뜁니다 (PI 패키지 설치 후 재시도)."
+        return
+    }
+    # 비대화형이면 묻지 않고 skill만 사용 (보수적 기본값).
+    $forceMode = $false
+    try { if ($script:Force -eq $true) { $forceMode = $true } } catch {}
+    if ($forceMode) {
+        Print-Info "  Persona Harness: 비활성화 (비대화형 — skill만 사용)"
+        return
+    }
+
+    Print-Step "(PI 전용) Persona Harness 활성화"
+    Write-PiHarnessDesc
+    Print-Info "  나중에 켜고/끄려면 [설치/업데이트] 또는 [제거] 메뉴의 'PI Persona Harness' 항목을 쓰세요."
+
+    if (Ask-YesNo "Persona Harness를 활성화할까요?" "N") {
+        if (Add-PiHarnessExtension) {
+            Print-Success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
+        }
+    } else {
+        Print-Info "  → 건너뜀 (skill만 사용)"
+    }
+}
+
+# harness 개념 설명 출력 (토글/단독 메뉴에서 재사용)
+function Write-PiHarnessDesc {
+    Print-Info "  Persona Harness는 PI가 대화를 시작할 때마다 '전문가 페르소나'와 'SDLC 워크플로우'를"
+    Print-Info "  시스템 프롬프트에 자동 주입하는 기능입니다."
+    Print-Info "  • 페르소나(PERSONA): 아키텍트·개발자·리뷰어 등 전문가 역할을 AI에 부여해 답변 품질을 끌어올림"
+    Print-Info "  • 워크플로우(WORKFLOW): 요구분석→설계→구현→검증 단계를 따르도록 행동 지침을 부여"
+    Print-Info "  skill과는 독립적으로 동작합니다 (skill은 그대로 두고 harness만 켜고/끌 수 있습니다)."
+}
+
+# [설치/업데이트] 메뉴에서 'PI Persona Harness' 단독 선택 시 — 현재 상태 토글.
+# skill은 건드리지 않고 harness 등록만 켜거나 끈다.
+function Invoke-PiHarnessToggle {
+    Write-Host ""
+    Print-Step "[ PI Persona Harness 관리 ]"
+    if (-not (Test-PiCli)) {
+        Print-Warning "  pi CLI 미감지 — 건너뜁니다"
+        return
+    }
+    if (-not (Test-Path (Get-PiHarnessLoaderPath))) {
+        Print-Warning "  harness loader가 없습니다 — 먼저 [설치/업데이트]에서 PI를 설치하세요."
+        return
+    }
+    Write-PiHarnessDesc
+    if (Test-PiHarnessEnabled) {
+        Print-Info "  현재 상태: 활성화"
+        if (Ask-YesNo "Persona Harness를 비활성화할까요? (PI skill은 유지됩니다)" "N") {
+            [void](Remove-PiHarnessExtension)
+        } else {
+            Print-Info "  → 활성화 상태 유지"
+        }
+    } else {
+        Print-Info "  현재 상태: 비활성화"
+        if (Ask-YesNo "Persona Harness를 활성화할까요?" "N") {
+            if (Add-PiHarnessExtension) {
+                Print-Success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
+            }
+        } else {
+            Print-Info "  → 비활성화 상태 유지 (skill만 사용)"
+        }
+    }
+}
+
+# [제거] 메뉴에서 'PI Persona Harness' 단독 선택 시 — harness만 해제, PI skill은 보존.
+function Remove-PiHarnessOnly {
+    Write-Host ""
+    Print-Step "[ PI Persona Harness 해제 ]"
+    if (-not (Test-PiHarnessEnabled)) {
+        Print-Info "  Persona Harness가 활성화돼 있지 않아 건너뜁니다"
+        return
+    }
+    Print-Info "  PI skill은 그대로 두고 harness 등록만 해제합니다."
+    [void](Remove-PiHarnessExtension)
+}
+
+function Invoke-PiSection {
+    Write-Host ""
+    Print-Step "[ PI 패키지 관리 ]"
+    Write-Host ""
+
+    if (-not (Test-PiCli)) {
+        Print-Warning "pi CLI가 감지되지 않았습니다. 설치 후 수동으로 실행하세요:"
+        Write-Host "    pi install $Script:PiPackageUrl"
+        return
+    }
+
+    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
+    if (Test-PiInstalled) {
+        Print-Step "PI 패키지 업데이트 중..."
+        cmd /c "pi update `"$Script:PiPackageUrl`" 2>&1" | ForEach-Object { Print-Info "    $_" }
+    } else {
+        Print-Step "PI 패키지 설치 중..."
+        cmd /c "pi install `"$Script:PiPackageUrl`" 2>&1" | ForEach-Object { Print-Info "    $_" }
+    }
+
+    if (Test-PiInstalled) {
+        Print-Success "PI 패키지 설치 / 업데이트 완료"
+        Print-Info "  → 'pi' 재실행 후 'pi list' 로 확인"
+        Print-Info "  → 채팅창에서 /suh-analyze, /suh-review 등으로 호출하세요."
+        # skill 설치와 별개로, harness는 opt-in으로만 켠다.
+        Offer-PiHarness
+    } else {
+        Print-Warning "PI 설치/업데이트 실패 — 수동으로 실행해주세요:"
+        Write-Host "    pi install $Script:PiPackageUrl"
+    }
+}
+
 # ===================================================================
 # 완료 요약
 # ===================================================================
@@ -3837,7 +4115,7 @@ function Show-Summary {
             Write-Host "  ✅ 이슈/PR/Discussion 템플릿"
         }
         "skills" {
-            Write-Host "  ✅ Agent Skill 설치 (Claude, Cursor, Gemini, Codex)"
+            Write-Host "  ✅ Agent Skill 설치 (Claude, Cursor, Gemini, Codex, PI)"
         }
     }
 

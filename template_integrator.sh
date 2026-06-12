@@ -1769,7 +1769,9 @@ detect_and_confirm_project() {
             local _confirm_label _confirm_rc=0
             # set -e 환경: choose_menu가 ESC로 비-0 반환 시 함수가 즉시 중단되지 않도록
             # || 로 종료코드를 받아 stay(머무름) 분기로 안전하게 흘려보낸다.
-            _confirm_label=$(choose_menu "이 정보가 맞습니까?" \
+            # 최상위 확인 화면 — ESC는 종료가 아니라 stay(머무름)이므로 안내도 "머무르기"로.
+            # (ps1 Ask-YesNoEdit와 문구·동작 동일)
+            _confirm_label=$(choose_menu --cancel-label="머무르기" "이 정보가 맞습니까?" \
                 "예, 계속 진행|" \
                 "수정하기|" \
                 "아니오, 취소|") || _confirm_rc=$?
@@ -1832,7 +1834,8 @@ handle_project_edit_menu() {
             "프로젝트 타입|" \
             "버전|" \
             "기본 브랜치|" \
-            "모두 맞음, 계속|") || _menu_rc=$?
+            "모두 맞음, 계속|" \
+            "뒤로 (변경 없이 확인 화면으로)|") || _menu_rc=$?
 
         local edit_choice=""
         if [ "$_menu_rc" -ne 0 ]; then
@@ -1844,6 +1847,7 @@ handle_project_edit_menu() {
                 버전*)           edit_choice="version" ;;
                 기본\ 브랜치*)   edit_choice="branch" ;;
                 모두\ 맞음*)     edit_choice="done" ;;
+                뒤로*)           edit_choice="back" ;;
                 *)               edit_choice="back" ;;
             esac
         fi

@@ -297,6 +297,129 @@ function Read-SingleKey {
 }
 
 # ─────────────────────────────────────────────────────────────
+# 인터랙티브 메뉴 (화살표/숫자/Enter/ESC) — sh interactive_menu와 1:1 대칭
+# 반환: 확정 시 선택 value(멀티는 csv), ESC 취소 시 $null
+# sh와 동일 동작: ↑↓ 이동, (멀티) Space 토글·a 전체토글, 숫자 점프, Enter 확정, ESC 취소
+# 키 입력 = RawUI.ReadKey(redirect에서도 동작), 렌더 = ANSI 상대이동(ESC[nA + ESC[2K)
+# ─────────────────────────────────────────────────────────────
+function Test-ArrowMenuSupported {
+    # RawUI 커서 제어가 실제 가능한지 타진 (IsInputRedirected로 판정하지 않는다 — redirect여도 RawUI는 동작)
+    if ($Host.Name -eq 'Windows PowerShell ISE Host') { return $false }
+    try {
+        $p = $Host.UI.RawUI.CursorPosition
+        $null = $p.Y
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Invoke-ArrowMenu {
+    param(
+        [Parameter(Mandatory=$true)][string]$Prompt,
+        [Parameter(Mandatory=$true)][hashtable[]]$Options,
+        [switch]$Multi,
+        [string]$Preselect = "",
+        [string]$CancelLabel = "취소"
+    )
+
+    $n = $Options.Count
+    if ($n -eq 0) { return $null }
+    $esc = [char]27
+
+    # VT(ANSI) 처리 활성화 시도 — Windows 콘솔은 기본 꺼져 있을 수 있다.
+    try {
+        $sig = '[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int h);' +
+               '[DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr h, out int m);' +
+               '[DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr h, int m);'
+        $k = Add-Type -MemberDefinition $sig -Name 'VtConsole' -Namespace 'Win32Vt' -PassThru -ErrorAction Stop
+        $h = $k::GetStdHandle(-11)
+        $m = 0
+        if ($k::GetConsoleMode($h, [ref]$m)) { $null = $k::SetConsoleMode($h, $m -bor 0x0004) }
+    } catch {}
+
+    $useColor = -not $env:NO_COLOR
+
+    # 멀티 선택 상태 + preselect 적용
+    $selected = New-Object 'bool[]' $n
+    if ($Multi -and $Preselect) {
+        foreach ($p in ($Preselect.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+            for ($i = 0; $i -lt $n; $i++) {
+                if ($Options[$i].Value -eq $p) { $selected[$i] = $true; break }
+            }
+        }
+    }
+
+    # 안내 문구 — sh와 동일
+    Write-Host ""
+    if ($Multi) {
+        Write-Host ("{0} (↑↓ 이동, Space 토글, a 전체토글, Enter 확정, ESC {1}):" -f $Prompt, $CancelLabel)
+    } else {
+        Write-Host ("{0} (↑↓ 이동, 숫자 점프, Enter 확정, ESC {1}):" -f $Prompt, $CancelLabel)
+    }
+    Write-Host ""
+
+    $cursor = 0
+
+    function Render {
+        param($first)
+        if (-not $first) { [Console]::Write("$esc[${n}A") }
+        for ($i = 0; $i -lt $n; $i++) {
+            [Console]::Write("$esc[2K`r")
+            $opt = $Options[$i]
+            $disp = if ([string]::IsNullOrWhiteSpace($opt.Label)) { $opt.Value } else { $opt.Label }
+            # 표시자 — 멀티는 체크박스, 단일은 커서표시
+            if ($Multi) {
+                $ind = if ($selected[$i]) { "[✓]" } else { "[ ]" }
+            } else {
+                $ind = if ($i -eq $cursor) { "[•]" } else { "[ ]" }
+            }
+            $line = "  {0} {1,2}) {2}" -f $ind, ($i + 1), $disp
+            if ($i -eq $cursor) {
+                Write-Host ("> " + $line.Substring(2)) -ForegroundColor Cyan
+            } elseif ($Multi -and $selected[$i] -and $useColor) {
+                Write-Host $line -ForegroundColor Green
+            } else {
+                Write-Host $line
+            }
+        }
+    }
+
+    Render $true
+    while ($true) {
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        $vk = $key.VirtualKeyCode
+        switch ($vk) {
+            38 { $cursor = ($cursor - 1 + $n) % $n }                  # ↑
+            40 { $cursor = ($cursor + 1) % $n }                       # ↓
+            { $_ -ge 49 -and $_ -le 57 } {                            # 숫자 점프 1~9
+                $jump = $vk - 49
+                if ($jump -lt $n) { $cursor = $jump }
+            }
+            32 { if ($Multi) { $selected[$cursor] = -not $selected[$cursor] } }   # Space
+            65 {                                                      # a 전체토글
+                if ($Multi) {
+                    $allOn = $true
+                    for ($i = 0; $i -lt $n; $i++) { if (-not $selected[$i]) { $allOn = $false; break } }
+                    for ($i = 0; $i -lt $n; $i++) { $selected[$i] = -not $allOn }
+                }
+            }
+            13 {                                                      # Enter 확정
+                if ($Multi) {
+                    $picked = @()
+                    for ($i = 0; $i -lt $n; $i++) { if ($selected[$i]) { $picked += $Options[$i].Value } }
+                    if ($picked.Count -eq 0) { return $null }
+                    return ($picked -join ',')
+                }
+                return $Options[$cursor].Value
+            }
+            27 { return $null }                                       # ESC 취소
+        }
+        Render $false
+    }
+}
+
+# ─────────────────────────────────────────────────────────────
 # 메뉴 — 숫자 입력 / 번호 토글 방식 (iex·파일실행·CI 어디서나 안전)
 # ─────────────────────────────────────────────────────────────
 function Invoke-LegacyNumericMenu {
@@ -442,13 +565,24 @@ function Invoke-ChooseMenu {
         [Parameter(Mandatory=$true)][hashtable[]]$Options,
         [int]$DefaultIndex = 0,
         [switch]$Multi,
-        [string]$Preselect = ""
+        [string]$Preselect = "",
+        [string]$CancelLabel = "취소"
     )
 
-    # 메뉴는 항상 숫자 입력 방식(Invoke-LegacyNumericMenu)으로 통일한다.
-    # 화살표+커서 좌표 제어 메뉴는 원격 iex 실행 환경에서 SetCursorPosition이
-    # 먹히지 않아 줄이 쌓이는 문제가 있어 제거했다. 숫자/토글 입력 방식은
-    # 화면 재배치가 없어 iex·파일실행·CI 어디서나 안정적으로 동작한다.
+    # sh choose_menu와 대칭: RawUI 커서 제어 가능 + 비FORCE → 화살표 메뉴.
+    # 불가(ISE 등) → 기존 숫자/토글 입력 메뉴로 폴백.
+    # 판정은 IsInputRedirected가 아니라 RawUI 동작 여부 (redirect여도 RawUI.ReadKey는 동작).
+    # $Force는 스크립트 최상위 param() switch(73행) — 함수 내부에서 $script:Force로 접근.
+    $forceMode = $false
+    try { if ($script:Force -eq $true) { $forceMode = $true } } catch {}
+
+    if ((Test-ArrowMenuSupported) -and -not $forceMode) {
+        if ($Multi) {
+            return Invoke-ArrowMenu -Multi -Prompt $Prompt -Options $Options -Preselect $Preselect -CancelLabel $CancelLabel
+        }
+        return Invoke-ArrowMenu -Prompt $Prompt -Options $Options -CancelLabel $CancelLabel
+    }
+
     if ($Multi) {
         return Invoke-LegacyNumericMenu -Prompt $Prompt -Options $Options -Multi -Preselect $Preselect
     }
@@ -467,30 +601,54 @@ function Ask-YesNo {
     $_title = $_title.Trim()
     if ([string]::IsNullOrWhiteSpace($_title) -or $_title -eq '선택') { $_title = '진행하시겠습니까?' }
 
+    $forceMode = $false
+    try { if ($script:Force -eq $true) { $forceMode = $true } } catch {}
+
+    # TTY 대화형(화살표 가능) → 화살표 2지선. default가 첫 항목 = 커서 초기 위치.
+    if ((Test-ArrowMenuSupported) -and -not $forceMode) {
+        if ($DefaultValue -match '^[Yy]$') {
+            $opts = @(@{Value='예'; Label=''}, @{Value='아니오'; Label=''})
+        } else {
+            $opts = @(@{Value='아니오'; Label=''}, @{Value='예'; Label=''})
+        }
+        $ans = Invoke-ArrowMenu -Prompt $_title -Options $opts -CancelLabel "취소"
+        if ($null -eq $ans) { return $false }   # ESC 취소 = No
+        return ($ans -eq '예')
+    }
+
+    # 폴백 — Y/N 키 입력
     while ($true) {
         $response = Read-SingleKey "$_title (Y/N, 기본: $DefaultValue) "
-        
-        if ([string]::IsNullOrWhiteSpace($response)) {
-            $response = $DefaultValue
-        }
-        
-        if ($response -eq "Y") {
-            return $true
-        } elseif ($response -eq "N") {
-            return $false
-        } else {
-            Print-Error "잘못된 입력입니다. Y 또는 N을 입력해주세요."
-            Write-Host ""
-        }
+        if ([string]::IsNullOrWhiteSpace($response)) { $response = $DefaultValue }
+        if ($response -eq "Y") { return $true }
+        elseif ($response -eq "N") { return $false }
+        else { Print-Error "잘못된 입력입니다. Y 또는 N을 입력해주세요."; Write-Host "" }
     }
 }
 
 function Ask-YesNoEdit {
+    $forceMode = $false
+    try { if ($script:Force -eq $true) { $forceMode = $true } } catch {}
+
+    # TTY 대화형 → 화살표 3지선. ESC = stay(머묾) 신호.
+    if ((Test-ArrowMenuSupported) -and -not $forceMode) {
+        $ans = Invoke-ArrowMenu -Prompt "이 정보가 맞습니까?" -Options @(
+            @{Value='예, 계속 진행'; Label=''},
+            @{Value='수정하기';      Label=''},
+            @{Value='아니오, 취소';  Label=''}
+        ) -CancelLabel "머무르기"
+        if ($null -eq $ans) { return "stay" }
+        switch -Wildcard ($ans) {
+            '예*'    { return "yes" }
+            '수정*'  { return "edit" }
+            '아니오*' { return "no" }
+            default  { return "stay" }
+        }
+    }
+
+    # 폴백 — Y/N/E 키 입력
     while ($true) {
-        $response = Read-SingleKey "선택 (Y/N/E) "
-        
-        $response = $response.ToUpper()
-        
+        $response = (Read-SingleKey "선택 (Y/N/E) ").ToUpper()
         if ($response -eq "" -or $response -eq "Y") {
             return "yes"
         } elseif ($response -eq "N") {
@@ -1223,7 +1381,7 @@ function Show-ProjectTypeMenu {
     if ($markerCsv) { $preselect = $markerCsv }
     else { $preselect = ($script:ProjectTypes -join ',') }
 
-    $selected = Invoke-ChooseMenu -Multi -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요" -Options @(
+    $selected = Invoke-ChooseMenu -Multi -CancelLabel "뒤로" -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요" -Options @(
         @{Value='spring';            Label='Spring Boot 백엔드'},
         @{Value='flutter';           Label='Flutter 모바일 앱'},
         @{Value='next';              Label='Next.js 웹 앱'},
@@ -1255,7 +1413,8 @@ function Edit-ProjectInfo {
     while ($true) {
         Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
 
-        $editChoice = Invoke-ChooseMenu -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
+        # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로). ESC + '뒤로' 항목 둘 다 제공.
+        $editChoice = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
             @{Value='type';    Label='프로젝트 타입'},
             @{Value='version'; Label='버전'},
             @{Value='branch';  Label='기본 브랜치'},
@@ -1263,8 +1422,8 @@ function Edit-ProjectInfo {
             @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
         )
 
-        if (-not $editChoice) {
-            # 입력 불가 등 → 안전하게 뒤로
+        # ESC($null) 또는 '뒤로' → 상위 확인 화면으로 복귀 (sh handle_project_edit_menu와 대칭)
+        if ((-not $editChoice) -or ($editChoice -eq 'back')) {
             return
         }
 
@@ -1379,16 +1538,9 @@ function Detect-AndConfirmProject {
         }
         Write-Host ""
 
-        # 사용자 확인
-        Write-Host "이 정보가 맞습니까?"
-        Write-Host "  Y/y - 예, 계속 진행"
-        Write-Host "  E/e - 수정하기"
-        Write-Host "  N/n - 아니오, 취소"
-        Write-Host ""
-        
-        # Y/N/E 입력 받기
+        # 사용자 확인 — 화살표 3지선(Ask-YesNoEdit가 자체 안내 출력). ESC=stay.
         $userChoice = Ask-YesNoEdit
-        
+
         switch ($userChoice) {
             "yes" {
                 $confirmed = $true
@@ -1402,6 +1554,9 @@ function Detect-AndConfirmProject {
             "edit" {
                 Edit-ProjectInfo
                 # 루프 계속 - 다시 확인 질문으로
+            }
+            "stay" {
+                # ESC 등 중립 상태 — 종료하지 않고 확인 화면을 다시 보여준다 (sh와 동일)
             }
         }
     }
@@ -3173,7 +3328,7 @@ function Offer-IdeToolsInstall {
         if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI'} }
         else { $ideOpts += @{Value='Codex CLI'; Label='Codex CLI (미감지)'} }
 
-        $action = Invoke-ChooseMenu -Prompt "AI 스킬을 어떻게 할까요?" -Options @(
+        $action = Invoke-ChooseMenu -CancelLabel "건너뛰기" -Prompt "AI 스킬을 어떻게 할까요?" -Options @(
             @{Value='apply';  Label='설치 / 업데이트 — 최신 상태로 맞추기'},
             @{Value='remove'; Label='제거 — 설치된 스킬 삭제하기'},
             @{Value='skip';   Label='그대로 두기'}
@@ -3184,7 +3339,7 @@ function Offer-IdeToolsInstall {
             $preParts = @('Claude Code', 'Cursor')
             if (Get-Command "gemini" -ErrorAction SilentlyContinue) { $preParts += 'Gemini CLI' }
             if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $preParts += 'Codex CLI' }
-            $targets = Invoke-ChooseMenu -Prompt "설치 / 업데이트할 IDE를 고르세요" -Options $ideOpts -Multi -Preselect ($preParts -join ',')
+            $targets = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "설치 / 업데이트할 IDE를 고르세요" -Options $ideOpts -Multi -Preselect ($preParts -join ',')
             if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
             $tcsv = ",$($targets -join ','),"
             if ($tcsv -like '*,Claude Code,*') { Invoke-ClaudeSection $claudeAvailable $installedScope $installedVersion }
@@ -3192,7 +3347,7 @@ function Offer-IdeToolsInstall {
             if ($tcsv -like '*,Gemini CLI,*')  { Invoke-GeminiExtensionManage }
             if ($tcsv -like '*,Codex CLI,*')   { Invoke-CodexSkillsManage }
         } elseif ($action -eq 'remove') {
-            $targets = Invoke-ChooseMenu -Prompt "제거할 IDE를 고르세요" -Options $ideOpts -Multi
+            $targets = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "제거할 IDE를 고르세요" -Options $ideOpts -Multi
             if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
             $tcsv = ",$($targets -join ','),"
             if ($tcsv -like '*,Claude Code,*') { Remove-ClaudeSection $claudeAvailable $installedScope }

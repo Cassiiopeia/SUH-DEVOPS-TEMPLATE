@@ -1,14 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-11T15:21:48Z",
-    "currentVersion": "3.0.119",
+    "lastUpdated": "2026-06-12T01:04:14Z",
+    "currentVersion": "3.0.120",
     "projectType": "basic",
-    "totalReleases": 140,
+    "totalReleases": 141,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.120",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-12",
+      "pr_number": 371,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * Windows에서도 마법사 메뉴를 방향키로 선택할 수 있습니다\n  * 메뉴 선택 화면이 macOS와 Windows에서 동일하게 동작합니다\n\n* **문서**\n  * 마법사 화살표 메뉴 사용법 가이드를 추가했습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "Windows에서도 마법사 메뉴를 방향키로 선택할 수 있습니다",
+            "메뉴 선택 화면이 macOS와 Windows에서 동일하게 동작합니다"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "마법사 화살표 메뉴 사용법 가이드를 추가했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.119",
       "project_type": "basic",

@@ -2256,6 +2256,192 @@ function Ask-SynologyOption {
 }
 
 # ===================================================================
+# 워크플로우 env 동적 설정 (토큰 + @wizard 마커 엔진) — .sh configure_workflow_env와 1:1
+# ===================================================================
+# 워크플로우 env의 "__TOKEN__"을 프로젝트에 맞게 자동 치환. 마법사는 '# @wizard' 마커를 스캔.
+#   ask → 기본값 우선순위로 질문(엔터=기본값) 후 치환 + version.yml 저장
+#   auto → 레포명 등 자동값  /  auto-find → find 탐색  /  paths-anchor → 모노레포 paths 주입
+
+# 배포 설정 기억용 (재실행 기본값 제안 + version.yml deploy 블록). type→(KEY→값) 중첩 해시.
+$script:WfDeploy = [ordered]@{}
+$script:WfUseDefaults = $null   # "전부 기본값 일괄" 모드 (1회 질문)
+
+# 레포명 자동 도출 (PROJECT_NAME auto 값)
+function Get-RepoName {
+    $url = ""
+    try { $url = (git remote get-url origin 2>$null) } catch {}
+    if ($url) {
+        if ($url -match '[/:]([^/]+)/([^/.]+?)(\.git)?/?$') { return $Matches[2] }
+    }
+    return (Split-Path -Leaf (Get-Location).Path)
+}
+
+# 타입별 상식 기본값 (ask 디폴트 우선순위 2). {name}은 호출측이 치환.
+function Get-DefaultForTypeKey {
+    param([string]$Type, [string]$Key)
+    switch ("${Type}:${Key}") {
+        'spring:DEPLOY_PORT' { return '8080' }
+        'python:DEPLOY_PORT' { return '8000' }
+        'react:DEPLOY_PORT'  { return '3000' }
+        'next:DEPLOY_PORT'   { return '3000' }
+        'node:DEPLOY_PORT'   { return '3000' }
+        'spring:JAVA_VERSION'  { return '21' }
+        'flutter:JAVA_VERSION' { return '17' }
+        'spring:VOLUME_HOST_PATH' { return '/volume1/projects/{name}' }
+        'python:VOLUME_HOST_PATH' { return '/volume1/projects/{name}' }
+        'spring:VOLUME_CONTAINER_PATH' { return '/mnt/{name}' }
+        'python:VOLUME_CONTAINER_PATH' { return '/mnt/{name}' }
+        'spring:DOMAIN_NAME' { return 'example.com' }
+        'spring:PRODUCTION_DOMAIN' { return 'example.com' }
+        default { return '' }
+    }
+}
+
+# WfDeploy 조회/저장 (우선순위 1 — 재실행 기존값)
+function Get-WfDeploy { param([string]$Type, [string]$Key)
+    if ($script:WfDeploy.Contains($Type) -and $script:WfDeploy[$Type].Contains($Key)) {
+        return $script:WfDeploy[$Type][$Key]
+    }
+    return ''
+}
+function Set-WfDeploy { param([string]$Type, [string]$Key, [string]$Value)
+    if (-not $script:WfDeploy.Contains($Type)) { $script:WfDeploy[$Type] = [ordered]@{} }
+    $script:WfDeploy[$Type][$Key] = $Value
+}
+
+# version.yml deploy 블록에 WfDeploy 기록 (copy_workflows 후 호출, 멱등)
+function Update-VersionYmlDeploy {
+    if ($script:WfDeploy.Count -eq 0) { return }
+    if (-not (Test-Path 'version.yml')) { return }
+
+    $lines = Get-Content 'version.yml'
+    # 기존 deploy: 블록 제거 (deploy: ~ 다음 최상위 키 전까지)
+    $out = New-Object System.Collections.Generic.List[string]
+    $inDeploy = $false
+    foreach ($l in $lines) {
+        if ($l -match '^deploy:') { $inDeploy = $true; continue }
+        if ($inDeploy) {
+            if ($l -match '^[^\s]' -or $l -match '^\S') { $inDeploy = $false } else { continue }
+        }
+        $out.Add($l)
+    }
+
+    $block = New-Object System.Collections.Generic.List[string]
+    $block.Add('')
+    $block.Add('deploy:                          # 마법사가 기억하는 배포 설정 (비민감 / 직접 수정 가능)')
+    foreach ($t in $script:WfDeploy.Keys) {
+        $block.Add("  ${t}:")
+        foreach ($k in $script:WfDeploy[$t].Keys) {
+            $v = $script:WfDeploy[$t][$k]
+            $block.Add("    ${k}: `"${v}`"")
+        }
+    }
+    ($out + $block) | Set-Content 'version.yml' -Encoding UTF8
+    Print-Info "version.yml에 deploy 설정을 기록했습니다 (재통합 시 기본값으로 제안)"
+}
+
+# 워크플로우 1개 env 토큰 치환 (.sh configure_workflow_env와 동일 동작)
+function Configure-WorkflowEnv {
+    param([string]$Type, [string]$File)
+    if (-not (Test-Path $File)) { return }
+    $content = Get-Content $File -Raw
+    if ($content -notmatch '@wizard') { return }   # 안전 폴백: 마커 없으면 미관여
+
+    $repo = Get-RepoName
+
+    # "전부 기본값 일괄" 모드 — 최초 1회 질문
+    if ($null -eq $script:WfUseDefaults) {
+        $force = $false
+        try { if ($script:Force -eq $true) { $force = $true } } catch {}
+        if ($force) {
+            $script:WfUseDefaults = $true
+        } else {
+            Print-Step "배포 워크플로우 환경설정을 채웁니다"
+            $ans = Read-UserInput "  전부 기본값으로 빠르게 채울까요? (Y=전부기본 / n=하나씩)" "Y"
+            if ($ans -match '^[nN]') { $script:WfUseDefaults = $false } else { $script:WfUseDefaults = $true }
+        }
+    }
+
+    $lines = Get-Content $File
+    $newLines = foreach ($line in $lines) {
+        if ($line -match '^\s*([A-Z_]+):.*#\s*@wizard\s+(ask|auto-find|auto)') {
+            $key = $Matches[1]; $action = $Matches[2]
+            $literal = ''
+            if ($line -match '\[기본:\s*([^\]]*)\]') { $literal = $Matches[1].Trim() }
+            $val = $null
+
+            switch ($action) {
+                'auto' {
+                    if ($key -eq 'PROJECT_NAME') { $val = $repo } else { $val = $literal }
+                }
+                'auto-find' {
+                    $base = '.'
+                    if ($script:ProjectPaths.Contains($Type)) { $base = $script:ProjectPaths[$Type] }
+                    $found = Get-ChildItem -Path $base -Recurse -Filter 'application*.yml' -ErrorAction SilentlyContinue |
+                             Where-Object { $_.FullName -match 'src[/\\]main[/\\]resources' } | Select-Object -First 1
+                    if ($found) {
+                        $p = (Resolve-Path -Relative $found.FullName) -replace '^\.[/\\]', '' -replace '\\', '/'
+                        if ($key -like '*_DIR') { $p = ($p -replace '/[^/]+$', '') }
+                        $val = $p
+                    } else {
+                        if ($literal -match '__' -or $literal -eq '') { $val = $null } else { $val = $literal }
+                    }
+                }
+                'ask' {
+                    $def = Get-WfDeploy $Type $key
+                    if (-not $def) { $def = (Get-DefaultForTypeKey $Type $key) -replace '\{name\}', $repo }
+                    if ((-not $def) -and $key -eq 'PROJECT_NAME') { $def = $repo }
+                    if (-not $def) {
+                        if (-not ($literal -match '__|레포|이름|프로젝트')) { $def = $literal }
+                    }
+                    if ($script:WfUseDefaults) {
+                        $val = $def
+                    } else {
+                        $inp = Read-UserInput "  $key" $def
+                        $val = if ([string]::IsNullOrWhiteSpace($inp)) { $def } else { $inp }
+                    }
+                    Set-WfDeploy $Type $key $val
+                }
+            }
+
+            if ($null -ne $val -and $val -ne '') {
+                # 값 치환 + 마커를 set으로 갱신
+                $escVal = $val
+                $line = $line -replace "(^\s*${key}:\s*`")[^`"]*(`")", "`${1}$escVal`${2}"
+                $line = $line -replace "#\s*@wizard\s+(ask|auto-find|auto).*$", "# @wizard set (직접 수정 가능)"
+            }
+        }
+        $line
+    }
+    $newLines | Set-Content $File -Encoding UTF8
+
+    # 토큰 재귀 치환: 남은 __PROJECT_NAME__
+    (Get-Content $File -Raw) -replace '__PROJECT_NAME__', $repo | Set-Content $File -NoNewline -Encoding UTF8
+
+    # paths 앵커 주입 (멀티타입 모노레포)
+    if ((Get-Content $File -Raw) -match '#\s*@wizard\s+paths-anchor') {
+        $ppath = ''
+        if ($script:ProjectPaths.Contains($Type)) { $ppath = $script:ProjectPaths[$Type] }
+        if ($ppath -and $ppath -ne '.') {
+            $pl = Get-Content $File
+            $pl = foreach ($l in $pl) {
+                if ($l -match '^(\s*)#\s*@wizard\s+paths-anchor') {
+                    "$($Matches[1])paths: ['$ppath/**']"
+                } else { $l }
+            }
+            $pl | Set-Content $File -Encoding UTF8
+        }
+    }
+
+    # 잔류 토큰 경고
+    $raw = Get-Content $File -Raw
+    if ($raw -match '__[A-Z_]+__') {
+        $left = ([regex]::Matches($raw, '__[A-Z_]+__') | ForEach-Object { $_.Value } | Sort-Object -Unique) -join ' '
+        Print-Warning "  $(Split-Path -Leaf $File): 미치환 토큰 남음($left) — 직접 채워주세요"
+    }
+}
+
+# ===================================================================
 # 워크플로우 다운로드
 # ===================================================================
 
@@ -2421,6 +2607,15 @@ function Copy-Workflows-ForType {
             if ($synologyFiles.Count -gt 0) {
                 Print-Info "$Type Synology 워크플로우 $($synologyFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
             }
+        }
+    }
+
+    # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
+    foreach ($srcDir in @($typeDir, $synologyDir)) {
+        if (-not (Test-Path $srcDir)) { continue }
+        foreach ($wf in (Get-ChildItem -Path $srcDir -Include '*.yaml','*.yml' -File -ErrorAction SilentlyContinue)) {
+            $target = Join-Path $WORKFLOWS_DIR $wf.Name
+            if (Test-Path $target) { Configure-WorkflowEnv -Type $Type -File $target }
         }
     }
 }
@@ -3188,6 +3383,7 @@ function Start-Integration {
             Create-VersionYml $script:ProjectVersion $script:ProjectType $script:DetectedBranch
             Add-VersionSectionToReadme $script:ProjectVersion
             Copy-Workflows
+            Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
             Copy-IssueTemplates
@@ -3209,6 +3405,7 @@ function Start-Integration {
         }
         "workflows" {
             Copy-Workflows
+            Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
             Copy-SetupGuide

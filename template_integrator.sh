@@ -929,21 +929,21 @@ detect_project_type() {
 
     # Flutter
     if [ -f "pubspec.yaml" ]; then
-        print_info "감지됨: Flutter"
+        print_info "✓ Flutter 감지됨"
         echo "flutter"
         return
     fi
 
     # Spring Boot
     if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] || [ -f "pom.xml" ]; then
-        print_info "감지됨: Spring Boot"
+        print_info "✓ Spring Boot 감지됨"
         echo "spring"
         return
     fi
 
     # Python
     if [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]; then
-        print_info "감지됨: Python"
+        print_info "✓ Python 감지됨"
         echo "python"
         return
     fi
@@ -959,11 +959,11 @@ detect_project_type() {
         if grep -q "@react-native" package.json || grep -q "react-native" package.json; then
             # Expo 체크
             if grep -q "expo" package.json; then
-                print_info "감지됨: React Native (Expo)"
+                print_info "✓ React Native (Expo) 감지됨"
                 echo "react-native-expo"
                 return
             else
-                print_info "감지됨: React Native"
+                print_info "✓ React Native 감지됨"
                 echo "react-native"
                 return
             fi
@@ -971,20 +971,20 @@ detect_project_type() {
 
         # Next.js 체크 (React보다 먼저 체크해야 함)
         if grep -q "\"next\"" package.json; then
-            print_info "감지됨: Next.js"
+            print_info "✓ Next.js 감지됨"
             echo "next"
             return
         fi
 
         # React 체크
         if grep -q "\"react\"" package.json; then
-            print_info "감지됨: React"
+            print_info "✓ React 감지됨"
             echo "react"
             return
         fi
 
         # 기본 Node.js
-        print_info "감지됨: Node.js"
+        print_info "✓ Node.js 감지됨"
         echo "node"
         return
     fi
@@ -1061,7 +1061,7 @@ detect_project_types() {
         # version.yml에 타입이 명시돼 있으면(basic 포함) 그것이 source of truth → 그대로 사용.
         # 값이 아예 없을 때만 아래 파일 스캔으로 새로 감지한다.
         if [ -n "$_existing_types" ]; then
-            print_info "기존 version.yml 타입 사용: $_existing_types"
+            print_info "✓ 기존 설정 적용: $_existing_types (version.yml에서 불러옴)"
             echo "$_existing_types"
             return
         fi
@@ -1103,7 +1103,7 @@ detect_project_types() {
 
     [ ${#detected[@]} -eq 0 ] && detected=("basic")
 
-    print_info "감지된 타입: ${detected[*]}"
+    print_info "✓ 감지된 타입: ${detected[*]}"
 
     # csv로 stdout 출력
     local IFS=','
@@ -1335,7 +1335,7 @@ resolve_project_paths() {
             _vp=$(echo "$_vp" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s#\\#/#g; s#/$##; s#^\./##')
             [ -z "$_vp" ] && _vp="."
             if [ ! -f "$_vp/$(existing_marker_in_dir "$_vt" "$_vp")" ]; then
-                print_warning "--paths: $_vt=$_vp 경로에 마커 파일이 없습니다 (그대로 기록합니다)"
+                print_warning "--paths: $_vt=$_vp 경로에서 마커 파일을 찾지 못했지만 입력값을 그대로 기록합니다"
             fi
             _vnorm="${_vnorm:+$_vnorm,}$_vt=$_vp"
             IFS=','
@@ -1353,15 +1353,37 @@ resolve_project_paths() {
     done
     [ ${#_targets[@]} -eq 0 ] && return 0  # basic만이면 경로 불필요
 
+    local _total=${#_targets[@]}
+
     print_step "타입별 프로젝트 경로 확인 중..."
     print_to_user ""
-    print_to_user "💡 경로 = 레포 루트에서 그 프로젝트 폴더까지의 상대경로입니다."
+    # ── 도입부: 무엇이 감지됐고 이제 무엇을 할지 먼저 설명 (에이전트형 안내 톤) ──
+    if [ "$_total" -gt 1 ]; then
+        print_to_user "🔍 멀티타입 프로젝트가 감지되었습니다 — 총 ${_total}개 타입"
+    else
+        print_to_user "🔍 ${_targets[0]} 프로젝트가 감지되었습니다 — 총 1개 타입"
+    fi
+    local _ml _mt
+    for _ml in "${_targets[@]}"; do
+        # 타입명을 8칸으로 패딩해 마커 파일명을 세로로 정렬 (safe_echo와 동일 출력 라우팅)
+        _mt=$(existing_marker_in_dir "$_ml" ".")
+        print_to_user "$(printf '   • %-8s → %s' "$_ml" "$_mt")"
+    done
+    print_to_user ""
+    print_to_user "각 타입의 프로젝트가 레포 어느 폴더에 있는지 확인이 필요합니다."
+    if [ "$_total" -gt 1 ]; then
+        print_to_user "이제 하나씩 차례대로 각 프로젝트의 루트 디렉터리를 설정하겠습니다."
+    else
+        print_to_user "이제 이 프로젝트의 루트 디렉터리를 설정하겠습니다."
+    fi
+    print_to_user ""
+    print_to_user "💡 '프로젝트 루트' = 그 타입의 버전 파일이 있는 폴더 (레포 루트 기준 상대경로)"
     print_to_user "   예) 레포루트/app/pubspec.yaml 이면 → \"app\""
     print_to_user "       레포루트/packages/web/package.json 이면 → \"packages/web\""
     print_to_user "       레포 루트에 바로 있으면 → \".\""
+    print_separator_line
     print_to_user ""
 
-    local _total=${#_targets[@]}
     local _idx=0
     for _t in "${_targets[@]}"; do
         _idx=$((_idx + 1))
@@ -1420,9 +1442,15 @@ resolve_project_paths() {
         # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
         if [ "$_count" -eq 1 ]; then
             print_to_user ""
-            print_to_user "  $_prog 🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
+            local _cand_marker _cand_full
+            _cand_marker=$(existing_marker_in_dir "$_t" "$_candidates")
+            # 루트면 마커만, 하위 폴더면 폴더/마커 — "어디 기준 경로"인지 전체 경로로 노출
+            if [ "$_candidates" = "." ]; then _cand_full="$_cand_marker"; else _cand_full="$_candidates/$_cand_marker"; fi
+            print_to_user "  $_prog 🔍 $_t — $_cand_marker 발견"
+            print_to_user "      위치: <레포루트>/$_cand_full"
+            print_to_user ""
             # '아니오' 선택 시 _chosen 미설정 → 아래 직접입력 루프로 진행
-            if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? — 아니오 선택 시 직접 입력" "Y"; then
+            if ask_yes_no "  $_t 프로젝트 루트를 '$_candidates'(으)로 설정할까요? ($_cand_full 기준 — 아니오 선택 시 직접 입력)" "Y"; then
                 _chosen="$_candidates"
             fi
         elif [ "$_count" -gt 1 ]; then
@@ -1436,7 +1464,7 @@ resolve_project_paths() {
             done <<< "$_candidates"
             _opts+=("직접 입력|")   # value 자체를 한국어로 — 센티넬 노출 방지
             local _sel
-            _sel=$(choose_menu "  $_t 경로를 선택하세요" "${_opts[@]}") || _sel="직접 입력"
+            _sel=$(choose_menu "  $_t 프로젝트 루트를 선택하세요" "${_opts[@]}") || _sel="직접 입력"
             if [ "$_sel" = "직접 입력" ] || [ -z "$_sel" ]; then
                 : # _chosen 미설정 → 아래 직접입력 루프로
             else
@@ -1449,8 +1477,10 @@ resolve_project_paths() {
 
         # ── 직접 입력 (위에서 미확정 시) ──
         while [ -z "$_chosen" ]; do
-            local _input="" _prompt
-            _prompt="  $_t 상대경로 입력 (예: app, client/web — 루트면 그냥 Enter"
+            local _input="" _prompt _hint_marker
+            # 루트(.) 기준 마커명으로 힌트 — 어떤 파일이 있는 폴더인지 사용자에게 명시
+            _hint_marker=$(existing_marker_in_dir "$_t" ".")
+            _prompt="  $_t 프로젝트 루트 경로 입력 ($_hint_marker 이 있는 폴더, 예: server, app — 루트면 그냥 Enter"
             if [ -n "$_existing" ]; then
                 _prompt="$_prompt, 현재값: $_existing"
             fi
@@ -1503,7 +1533,7 @@ resolve_project_paths() {
         while IFS= read -r _dl; do
             [ -z "$_dl" ] && continue
             print_warning "  ⚠️ 같은 파일(${_dl%%:*})을 여러 타입(${_dl#*:} )이 바라봅니다."
-            print_warning "     sync 시 같은 버전이 기록되므로 동작엔 문제없지만, 의도한 구성인지 확인하세요."
+            print_warning "     → 이렇게 하면 sync 때 모두 같은 버전이 기록됩니다. 동작에는 문제없지만 의도한 구성인지 확인하세요."
         done <<< "$_dups"
     fi
     print_to_user ""
@@ -1519,7 +1549,7 @@ detect_version() {
     if [ -f "package.json" ] && command -v jq >/dev/null 2>&1; then
         detected_version=$(jq -r '.version // empty' package.json 2>/dev/null)
         if [ -n "$detected_version" ]; then
-            print_info "package.json에서 발견: v$detected_version"
+            print_info "✓ package.json에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
@@ -1529,7 +1559,7 @@ detect_version() {
     if [ -f "build.gradle" ]; then
         detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" build.gradle | head -1)
         if [ -n "$detected_version" ]; then
-            print_info "build.gradle에서 발견: v$detected_version"
+            print_info "✓ build.gradle에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
@@ -1539,7 +1569,7 @@ detect_version() {
     if [ -f "pubspec.yaml" ]; then
         detected_version=$(grep -oP "version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" pubspec.yaml | head -1)
         if [ -n "$detected_version" ]; then
-            print_info "pubspec.yaml에서 발견: v$detected_version"
+            print_info "✓ pubspec.yaml에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
@@ -1549,7 +1579,7 @@ detect_version() {
     if [ -f "pyproject.toml" ]; then
         detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" pyproject.toml | head -1)
         if [ -n "$detected_version" ]; then
-            print_info "pyproject.toml에서 발견: v$detected_version"
+            print_info "✓ pyproject.toml에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
@@ -1559,7 +1589,7 @@ detect_version() {
     if git rev-parse --git-dir > /dev/null 2>&1; then
         detected_version=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
         if [ -n "$detected_version" ]; then
-            print_info "Git 태그에서 발견: v$detected_version"
+            print_info "✓ Git 태그에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
@@ -1702,7 +1732,7 @@ show_project_type_menu() {
         "basic|기타 프로젝트") || true
 
     if [ -z "$selected" ]; then
-        print_info "타입 선택을 취소했습니다. 기존 값을 유지합니다."
+        print_info "타입 선택을 취소했습니다 — 기존 설정을 그대로 유지합니다."
         local IFS=','
         echo "${PROJECT_TYPES[*]:-$PROJECT_TYPE}"
         unset IFS
@@ -1771,7 +1801,7 @@ detect_and_confirm_project() {
             # || 로 종료코드를 받아 stay(머무름) 분기로 안전하게 흘려보낸다.
             # 최상위 확인 화면 — ESC는 종료가 아니라 stay(머무름)이므로 안내도 "머무르기"로.
             # (ps1 Ask-YesNoEdit와 문구·동작 동일)
-            _confirm_label=$(choose_menu --cancel-label="머무르기" "이 정보가 맞습니까?" \
+            _confirm_label=$(choose_menu --cancel-label="머무르기" "위 분석 결과가 맞습니까?" \
                 "예, 계속 진행|" \
                 "수정하기|" \
                 "아니오, 취소|") || _confirm_rc=$?
@@ -1795,11 +1825,11 @@ detect_and_confirm_project() {
         case "$user_choice" in
             "yes")
                 confirmed=true
-                print_success "프로젝트 정보 확인 완료"
+                print_success "프로젝트 정보 검증 완료 — 이 설정으로 통합을 진행합니다"
                 print_to_user ""
                 ;;
             "no")
-                print_info "취소되었습니다"
+                print_info "통합을 취소했습니다. (다시 실행하면 처음부터 설정할 수 있습니다)"
                 exit 0
                 ;;
             "edit")
@@ -1825,7 +1855,7 @@ detect_and_confirm_project() {
 # set -e 환경: 메뉴/입력이 ESC로 비-0 반환해도 함수가 죽지 않도록 모두 || 로 코드를 받는다.
 handle_project_edit_menu() {
     while true; do
-        print_question_header "💫" "어떤 항목을 수정하시겠습니까?"
+        print_question_header "💫" "어떤 항목을 수정할까요?"
 
         # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
         # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로) 표기.
@@ -1865,9 +1895,9 @@ handle_project_edit_menu() {
                     IFS=',' read -ra PROJECT_TYPES <<< "$_new_csv"
                     PROJECT_TYPE="${PROJECT_TYPES[0]}"
                     if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
-                        print_success "Project Types가 '${PROJECT_TYPES[*]}'(으)로 변경되었습니다"
+                        print_success "프로젝트 타입을 '${PROJECT_TYPES[*]}'(으)로 변경했습니다"
                     else
-                        print_success "Project Type이 '$PROJECT_TYPE'(으)로 변경되었습니다"
+                        print_success "프로젝트 타입을 '$PROJECT_TYPE'(으)로 변경했습니다"
                     fi
 
                     # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
@@ -1888,19 +1918,19 @@ handle_project_edit_menu() {
                 safe_read "새 버전을 입력하세요 (예: 1.0.0, ESC=뒤로): " new_version "" || _rc=$?
                 if [ "$_rc" -eq 2 ]; then
                     # ESC → 이전 메뉴로 돌아감(기존 값 유지)
-                    print_info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    print_info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
                     print_to_user ""
                 elif [ "$_rc" -eq 0 ]; then
                     print_to_user ""
                     if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                         VERSION="$new_version"
-                        print_success "Version이 '$VERSION'(으)로 변경되었습니다"
+                        print_success "버전을 '$VERSION'(으)로 변경했습니다"
                     else
-                        print_error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                        print_error "버전 형식이 올바르지 않습니다 (x.y.z 형태로 입력) — 기존 값을 유지합니다."
                     fi
                     print_to_user ""
                 else
-                    print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                    print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
                     print_to_user ""
                 fi
                 ;;
@@ -1912,24 +1942,24 @@ handle_project_edit_menu() {
                 safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop, ESC=뒤로): " new_branch "" || _rc=$?
                 if [ "$_rc" -eq 2 ]; then
                     # ESC → 이전 메뉴로 돌아감(기존 값 유지)
-                    print_info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    print_info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
                     print_to_user ""
                 elif [ "$_rc" -eq 0 ]; then
                     print_to_user ""
                     if [ -n "$new_branch" ]; then
                         DETECTED_BRANCH="$new_branch"
-                        print_success "Default Branch가 '$DETECTED_BRANCH'(으)로 변경되었습니다"
+                        print_success "기본 브랜치를 '$DETECTED_BRANCH'(으)로 변경했습니다"
                     else
-                        print_error "브랜치 이름이 비어있습니다. 기존 값을 유지합니다."
+                        print_error "브랜치 이름이 비어 있어 변경하지 않고 기존 값을 유지합니다."
                     fi
                     print_to_user ""
                 else
-                    print_warning "입력을 읽을 수 없습니다. 기존 값을 유지합니다."
+                    print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
                     print_to_user ""
                 fi
                 ;;
             done)
-                print_success "프로젝트 정보 확인 완료"
+                print_success "수정을 마쳤습니다 — 확인 화면으로 돌아갑니다"
                 print_to_user ""
                 return 0
                 ;;
@@ -1949,7 +1979,7 @@ download_template() {
         return
     fi
 
-    print_step "템플릿 다운로드 중..."
+    print_step "템플릿을 GitHub 저장소에서 내려받고 있습니다..."
 
     if [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
@@ -1961,7 +1991,7 @@ download_template() {
     }
     
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
-    print_info "템플릿 내부 문서 제외 중..."
+    print_info "프로젝트에는 불필요한 템플릿 내부 문서를 정리하고 있습니다..."
     local docs_to_remove=(
         "CONTRIBUTING.md"
         "CLAUDE.md"
@@ -1977,7 +2007,7 @@ download_template() {
     done
 
     # 플러그인 전용 파일/폴더 제거 (마켓플레이스 전용, template_integrator로 배포하지 않음)
-    print_info "플러그인 전용 파일 제외 중..."
+    print_info "마켓플레이스 전용 파일(플러그인 메타데이터 등)을 정리하고 있습니다..."
     local plugin_items_to_remove=(
         ".claude-plugin"    # Claude Code 플러그인 매니페스트
         ".codex-plugin"     # Codex 플러그인 메타데이터
@@ -1998,7 +2028,7 @@ download_template() {
     done
 
     # 사용자 적용 가이드 문서는 포함 (SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)
-    print_info "사용자 적용 가이드 문서 다운로드 중..."
+    print_info "사용자용 적용 가이드 문서를 내려받고 있습니다..."
     if [ -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
         print_info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
     fi
@@ -2014,7 +2044,7 @@ download_template() {
         TEMPLATE_VERSION="$DEFAULT_VERSION"
     fi
 
-    print_success "템플릿 다운로드 완료"
+    print_success "템플릿 다운로드 완료 — 이제 프로젝트에 맞게 구성합니다"
 }
 
 
@@ -2025,7 +2055,7 @@ add_version_section_to_readme() {
     print_step "README.md에 버전 관리 섹션 추가 중..."
     
     if [ ! -f "README.md" ]; then
-        print_warning "README.md 파일이 없습니다. 건너뜁니다."
+        print_warning "README.md를 찾지 못해 이 단계를 건너뜁니다."
         return
     fi
     
@@ -2052,7 +2082,7 @@ add_version_section_to_readme() {
 [전체 버전 기록 보기](CHANGELOG.md)
 EOF
     
-    print_success "README.md에 버전 관리 섹션 추가 완료"
+    print_success "README.md에 버전 관리 섹션을 추가했습니다"
     print_info "📝 위치: README.md 파일 하단"
     print_info "🔄 자동 업데이트: PROJECT-README-VERSION-UPDATE.yaml 워크플로우"
 }
@@ -2135,13 +2165,13 @@ create_version_yml() {
             print_to_user "$_row"
             print_to_user ""
             print_to_user "  📝 갱신되는 것"
-            print_to_user "       구조 · 주석 · project_paths · metadata"
+            print_to_user "       구조, 주석, project_paths, metadata"
             print_to_user ""
             print_to_user "  ⚠️  업데이트하지 않으면 구버전 구조가 남아"
-            print_to_user "       최신 워크플로우의 버전 자동증가 · 체인지로그 · 배포"
+            print_to_user "       최신 워크플로우의 버전 자동증가, 체인지로그, 배포"
             print_to_user "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
             print_to_user ""
-            print_to_user "     Y   업데이트하고 계속  (권장 · 기본)"
+            print_to_user "     Y   업데이트하고 계속  (권장, 기본)"
             print_to_user "     N   통합 취소"
             print_to_user ""
 
@@ -2229,7 +2259,7 @@ metadata:
   integration_date: "$(date -u +"%Y-%m-%d")"
 EOF
 
-    print_success "version.yml 생성 완료"
+    print_success "version.yml 생성 완료 — 이 파일이 버전 관리의 기준이 됩니다"
 }
 
 # ===================================================================
@@ -2271,10 +2301,10 @@ read_template_options() {
 
                 if [ "$synology_val" = "true" ]; then
                     INCLUDE_SYNOLOGY=true
-                    print_info "이전 설정에서 Synology 옵션 감지: 포함"
+                    print_info "이전 설정 기준 Synology 옵션: 포함 — 같은 설정으로 진행합니다"
                 elif [ "$synology_val" = "false" ]; then
                     INCLUDE_SYNOLOGY=false
-                    print_info "이전 설정에서 Synology 옵션 감지: 제외"
+                    print_info "이전 설정 기준 Synology 옵션: 제외 — 같은 설정으로 진행합니다"
                 fi
                 return
             fi
@@ -2405,7 +2435,7 @@ check_breaking_changes() {
 
     # jq 없으면 스킵 (JSON 파싱 불가)
     if ! command -v jq &> /dev/null; then
-        print_warning "jq가 설치되지 않아 breaking change 확인을 건너뜁니다."
+        print_warning "jq가 없어 호환성 변경(breaking change) 확인을 건너뜁니다 — jq 설치를 권장합니다."
         return 0
     fi
 
@@ -2474,11 +2504,11 @@ check_breaking_changes() {
 
     # Critical이 있으면 Y/N 확인
     if [ ${#critical_changes[@]} -gt 0 ]; then
-        print_warning "CRITICAL 변경사항이 있습니다."
+        print_warning "주의가 필요한 호환성 변경(CRITICAL)이 있습니다. 아래 내용을 꼭 확인하세요."
         print_to_user ""
 
-        if ! ask_yes_no "계속 진행하시겠습니까?" "N"; then
-            print_info "취소되었습니다"
+        if ! ask_yes_no "위 호환성 변경을 확인했고 계속 진행할까요?" "N"; then
+            print_info "통합을 안전하게 취소했습니다."
             exit 0
         fi
     fi
@@ -2577,8 +2607,8 @@ ask_synology_option() {
 
     print_separator_line
     print_to_user ""
-    print_to_user "🗄️ Synology 워크플로우가 발견되었습니다. ($synology_files개 파일)"
-    print_to_user "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
+    print_to_user "🗄️ Synology NAS 배포용 워크플로우를 발견했습니다. ($synology_files개 파일)"
+    print_to_user "   이 워크플로우를 프로젝트에 포함할까요?"
     print_to_user ""
     print_to_user "   포함되는 워크플로우:"
     for _sd in "${synology_dirs[@]}"; do
@@ -2595,10 +2625,10 @@ ask_synology_option() {
 
     if ask_yes_no "Synology 워크플로우를 포함할까요?" "N"; then
         INCLUDE_SYNOLOGY=true
-        print_info "Synology 워크플로우를 포함합니다"
+        print_info "Synology 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
     else
         INCLUDE_SYNOLOGY=false
-        print_info "Synology 워크플로우를 제외합니다"
+        print_info "Synology 워크플로우를 제외합니다 (나중에 --synology 옵션으로 추가 가능)"
     fi
 }
 
@@ -2626,7 +2656,7 @@ _copy_workflows_for_type() {
 
         # 신규 파일은 바로 복사
         if [ ${#new_files[@]} -gt 0 ]; then
-            print_info "$type 신규 워크플로우 다운로드 중..."
+            print_info "$type 타입의 신규 워크플로우를 내려받고 있습니다..."
             for filename in "${new_files[@]}"; do
                 cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
                 echo "  ✓ $filename (신규, $type)"
@@ -2660,7 +2690,7 @@ _copy_workflows_for_type() {
 
             case "$choice" in
                 T)
-                    print_info "새 버전을 .template.yaml로 추가합니다..."
+                    print_info "기존 파일은 두고 새 버전을 .template.yaml로 추가합니다 (수동 반영용 참고)..."
                     for filename in "${existing_files[@]}"; do
                         local template_name="${filename%.yaml}.template.yaml"
                         rm -f "$WORKFLOWS_DIR/$template_name"
@@ -2672,14 +2702,14 @@ _copy_workflows_for_type() {
                     print_info "   필요한 변경사항을 참고하여 기존 파일에 수동으로 반영하세요."
                     ;;
                 S)
-                    print_info "기존 파일을 유지합니다..."
+                    print_info "기존 워크플로우를 그대로 유지합니다..."
                     for filename in "${existing_files[@]}"; do
                         echo "  ⏭ $filename (건너뜀)"
                         _wf_skipped=$((_wf_skipped + 1))
                     done
                     ;;
                 O)
-                    print_info "기존 파일을 백업 후 덮어씁니다..."
+                    print_info "기존 파일을 .bak으로 백업한 뒤 새 버전으로 교체합니다..."
                     for filename in "${existing_files[@]}"; do
                         mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
                         cp "$type_dir/$filename" "$WORKFLOWS_DIR/"
@@ -2688,7 +2718,7 @@ _copy_workflows_for_type() {
                     done
                     ;;
                 *)
-                    print_warning "잘못된 선택. 기존 파일을 유지합니다."
+                    print_warning "선택을 인식하지 못해 기존 파일을 유지합니다."
                     for filename in "${existing_files[@]}"; do
                         echo "  ⏭ $filename (건너뜀)"
                         _wf_skipped=$((_wf_skipped + 1))
@@ -2760,13 +2790,13 @@ copy_workflows() {
     # project-types 폴더 존재 확인
     if [ ! -d "$project_types_dir" ]; then
         print_error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
-        print_error "project-types 폴더를 찾을 수 없습니다."
+        print_error "템플릿 저장소 구조 오류 — project-types 폴더를 찾지 못했습니다."
         exit 1
     fi
 
     # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
     # *.{yaml,yml} 글로브는 common/ 직접 하위 파일만 매칭 (common/synology/ 등 하위 디렉토리 제외)
-    print_info "공통 워크플로우 다운로드 중..."
+    print_info "모든 타입에 공통으로 들어가는 기본 워크플로우를 내려받고 있습니다..."
     if [ -d "$project_types_dir/common" ]; then
         for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
@@ -2782,7 +2812,7 @@ copy_workflows() {
             _wf_copied=$((_wf_copied + 1))
         done
     else
-        print_warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
+        print_warning "공통 워크플로우 폴더(common)를 찾지 못해 건너뜁니다."
     fi
 
     # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — PROJECT_TYPES 배열 순회
@@ -2804,7 +2834,7 @@ copy_workflows() {
 
                 # 타입별 synology에서 이미 복사된 파일이면 스킵
                 if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                    print_warning "$filename: 타입별 Synology에 동일 파일 존재. 타입별 버전 유지."
+                    print_warning "$filename: 타입별 Synology에 같은 파일이 있어 타입별 버전을 유지합니다."
                     continue
                 fi
 
@@ -2890,7 +2920,7 @@ copy_scripts() {
         fi
     done
     
-    print_success "$copied 개 스크립트 다운로드 완료"
+    print_success "$copied개 스크립트 다운로드 완료"
 }
 
 # .github/config 폴더 복사
@@ -2901,13 +2931,13 @@ copy_config_folder() {
     local dst_config_dir=".github/config"
 
     if [ ! -d "$src_config_dir" ]; then
-        print_info ".github/config 폴더가 템플릿에 없습니다. 건너뜁니다."
+        print_info ".github/config 폴더가 템플릿에 없어 건너뜁니다."
         return
     fi
 
     # 기존 config 파일이 있으면 알림
     if [ -d "$dst_config_dir" ] && [ "$(ls -A "$dst_config_dir" 2>/dev/null)" ]; then
-        print_info "기존 config 파일이 있습니다. 덮어씁니다."
+        print_info "기존 config 파일을 최신 버전으로 덮어씁니다."
     fi
 
     mkdir -p "$dst_config_dir"
@@ -2917,7 +2947,7 @@ copy_config_folder() {
 
     # 복사된 파일 개수 계산
     local copied=$(ls -1 "$dst_config_dir" 2>/dev/null | wc -l | tr -d ' ')
-    print_success ".github/config 폴더 복사 완료 ($copied 개 파일)"
+    print_success ".github/config 폴더 복사 완료 ($copied개 파일)"
 }
 
 # 이슈 템플릿 다운로드
@@ -2928,7 +2958,7 @@ copy_issue_templates() {
     
     # 기존 템플릿 백업 (백업 디렉토리 없어도 실패하지 않음)
     if [ -d ".github/ISSUE_TEMPLATE" ] && [ "$(ls -A .github/ISSUE_TEMPLATE 2>/dev/null)" ]; then
-        print_info "기존 이슈 템플릿이 있습니다. 덮어씁니다."
+        print_info "기존 이슈 템플릿을 최신 버전으로 덮어씁니다."
     fi
     
     # 템플릿 다운로드
@@ -2939,7 +2969,7 @@ copy_issue_templates() {
     # PR 템플릿
     if [ -f "$TEMP_DIR/.github/PULL_REQUEST_TEMPLATE.md" ]; then
         cp "$TEMP_DIR/.github/PULL_REQUEST_TEMPLATE.md" .github/
-        print_success "이슈/PR 템플릿 다운로드 완료"
+        print_success "이슈/PR 템플릿을 적용했습니다"
     fi
 }
 
@@ -2949,7 +2979,7 @@ copy_discussion_templates() {
     
     # 템플릿에 DISCUSSION_TEMPLATE이 없으면 건너뛰기
     if [ ! -d "$TEMP_DIR/.github/DISCUSSION_TEMPLATE" ]; then
-        print_info "DISCUSSION_TEMPLATE이 템플릿에 없습니다. 건너뜁니다."
+        print_info "Discussions 템플릿이 템플릿에 없어 건너뜁니다."
         return
     fi
     
@@ -2957,33 +2987,33 @@ copy_discussion_templates() {
     
     # 기존 템플릿이 있으면 알림
     if [ -d ".github/DISCUSSION_TEMPLATE" ] && [ "$(ls -A .github/DISCUSSION_TEMPLATE 2>/dev/null)" ]; then
-        print_info "기존 Discussion 템플릿이 있습니다. 덮어씁니다."
+        print_info "기존 Discussion 템플릿을 최신 버전으로 덮어씁니다."
     fi
     
     # 템플릿 다운로드
     cp -r "$TEMP_DIR/.github/DISCUSSION_TEMPLATE/"* .github/DISCUSSION_TEMPLATE/ 2>/dev/null || true
-    print_success "GitHub Discussions 템플릿 다운로드 완료"
+    print_success "GitHub Discussions 템플릿을 적용했습니다"
 }
 
 # .coderabbit.yaml 다운로드
 copy_coderabbit_config() {
-    print_step "CodeRabbit 설정 파일 다운로드 여부 확인 중..."
+    print_step "CodeRabbit AI 리뷰 설정을 확인하고 있습니다..."
     
     if [ ! -f "$TEMP_DIR/.coderabbit.yaml" ]; then
-        print_info ".coderabbit.yaml 파일이 템플릿에 없습니다. 건너뜁니다."
+        print_info ".coderabbit.yaml이 템플릿에 없어 건너뜁니다."
         return
     fi
     
     # 기존 파일이 있으면 사용자 확인
     if [ -f ".coderabbit.yaml" ]; then
-        print_warning ".coderabbit.yaml이 이미 존재합니다"
+        print_warning ".coderabbit.yaml이 이미 있습니다 — 덮어쓸지 확인합니다"
         
         if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
             print_separator_line
             print_to_user ""
 
             if ! ask_yes_no ".coderabbit.yaml을 덮어쓸까요?" "N"; then
-                print_info ".coderabbit.yaml 다운로드 건너뜁니다"
+                print_info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
                 return
             fi
             
@@ -2993,17 +3023,17 @@ copy_coderabbit_config() {
         elif [ "$FORCE_MODE" = true ]; then
             # Force 모드에서는 백업하고 덮어쓰기
             cp .coderabbit.yaml .coderabbit.yaml.bak 2>/dev/null || true
-            print_info "강제 모드: 기존 파일 덮어씁니다"
+            print_info "강제 모드 — 기존 파일을 새 버전으로 교체합니다"
         else
             # TTY 없고 Force도 아니면 건너뛰기
-            print_info "대화형 모드가 아닙니다. 기존 파일을 유지합니다."
+            print_info "대화형 입력이 불가능한 환경이라 기존 파일을 유지합니다."
             return
         fi
     fi
     
     # 다운로드 실행
     cp "$TEMP_DIR/.coderabbit.yaml" .coderabbit.yaml
-    print_success ".coderabbit.yaml 다운로드 완료"
+    print_success ".coderabbit.yaml 설정을 적용했습니다 (CodeRabbit AI 리뷰 활성화)"
     print_info "💡 CodeRabbit AI 리뷰가 활성화됩니다 (language: ko-KR)"
 }
 
@@ -3072,7 +3102,7 @@ ensure_gitignore() {
     
     # .gitignore가 없으면 생성
     if [ ! -f ".gitignore" ]; then
-        print_info ".gitignore 파일이 없습니다. 생성합니다."
+        print_info ".gitignore가 없어 필수 항목과 함께 새로 만듭니다."
         
         cat > .gitignore << 'EOF'
 # IDE Settings
@@ -3082,12 +3112,12 @@ ensure_gitignore() {
 /.claude/settings.local.json
 EOF
         
-        print_success ".gitignore 파일 생성 완료"
+        print_success ".gitignore를 새로 만들었습니다"
         return
     fi
     
     # 기존 파일이 있으면 누락된 항목만 추가
-    print_info "기존 .gitignore 파일 발견. 필수 항목 확인 중..."
+    print_info "기존 .gitignore를 발견했습니다 — 필수 항목이 있는지 확인합니다..."
     
     local added=0
     local entries_to_add=()
@@ -3101,12 +3131,12 @@ EOF
     done
     
     if [ $added -eq 0 ]; then
-        print_info "필수 항목이 이미 모두 존재합니다. 건너뜁니다."
+        print_info "필수 항목이 이미 모두 있어 업데이트를 건너뜁니다."
         return
     fi
     
     # 항목 추가 (마지막에 섹션으로 추가)
-    print_info "$added 개 항목 추가 중..."
+    print_info "$added개 항목 추가 중..."
     
     # 파일 끝에 빈 줄이 없으면 추가
     if [ -n "$(tail -c 1 .gitignore 2>/dev/null)" ]; then
@@ -3124,7 +3154,7 @@ EOF
         print_info "  ✓ $entry"
     done
     
-    print_success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
+    print_success ".gitignore 업데이트 완료 ($added개 항목 추가)"
 }
 
 # SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
@@ -3132,13 +3162,13 @@ copy_setup_guide() {
     print_step "템플릿 설정 가이드 다운로드 중..."
     
     if [ ! -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
-        print_info "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 파일이 템플릿에 없습니다. 건너뜁니다."
+        print_info "설정 가이드(SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)가 템플릿에 없어 건너뜁니다."
         return
     fi
     
     # 항상 최신 버전으로 다운로드 (기존 파일 덮어쓰기)
     cp "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" .
-    print_success "템플릿 설정 가이드 다운로드 완료 (최신 버전)"
+    print_success "템플릿 설정 가이드를 적용했습니다 (최신 버전)"
     print_info "📖 템플릿 사용법을 SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md에서 확인하세요"
 }
 
@@ -3236,15 +3266,15 @@ copy_util_modules() {
     # 사용자 확인 (force 모드가 아니고 TTY 가용 시)
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
         if ! ask_yes_no "이 유틸리티 모듈을 다운로드할까요?" "N"; then
-            print_info "util 모듈 다운로드 건너뜁니다"
+            print_info "유틸리티 모듈 다운로드를 건너뜁니다"
             return
         fi
     elif [ "$FORCE_MODE" = true ]; then
         # Force 모드에서는 자동으로 다운로드
-        print_info "강제 모드: util 모듈 자동 다운로드"
+        print_info "강제 모드 — 유틸리티 모듈을 자동으로 내려받습니다"
     else
         # TTY 없고 Force도 아니면 건너뛰기
-        print_info "대화형 모드가 아닙니다. util 모듈을 건너뜁니다."
+        print_info "대화형 입력이 불가능한 환경이라 유틸리티 모듈을 건너뜁니다."
         print_info "util 모듈을 다운로드하려면 --force 옵션을 사용하세요."
         return
     fi
@@ -3259,7 +3289,7 @@ copy_util_modules() {
         [ -d "$dir" ] && module_count=$((module_count + 1))
     done
 
-    print_success "util 모듈 다운로드 완료 ($module_count 개 모듈)"
+    print_success "유틸리티 모듈을 적용했습니다 ($module_count개 모듈)"
 
     # 복사된 모듈 목록 표시
     for dir in "$util_dst"/*/; do
@@ -3358,7 +3388,7 @@ interactive_mode() {
     fi
 
     if [ -z "$_mode_selected" ] || [ "$_mode_selected" = "cancel" ]; then
-        print_info "취소되었습니다"
+        print_info "설치를 취소했습니다. 스크립트를 종료합니다."
         exit 0
     fi
 
@@ -3437,7 +3467,7 @@ execute_integration() {
         fi
 
         # CLI 모드에서만 통합 정보 표시
-        print_question_header "🪐" "통합 정보"
+        print_question_header "🪐" "통합 설정 확인"
 
         local _cli_types
         local IFS=','
@@ -3457,8 +3487,8 @@ execute_integration() {
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         if [ "$FORCE_MODE" = false ]; then
             if [ "$TTY_AVAILABLE" = true ]; then
-                if ! ask_yes_no "이 정보로 통합을 진행할까요?" "Y"; then
-                    print_info "취소되었습니다"
+                if ! ask_yes_no "이 설정으로 통합을 진행할까요?" "Y"; then
+                    print_info "통합을 취소했습니다. (설정을 다시 검토한 뒤 재실행하세요)"
                     exit 0
                 fi
             else
@@ -3708,7 +3738,7 @@ offer_ide_tools_install() {
                 # ESC/무선택 → 건너뛰기. set -e 가드 || true.
                 local _targets=""
                 _targets=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_pre" "설치 / 업데이트할 IDE를 고르세요" "${_ide_opts[@]}") || true
-                [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
+                [ -z "$_targets" ] && { print_info "선택한 IDE가 없어 설치/업데이트를 건너뜁니다 (원할 때 다시 실행하세요)."; return; }
                 case ",$_targets," in *,Claude\ Code,*) _manage_claude_section "$claude_available" "$installed_scope" "$installed_version" ;; esac
                 case ",$_targets," in *,Cursor,*)       _manage_cursor_section ;; esac
                 case ",$_targets," in *,Gemini\ CLI,*)  _manage_gemini_extension ;; esac
@@ -3721,7 +3751,7 @@ offer_ide_tools_install() {
                 # ESC/무선택 → 건너뛰기. set -e 가드 || true.
                 local _targets=""
                 _targets=$(choose_menu --multi --cancel-label="뒤로" "제거할 IDE를 고르세요" "${_ide_opts[@]}") || true
-                [ -z "$_targets" ] && { print_info "선택된 IDE가 없어 건너뜁니다"; return; }
+                [ -z "$_targets" ] && { print_info "선택한 IDE가 없어 설치/업데이트를 건너뜁니다 (원할 때 다시 실행하세요)."; return; }
                 case ",$_targets," in *,Claude\ Code,*) _remove_claude_section "$claude_available" "$installed_scope" ;; esac
                 case ",$_targets," in *,Cursor,*)       _remove_cursor_section ;; esac
                 case ",$_targets," in *,Gemini\ CLI,*)  _remove_gemini_section ;; esac
@@ -3731,7 +3761,7 @@ offer_ide_tools_install() {
                 case ",$_targets," in *,PI\ Persona\ Harness,*) _pi_harness_remove_only ;; esac
                 ;;
             *)
-                print_info "IDE Skills 변경 없이 건너뜁니다"
+                print_info "IDE Skills는 변경하지 않고 넘어갑니다 — 통합은 계속됩니다."
                 ;;
         esac
         return
@@ -3792,7 +3822,7 @@ _manage_claude_section() {
                         ;;
                     delete)
                         print_step "플러그인 삭제 중..."
-                        print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
+                        print_info "  제거할 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
                         print_info "             ~/.claude/plugins/data/cassiiopeia@cassiiopeia-marketplace/"
                         if claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
                             print_success "플러그인 uninstall 완료"
@@ -3803,7 +3833,7 @@ _manage_claude_section() {
                         fi
                         ;;
                     *)
-                        print_info "Claude Code 플러그인 변경 없이 건너뜁니다"
+                        print_info "Claude Code 플러그인은 변경하지 않고 넘어갑니다."
                         ;;
                 esac
             else
@@ -3867,7 +3897,7 @@ _manage_cursor_section() {
     fi
 
     if [ -z "$src" ]; then
-        print_warning "사용 가능한 스킬 소스가 없습니다."
+        print_warning "설치할 스킬 소스를 찾지 못했습니다 (다운로드된 템플릿 또는 로컬 skills/ 폴더가 필요합니다)."
         return
     fi
     # 라우터에서 '설치/업데이트' 선택됨 → 추가 질문 없이 global(user)로 바로 복사·최신화.
@@ -3885,7 +3915,7 @@ _remove_claude_section() {
         print_info "  설치된 Claude Code 플러그인이 없어 건너뜁니다"
         return
     fi
-    print_info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
+    print_info "  제거할 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installed_scope})"
     if claude plugin uninstall cassiiopeia@cassiiopeia-marketplace --scope "$installed_scope" 2>/dev/null; then
         print_success "플러그인 uninstall 완료"
         _remove_claude_plugin_data
@@ -3959,7 +3989,7 @@ _remove_pi_section() {
     fi
     # package 클론이 사라지면 등록된 harness loader 경로가 허공을 가리킨다 — 같이 해제
     if _pi_harness_enabled; then
-        print_info "  Persona Harness 등록도 함께 해제"
+        print_info "  Persona Harness 등록도 함께 해제됩니다."
         _pi_harness_remove
     fi
 }
@@ -4050,7 +4080,7 @@ _do_cursor_skills_copy() {
         _write_cursor_skills_meta "user" "$dest"
         print_success "Cursor Skills 설치 완료 (${dest}/, v${TEMPLATE_VERSION:-unknown})"
     else
-        print_warning "Cursor Skills 복사 실패"
+        print_warning "Cursor Skills 복사에 실패했습니다 — 원본 skills/ 폴더를 확인하거나 다시 시도하세요."
     fi
 }
 
@@ -4127,7 +4157,7 @@ _do_codex_native_skills_fallback() {
     if [ "$mode" != "auto" ] && [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
         print_info "  설치 경로: ${target}"
         if ! ask_yes_no "Codex native skills fallback을 설치/업데이트할까요?" "Y"; then
-            print_info "Codex native skills fallback 변경 없이 건너뜁니다"
+            print_info "Codex native skills fallback을 건너뜁니다 (marketplace 등록 방식만 사용)."
             return
         fi
     fi
@@ -4149,7 +4179,7 @@ _do_codex_native_skills_fallback() {
     else
         print_step "Codex skills 저장소 clone 중..."
         git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$install_dir" 2>/dev/null || {
-            print_warning "Codex skills 저장소 clone 실패"
+            print_warning "Codex skills 저장소 clone에 실패했습니다 — 네트워크를 확인하거나 수동으로 git clone 하세요."
             return
         }
     fi
@@ -4324,7 +4354,7 @@ _pi_harness_offer() {
             print_success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
         fi
     else
-        print_info "  → 건너뜀 (skill만 사용)"
+        print_info "  → 건너뜁니다 (skill만 사용, harness는 비활성)"
     fi
 }
 
@@ -4365,7 +4395,7 @@ _pi_harness_toggle() {
                 print_success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
             fi
         else
-            print_info "  → 비활성화 상태 유지 (skill만 사용)"
+            print_info "  → 비활성화 상태를 유지합니다 (skill만 사용)"
         fi
     fi
 }

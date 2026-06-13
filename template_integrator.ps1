@@ -1110,16 +1110,37 @@ function Resolve-ProjectPaths {
     $targets = @($allTypes | Where-Object { $_ -ne "basic" })
     if ($targets.Count -eq 0) { return }  # basic만이면 경로 불필요
 
+    $total = $targets.Count
+
     Print-Step "타입별 프로젝트 경로 확인 중..."
     Write-Host ""
-    Write-Host "💡 경로 = 레포 루트에서 그 프로젝트 폴더까지의 상대경로입니다."
+    # ── 도입부: 무엇이 감지됐고 이제 무엇을 할지 먼저 설명 (에이전트형 안내 톤) ──
+    if ($total -gt 1) {
+        Write-Host "🔍 멀티타입 프로젝트가 감지되었습니다 — 총 ${total}개 타입"
+    } else {
+        Write-Host "🔍 $($targets[0]) 프로젝트가 감지되었습니다 — 총 1개 타입"
+    }
+    foreach ($ml in $targets) {
+        # 타입명을 8칸으로 패딩해 마커 파일명을 세로로 정렬
+        $mt = Get-ExistingMarkerInDir $ml "."
+        Write-Host ("   • {0,-8} → {1}" -f $ml, $mt)
+    }
+    Write-Host ""
+    Write-Host "각 타입의 프로젝트가 레포 어느 폴더에 있는지 확인이 필요합니다."
+    if ($total -gt 1) {
+        Write-Host "이제 하나씩 차례대로 각 프로젝트의 루트 디렉터리를 설정하겠습니다."
+    } else {
+        Write-Host "이제 이 프로젝트의 루트 디렉터리를 설정하겠습니다."
+    }
+    Write-Host ""
+    Write-Host "💡 '프로젝트 루트' = 그 타입의 버전 파일이 있는 폴더 (레포 루트 기준 상대경로)"
     Write-Host "   예) 레포루트/app/pubspec.yaml 이면 → `"app`""
     Write-Host "       레포루트/packages/web/package.json 이면 → `"packages/web`""
     Write-Host "       레포 루트에 바로 있으면 → `".`""
+    Print-SeparatorLine
     Write-Host ""
 
     $idx = 0
-    $total = $targets.Count
     foreach ($t in $targets) {
         $idx++
         $prog = "[$idx/$total]"
@@ -1176,9 +1197,13 @@ function Resolve-ProjectPaths {
         # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
         if ($candidates.Count -eq 1) {
             $c0Marker = Get-ExistingMarkerInDir $t $candidates[0]
+            # 루트면 마커만, 하위 폴더면 폴더/마커 — "어디 기준 경로"인지 전체 경로로 노출
+            if ($candidates[0] -eq ".") { $c0Full = $c0Marker } else { $c0Full = "$($candidates[0])/$c0Marker" }
             Write-Host ""
-            Write-Host "  $prog 🔍 ${t}: $($candidates[0])/$c0Marker 발견"
-            if (Ask-YesNo "  $t 경로를 '$($candidates[0])'(으)로 설정할까요? (Y=예 / N=직접입력)" "Y") {
+            Write-Host "  $prog 🔍 $t — $c0Marker 발견"
+            Write-Host "      위치: <레포루트>/$c0Full"
+            Write-Host ""
+            if (Ask-YesNo "  $t 프로젝트 루트를 '$($candidates[0])'(으)로 설정할까요? ($c0Full 기준 — 아니오 선택 시 직접 입력)" "Y") {
                 $chosen = $candidates[0]
             }
         } elseif ($candidates.Count -gt 1) {
@@ -1191,7 +1216,7 @@ function Resolve-ProjectPaths {
                 $candOpts += @{Value=$cand; Label=$cMarker}
             }
             $candOpts += @{Value='직접 입력'; Label=''}
-            $sel = Invoke-ChooseMenu -Prompt "  $t 경로를 선택하세요" -Options $candOpts
+            $sel = Invoke-ChooseMenu -Prompt "  $t 프로젝트 루트를 선택하세요" -Options $candOpts
             if ($sel -and $sel -ne '직접 입력') { $chosen = $sel }
             # '직접 입력'이거나 취소면 chosen 미설정 → 아래 직접입력 루프로
         } else {
@@ -1201,7 +1226,9 @@ function Resolve-ProjectPaths {
 
         # ── 직접 입력 (위에서 미확정 시) ──
         while ([string]::IsNullOrEmpty($chosen)) {
-            $promptText = "  $t 상대경로 입력 (예: app, client/web — 루트면 그냥 Enter"
+            # 루트(.) 기준 마커명으로 힌트 — 어떤 파일이 있는 폴더인지 사용자에게 명시
+            $hintMarker = Get-ExistingMarkerInDir $t "."
+            $promptText = "  $t 프로젝트 루트 경로 입력 ($hintMarker 이 있는 폴더, 예: server, app — 루트면 그냥 Enter"
             if ($existing) { $promptText = "$promptText, 현재값: $existing" }
             $promptText = "$promptText)"
             $userInput = Read-UserInput $promptText

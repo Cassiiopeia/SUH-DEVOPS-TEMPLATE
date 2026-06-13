@@ -1353,15 +1353,37 @@ resolve_project_paths() {
     done
     [ ${#_targets[@]} -eq 0 ] && return 0  # basic만이면 경로 불필요
 
+    local _total=${#_targets[@]}
+
     print_step "타입별 프로젝트 경로 확인 중..."
     print_to_user ""
-    print_to_user "💡 경로 = 레포 루트에서 그 프로젝트 폴더까지의 상대경로입니다."
+    # ── 도입부: 무엇이 감지됐고 이제 무엇을 할지 먼저 설명 (에이전트형 안내 톤) ──
+    if [ "$_total" -gt 1 ]; then
+        print_to_user "🔍 멀티타입 프로젝트가 감지되었습니다 — 총 ${_total}개 타입"
+    else
+        print_to_user "🔍 ${_targets[0]} 프로젝트가 감지되었습니다 — 총 1개 타입"
+    fi
+    local _ml _mt
+    for _ml in "${_targets[@]}"; do
+        # 타입명을 8칸으로 패딩해 마커 파일명을 세로로 정렬 (safe_echo와 동일 출력 라우팅)
+        _mt=$(existing_marker_in_dir "$_ml" ".")
+        print_to_user "$(printf '   • %-8s → %s' "$_ml" "$_mt")"
+    done
+    print_to_user ""
+    print_to_user "각 타입의 프로젝트가 레포 어느 폴더에 있는지 확인이 필요합니다."
+    if [ "$_total" -gt 1 ]; then
+        print_to_user "이제 하나씩 차례대로 각 프로젝트의 루트 디렉터리를 설정하겠습니다."
+    else
+        print_to_user "이제 이 프로젝트의 루트 디렉터리를 설정하겠습니다."
+    fi
+    print_to_user ""
+    print_to_user "💡 '프로젝트 루트' = 그 타입의 버전 파일이 있는 폴더 (레포 루트 기준 상대경로)"
     print_to_user "   예) 레포루트/app/pubspec.yaml 이면 → \"app\""
     print_to_user "       레포루트/packages/web/package.json 이면 → \"packages/web\""
     print_to_user "       레포 루트에 바로 있으면 → \".\""
+    print_separator_line
     print_to_user ""
 
-    local _total=${#_targets[@]}
     local _idx=0
     for _t in "${_targets[@]}"; do
         _idx=$((_idx + 1))
@@ -1420,9 +1442,15 @@ resolve_project_paths() {
         # ── 대화형: 후보 개수별 분기 (스펙 §4.4) ──
         if [ "$_count" -eq 1 ]; then
             print_to_user ""
-            print_to_user "  $_prog 🔍 $_t: ${_candidates}/$(existing_marker_in_dir "$_t" "$_candidates") 발견"
+            local _cand_marker _cand_full
+            _cand_marker=$(existing_marker_in_dir "$_t" "$_candidates")
+            # 루트면 마커만, 하위 폴더면 폴더/마커 — "어디 기준 경로"인지 전체 경로로 노출
+            if [ "$_candidates" = "." ]; then _cand_full="$_cand_marker"; else _cand_full="$_candidates/$_cand_marker"; fi
+            print_to_user "  $_prog 🔍 $_t — $_cand_marker 발견"
+            print_to_user "      위치: <레포루트>/$_cand_full"
+            print_to_user ""
             # '아니오' 선택 시 _chosen 미설정 → 아래 직접입력 루프로 진행
-            if ask_yes_no "  $_t 경로를 '$_candidates'(으)로 설정할까요? — 아니오 선택 시 직접 입력" "Y"; then
+            if ask_yes_no "  $_t 프로젝트 루트를 '$_candidates'(으)로 설정할까요? ($_cand_full 기준 — 아니오 선택 시 직접 입력)" "Y"; then
                 _chosen="$_candidates"
             fi
         elif [ "$_count" -gt 1 ]; then
@@ -1436,7 +1464,7 @@ resolve_project_paths() {
             done <<< "$_candidates"
             _opts+=("직접 입력|")   # value 자체를 한국어로 — 센티넬 노출 방지
             local _sel
-            _sel=$(choose_menu "  $_t 경로를 선택하세요" "${_opts[@]}") || _sel="직접 입력"
+            _sel=$(choose_menu "  $_t 프로젝트 루트를 선택하세요" "${_opts[@]}") || _sel="직접 입력"
             if [ "$_sel" = "직접 입력" ] || [ -z "$_sel" ]; then
                 : # _chosen 미설정 → 아래 직접입력 루프로
             else
@@ -1449,8 +1477,10 @@ resolve_project_paths() {
 
         # ── 직접 입력 (위에서 미확정 시) ──
         while [ -z "$_chosen" ]; do
-            local _input="" _prompt
-            _prompt="  $_t 상대경로 입력 (예: app, client/web — 루트면 그냥 Enter"
+            local _input="" _prompt _hint_marker
+            # 루트(.) 기준 마커명으로 힌트 — 어떤 파일이 있는 폴더인지 사용자에게 명시
+            _hint_marker=$(existing_marker_in_dir "$_t" ".")
+            _prompt="  $_t 프로젝트 루트 경로 입력 ($_hint_marker 이 있는 폴더, 예: server, app — 루트면 그냥 Enter"
             if [ -n "$_existing" ]; then
                 _prompt="$_prompt, 현재값: $_existing"
             fi

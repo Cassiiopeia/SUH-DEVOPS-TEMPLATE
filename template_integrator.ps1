@@ -633,7 +633,7 @@ function Ask-YesNoEdit {
 
     # TTY 대화형 → 화살표 3지선. ESC = stay(머묾) 신호.
     if ((Test-ArrowMenuSupported) -and -not $forceMode) {
-        $ans = Invoke-ArrowMenu -Prompt "이 정보가 맞습니까?" -Options @(
+        $ans = Invoke-ArrowMenu -Prompt "위 분석 결과가 맞습니까?" -Options @(
             @{Value='예, 계속 진행'; Label=''},
             @{Value='수정하기';      Label=''},
             @{Value='아니오, 취소';  Label=''}
@@ -756,19 +756,19 @@ function Detect-ProjectType {
 
     # Flutter
     if (Test-Path "pubspec.yaml") {
-        Print-Info "감지됨: Flutter"
+        Print-Info "✓ Flutter 감지됨"
         return "flutter"
     }
 
     # Spring Boot
     if ((Test-Path "build.gradle") -or (Test-Path "build.gradle.kts") -or (Test-Path "pom.xml")) {
-        Print-Info "감지됨: Spring Boot"
+        Print-Info "✓ Spring Boot 감지됨"
         return "spring"
     }
 
     # Python
     if ((Test-Path "pyproject.toml") -or (Test-Path "setup.py") -or (Test-Path "requirements.txt")) {
-        Print-Info "감지됨: Python"
+        Print-Info "✓ Python 감지됨"
         return "python"
     }
 
@@ -785,28 +785,28 @@ function Detect-ProjectType {
         if ($packageJson -match "@react-native|react-native") {
             # Expo 체크
             if ($packageJson -match "expo") {
-                Print-Info "감지됨: React Native (Expo)"
+                Print-Info "✓ React Native (Expo) 감지됨"
                 return "react-native-expo"
             } else {
-                Print-Info "감지됨: React Native"
+                Print-Info "✓ React Native 감지됨"
                 return "react-native"
             }
         }
 
         # Next.js 체크 (React보다 먼저 체크해야 함)
         if ($packageJson -match '"next"') {
-            Print-Info "감지됨: Next.js"
+            Print-Info "✓ Next.js 감지됨"
             return "next"
         }
 
         # React 체크
         if ($packageJson -match '"react"') {
-            Print-Info "감지됨: React"
+            Print-Info "✓ React 감지됨"
             return "react"
         }
 
         # 기본 Node.js
-        Print-Info "감지됨: Node.js"
+        Print-Info "✓ Node.js 감지됨"
         return "node"
     }
 
@@ -878,7 +878,7 @@ function Detect-ProjectTypes {
         }
         # version.yml에 타입이 명시돼 있으면(basic 포함) source of truth → 그대로 사용
         if ($existingTypes) {
-            Print-Info "기존 version.yml 타입 사용: $existingTypes"
+            Print-Info "✓ 기존 설정 적용: $existingTypes (version.yml에서 불러옴)"
             return $existingTypes
         }
     }
@@ -919,7 +919,7 @@ function Detect-ProjectTypes {
 
     if ($detected.Count -eq 0) { $detected = @("basic") }
 
-    Print-Info "감지된 타입: $($detected -join ' ')"
+    Print-Info "✓ 감지된 타입: $($detected -join ' ')"
 
     return ($detected -join ',')
 }
@@ -1099,7 +1099,7 @@ function Resolve-ProjectPaths {
             if ([string]::IsNullOrEmpty($vp)) { $vp = "." }
             $vm = Get-ExistingMarkerInDir $vt $vp
             if (-not (Test-Path (Join-Path $vp $vm) -PathType Leaf)) {
-                Print-Warning "-Paths: $vt=$vp 경로에 마커 파일이 없습니다 (그대로 기록합니다)"
+                Print-Warning "-Paths: $vt=$vp 경로에서 마커 파일을 찾지 못했지만 입력값을 그대로 기록합니다"
             }
             $normalized[$vt] = $vp
         }
@@ -1268,7 +1268,7 @@ function Resolve-ProjectPaths {
     foreach ($file in $fileToTypes.Keys) {
         if ($fileToTypes[$file].Count -gt 1) {
             Print-Warning "  ⚠️ 같은 파일($file)을 여러 타입($($fileToTypes[$file] -join ', '))이 바라봅니다."
-            Print-Warning "     sync 시 같은 버전이 기록되므로 동작엔 문제없지만, 의도한 구성인지 확인하세요."
+            Print-Warning "     → 이렇게 하면 sync 때 모두 같은 버전이 기록됩니다. 동작에는 문제없지만 의도한 구성인지 확인하세요."
         }
     }
     Write-Host ""
@@ -1289,7 +1289,7 @@ function Detect-Version {
             $packageJson = Get-Content "package.json" -Raw | ConvertFrom-Json
             if ($packageJson.version) {
                 $detectedVersion = $packageJson.version
-                Print-Info "package.json에서 발견: v$detectedVersion"
+                Print-Info "✓ package.json에서 버전 감지: v$detectedVersion"
                 return $detectedVersion
             }
         } catch {
@@ -1302,7 +1302,7 @@ function Detect-Version {
         $content = Get-Content "build.gradle" -Raw
         if ($content -match 'version\s*=\s*[''"]?([0-9]+\.[0-9]+\.[0-9]+)') {
             $detectedVersion = $matches[1]
-            Print-Info "build.gradle에서 발견: v$detectedVersion"
+            Print-Info "✓ build.gradle에서 버전 감지: v$detectedVersion"
             return $detectedVersion
         }
     }
@@ -1312,7 +1312,7 @@ function Detect-Version {
         $content = Get-Content "pubspec.yaml" -Raw
         if ($content -match 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)') {
             $detectedVersion = $matches[1]
-            Print-Info "pubspec.yaml에서 발견: v$detectedVersion"
+            Print-Info "✓ pubspec.yaml에서 버전 감지: v$detectedVersion"
             return $detectedVersion
         }
     }
@@ -1322,7 +1322,7 @@ function Detect-Version {
         $content = Get-Content "pyproject.toml" -Raw
         if ($content -match 'version\s*=\s*[''"]?([0-9]+\.[0-9]+\.[0-9]+)') {
             $detectedVersion = $matches[1]
-            Print-Info "pyproject.toml에서 발견: v$detectedVersion"
+            Print-Info "✓ pyproject.toml에서 버전 감지: v$detectedVersion"
             return $detectedVersion
         }
     }
@@ -1332,7 +1332,7 @@ function Detect-Version {
         $gitTag = git describe --tags --abbrev=0 2>$null
         if ($gitTag) {
             $detectedVersion = $gitTag -replace '^v', ''
-            Print-Info "Git 태그에서 발견: v$detectedVersion"
+            Print-Info "✓ Git 태그에서 버전 감지: v$detectedVersion"
             return $detectedVersion
         }
     } catch {
@@ -1422,7 +1422,7 @@ function Show-ProjectTypeMenu {
     )
 
     if (-not $selected) {
-        Print-Error "프로젝트 타입 선택이 취소되었습니다. 기존 값을 유지합니다."
+        Print-Error "타입 선택을 취소했습니다 — 기존 설정을 그대로 유지합니다."
         if ($script:ProjectTypes.Count -gt 0) { return ($script:ProjectTypes -join ',') }
         return $script:ProjectType
     }
@@ -1439,7 +1439,7 @@ function Edit-ProjectInfo {
     # 다른 항목을 이어서 수정할 수 있다. '모두 맞음, 계속' 또는 '뒤로' → 확인 화면으로 복귀.
     # ps1은 숫자 입력 메뉴라 ESC 키가 없어 '뒤로'를 명시적 항목으로 제공한다.
     while ($true) {
-        Print-QuestionHeader "💫" "어떤 항목을 수정하시겠습니까?"
+        Print-QuestionHeader "💫" "어떤 항목을 수정할까요?"
 
         # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로). ESC + '뒤로' 항목 둘 다 제공.
         $editChoice = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
@@ -1463,9 +1463,9 @@ function Edit-ProjectInfo {
                     $script:ProjectTypes = @($newCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
                     $script:ProjectType = $script:ProjectTypes[0]
                     if ($script:ProjectTypes.Count -gt 1) {
-                        Print-Success "Project Types가 '$($script:ProjectTypes -join ', ')'(으)로 변경되었습니다"
+                        Print-Success "프로젝트 타입을 '$($script:ProjectTypes -join ', ')'(으)로 변경했습니다"
                     } else {
-                        Print-Success "Project Type이 '$($script:ProjectType)'(으)로 변경되었습니다"
+                        Print-Success "프로젝트 타입을 '$($script:ProjectType)'(으)로 변경했습니다"
                     }
                     # ★ 타입이 실제로 바뀌었으면 그 자리에서 path 감지를 바로 이어 붙임
                     # (선택 순서가 달라도 같은 집합이면 변경 아님 — 정렬 후 비교)
@@ -1485,12 +1485,12 @@ function Edit-ProjectInfo {
                 Write-Host ""
 
                 if ([string]::IsNullOrWhiteSpace($newVersion)) {
-                    Print-Info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    Print-Info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
                 } elseif ($newVersion -match '^[0-9]+\.[0-9]+\.[0-9]+$') {
                     $script:ProjectVersion = $newVersion
-                    Print-Success "Version이 '$($script:ProjectVersion)'(으)로 변경되었습니다"
+                    Print-Success "버전을 '$($script:ProjectVersion)'(으)로 변경했습니다"
                 } else {
-                    Print-Error "잘못된 버전 형식입니다. 기존 값을 유지합니다. (올바른 형식: x.y.z)"
+                    Print-Error "버전 형식이 올바르지 않습니다 (x.y.z 형태로 입력) — 기존 값을 유지합니다."
                 }
                 Write-Host ""
             }
@@ -1504,14 +1504,14 @@ function Edit-ProjectInfo {
 
                 if (![string]::IsNullOrWhiteSpace($newBranch)) {
                     $script:DetectedBranch = $newBranch
-                    Print-Success "Default Branch가 '$($script:DetectedBranch)'(으)로 변경되었습니다"
+                    Print-Success "기본 브랜치를 '$($script:DetectedBranch)'(으)로 변경했습니다"
                 } else {
-                    Print-Info "이전 메뉴로 돌아갑니다. 기존 값을 유지합니다."
+                    Print-Info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
                 }
                 Write-Host ""
             }
             'done' {
-                Print-Success "프로젝트 정보 확인 완료"
+                Print-Success "수정을 마쳤습니다 — 확인 화면으로 돌아갑니다"
                 Write-Host ""
                 return
             }
@@ -1572,11 +1572,11 @@ function Detect-AndConfirmProject {
         switch ($userChoice) {
             "yes" {
                 $confirmed = $true
-                Print-Success "프로젝트 정보 확인 완료"
+                Print-Success "프로젝트 정보 검증 완료 — 이 설정으로 통합을 진행합니다"
                 Write-Host ""
             }
             "no" {
-                Print-Info "취소되었습니다"
+                Print-Info "통합을 취소했습니다. (다시 실행하면 처음부터 설정할 수 있습니다)"
                 exit 0
             }
             "edit" {
@@ -1595,7 +1595,7 @@ function Detect-AndConfirmProject {
 # ===================================================================
 
 function Download-Template {
-    Print-Step "템플릿 다운로드 중..."
+    Print-Step "템플릿을 GitHub 저장소에서 내려받고 있습니다..."
     
     if (Test-Path $TEMP_DIR) {
         Remove-Item -Path $TEMP_DIR -Recurse -Force
@@ -1609,7 +1609,7 @@ function Download-Template {
     }
     
     # 문서 파일 제거 (프로젝트 특화 문서는 복사하지 않음)
-    Print-Info "템플릿 내부 문서 제외 중..."
+    Print-Info "프로젝트에는 불필요한 템플릿 내부 문서를 정리하고 있습니다..."
     $docsToRemove = @(
         "CONTRIBUTING.md",
         "CLAUDE.md",
@@ -1626,7 +1626,7 @@ function Download-Template {
     }
 
     # 플러그인 전용 파일/폴더 제거 (마켓플레이스 전용, template_integrator로 배포하지 않음)
-    Print-Info "플러그인 전용 파일 제외 중..."
+    Print-Info "마켓플레이스 전용 파일(플러그인 메타데이터 등)을 정리하고 있습니다..."
     $pluginItemsToRemove = @(
         ".claude-plugin",   # Claude Code 플러그인 매니페스트
         ".codex-plugin",    # Codex 플러그인 메타데이터
@@ -1646,7 +1646,7 @@ function Download-Template {
     }
 
     # 사용자 적용 가이드 문서는 포함
-    Print-Info "사용자 적용 가이드 문서 다운로드 중..."
+    Print-Info "사용자용 적용 가이드 문서를 내려받고 있습니다..."
     $guidePath = Join-Path $TEMP_DIR "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
     if (Test-Path $guidePath) {
         Print-Info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
@@ -1665,7 +1665,7 @@ function Download-Template {
         $script:TemplateVersion = $DEFAULT_VERSION
     }
 
-    Print-Success "템플릿 다운로드 완료"
+    Print-Success "템플릿 다운로드 완료 — 이제 프로젝트에 맞게 구성합니다"
 }
 
 # ===================================================================
@@ -1678,7 +1678,7 @@ function Add-VersionSectionToReadme {
     Print-Step "README.md에 버전 관리 섹션 추가 중..."
     
     if (-not (Test-Path "README.md")) {
-        Print-Warning "README.md 파일이 없습니다. 건너뜁니다."
+        Print-Warning "README.md를 찾지 못해 이 단계를 건너뜁니다."
         return
     }
     
@@ -1709,7 +1709,7 @@ function Add-VersionSectionToReadme {
     
     Add-Content -Path "README.md" -Value $versionSection -Encoding UTF8
     
-    Print-Success "README.md에 버전 관리 섹션 추가 완료"
+    Print-Success "README.md에 버전 관리 섹션을 추가했습니다"
     Print-Info "📝 위치: README.md 파일 하단"
     Print-Info "🔄 자동 업데이트: PROJECT-README-VERSION-UPDATE.yaml 워크플로우"
 }
@@ -1776,13 +1776,13 @@ function Create-VersionYml {
             Write-Host ("       {0,-14} {1,-11} {2}" -f "version_code", $existingVersionCode, "스토어 빌드번호 안전")
             Write-Host ""
             Write-Host "  📝 갱신되는 것"
-            Write-Host "       구조 · 주석 · project_paths · metadata"
+            Write-Host "       구조, 주석, project_paths, metadata"
             Write-Host ""
             Write-Host "  ⚠️  업데이트하지 않으면 구버전 구조가 남아"
-            Write-Host "       최신 워크플로우의 버전 자동증가 · 체인지로그 · 배포"
+            Write-Host "       최신 워크플로우의 버전 자동증가, 체인지로그, 배포"
             Write-Host "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
             Write-Host ""
-            Write-Host "     Y   업데이트하고 계속  (권장 · 기본)"
+            Write-Host "     Y   업데이트하고 계속  (권장, 기본)"
             Write-Host "     N   통합 취소"
             Write-Host ""
 
@@ -1879,7 +1879,7 @@ metadata:
     $versionYmlContent = $part1.TrimEnd("`r", "`n") + "`r`n" + $pathsBlock + $part2
     Set-Content -Path "version.yml" -Value $versionYmlContent -Encoding UTF8
 
-    Print-Success "version.yml 생성 완료"
+    Print-Success "version.yml 생성 완료 — 이 파일이 버전 관리의 기준이 됩니다"
 }
 
 # ===================================================================
@@ -1922,11 +1922,11 @@ function Read-TemplateOptions {
 
                 if ($synologyVal -eq "true" -or $synologyVal -eq "True") {
                     $script:IncludeSynology = $true
-                    Print-Info "이전 설정에서 Synology 옵션 감지: 포함"
+                    Print-Info "이전 설정 기준 Synology 옵션: 포함 — 같은 설정으로 진행합니다"
                 }
                 elseif ($synologyVal -eq "false" -or $synologyVal -eq "False") {
                     $script:IncludeSynology = $false
-                    Print-Info "이전 설정에서 Synology 옵션 감지: 제외"
+                    Print-Info "이전 설정 기준 Synology 옵션: 제외 — 같은 설정으로 진행합니다"
                 }
                 return
             }
@@ -2112,15 +2112,15 @@ function Test-BreakingChanges {
 
     # Critical이 있으면 Y/N 확인
     if ($criticalChanges.Count -gt 0) {
-        Print-Warning "CRITICAL 변경사항이 있습니다."
+        Print-Warning "주의가 필요한 호환성 변경(CRITICAL)이 있습니다. 아래 내용을 꼭 확인하세요."
         Write-Host ""
         Write-Host "계속 진행하시겠습니까?"
         Write-Host "  Y/y - 예, 계속 진행"
         Write-Host "  N/n - 아니오, 취소"
         Write-Host ""
 
-        if (-not (Ask-YesNo -Prompt "선택: " -Default "N")) {
-            Print-Info "취소되었습니다"
+        if (-not (Ask-YesNo -Prompt "위 호환성 변경을 확인했고 계속 진행할까요? " -Default "N")) {
+            Print-Info "통합을 안전하게 취소했습니다."
             exit 0
         }
     }
@@ -2230,8 +2230,8 @@ function Ask-SynologyOption {
 
     Print-SeparatorLine
     Write-Host ""
-    Write-Host "🗄️ Synology 워크플로우가 발견되었습니다. ($totalSynologyCount개 파일)"
-    Write-Host "   Synology NAS에 배포하는 워크플로우를 포함하시겠습니까?"
+    Write-Host "🗄️ Synology NAS 배포용 워크플로우를 발견했습니다. ($totalSynologyCount개 파일)"
+    Write-Host "   이 워크플로우를 프로젝트에 포함할까요?"
     Write-Host ""
     Write-Host "   포함되는 워크플로우:"
     foreach ($f in $typeFiles) {
@@ -2247,11 +2247,11 @@ function Ask-SynologyOption {
 
     if (Ask-YesNo "선택" "N") {
         $script:IncludeSynology = $true
-        Print-Info "Synology 워크플로우를 포함합니다"
+        Print-Info "Synology 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
     }
     else {
         $script:IncludeSynology = $false
-        Print-Info "Synology 워크플로우를 제외합니다"
+        Print-Info "Synology 워크플로우를 제외합니다 (나중에 --synology 옵션으로 추가 가능)"
     }
 }
 
@@ -2295,7 +2295,7 @@ function Copy-Workflows-ForType {
 
         # 신규 파일은 바로 복사
         if ($newFiles.Count -gt 0) {
-            Print-Info "$Type 신규 워크플로우 다운로드 중..."
+            Print-Info "$Type 타입의 신규 워크플로우를 내려받고 있습니다..."
             foreach ($workflow in $newFiles) {
                 Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
                 Write-Host "  ✓ $($workflow.Name) (신규, $Type)"
@@ -2326,7 +2326,7 @@ function Copy-Workflows-ForType {
             switch ($choice.ToUpper()) {
                 "T" {
                     # .template.yaml로 추가
-                    Print-Info "새 버전을 .template.yaml로 추가합니다..."
+                    Print-Info "기존 파일은 두고 새 버전을 .template.yaml로 추가합니다 (수동 반영용 참고)..."
                     foreach ($workflow in $existingFiles) {
                         $filename = $workflow.Name
                         $templateName = $filename -replace '\.yaml$', '.template.yaml'
@@ -2344,7 +2344,7 @@ function Copy-Workflows-ForType {
                 }
                 "S" {
                     # 건너뛰기
-                    Print-Info "기존 파일을 유지합니다..."
+                    Print-Info "기존 워크플로우를 그대로 유지합니다..."
                     foreach ($workflow in $existingFiles) {
                         Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
                         $Counters.skipped++
@@ -2352,7 +2352,7 @@ function Copy-Workflows-ForType {
                 }
                 "O" {
                     # 기존 방식 (덮어쓰기)
-                    Print-Info "기존 파일을 백업 후 덮어씁니다..."
+                    Print-Info "기존 파일을 .bak으로 백업한 뒤 새 버전으로 교체합니다..."
                     foreach ($workflow in $existingFiles) {
                         $filename = $workflow.Name
                         $destPath = Join-Path $WORKFLOWS_DIR $filename
@@ -2365,7 +2365,7 @@ function Copy-Workflows-ForType {
                 }
                 default {
                     # 기본값: 건너뛰기
-                    Print-Warning "잘못된 선택. 기존 파일을 유지합니다."
+                    Print-Warning "선택을 인식하지 못해 기존 파일을 유지합니다."
                     foreach ($workflow in $existingFiles) {
                         Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
                         $Counters.skipped++
@@ -2448,12 +2448,12 @@ function Copy-Workflows {
     # project-types 폴더 존재 확인
     if (-not (Test-Path $projectTypesDir)) {
         Print-Error "템플릿 저장소의 폴더 구조가 올바르지 않습니다."
-        Print-Error "project-types 폴더를 찾을 수 없습니다."
+        Print-Error "템플릿 저장소 구조 오류 — project-types 폴더를 찾지 못했습니다."
         exit 1
     }
 
     # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
-    Print-Info "공통 워크플로우 다운로드 중..."
+    Print-Info "모든 타입에 공통으로 들어가는 기본 워크플로우를 내려받고 있습니다..."
     $commonDir = Join-Path $projectTypesDir "common"
     if (Test-Path $commonDir) {
         # PowerShell 5.1 호환성: 배열 초기화 후 추가 (null += 방지)
@@ -2477,7 +2477,7 @@ function Copy-Workflows {
             $counters.copied++
         }
     } else {
-        Print-Warning "common 폴더를 찾을 수 없습니다. 건너뜁니다."
+        Print-Warning "공통 워크플로우 폴더(common)를 찾지 못해 건너뜁니다."
     }
 
     # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — ProjectTypes 배열 순회
@@ -2511,7 +2511,7 @@ function Copy-Workflows {
 
                 # 타입별 synology에서 이미 복사된 파일이면 스킵
                 if (Test-Path $destPath) {
-                    Print-Warning "$($filename): 타입별 Synology에 동일 파일 존재. 타입별 버전 유지."
+                    Print-Warning "$($filename): 타입별 Synology에 같은 파일이 있어 타입별 버전을 유지합니다."
                     continue
                 }
 
@@ -2600,7 +2600,7 @@ function Copy-Scripts {
         }
     }
     
-    Print-Success "$copied 개 스크립트 다운로드 완료"
+    Print-Success "$copied개 스크립트 다운로드 완료"
 }
 
 # ===================================================================
@@ -2614,13 +2614,13 @@ function Copy-ConfigFolder {
     $dstConfigDir = ".github\config"
 
     if (-not (Test-Path $srcConfigDir)) {
-        Print-Info ".github/config 폴더가 템플릿에 없습니다. 건너뜁니다."
+        Print-Info ".github/config 폴더가 템플릿에 없어 건너뜁니다."
         return
     }
 
     # 기존 config 파일이 있으면 알림
     if ((Test-Path $dstConfigDir) -and (Get-ChildItem $dstConfigDir -ErrorAction SilentlyContinue)) {
-        Print-Info "기존 config 파일이 있습니다. 덮어씁니다."
+        Print-Info "기존 config 파일을 최신 버전으로 덮어씁니다."
     }
 
     if (-not (Test-Path $dstConfigDir)) {
@@ -2632,7 +2632,7 @@ function Copy-ConfigFolder {
 
     # 복사된 파일 개수 계산
     $copied = (Get-ChildItem $dstConfigDir -File -ErrorAction SilentlyContinue | Measure-Object).Count
-    Print-Success ".github/config 폴더 복사 완료 ($copied 개 파일)"
+    Print-Success ".github/config 폴더 복사 완료 ($copied개 파일)"
 }
 
 # ===================================================================
@@ -2649,7 +2649,7 @@ function Copy-IssueTemplates {
     
     # 기존 템플릿이 있으면 알림
     if ((Test-Path $issueTemplateDir) -and (Get-ChildItem $issueTemplateDir -ErrorAction SilentlyContinue)) {
-        Print-Info "기존 이슈 템플릿이 있습니다. 덮어씁니다."
+        Print-Info "기존 이슈 템플릿을 최신 버전으로 덮어씁니다."
     }
     
     # 템플릿 다운로드
@@ -2662,7 +2662,7 @@ function Copy-IssueTemplates {
     $srcPrTemplate = Join-Path $TEMP_DIR ".github\PULL_REQUEST_TEMPLATE.md"
     if (Test-Path $srcPrTemplate) {
         Copy-Item -Path $srcPrTemplate -Destination ".github\" -Force
-        Print-Success "이슈/PR 템플릿 다운로드 완료"
+        Print-Success "이슈/PR 템플릿을 적용했습니다"
     }
 }
 
@@ -2675,7 +2675,7 @@ function Copy-DiscussionTemplates {
     
     $srcDiscussionDir = Join-Path $TEMP_DIR ".github\DISCUSSION_TEMPLATE"
     if (-not (Test-Path $srcDiscussionDir)) {
-        Print-Info "DISCUSSION_TEMPLATE이 템플릿에 없습니다. 건너뜁니다."
+        Print-Info "Discussions 템플릿이 템플릿에 없어 건너뜁니다."
         return
     }
     
@@ -2686,12 +2686,12 @@ function Copy-DiscussionTemplates {
     
     # 기존 템플릿이 있으면 알림
     if ((Test-Path $discussionTemplateDir) -and (Get-ChildItem $discussionTemplateDir -ErrorAction SilentlyContinue)) {
-        Print-Info "기존 Discussion 템플릿이 있습니다. 덮어씁니다."
+        Print-Info "기존 Discussion 템플릿을 최신 버전으로 덮어씁니다."
     }
     
     # 템플릿 다운로드
     Copy-Item -Path "$srcDiscussionDir\*" -Destination $discussionTemplateDir -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success "GitHub Discussions 템플릿 다운로드 완료"
+    Print-Success "GitHub Discussions 템플릿을 적용했습니다"
 }
 
 # ===================================================================
@@ -2699,17 +2699,17 @@ function Copy-DiscussionTemplates {
 # ===================================================================
 
 function Copy-CodeRabbitConfig {
-    Print-Step "CodeRabbit 설정 파일 다운로드 여부 확인 중..."
+    Print-Step "CodeRabbit AI 리뷰 설정을 확인하고 있습니다..."
     
     $srcCodeRabbit = Join-Path $TEMP_DIR ".coderabbit.yaml"
     if (-not (Test-Path $srcCodeRabbit)) {
-        Print-Info ".coderabbit.yaml 파일이 템플릿에 없습니다. 건너뜁니다."
+        Print-Info ".coderabbit.yaml이 템플릿에 없어 건너뜁니다."
         return
     }
     
     # 기존 파일이 있으면 사용자 확인
     if (Test-Path ".coderabbit.yaml") {
-        Print-Warning ".coderabbit.yaml이 이미 존재합니다"
+        Print-Warning ".coderabbit.yaml이 이미 있습니다 — 덮어쓸지 확인합니다"
         
         if (-not $Force) {
             Print-SeparatorLine
@@ -2720,7 +2720,7 @@ function Copy-CodeRabbitConfig {
             Write-Host ""
             
             if (-not (Ask-YesNo "선택" "N")) {
-                Print-Info ".coderabbit.yaml 다운로드 건너뜁니다"
+                Print-Info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
                 return
             }
 
@@ -2733,13 +2733,13 @@ function Copy-CodeRabbitConfig {
             # PowerShell 5.1 호환성: 백업 경로를 변수로 분리
             $backupPath = ".coderabbit.yaml.bak"
             Copy-Item -Path ".coderabbit.yaml" -Destination $backupPath -Force -ErrorAction SilentlyContinue
-            Print-Info "강제 모드: 기존 파일 덮어씁니다"
+            Print-Info "강제 모드 — 기존 파일을 새 버전으로 교체합니다"
         }
     }
     
     # 다운로드 실행
     Copy-Item -Path $srcCodeRabbit -Destination ".coderabbit.yaml" -Force
-    Print-Success ".coderabbit.yaml 다운로드 완료"
+    Print-Success ".coderabbit.yaml 설정을 적용했습니다 (CodeRabbit AI 리뷰 활성화)"
     Print-Info "💡 CodeRabbit AI 리뷰가 활성화됩니다 (language: ko-KR)"
 }
 
@@ -2822,7 +2822,7 @@ function Ensure-GitIgnore {
     
     # .gitignore가 없으면 생성
     if (-not (Test-Path ".gitignore")) {
-        Print-Info ".gitignore 파일이 없습니다. 생성합니다."
+        Print-Info ".gitignore가 없어 필수 항목과 함께 새로 만듭니다."
         
         $gitignoreContent = @"
 # IDE Settings
@@ -2834,12 +2834,12 @@ function Ensure-GitIgnore {
         
         Set-Content -Path ".gitignore" -Value $gitignoreContent -Encoding UTF8
         
-        Print-Success ".gitignore 파일 생성 완료"
+        Print-Success ".gitignore를 새로 만들었습니다"
         return
     }
     
     # 기존 파일이 있으면 누락된 항목만 추가
-    Print-Info "기존 .gitignore 파일 발견. 필수 항목 확인 중..."
+    Print-Info "기존 .gitignore를 발견했습니다 — 필수 항목이 있는지 확인합니다..."
     
     $added = 0
     $entriesToAdd = @()
@@ -2853,12 +2853,12 @@ function Ensure-GitIgnore {
     }
     
     if ($added -eq 0) {
-        Print-Info "필수 항목이 이미 모두 존재합니다. 건너뜁니다."
+        Print-Info "필수 항목이 이미 모두 있어 업데이트를 건너뜁니다."
         return
     }
     
     # 항목 추가
-    Print-Info "$added 개 항목 추가 중..."
+    Print-Info "$added개 항목 추가 중..."
     
     $appendContent = @"
 
@@ -2874,7 +2874,7 @@ function Ensure-GitIgnore {
     
     Add-Content -Path ".gitignore" -Value $appendContent -Encoding UTF8
 
-    Print-Success ".gitignore 업데이트 완료 ($added 개 항목 추가)"
+    Print-Success ".gitignore 업데이트 완료 ($added개 항목 추가)"
 }
 
 # ===================================================================
@@ -2886,13 +2886,13 @@ function Copy-SetupGuide {
     
     $srcGuide = Join-Path $TEMP_DIR "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
     if (-not (Test-Path $srcGuide)) {
-        Print-Info "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 파일이 템플릿에 없습니다. 건너뜁니다."
+        Print-Info "설정 가이드(SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)가 템플릿에 없어 건너뜁니다."
         return
     }
     
     # 항상 최신 버전으로 다운로드
     Copy-Item -Path $srcGuide -Destination "." -Force
-    Print-Success "템플릿 설정 가이드 다운로드 완료 (최신 버전)"
+    Print-Success "템플릿 설정 가이드를 적용했습니다 (최신 버전)"
     Print-Info "📖 템플릿 사용법을 SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md에서 확인하세요"
 }
 
@@ -2989,12 +2989,12 @@ function Copy-UtilModules {
         Write-Host ""
 
         if (-not (Ask-YesNo "선택" "N")) {
-            Print-Info "util 모듈 다운로드 건너뜁니다"
+            Print-Info "유틸리티 모듈 다운로드를 건너뜁니다"
             return
         }
     } else {
         # Force 모드에서는 자동으로 다운로드
-        Print-Info "강제 모드: util 모듈 자동 다운로드"
+        Print-Info "강제 모드 — 유틸리티 모듈을 자동으로 내려받습니다"
     }
 
     # 다운로드 실행
@@ -3010,7 +3010,7 @@ function Copy-UtilModules {
         $moduleCount = $moduleDirs.Count
     }
 
-    Print-Success "util 모듈 다운로드 완료 ($moduleCount 개 모듈)"
+    Print-Success "유틸리티 모듈을 적용했습니다 ($moduleCount개 모듈)"
 
     # 복사된 모듈 목록 표시
     foreach ($dir in $moduleDirs) {
@@ -3062,7 +3062,7 @@ function Start-InteractiveMode {
     )
 
     if (-not $_modeSelected -or $_modeSelected -eq 'cancel') {
-        Print-Info "취소되었습니다"
+        Print-Info "설치를 취소했습니다. 스크립트를 종료합니다."
         exit 0
     }
 
@@ -3138,7 +3138,7 @@ function Start-Integration {
         }
 
         # CLI 모드에서만 통합 정보 표시 — 멀티면 csv로
-        Print-QuestionHeader "🪐" "통합 정보"
+        Print-QuestionHeader "🪐" "통합 설정 확인"
 
         if ($script:ProjectTypes.Count -gt 1) {
             Write-Host "🔭 프로젝트 타입  : $($script:ProjectTypes -join ',') (멀티)"
@@ -3154,8 +3154,8 @@ function Start-Integration {
         # CLI 모드에서만 확인 질문 (force 모드가 아닐 때만)
         # ps1은 키 입력 방식이라 입력 안내(Y/N)를 유지한다(sh는 화살표라 제거).
         if (-not $Force) {
-            if (-not (Ask-YesNo "이 정보로 통합을 진행할까요?" "Y")) {
-                Print-Info "취소되었습니다"
+            if (-not (Ask-YesNo "이 설정으로 통합을 진행할까요?" "Y")) {
+                Print-Info "통합을 취소했습니다. (설정을 다시 검토한 뒤 재실행하세요)"
                 exit 0
             }
         }
@@ -3393,7 +3393,7 @@ function Offer-IdeToolsInstall {
             if ((Get-Command "codex" -ErrorAction SilentlyContinue) -or (Test-Path $codexTarget)) { $preParts += 'Codex CLI' }
             if (Test-PiCli) { $preParts += 'PI' }
             $targets = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "설치 / 업데이트할 IDE를 고르세요" -Options $ideOpts -Multi -Preselect ($preParts -join ',')
-            if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
+            if (-not $targets) { Print-Info "선택한 IDE가 없어 설치/업데이트를 건너뜁니다 (원할 때 다시 실행하세요)."; return }
             $tcsv = ",$($targets -join ','),"
             if ($tcsv -like '*,Claude Code,*') { Invoke-ClaudeSection $claudeAvailable $installedScope $installedVersion }
             if ($tcsv -like '*,Cursor,*')      { Invoke-CursorSection }
@@ -3403,7 +3403,7 @@ function Offer-IdeToolsInstall {
             if ($tcsv -like '*,PI Persona Harness,*') { Invoke-PiHarnessToggle }
         } elseif ($action -eq 'remove') {
             $targets = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "제거할 IDE를 고르세요" -Options $ideOpts -Multi
-            if (-not $targets) { Print-Info "선택된 IDE가 없어 건너뜁니다"; return }
+            if (-not $targets) { Print-Info "선택한 IDE가 없어 설치/업데이트를 건너뜁니다 (원할 때 다시 실행하세요)."; return }
             $tcsv = ",$($targets -join ','),"
             if ($tcsv -like '*,Claude Code,*') { Remove-ClaudeSection $claudeAvailable $installedScope }
             if ($tcsv -like '*,Cursor,*')      { Remove-CursorSection }
@@ -3413,7 +3413,7 @@ function Offer-IdeToolsInstall {
             # PI skill은 두고 harness만 해제 (PI 항목과 별개로 단독 선택 가능)
             if ($tcsv -like '*,PI Persona Harness,*') { Remove-PiHarnessOnly }
         } else {
-            Print-Info "IDE Skills 변경 없이 건너뜁니다"
+            Print-Info "IDE Skills는 변경하지 않고 넘어갑니다 — 통합은 계속됩니다."
         }
         return
     }
@@ -3508,7 +3508,7 @@ function Invoke-CursorSection {
     }
 
     if (-not $src) {
-        Print-Warning "사용 가능한 스킬 소스가 없습니다."
+        Print-Warning "설치할 스킬 소스를 찾지 못했습니다 (다운로드된 템플릿 또는 로컬 skills/ 폴더가 필요합니다)."
         return
     }
     # 라우터에서 '설치/업데이트' 선택됨 → 추가 질문 없이 global(user)로 바로 복사·최신화.
@@ -3524,7 +3524,7 @@ function Remove-ClaudeSection {
         Print-Info "  설치된 Claude Code 플러그인이 없어 건너뜁니다"
         return
     }
-    Print-Info "  삭제 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
+    Print-Info "  제거할 대상: cassiiopeia@cassiiopeia-marketplace (scope: ${installedScope})"
     $null = & claude plugin uninstall "cassiiopeia@cassiiopeia-marketplace" --scope $installedScope 2>&1
     if ($LASTEXITCODE -eq 0) {
         Print-Success "플러그인 uninstall 완료"
@@ -3599,7 +3599,7 @@ function Remove-PiSection {
     }
     # package 클론이 사라지면 등록된 harness loader 경로가 허공을 가리킨다 — 같이 해제
     if (Test-PiHarnessEnabled) {
-        Print-Info "  Persona Harness 등록도 함께 해제"
+        Print-Info "  Persona Harness 등록도 함께 해제됩니다."
         [void](Remove-PiHarnessExtension)
     }
 }
@@ -3737,7 +3737,7 @@ function Invoke-CursorSkillsCopy {
         Write-CursorSkillsMeta "user" $dest
         Print-Success "Cursor Skills 설치 완료 ($dest\, v$($script:templateVersion))"
     } catch {
-        Print-Warning "Cursor Skills 복사 실패"
+        Print-Warning "Cursor Skills 복사에 실패했습니다 — 원본 skills/ 폴더를 확인하거나 다시 시도하세요."
     }
 }
 
@@ -3823,7 +3823,7 @@ function Invoke-CodexNativeSkillsFallback {
         Write-Host "  N/n - 아니오, 건너뛰기"
         Write-Host ""
         if (-not (Ask-YesNo "선택" "Y")) {
-            Print-Info "Codex native skills fallback 변경 없이 건너뜁니다"
+            Print-Info "Codex native skills fallback을 건너뜁니다 (marketplace 등록 방식만 사용)."
             return
         }
     }
@@ -3849,7 +3849,7 @@ function Invoke-CodexNativeSkillsFallback {
         Print-Step "Codex skills 저장소 clone 중..."
         $null = & git clone "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git" $installDir 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Print-Warning "Codex skills 저장소 clone 실패"
+            Print-Warning "Codex skills 저장소 clone에 실패했습니다 — 네트워크를 확인하거나 수동으로 git clone 하세요."
             return
         }
     }
@@ -4014,7 +4014,7 @@ function Offer-PiHarness {
             Print-Success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
         }
     } else {
-        Print-Info "  → 건너뜀 (skill만 사용)"
+        Print-Info "  → 건너뜁니다 (skill만 사용, harness는 비활성)"
     }
 }
 
@@ -4055,7 +4055,7 @@ function Invoke-PiHarnessToggle {
                 Print-Success "  Persona Harness 활성화 완료 — PI 재시작 후 적용됩니다."
             }
         } else {
-            Print-Info "  → 비활성화 상태 유지 (skill만 사용)"
+            Print-Info "  → 비활성화 상태를 유지합니다 (skill만 사용)"
         }
     }
 }

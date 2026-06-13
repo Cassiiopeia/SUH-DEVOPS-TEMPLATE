@@ -55,6 +55,7 @@ on:
   push:
     branches:
       - deploy  # 프로덕션 배포
+    # @wizard paths-anchor (모노레포일 때 integrator가 paths 필터를 여기 주입)
   workflow_dispatch:  # 수동 실행 허용
 
 # ===================================================================
@@ -62,10 +63,10 @@ on:
 # ===================================================================
 env:
   # 프로젝트 고유 식별자
-  PROJECT_NAME: "프로젝트명-ai"
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
 
   # 🌐 포트 설정
-  DEPLOY_PORT: "8092"
+  DEPLOY_PORT: "__DEPLOY_PORT__"  # @wizard ask: 배포 포트 [기본: 8000]
 
   # 🐍 Python 설정
   PYTHON_VERSION: "3.13"
@@ -75,8 +76,8 @@ env:
 
   # 🗂️ 볼륨 마운트 설정 (빈값이면 마운트 안함)
   ENABLE_VOLUME_MOUNT: "false"
-  VOLUME_HOST_PATH: "/volume1/projects/프로젝트명/ai"
-  VOLUME_CONTAINER_PATH: "/mnt/프로젝트명"
+  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
+  VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask: 컨테이너 내부 경로 [기본: /mnt/__PROJECT_NAME__]
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)

@@ -63,10 +63,10 @@ env:
   # 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
   # ============================================
   # 프로젝트 이름
-  PROJECT_NAME: "your-project"
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
   # Flutter/Java 버전
   FLUTTER_VERSION: "3.35.5"
-  JAVA_VERSION: "17"
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 17]
   PROJECT_TYPE: "flutter"
   # Firebase App Distribution 설정
   FIREBASE_APP_ID: "your-firebase-app-id"

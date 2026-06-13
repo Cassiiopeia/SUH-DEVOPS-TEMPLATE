@@ -33,7 +33,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_NAME: "project"
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
   NODE_VERSION: "20.15.0"
   ENV_FILE: ".env"
 

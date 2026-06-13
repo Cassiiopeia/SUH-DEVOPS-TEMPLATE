@@ -218,6 +218,7 @@ docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work mcr.microsoft.co
 
 - ⚠️ **하지 말 것**: 스크립트 전체를 `Invoke-Expression` 으로 AST 로드 → ARM Mac의 QEMU 에뮬레이션에서 `AccessViolationException`(메모리 폴트)로 죽는다. 실측 확인됨.
 - ✅ **할 것**: 검증할 함수 본문만 `sed -n 'START,ENDp'` 로 잘라 최소 하네스에 붙이고, `Invoke-ChooseMenu`·`Read-UserInput`·`Read-Host` 등 입력 함수를 **배열 주입 스텁**으로 덮어쓴다. `Print-*`·`Detect-*`·외부접근 함수도 스텁.
+- ⚠️ **QEMU 변종 크래시 (실측)**: 함수를 `function`으로 정의 후 **호출**하면 QEMU가 `assertion failed [block != nullptr]: BasicBlock requested for unrecognized address`로 죽을 수 있다(try-catch·trap도 못 잡는 네이티브 폴트). 이건 **PS 코드 버그가 아니라 QEMU JIT 한계**다. 구별법: ① `Parser::ParseFile`로 구문은 `PS1_PARSE_OK` 통과하는지 ② **함수 본문을 `function` 래핑 없이 인라인으로** 같은 입력에 돌려 정상 동작하는지 확인 → 둘 다 OK면 로직은 정상, QEMU만 못 돌린 것이다. 실제 Windows/Linux PowerShell에선 정상 동작한다.
 
 ```bash
 # 예: Edit-ProjectInfo(1256~1342행)만 추출해 입력 시퀀스 주입

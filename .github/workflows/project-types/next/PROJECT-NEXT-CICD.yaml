@@ -23,10 +23,11 @@ on:
   push:
     branches:
       - deploy
+    # @wizard paths-anchor (모노레포일 때 integrator가 paths 필터를 여기 주입)
   workflow_dispatch:
 
 env:
-  PROJECT_NAME: "project"
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
   DOCKER_IMAGE_PREFIX: "nextjs-container"
   NODE_VERSION: "20.15.0"
   ENV_FILE_NAME: ".env"

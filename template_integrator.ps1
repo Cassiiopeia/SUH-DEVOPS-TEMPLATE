@@ -2715,11 +2715,11 @@ function Copy-CodeRabbitConfig {
             Print-SeparatorLine
             Write-Host ""
             Write-Host ".coderabbit.yaml을 덮어쓰시겠습니까?"
-            Write-Host "  Y/y - 예, 덮어쓰기"
-            Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
+            Write-Host "  Y/y - 예, 덮어쓰기 (기본)"
+            Write-Host "  N/n - 아니오, 건너뛰기"
             Write-Host ""
-            
-            if (-not (Ask-YesNo "선택" "N")) {
+
+            if (-not (Ask-YesNo "선택" "Y")) {
                 Print-Info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
                 return
             }
@@ -2984,11 +2984,11 @@ function Copy-UtilModules {
     # 사용자 확인 (force 모드가 아닐 때만)
     if (-not $Force) {
         Write-Host "이 유틸리티 모듈을 다운로드하시겠습니까?"
-        Write-Host "  Y/y - 예, 다운로드하기"
-        Write-Host "  N/n - 아니오, 건너뛰기 (기본)"
+        Write-Host "  Y/y - 예, 다운로드하기 (기본)"
+        Write-Host "  N/n - 아니오, 건너뛰기"
         Write-Host ""
 
-        if (-not (Ask-YesNo "선택" "N")) {
+        if (-not (Ask-YesNo "선택" "Y")) {
             Print-Info "유틸리티 모듈 다운로드를 건너뜁니다"
             return
         }

@@ -65,6 +65,7 @@ on:
   push:
     branches:
       - deploy  # 배포 환경 (DEPLOY_PORT 사용)
+    # @wizard paths-anchor (모노레포일 때 integrator가 paths 필터를 여기 주입)
   workflow_dispatch:  # 수동 실행 허용
 
 # ===================================================================
@@ -72,20 +73,20 @@ on:
 # ===================================================================
 env:
   # 🔧 프로젝트 설정 - 실제 프로젝트명으로 변경하세요
-  PROJECT_NAME: "mapsy-back"  # 기본값: project (프로젝트명에 맞게 수정 필요)
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
 
   # ☁️ Spring Boot 설정
   SPRING_PROFILE: "prod"
-  JAVA_VERSION: "21"
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 21]
   GRADLE_OPTS: "-Dspring.profiles.active=prod"
 
   # 📁 경로 설정
-  APPLICATION_YML_DIR: "MS-Web/src/main/resources"
+  APPLICATION_YML_DIR: "__APPLICATION_YML_DIR__"  # @wizard auto-find: application.yml이 있는 resources 디렉토리
   DOCKERFILE_PATH: "./Dockerfile"
 
   # 🌐 포트 설정
-  CONTAINER_INTERNAL_PORT: "8080"  # Spring Boot 내부 포트
-  DEPLOY_PORT: "8096"  # deploy/main 브랜치 배포 포트
+  CONTAINER_INTERNAL_PORT: "8080"  # Spring Boot 내부 포트 (고정값)
+  DEPLOY_PORT: "__DEPLOY_PORT__"  # @wizard ask: 배포 포트 [기본: 8080]
 
   # 🐳 컨테이너 이름 설정
   # 비워두면 PROJECT_NAME을 기본값으로 사용 (예: mapsy-back)
@@ -96,8 +97,8 @@ env:
   # true: 볼륨 마운트 활성화 (디렉토리 없으면 자동 생성)
   # false: 볼륨 마운트 비활성화 (기본값)
   ENABLE_VOLUME_MOUNT: "false"
-  VOLUME_HOST_PATH: "/volume1/projects/mapsy-back"  # 호스트 풀 경로 (예: /volume1/projects/프로젝트명)
-  VOLUME_CONTAINER_PATH: "/mnt/mapsy-back"  # 컨테이너 내부 경로
+  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
+  VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask: 컨테이너 내부 경로 [기본: /mnt/__PROJECT_NAME__]
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)

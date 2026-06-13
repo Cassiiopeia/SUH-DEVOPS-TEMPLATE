@@ -1,14 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-13T12:41:14Z",
-    "currentVersion": "3.0.123",
+    "lastUpdated": "2026-06-13T13:57:27Z",
+    "currentVersion": "3.0.125",
     "projectType": "basic",
-    "totalReleases": 144,
+    "totalReleases": 145,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.125",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-13",
+      "pr_number": 378,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 마법사 설치 시 배포 설정이 프로젝트에 맞게 자동으로 채워집니다\n  * 프로젝트 이름·포트·JDK 버전 등을 설치 중에 물어보고 적용합니다\n\n* **개선**\n  * 설치 마법사의 확인 단계 기본 선택이 더 편하게 바뀌었습니다\n  * 워크플로우 예시 값들이 일관되게 정리되었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "마법사 설치 시 배포 설정이 프로젝트에 맞게 자동으로 채워집니다",
+            "프로젝트 이름·포트·JDK 버전 등을 설치 중에 물어보고 적용합니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설치 마법사의 확인 단계 기본 선택이 더 편하게 바뀌었습니다",
+            "워크플로우 예시 값들이 일관되게 정리되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.123",
       "project_type": "basic",

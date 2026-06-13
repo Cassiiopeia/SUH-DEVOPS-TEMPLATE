@@ -32,13 +32,13 @@ name: PROJECT-SPRING-SYNOLOGY-PR-PREVIEW
 # ===================================================================
 env:
   # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용) (프로젝트별 수정 필요)
-  PROJECT_NAME: suh-project-utility
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
 
   # Spring Boot 빌드 설정 (프로젝트별 수정 필요)
-  JAVA_VERSION: '17'
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 21]
   GRADLE_BUILD_CMD: './gradlew clean build -x test -Dspring.profiles.active=prod'
-  JAR_PATH: 'Suh-Web/build/libs/*.jar'
-  APPLICATION_YML_PATH: 'Suh-Web/src/main/resources/application-prod.yml'
+  JAR_PATH: 'Suh-Web/build/libs/*.jar'  # 멀티모듈이면 빌드 산출물 경로를 직접 수정하세요
+  APPLICATION_YML_PATH: "__APPLICATION_YML_PATH__"  # @wizard auto-find: application-prod.yml 전체 경로
 
   # Docker 설정 (프로젝트별 수정 필요)
   DOCKERFILE_PATH: './Dockerfile'

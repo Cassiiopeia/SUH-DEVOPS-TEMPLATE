@@ -4,6 +4,17 @@
 
 ---
 
+## ⚠️ 작업 브랜치 규칙 (agent 필독)
+
+**이 프로젝트는 `main` 브랜치에서 직접 작업하는 것을 기본값으로 한다.**
+
+- 별도 지시가 없으면 feature 브랜치를 만들지 말고 `main`에서 작업·커밋·푸시한다.
+- `main` push 전에는 **항상 `git pull --rebase origin main`** 으로 먼저 동기화한다 (버전 자동증가 워크플로우가 main에 커밋을 추가하므로 로컬이 뒤처지기 쉽다).
+- `git push`는 **사용자가 명시적으로 요청한 경우에만** 실행한다.
+- 사용자가 명시적으로 브랜치 작업을 요청한 경우에만 feature 브랜치를 사용한다.
+
+---
+
 ## 프로젝트 개요
 
 ### 지원 프로젝트 타입
@@ -267,6 +278,49 @@ EXP
 - `set -e` 환경의 sh에서 `var=$(menu_fn)` 단독 라인은 ESC(비-0 반환) 시 **함수 전체가 즉시 종료**된다. 반드시 `var=$(menu_fn) || rc=$?` 또는 `|| true`로 종료코드를 흡수한다. ("ESC 눌렀더니 마법사가 통째로 꺼짐" 버그의 주원인.)
 - `var=$(cmd); rc=$?` 처럼 `;`로 이어 같은 줄에 두면 `set -e` 안전(마지막 명령 `rc=$?`가 성공).
 - 임시 하네스/`.exp` 파일은 검증 후 반드시 정리한다(`rm -f /tmp/h.sh /tmp/ps_min.ps1` 등).
+
+---
+
+## ⚠️ 워크플로우 YAML 검증 — 로컬 파서를 GitHub 실제 동작으로 착각하지 말 것 (agent 필독)
+
+> **핵심 원칙: 로컬 YAML 검증 도구(`actionlint`·Ruby `psych`·Python `pyyaml`)가 빨갛게 떠도, 그 워크플로우가 GitHub에서 실제로 깨진다는 뜻이 아니다.** 도구가 못 읽는 것과 GitHub이 못 돌리는 것은 **다르다.** 멀쩡히 돌던 워크플로우를 "검증 도구가 오류라고 했으니" 멋대로 고치지 마라 — 이건 실측으로 확인된 함정이다.
+
+### 왜 이런 일이 생기나 (실측 사례)
+
+`run: |` 블록 안에서 heredoc을 **들여쓰기 0칸 본문**으로 쓰는 패턴이 대표적이다:
+```yaml
+        run: |
+          cat > android/key.properties << EOF
+storeFile=keystore/key.jks      # ← 들여쓰기 0칸
+EOF
+```
+- `actionlint`·`psych`·`pyyaml`은 이걸 `could not find expected ':'`로 **파싱 실패** 처리한다 (블록 스칼라 경계를 들여쓰기로만 판단하는 엄격한 go-yaml/libyaml 계열).
+- 하지만 **GitHub Actions의 실제 YAML 파서는 이 heredoc을 정상 처리해서 워크플로우가 success한다.** 즉 도구의 한계지 진짜 버그가 아니다.
+
+### 진짜 깨졌는지 확인하는 올바른 순서 (추측 금지, 실측만)
+
+1. **GitHub 실행 이력을 먼저 본다 (가장 강력한 증거).** 같은 파일/패턴이 실제 `success`한 run이 있으면 → **멀쩡한 코드 확정.** 절대 손대지 마라.
+   ```bash
+   PAT=$(python3 -c "import json;print(json.load(open('$HOME/.suh-template/config/config.json'))['github']['global_pat'])")
+   curl -s -H "Authorization: token $PAT" \
+     "https://api.github.com/repos/<owner>/<repo>/actions/workflows/<file>.yaml/runs?per_page=20" \
+     | python3 -c "import json,sys;from collections import Counter;d=json.load(sys.stdin);print(Counter(r['conclusion'] for r in d.get('workflow_runs',[])))"
+   ```
+2. **"잘 작동하는 기준 레포"와 대조한다.** 이 템플릿의 검증 기준 레포는 **`TEAM-ROMROM/RomRom-FE`(Flutter)·`TEAM-ROMROM/RomRom-BE`(Spring)** 다 — 실제 운영 중이고 빌드가 success한다. `passQL`은 **이 템플릿을 테스트하는 실험 프로젝트**라 (Flutter init도 미완) **신뢰 기준이 아니다.** passQL의 failure를 근거로 템플릿이 깨졌다고 결론짓지 마라.
+3. **YAML 파싱 자체가 깨졌는지는 run annotations로 확인한다.** GitHub이 파싱에 실패하면 `syntax error` annotation을 남긴다. annotation이 없고 job이 빌드 중간 step에서 실패했으면 → **YAML은 정상, 원인은 빌드 로직(secret 누락 등)이다.**
+   ```bash
+   curl -s -H "Authorization: token $PAT" "https://api.github.com/repos/<owner>/<repo>/check-runs/<job_id>/annotations"
+   ```
+
+### 검증 도구를 쓸 때의 자세
+
+- `actionlint`/`psych`/`pyyaml`은 **참고용 신호**다. 빨간불 = "확인해봐라"지 "고쳐라"가 아니다.
+- 특히 **이미 운영 중인 워크플로우**(GitHub에 success 이력 있음)는 도구가 뭐라 하든 **건드리지 않는 것이 기본값**이다.
+- 정 고쳐야 한다면, "잘 작동하는 RomRom이 같은 자리를 어떻게 쓰는지" 먼저 받아 대조하라. (예: key.properties는 RomRom-FE가 `echo "k=v" >> file` 방식으로 쓰며 success — 0칸 heredoc을 안 쓴다.)
+- 내가 토큰화·치환 같은 **env 값만 바꾸는 작업**을 할 때, `run:`/`uses:`/`with:`/`steps:` 등 **실행 로직은 한 줄도 건드리지 않았는지** `git diff`로 자가검증하라:
+  ```bash
+  git diff <files> | grep "^+" | grep -v "^+++" | grep -vE "내가_의도한_변경_패턴"   # 결과 비면 실행로직 무손상
+  ```
 
 ---
 

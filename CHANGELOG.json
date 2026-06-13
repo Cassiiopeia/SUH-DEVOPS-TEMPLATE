@@ -1,14 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-13T13:57:27Z",
-    "currentVersion": "3.0.125",
+    "lastUpdated": "2026-06-13T14:35:15Z",
+    "currentVersion": "3.0.126",
     "projectType": "basic",
-    "totalReleases": 145,
+    "totalReleases": 146,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.126",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-13",
+      "pr_number": 379,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 설치 마법사가 배포에 필요한 값을 직접 물어보고 자동으로 채워줍니다\n  * 포트·JDK 버전 등은 엔터만 누르면 프로젝트에 맞는 기본값이 들어갑니다\n  * 한 번 입력한 설정을 기억해 다음 설치 때 기본값으로 제안합니다\n\n* **개선**\n  * 설정 파일 위치를 자동으로 찾아 채워주어 수동 작업이 줄었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "설치 마법사가 배포에 필요한 값을 직접 물어보고 자동으로 채워줍니다",
+            "포트·JDK 버전 등은 엔터만 누르면 프로젝트에 맞는 기본값이 들어갑니다",
+            "한 번 입력한 설정을 기억해 다음 설치 때 기본값으로 제안합니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설정 파일 위치를 자동으로 찾아 채워주어 수동 작업이 줄었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.125",
       "project_type": "basic",

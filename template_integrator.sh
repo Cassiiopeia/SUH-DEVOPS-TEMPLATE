@@ -3012,7 +3012,7 @@ copy_coderabbit_config() {
             print_separator_line
             print_to_user ""
 
-            if ! ask_yes_no ".coderabbit.yaml을 덮어쓸까요?" "N"; then
+            if ! ask_yes_no ".coderabbit.yaml을 덮어쓸까요?" "Y"; then
                 print_info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
                 return
             fi
@@ -3265,7 +3265,7 @@ copy_util_modules() {
 
     # 사용자 확인 (force 모드가 아니고 TTY 가용 시)
     if [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
-        if ! ask_yes_no "이 유틸리티 모듈을 다운로드할까요?" "N"; then
+        if ! ask_yes_no "이 유틸리티 모듈을 다운로드할까요?" "Y"; then
             print_info "유틸리티 모듈 다운로드를 건너뜁니다"
             return
         fi

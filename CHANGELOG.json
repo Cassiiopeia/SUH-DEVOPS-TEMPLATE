@@ -1,14 +1,36 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-12T08:35:00Z",
-    "currentVersion": "3.0.122",
+    "lastUpdated": "2026-06-13T12:41:14Z",
+    "currentVersion": "3.0.123",
     "projectType": "basic",
-    "totalReleases": 143,
+    "totalReleases": 144,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.123",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-13",
+      "pr_number": 377,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 설치 마법사가 각 단계를 더 친절하게 안내합니다\n  * 감지된 프로젝트 정보를 한눈에 요약해 보여줍니다\n  * 프로젝트 폴더를 물어볼 때 전체 경로를 함께 안내합니다\n  * 안내 문구의 표현을 일관되게 다듬었습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설치 마법사가 각 단계를 더 친절하게 안내합니다",
+            "감지된 프로젝트 정보를 한눈에 요약해 보여줍니다",
+            "프로젝트 폴더를 물어볼 때 전체 경로를 함께 안내합니다",
+            "안내 문구의 표현을 일관되게 다듬었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.122",
       "project_type": "basic",

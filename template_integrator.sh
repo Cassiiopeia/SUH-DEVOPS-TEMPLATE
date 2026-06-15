@@ -1913,13 +1913,19 @@ handle_project_edit_menu() {
 
         # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
         # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로) 표기.
+        # Synology 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 노출한다.
+        # (version 모드는 워크플로우를 안 깔아 Synology와 무관.)
+        local _edit_opts=("프로젝트 타입|" "버전|" "기본 브랜치|")
+        if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
+            local _syn_state="제외"
+            [ "$INCLUDE_SYNOLOGY" = "true" ] && _syn_state="포함"
+            _edit_opts+=("Synology 포함 여부 (현재: ${_syn_state})|")
+        fi
+        _edit_opts+=("모두 맞음, 계속|" "뒤로 (변경 없이 확인 화면으로)|")
+
         local _edit_label _menu_rc=0
         _edit_label=$(choose_menu --cancel-label="뒤로" "어떤 항목을 수정하시겠습니까?" \
-            "프로젝트 타입|" \
-            "버전|" \
-            "기본 브랜치|" \
-            "모두 맞음, 계속|" \
-            "뒤로 (변경 없이 확인 화면으로)|") || _menu_rc=$?
+            "${_edit_opts[@]}") || _menu_rc=$?
 
         local edit_choice=""
         if [ "$_menu_rc" -ne 0 ]; then
@@ -1930,6 +1936,7 @@ handle_project_edit_menu() {
                 프로젝트\ 타입*) edit_choice="type" ;;
                 버전*)           edit_choice="version" ;;
                 기본\ 브랜치*)   edit_choice="branch" ;;
+                Synology*)       edit_choice="synology" ;;
                 모두\ 맞음*)     edit_choice="done" ;;
                 뒤로*)           edit_choice="back" ;;
                 *)               edit_choice="back" ;;
@@ -2011,6 +2018,16 @@ handle_project_edit_menu() {
                     print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
                     print_to_user ""
                 fi
+                ;;
+            synology)
+                # Synology 포함 여부를 다시 묻는다. --force-ask로 이미 설정된 값이 있어도 무조건 재질문.
+                # ask_synology_option이 폴더를 스캔해 발견 시 안내+질문하고 INCLUDE_SYNOLOGY를 갱신한다.
+                local _syn_dirs=() _st
+                for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+                    _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+                done
+                ask_synology_option --force-ask "${_syn_dirs[@]}"
+                print_to_user ""
                 ;;
             done)
                 print_success "수정을 마쳤습니다 — 확인 화면으로 돌아갑니다"
@@ -2600,6 +2617,13 @@ get_current_template_version() {
 # 인자로 여러 type_dir를 받을 수 있다 (멀티타입). 각 타입의 synology 폴더 +
 # 공통 synology 폴더를 모두 합산해 한 번만 질문한다.
 ask_synology_option() {
+    # 첫 인자가 --force-ask면, 이미 설정된 INCLUDE_SYNOLOGY가 있어도 무조건 다시 묻는다.
+    # (확인 화면의 수정 메뉴에서 사용 — 사용자가 명시적으로 다시 고르려는 경우)
+    local _force_ask=false
+    if [ "$1" = "--force-ask" ]; then
+        _force_ask=true
+        shift
+    fi
     local type_dirs=("$@")
     [ ${#type_dirs[@]} -eq 0 ] && return
 
@@ -2625,17 +2649,19 @@ ask_synology_option() {
     done
     [ "$_any_dir" = false ] && return
 
-    # 이미 CLI로 지정된 경우 건너뛰기
-    if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
+    # 이미 CLI로 지정된 경우 건너뛰기 (단, --force-ask면 무시하고 다시 묻는다)
+    if [ "$_force_ask" = false ] && { [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; }; then
         return
     fi
 
-    # 기존 version.yml에서 설정 읽기 시도
-    read_template_options
+    # 기존 version.yml에서 설정 읽기 시도 (--force-ask면 저장값으로 덮어쓰지 않는다)
+    if [ "$_force_ask" = false ]; then
+        read_template_options
 
-    # 이전 설정이 있으면 건너뛰기
-    if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
-        return
+        # 이전 설정이 있으면 건너뛰기
+        if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
+            return
+        fi
     fi
 
     # TTY 없으면 건너뛰기 (기본값: 제외)

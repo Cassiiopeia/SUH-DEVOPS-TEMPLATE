@@ -1309,6 +1309,54 @@ find_type_path_candidates() {
     done <<< "$found" | sort -u
 }
 
+# 기존 version.yml의 project_paths 값을 PROJECT_PATHS_CSV에 로드만 한다 (질문 없음).
+# 이미 init된 프로젝트는 확인 화면에 저장된 경로를 그대로 보여주기 위해 사용한다.
+# 반환: 대상 타입(basic 제외) 전부가 이미 채워졌으면 0 (= 경로 질문 불필요), 아니면 1.
+load_saved_project_paths() {
+    [ ! -f "version.yml" ] && return 1
+
+    local _all_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    local _targets=() _t
+    for _t in "${_all_types[@]}"; do
+        [ "$_t" = "basic" ] && continue
+        _targets+=("$_t")
+    done
+    [ ${#_targets[@]} -eq 0 ] && return 0  # basic만이면 경로 불필요
+
+    # 대상 타입을 version.yml의 project_paths 저장값으로 채운다 (이미 있으면 건드리지 않음)
+    local _in_paths=false _line _key _val _existing
+    for _t in "${_targets[@]}"; do
+        # 이미 채워져 있으면(예: --paths) 건너뜀
+        _existing=$(get_path_for_type "$_t")
+        [ -n "$_existing" ] && continue
+        # version.yml의 project_paths 블록에서 해당 타입 줄 찾기
+        _in_paths=false
+        while IFS= read -r _line; do
+            case "$_line" in
+                project_paths:*) _in_paths=true; continue ;;
+            esac
+            if [ "$_in_paths" = true ]; then
+                # '  flutter: "app"' 형태
+                if printf '%s' "$_line" | grep -qE "^  ${_t}:[[:space:]]*\""; then
+                    _val=$(printf '%s' "$_line" | sed -E "s/^  ${_t}:[[:space:]]*\"([^\"]*)\".*/\1/")
+                    [ -n "$_val" ] && set_path_for_type "$_t" "$_val"
+                    break
+                fi
+                # 다른 최상위 키(들여쓰기 없음) → 섹션 종료
+                case "$_line" in
+                    [!\ ]*) break ;;
+                esac
+            fi
+        done < version.yml
+    done
+
+    # 대상 전부가 채워졌는지 확인
+    for _t in "${_targets[@]}"; do
+        [ -z "$(get_path_for_type "$_t")" ] && return 1
+    done
+    return 0
+}
+
 # 선택된 모든 타입의 경로를 감지·확인하여 PROJECT_PATHS_CSV 확정 (스펙 §4)
 resolve_project_paths() {
     # --paths 사전 검증·정규화: 타입 유효성 + 경로 정규화 (백슬래시→슬래시, 끝 슬래시·앞 ./ 제거)
@@ -2171,11 +2219,9 @@ create_version_yml() {
             print_to_user "       최신 워크플로우의 버전 자동증가, 체인지로그, 배포"
             print_to_user "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
             print_to_user ""
-            print_to_user "     Y   업데이트하고 계속  (권장, 기본)"
-            print_to_user "     N   통합 취소"
-            print_to_user ""
 
             # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            # 선택지(예/아니오)는 아래 ask_yes_no가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
             if ! ask_yes_no "  선택 (Y/N, 기본: Y): " "Y"; then
                 print_error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
                 exit 0
@@ -3282,14 +3328,38 @@ copy_discussion_templates() {
 }
 
 # .coderabbit.yaml 다운로드
+# CodeRabbit이 무엇이고, 이 파일이 어떤 설정으로 동작하는지 안내한다.
+# (설정을 안 하고 "왜 리뷰가 안 달리지?" 하는 사용자가 많아 명시적으로 설명한다.)
+show_coderabbit_intro() {
+    print_to_user ""
+    print_to_user "  🐰 CodeRabbit이란?"
+    print_to_user "     PR을 올리면 AI가 코드 변경을 자동으로 읽고 리뷰 코멘트를 달아주는 서비스입니다."
+    print_to_user "     (버그·보안·개선점 지적, 변경 요약, PR 내 채팅 질문 응답)"
+    print_to_user ""
+    print_to_user "  📋 이 .coderabbit.yaml에 들어가는 설정:"
+    print_to_user "     • 리뷰 언어        : 한국어(ko-KR)"
+    print_to_user "     • 자동 리뷰        : 켜짐 — main 대상 PR에 자동 리뷰 (draft PR 제외)"
+    print_to_user "     • 리뷰 성향        : chill (과하지 않게), 변경요약 표시, 변경요청 강제 안 함"
+    print_to_user "     • PR 채팅 자동응답  : 켜짐"
+    print_to_user ""
+    print_to_user "  ⚠️  파일만으로는 끝이 아닙니다 — 한 번만 활성화하면 됩니다:"
+    print_to_user "     1) https://coderabbit.ai 접속 → GitHub으로 로그인"
+    print_to_user "     2) 이 저장소를 CodeRabbit에 연결(Authorize/Enable)"
+    print_to_user "     이 단계를 안 하면 .coderabbit.yaml이 있어도 리뷰가 달리지 않습니다."
+    print_to_user ""
+}
+
 copy_coderabbit_config() {
     print_step "CodeRabbit AI 리뷰 설정을 확인하고 있습니다..."
-    
+
     if [ ! -f "$TEMP_DIR/.coderabbit.yaml" ]; then
         print_info ".coderabbit.yaml이 템플릿에 없어 건너뜁니다."
         return
     fi
-    
+
+    # CodeRabbit 소개 + 설정 안내 (덮어쓰기/신규 적용 공통으로 먼저 보여준다)
+    show_coderabbit_intro
+
     # 기존 파일이 있으면 사용자 확인
     if [ -f ".coderabbit.yaml" ]; then
         print_warning ".coderabbit.yaml이 이미 있습니다 — 덮어쓸지 확인합니다"
@@ -3714,13 +3784,27 @@ interactive_mode() {
                 ask_synology_option "${_syn_dirs[@]}"
             fi
 
-            # 3) 경로: full/version 모드에서 멀티경로 확정
+            # 3) 경로: full/version 모드에서만 필요
+            #    이미 init된 프로젝트(version.yml에 project_paths 있음)는 저장값을 '로드만' 해
+            #    확인 화면에 보여주고 질문은 생략한다. 저장값이 없거나 일부만 있으면(신규 init)
+            #    확인 화면을 거친 뒤(아래 5번) 비어있는 타입만 resolve_project_paths로 묻는다.
             if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
-                resolve_project_paths
+                load_saved_project_paths || true
             fi
 
             # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인 (수정/취소 가능)
             detect_and_confirm_project
+
+            # 5) 확인 후에도 경로가 비어있는 대상 타입이 있으면(신규 init) 그때 질문한다.
+            #    (사용자가 '수정 → 타입 변경'을 했다면 그 안에서 이미 경로를 다시 물었으므로 보통 채워져 있다.)
+            if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
+                local _need_paths=false _pt
+                for _pt in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+                    [ "$_pt" = "basic" ] && continue
+                    if [ -z "$(get_path_for_type "$_pt")" ]; then _need_paths=true; break; fi
+                done
+                [ "$_need_paths" = true ] && resolve_project_paths
+            fi
             ;;
     esac
 }

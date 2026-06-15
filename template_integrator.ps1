@@ -1083,6 +1083,40 @@ function Find-TypePathCandidates {
     return @()
 }
 
+# 기존 version.yml의 project_paths 값을 $script:ProjectPaths에 로드만 한다 (질문 없음).
+# 이미 init된 프로젝트는 확인 화면에 저장된 경로를 그대로 보여주기 위해 사용한다.
+# 반환: 대상 타입(basic 제외) 전부가 이미 채워졌으면 $true (= 경로 질문 불필요).
+function Load-SavedProjectPaths {
+    if (-not (Test-Path "version.yml")) { return $false }
+
+    $allTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    $targets = @($allTypes | Where-Object { $_ -ne "basic" })
+    if ($targets.Count -eq 0) { return $true }  # basic만이면 경로 불필요
+
+    # version.yml의 project_paths 블록을 한 번에 파싱해 맵으로 적재
+    $saved = @{}
+    $inPaths = $false
+    foreach ($line in (Get-Content "version.yml")) {
+        if ($line -match '^project_paths:') { $inPaths = $true; continue }
+        if ($inPaths) {
+            if ($line -match '^\s{2}([^\s:]+):\s*"([^"]*)"') { $saved[$matches[1]] = $matches[2]; continue }
+            if ($line -match '^[^\s]') { break }  # 다른 최상위 키 → 섹션 종료
+        }
+    }
+
+    # 대상 타입을 저장값으로 채운다 (-Paths로 이미 지정된 건 건드리지 않음)
+    foreach ($t in $targets) {
+        if ($script:ProjectPaths.Contains($t)) { continue }
+        if ($saved.ContainsKey($t)) { $script:ProjectPaths[$t] = $saved[$t] }
+    }
+
+    # 대상 전부가 채워졌는지 확인
+    foreach ($t in $targets) {
+        if (-not $script:ProjectPaths.Contains($t)) { return $false }
+    }
+    return $true
+}
+
 # 선택된 모든 타입의 경로를 감지·확인하여 $script:ProjectPaths 확정 (스펙 §4)
 function Resolve-ProjectPaths {
     # -Paths 사전 검증·정규화: 타입 유효성 + 경로 정규화 (백슬래시→슬래시, 끝 슬래시·앞 ./ 제거)
@@ -1782,11 +1816,9 @@ function Create-VersionYml {
             Write-Host "       최신 워크플로우의 버전 자동증가, 체인지로그, 배포"
             Write-Host "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
             Write-Host ""
-            Write-Host "     Y   업데이트하고 계속  (권장, 기본)"
-            Write-Host "     N   통합 취소"
-            Write-Host ""
 
             # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
             if (-not (Ask-YesNo "  선택" "Y")) {
                 Print-Error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
                 exit 0
@@ -2114,11 +2146,9 @@ function Test-BreakingChanges {
     if ($criticalChanges.Count -gt 0) {
         Print-Warning "주의가 필요한 호환성 변경(CRITICAL)이 있습니다. 아래 내용을 꼭 확인하세요."
         Write-Host ""
-        Write-Host "계속 진행하시겠습니까?"
-        Write-Host "  Y/y - 예, 계속 진행"
-        Write-Host "  N/n - 아니오, 취소"
         Write-Host ""
 
+        # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
         if (-not (Ask-YesNo -Prompt "위 호환성 변경을 확인했고 계속 진행할까요? " -Default "N")) {
             Print-Info "통합을 안전하게 취소했습니다."
             exit 0
@@ -2241,11 +2271,9 @@ function Ask-SynologyOption {
         Write-Host "     • $($f.Name) (공통)"
     }
     Write-Host ""
-    Write-Host "  Y/y - 예, 포함"
-    Write-Host "  N/n - 아니오, 제외 (기본)"
-    Write-Host ""
 
-    if (Ask-YesNo "선택" "N") {
+    # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
+    if (Ask-YesNo "Synology 워크플로우를 포함할까요?" "N") {
         $script:IncludeSynology = $true
         Print-Info "Synology 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
     }
@@ -2893,15 +2921,39 @@ function Copy-DiscussionTemplates {
 # .coderabbit.yaml 다운로드
 # ===================================================================
 
+function Show-CodeRabbitIntro {
+    # CodeRabbit이 무엇이고, 이 파일이 어떤 설정으로 동작하는지 안내한다.
+    # (설정을 안 하고 "왜 리뷰가 안 달리지?" 하는 사용자가 많아 명시적으로 설명한다.)
+    Write-Host ""
+    Write-Host "  🐰 CodeRabbit이란?"
+    Write-Host "     PR을 올리면 AI가 코드 변경을 자동으로 읽고 리뷰 코멘트를 달아주는 서비스입니다."
+    Write-Host "     (버그·보안·개선점 지적, 변경 요약, PR 내 채팅 질문 응답)"
+    Write-Host ""
+    Write-Host "  📋 이 .coderabbit.yaml에 들어가는 설정:"
+    Write-Host "     • 리뷰 언어        : 한국어(ko-KR)"
+    Write-Host "     • 자동 리뷰        : 켜짐 — main 대상 PR에 자동 리뷰 (draft PR 제외)"
+    Write-Host "     • 리뷰 성향        : chill (과하지 않게), 변경요약 표시, 변경요청 강제 안 함"
+    Write-Host "     • PR 채팅 자동응답  : 켜짐"
+    Write-Host ""
+    Write-Host "  ⚠️  파일만으로는 끝이 아닙니다 — 한 번만 활성화하면 됩니다:"
+    Write-Host "     1) https://coderabbit.ai 접속 → GitHub으로 로그인"
+    Write-Host "     2) 이 저장소를 CodeRabbit에 연결(Authorize/Enable)"
+    Write-Host "     이 단계를 안 하면 .coderabbit.yaml이 있어도 리뷰가 달리지 않습니다."
+    Write-Host ""
+}
+
 function Copy-CodeRabbitConfig {
     Print-Step "CodeRabbit AI 리뷰 설정을 확인하고 있습니다..."
-    
+
     $srcCodeRabbit = Join-Path $TEMP_DIR ".coderabbit.yaml"
     if (-not (Test-Path $srcCodeRabbit)) {
         Print-Info ".coderabbit.yaml이 템플릿에 없어 건너뜁니다."
         return
     }
-    
+
+    # CodeRabbit 소개 + 설정 안내 (덮어쓰기/신규 적용 공통으로 먼저 보여준다)
+    Show-CodeRabbitIntro
+
     # 기존 파일이 있으면 사용자 확인
     if (Test-Path ".coderabbit.yaml") {
         Print-Warning ".coderabbit.yaml이 이미 있습니다 — 덮어쓸지 확인합니다"
@@ -2909,12 +2961,9 @@ function Copy-CodeRabbitConfig {
         if (-not $Force) {
             Print-SeparatorLine
             Write-Host ""
-            Write-Host ".coderabbit.yaml을 덮어쓰시겠습니까?"
-            Write-Host "  Y/y - 예, 덮어쓰기 (기본)"
-            Write-Host "  N/n - 아니오, 건너뛰기"
-            Write-Host ""
 
-            if (-not (Ask-YesNo "선택" "Y")) {
+            # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
+            if (-not (Ask-YesNo ".coderabbit.yaml을 덮어쓸까요? (기존은 .bak으로 백업)" "Y")) {
                 Print-Info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
                 return
             }
@@ -3178,12 +3227,8 @@ function Copy-UtilModules {
 
     # 사용자 확인 (force 모드가 아닐 때만)
     if (-not $Force) {
-        Write-Host "이 유틸리티 모듈을 다운로드하시겠습니까?"
-        Write-Host "  Y/y - 예, 다운로드하기 (기본)"
-        Write-Host "  N/n - 아니오, 건너뛰기"
-        Write-Host ""
-
-        if (-not (Ask-YesNo "선택" "Y")) {
+        # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
+        if (-not (Ask-YesNo "이 유틸리티 모듈을 다운로드할까요?" "Y")) {
             Print-Info "유틸리티 모듈 다운로드를 건너뜁니다"
             return
         }
@@ -3293,13 +3338,28 @@ function Start-InteractiveMode {
                 Ask-SynologyOption $typeDirs
             }
 
-            # 3) 경로: full/version 모드에서 멀티경로 확정
+            # 3) 경로: full/version 모드에서만 필요
+            #    이미 init된 프로젝트(version.yml에 project_paths 있음)는 저장값을 '로드만' 해
+            #    확인 화면에 보여주고 질문은 생략한다. 저장값이 없거나 일부만 있으면(신규 init)
+            #    확인 화면을 거친 뒤(아래 4번) 비어있는 타입만 Resolve-ProjectPaths로 묻는다.
             if ($script:Mode -eq "full" -or $script:Mode -eq "version") {
-                Resolve-ProjectPaths
+                Load-SavedProjectPaths | Out-Null
             }
 
             # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인
             Detect-AndConfirmProject
+
+            # 5) 확인 후에도 경로가 비어있는 대상 타입이 있으면(신규 init) 그때 질문한다.
+            #    (사용자가 '수정 → 타입 변경'을 했다면 그 안에서 이미 경로를 다시 물었으므로 보통 채워져 있다.)
+            if ($script:Mode -eq "full" -or $script:Mode -eq "version") {
+                $_needPaths = $false
+                $_allTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $_pathTargets = @($_allTypes | Where-Object { $_ -ne "basic" })
+                foreach ($_pt in $_pathTargets) {
+                    if (-not $script:ProjectPaths.Contains($_pt)) { $_needPaths = $true; break }
+                }
+                if ($_needPaths) { Resolve-ProjectPaths }
+            }
         }
     }
 }
@@ -4014,12 +4074,10 @@ function Invoke-CodexNativeSkillsFallback {
     $target     = Join-Path $targetDir "cassiiopeia"
 
     if ($Mode -ne "auto" -and -not $Force) {
-        Write-Host "Codex native skills fallback을 설치/업데이트하시겠습니까?"
         Write-Host "  설치 경로: $target"
-        Write-Host "  Y/y - 예, 설치 또는 업데이트"
-        Write-Host "  N/n - 아니오, 건너뛰기"
         Write-Host ""
-        if (-not (Ask-YesNo "선택" "Y")) {
+        # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
+        if (-not (Ask-YesNo "Codex native skills fallback을 설치/업데이트할까요?" "Y")) {
             Print-Info "Codex native skills fallback을 건너뜁니다 (marketplace 등록 방식만 사용)."
             return
         }

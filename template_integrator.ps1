@@ -1476,14 +1476,24 @@ function Edit-ProjectInfo {
     while ($true) {
         Print-QuestionHeader "💫" "어떤 항목을 수정할까요?"
 
-        # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로). ESC + '뒤로' 항목 둘 다 제공.
-        $editChoice = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "어떤 항목을 수정하시겠습니까?" -Options @(
+        # Synology 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 의미가 있다.
+        # (version 모드는 워크플로우를 안 깔아 Synology와 무관 → 메뉴에 노출하지 않는다.)
+        $_synEditable = ($script:Mode -eq "full" -or $script:Mode -eq "workflows")
+
+        $_editOptions = @(
             @{Value='type';    Label='프로젝트 타입'},
             @{Value='version'; Label='버전'},
-            @{Value='branch';  Label='기본 브랜치'},
-            @{Value='done';    Label='모두 맞음, 계속'},
-            @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
+            @{Value='branch';  Label='기본 브랜치'}
         )
+        if ($_synEditable) {
+            $_synState = if ($script:IncludeSynology -eq $true) { '포함' } else { '제외' }
+            $_editOptions += @{Value='synology'; Label="Synology 포함 여부 (현재: $_synState)"}
+        }
+        $_editOptions += @{Value='done';    Label='모두 맞음, 계속'}
+        $_editOptions += @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
+
+        # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로). ESC + '뒤로' 항목 둘 다 제공.
+        $editChoice = Invoke-ChooseMenu -CancelLabel "뒤로" -Prompt "어떤 항목을 수정하시겠습니까?" -Options $_editOptions
 
         # ESC($null) 또는 '뒤로' → 상위 확인 화면으로 복귀 (sh handle_project_edit_menu와 대칭)
         if ((-not $editChoice) -or ($editChoice -eq 'back')) {
@@ -1543,6 +1553,14 @@ function Edit-ProjectInfo {
                 } else {
                     Print-Info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
                 }
+                Write-Host ""
+            }
+            'synology' {
+                # Synology 포함 여부를 다시 묻는다. -ForceAsk로 이미 설정된 값이 있어도 무조건 재질문.
+                # Ask-SynologyOption이 폴더를 스캔해 발견 시 안내+질문하고 $script:IncludeSynology를 갱신한다.
+                $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+                Ask-SynologyOption -TypeDirs $typeDirs -ForceAsk
                 Write-Host ""
             }
             'done' {
@@ -2180,7 +2198,12 @@ function Get-CurrentTemplateVersion {
 function Ask-SynologyOption {
     # 여러 TypeDir를 받을 수 있다 (멀티타입). 각 타입의 synology 폴더 +
     # 공통 synology 폴더를 모두 합산해 한 번만 질문한다.
-    param([string[]]$TypeDirs)
+    # -ForceAsk: 이미 설정된 IncludeSynology가 있어도 무조건 다시 묻는다
+    #            (확인 화면의 수정 메뉴에서 사용 — 사용자가 명시적으로 다시 고르려는 경우)
+    param(
+        [string[]]$TypeDirs,
+        [switch]$ForceAsk
+    )
 
     if (-not $TypeDirs -or $TypeDirs.Count -eq 0) { return }
 
@@ -2228,17 +2251,19 @@ function Ask-SynologyOption {
         return
     }
 
-    # 이미 설정되어 있으면 건너뛰기
-    if ($null -ne $script:IncludeSynology) {
+    # 이미 설정되어 있으면 건너뛰기 (단, -ForceAsk면 무시하고 다시 묻는다)
+    if (-not $ForceAsk -and $null -ne $script:IncludeSynology) {
         return
     }
 
-    # 기존 version.yml에서 설정 읽기 시도
-    Read-TemplateOptions
+    # 기존 version.yml에서 설정 읽기 시도 (-ForceAsk면 저장값으로 덮어쓰지 않는다)
+    if (-not $ForceAsk) {
+        Read-TemplateOptions
 
-    # 이전 설정이 있으면 건너뛰기
-    if ($null -ne $script:IncludeSynology) {
-        return
+        # 이전 설정이 있으면 건너뛰기
+        if ($null -ne $script:IncludeSynology) {
+            return
+        }
     }
 
     # synology 폴더 내 파일 목록 수집 (전체 대상 폴더 합산, 타입별/공통 구분)

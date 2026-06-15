@@ -1,6 +1,6 @@
 # 전문가 페르소나 & 마인드셋 (Personas)
 
-> **출처**: 이 문서는 `harness/PERSONA.md`(PI 에이전트 전용, 영문)를 Claude Code 스킬 문맥의 한국어로 옮긴 **single source**다. harness 원본을 수정할 일이 생기면 이 문서도 함께 검토한다 (양방향 자동 동기화는 없음 — 수동 정합).
+> **출처 (single source)**: 페르소나·마인드셋의 정본은 `harness/PERSONA.md`(한글)다. 이 문서는 Claude Code 스킬 문맥용으로 같은 내용을 담되, **수정은 `harness/PERSONA.md`를 먼저 고치고 이 문서를 맞춘다** (양방향 자동 동기화는 없음 — 수동 정합). 산출물 경로 규칙은 `harness/WORKFLOW.md` §"산출물 경로 단일 규칙"(`docs/suh-template/` 우산)을 따른다.
 >
 > **용도**: `suh-plan` / `suh-analyze` / `suh-implement` 등 코드 스킬은 "시작 전" 단계에서 자기 페르소나 카드 + 아래 공통 마인드셋을 명시적으로 로드해 행동에 반영한다. 페르소나는 장식이 아니라 **행동 강제 레이어**다.
 

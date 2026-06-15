@@ -32,6 +32,16 @@ PYTHONIOENCODING=utf-8 "$PYTHON" review_cli.py get-output-path review
 - `docs/suh-template/plan/20260418_427_드롭다운_디자인_변경.md`
 - `docs/suh-template/analyze/20260418_001_초기_분석.md`
 
+## 산출물 경로 우산 (`docs/suh-template/`)
+
+모든 산출물은 `docs/suh-template/` 우산 아래에 둔다. harness(`harness/WORKFLOW.md` §"산출물 경로 단일 규칙")와 skill이 동일한 위치를 공유한다.
+
+| 종류 | 경로 | 비고 |
+|------|------|------|
+| skill 최종 산출물 | `docs/suh-template/<skill>/` | plan·analyze·report·review·issue 등 |
+| 작업중 지식 그래프 | `docs/suh-template/hypercortex/` | harness SDLC의 TODO·REQUIREMENT·DESIGN·QUALITY 등 |
+| 코드 작업 격리 | `docs/suh-template/workspace/` | harness Phase 4 코드 산출물 격리 |
+
 ## 실패 시 대응
 
 | 상황 | 대응 |

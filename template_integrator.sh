@@ -2219,11 +2219,9 @@ create_version_yml() {
             print_to_user "       최신 워크플로우의 버전 자동증가, 체인지로그, 배포"
             print_to_user "       동기화가 깨집니다. 그래서 건너뛸 수 없습니다."
             print_to_user ""
-            print_to_user "     Y   업데이트하고 계속  (권장, 기본)"
-            print_to_user "     N   통합 취소"
-            print_to_user ""
 
             # 기본값 Y — Enter만 쳐도 업데이트. N이면 통합 전체 중단.
+            # 선택지(예/아니오)는 아래 ask_yes_no가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
             if ! ask_yes_no "  선택 (Y/N, 기본: Y): " "Y"; then
                 print_error "통합이 취소되었습니다. version.yml은 변경되지 않았습니다."
                 exit 0
@@ -3330,14 +3328,38 @@ copy_discussion_templates() {
 }
 
 # .coderabbit.yaml 다운로드
+# CodeRabbit이 무엇이고, 이 파일이 어떤 설정으로 동작하는지 안내한다.
+# (설정을 안 하고 "왜 리뷰가 안 달리지?" 하는 사용자가 많아 명시적으로 설명한다.)
+show_coderabbit_intro() {
+    print_to_user ""
+    print_to_user "  🐰 CodeRabbit이란?"
+    print_to_user "     PR을 올리면 AI가 코드 변경을 자동으로 읽고 리뷰 코멘트를 달아주는 서비스입니다."
+    print_to_user "     (버그·보안·개선점 지적, 변경 요약, PR 내 채팅 질문 응답)"
+    print_to_user ""
+    print_to_user "  📋 이 .coderabbit.yaml에 들어가는 설정:"
+    print_to_user "     • 리뷰 언어        : 한국어(ko-KR)"
+    print_to_user "     • 자동 리뷰        : 켜짐 — main 대상 PR에 자동 리뷰 (draft PR 제외)"
+    print_to_user "     • 리뷰 성향        : chill (과하지 않게), 변경요약 표시, 변경요청 강제 안 함"
+    print_to_user "     • PR 채팅 자동응답  : 켜짐"
+    print_to_user ""
+    print_to_user "  ⚠️  파일만으로는 끝이 아닙니다 — 한 번만 활성화하면 됩니다:"
+    print_to_user "     1) https://coderabbit.ai 접속 → GitHub으로 로그인"
+    print_to_user "     2) 이 저장소를 CodeRabbit에 연결(Authorize/Enable)"
+    print_to_user "     이 단계를 안 하면 .coderabbit.yaml이 있어도 리뷰가 달리지 않습니다."
+    print_to_user ""
+}
+
 copy_coderabbit_config() {
     print_step "CodeRabbit AI 리뷰 설정을 확인하고 있습니다..."
-    
+
     if [ ! -f "$TEMP_DIR/.coderabbit.yaml" ]; then
         print_info ".coderabbit.yaml이 템플릿에 없어 건너뜁니다."
         return
     fi
-    
+
+    # CodeRabbit 소개 + 설정 안내 (덮어쓰기/신규 적용 공통으로 먼저 보여준다)
+    show_coderabbit_intro
+
     # 기존 파일이 있으면 사용자 확인
     if [ -f ".coderabbit.yaml" ]; then
         print_warning ".coderabbit.yaml이 이미 있습니다 — 덮어쓸지 확인합니다"

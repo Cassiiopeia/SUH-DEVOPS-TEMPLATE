@@ -3368,11 +3368,22 @@ copy_coderabbit_config() {
             print_separator_line
             print_to_user ""
 
-            if ! ask_yes_no ".coderabbit.yaml을 덮어쓸까요?" "Y"; then
-                print_info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
-                return
-            fi
-            
+            # 워크플로우 충돌 메뉴와 동일하게 '덮어쓰기 / 건너뛰기' 선택지를 명시한다.
+            # (단순 예/아니오는 "건너뛰기"가 직관적이지 않아 사용자가 헷갈린다.)
+            # set -e 안전: ESC(비-0)에 함수가 통째로 종료되지 않도록 || true로 종료코드 흡수.
+            local _cr_label
+            _cr_label=$(choose_menu "기존 .coderabbit.yaml을 어떻게 할까요?" \
+                "덮어쓰기 — 기존 파일을 .bak 백업 후 교체 (권장)|" \
+                "건너뛰기 — 기존 파일만 유지|") || true
+            case "$_cr_label" in
+                덮어쓰기*) : ;;   # 계속 진행 (아래에서 백업 후 교체)
+                *)
+                    # 건너뛰기 또는 ESC/취소 → 기존 유지
+                    print_info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
+                    return
+                    ;;
+            esac
+
             # 백업
             cp .coderabbit.yaml .coderabbit.yaml.bak
             print_info "기존 파일을 .coderabbit.yaml.bak으로 백업했습니다"

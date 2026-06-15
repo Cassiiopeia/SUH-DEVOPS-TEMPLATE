@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-15T08:05:28Z",
-    "currentVersion": "3.0.128",
+    "lastUpdated": "2026-06-15T08:15:13Z",
+    "currentVersion": "3.0.129",
     "projectType": "basic",
-    "totalReleases": 148,
+    "totalReleases": 149,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.129",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-15",
+      "pr_number": 383,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 설정 파일을 덮어쓸지 물을 때 '건너뛰기' 선택이 한눈에 보이도록 정리했습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설정 파일을 덮어쓸지 물을 때 '건너뛰기' 선택이 한눈에 보이도록 정리했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.128",
       "project_type": "basic",

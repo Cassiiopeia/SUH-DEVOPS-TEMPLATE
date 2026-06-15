@@ -2962,8 +2962,14 @@ function Copy-CodeRabbitConfig {
             Print-SeparatorLine
             Write-Host ""
 
-            # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
-            if (-not (Ask-YesNo ".coderabbit.yaml을 덮어쓸까요? (기존은 .bak으로 백업)" "Y")) {
+            # 워크플로우 충돌 메뉴와 동일하게 '덮어쓰기 / 건너뛰기' 선택지를 명시한다.
+            # (단순 예/아니오는 "건너뛰기"가 직관적이지 않아 사용자가 헷갈린다.)
+            $crChoice = Invoke-ChooseMenu -Prompt "기존 .coderabbit.yaml을 어떻게 할까요?" -Options @(
+                @{Value='O'; Label='덮어쓰기 — 기존 파일을 .bak 백업 후 교체 (권장)'},
+                @{Value='S'; Label='건너뛰기 — 기존 파일만 유지'}
+            )
+            # ESC($null) 또는 건너뛰기 → 기존 유지
+            if ((-not $crChoice) -or ($crChoice -eq 'S')) {
                 Print-Info ".coderabbit.yaml 업데이트를 건너뜁니다 — 기존 설정을 유지합니다"
                 return
             }

@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-15T08:32:13Z",
-    "currentVersion": "3.0.130",
+    "lastUpdated": "2026-06-15T08:40:25Z",
+    "currentVersion": "3.0.131",
     "projectType": "basic",
-    "totalReleases": 150,
+    "totalReleases": 151,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.131",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-15",
+      "pr_number": 385,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 설치 정보 확인 화면의 '수정하기'에서 시놀로지 포함 여부도 바꿀 수 있습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설치 정보 확인 화면의 '수정하기'에서 시놀로지 포함 여부도 바꿀 수 있습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.130",
       "project_type": "basic",

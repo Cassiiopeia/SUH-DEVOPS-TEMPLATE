@@ -1083,6 +1083,40 @@ function Find-TypePathCandidates {
     return @()
 }
 
+# 기존 version.yml의 project_paths 값을 $script:ProjectPaths에 로드만 한다 (질문 없음).
+# 이미 init된 프로젝트는 확인 화면에 저장된 경로를 그대로 보여주기 위해 사용한다.
+# 반환: 대상 타입(basic 제외) 전부가 이미 채워졌으면 $true (= 경로 질문 불필요).
+function Load-SavedProjectPaths {
+    if (-not (Test-Path "version.yml")) { return $false }
+
+    $allTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    $targets = @($allTypes | Where-Object { $_ -ne "basic" })
+    if ($targets.Count -eq 0) { return $true }  # basic만이면 경로 불필요
+
+    # version.yml의 project_paths 블록을 한 번에 파싱해 맵으로 적재
+    $saved = @{}
+    $inPaths = $false
+    foreach ($line in (Get-Content "version.yml")) {
+        if ($line -match '^project_paths:') { $inPaths = $true; continue }
+        if ($inPaths) {
+            if ($line -match '^\s{2}([^\s:]+):\s*"([^"]*)"') { $saved[$matches[1]] = $matches[2]; continue }
+            if ($line -match '^[^\s]') { break }  # 다른 최상위 키 → 섹션 종료
+        }
+    }
+
+    # 대상 타입을 저장값으로 채운다 (-Paths로 이미 지정된 건 건드리지 않음)
+    foreach ($t in $targets) {
+        if ($script:ProjectPaths.Contains($t)) { continue }
+        if ($saved.ContainsKey($t)) { $script:ProjectPaths[$t] = $saved[$t] }
+    }
+
+    # 대상 전부가 채워졌는지 확인
+    foreach ($t in $targets) {
+        if (-not $script:ProjectPaths.Contains($t)) { return $false }
+    }
+    return $true
+}
+
 # 선택된 모든 타입의 경로를 감지·확인하여 $script:ProjectPaths 확정 (스펙 §4)
 function Resolve-ProjectPaths {
     # -Paths 사전 검증·정규화: 타입 유효성 + 경로 정규화 (백슬래시→슬래시, 끝 슬래시·앞 ./ 제거)
@@ -3293,13 +3327,28 @@ function Start-InteractiveMode {
                 Ask-SynologyOption $typeDirs
             }
 
-            # 3) 경로: full/version 모드에서 멀티경로 확정
+            # 3) 경로: full/version 모드에서만 필요
+            #    이미 init된 프로젝트(version.yml에 project_paths 있음)는 저장값을 '로드만' 해
+            #    확인 화면에 보여주고 질문은 생략한다. 저장값이 없거나 일부만 있으면(신규 init)
+            #    확인 화면을 거친 뒤(아래 4번) 비어있는 타입만 Resolve-ProjectPaths로 묻는다.
             if ($script:Mode -eq "full" -or $script:Mode -eq "version") {
-                Resolve-ProjectPaths
+                Load-SavedProjectPaths | Out-Null
             }
 
             # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인
             Detect-AndConfirmProject
+
+            # 5) 확인 후에도 경로가 비어있는 대상 타입이 있으면(신규 init) 그때 질문한다.
+            #    (사용자가 '수정 → 타입 변경'을 했다면 그 안에서 이미 경로를 다시 물었으므로 보통 채워져 있다.)
+            if ($script:Mode -eq "full" -or $script:Mode -eq "version") {
+                $_needPaths = $false
+                $_allTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $_pathTargets = @($_allTypes | Where-Object { $_ -ne "basic" })
+                foreach ($_pt in $_pathTargets) {
+                    if (-not $script:ProjectPaths.Contains($_pt)) { $_needPaths = $true; break }
+                }
+                if ($_needPaths) { Resolve-ProjectPaths }
+            }
         }
     }
 }

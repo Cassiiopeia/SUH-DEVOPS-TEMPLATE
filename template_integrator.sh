@@ -1309,6 +1309,54 @@ find_type_path_candidates() {
     done <<< "$found" | sort -u
 }
 
+# 기존 version.yml의 project_paths 값을 PROJECT_PATHS_CSV에 로드만 한다 (질문 없음).
+# 이미 init된 프로젝트는 확인 화면에 저장된 경로를 그대로 보여주기 위해 사용한다.
+# 반환: 대상 타입(basic 제외) 전부가 이미 채워졌으면 0 (= 경로 질문 불필요), 아니면 1.
+load_saved_project_paths() {
+    [ ! -f "version.yml" ] && return 1
+
+    local _all_types=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    local _targets=() _t
+    for _t in "${_all_types[@]}"; do
+        [ "$_t" = "basic" ] && continue
+        _targets+=("$_t")
+    done
+    [ ${#_targets[@]} -eq 0 ] && return 0  # basic만이면 경로 불필요
+
+    # 대상 타입을 version.yml의 project_paths 저장값으로 채운다 (이미 있으면 건드리지 않음)
+    local _in_paths=false _line _key _val _existing
+    for _t in "${_targets[@]}"; do
+        # 이미 채워져 있으면(예: --paths) 건너뜀
+        _existing=$(get_path_for_type "$_t")
+        [ -n "$_existing" ] && continue
+        # version.yml의 project_paths 블록에서 해당 타입 줄 찾기
+        _in_paths=false
+        while IFS= read -r _line; do
+            case "$_line" in
+                project_paths:*) _in_paths=true; continue ;;
+            esac
+            if [ "$_in_paths" = true ]; then
+                # '  flutter: "app"' 형태
+                if printf '%s' "$_line" | grep -qE "^  ${_t}:[[:space:]]*\""; then
+                    _val=$(printf '%s' "$_line" | sed -E "s/^  ${_t}:[[:space:]]*\"([^\"]*)\".*/\1/")
+                    [ -n "$_val" ] && set_path_for_type "$_t" "$_val"
+                    break
+                fi
+                # 다른 최상위 키(들여쓰기 없음) → 섹션 종료
+                case "$_line" in
+                    [!\ ]*) break ;;
+                esac
+            fi
+        done < version.yml
+    done
+
+    # 대상 전부가 채워졌는지 확인
+    for _t in "${_targets[@]}"; do
+        [ -z "$(get_path_for_type "$_t")" ] && return 1
+    done
+    return 0
+}
+
 # 선택된 모든 타입의 경로를 감지·확인하여 PROJECT_PATHS_CSV 확정 (스펙 §4)
 resolve_project_paths() {
     # --paths 사전 검증·정규화: 타입 유효성 + 경로 정규화 (백슬래시→슬래시, 끝 슬래시·앞 ./ 제거)
@@ -3714,13 +3762,27 @@ interactive_mode() {
                 ask_synology_option "${_syn_dirs[@]}"
             fi
 
-            # 3) 경로: full/version 모드에서 멀티경로 확정
+            # 3) 경로: full/version 모드에서만 필요
+            #    이미 init된 프로젝트(version.yml에 project_paths 있음)는 저장값을 '로드만' 해
+            #    확인 화면에 보여주고 질문은 생략한다. 저장값이 없거나 일부만 있으면(신규 init)
+            #    확인 화면을 거친 뒤(아래 5번) 비어있는 타입만 resolve_project_paths로 묻는다.
             if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
-                resolve_project_paths
+                load_saved_project_paths || true
             fi
 
             # 4) 모든 수집 결과를 확인 화면에 모아 최종 확인 (수정/취소 가능)
             detect_and_confirm_project
+
+            # 5) 확인 후에도 경로가 비어있는 대상 타입이 있으면(신규 init) 그때 질문한다.
+            #    (사용자가 '수정 → 타입 변경'을 했다면 그 안에서 이미 경로를 다시 물었으므로 보통 채워져 있다.)
+            if [ "$MODE" = "full" ] || [ "$MODE" = "version" ]; then
+                local _need_paths=false _pt
+                for _pt in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
+                    [ "$_pt" = "basic" ] && continue
+                    if [ -z "$(get_path_for_type "$_pt")" ]; then _need_paths=true; break; fi
+                done
+                [ "$_need_paths" = true ] && resolve_project_paths
+            fi
             ;;
     esac
 }

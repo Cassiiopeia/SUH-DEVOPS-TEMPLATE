@@ -1,6 +1,6 @@
 {
   "name": "cassiiopeia",
-  "version": "3.0.128",
+  "version": "3.0.129",
   "description": "DevOps automation skills for coding agents",
   "skills": "./skills/"
 }

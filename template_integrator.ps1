@@ -321,7 +321,8 @@ function Invoke-ArrowMenu {
         [Parameter(Mandatory=$true)][hashtable[]]$Options,
         [switch]$Multi,
         [string]$Preselect = "",
-        [string]$CancelLabel = "취소"
+        [string]$CancelLabel = "취소",
+        [int]$InitialIndex = 0   # 단일 선택 시 커서 초기 위치(=기본값). 항목 순서는 고정한 채 기본만 표현.
     )
 
     $n = $Options.Count
@@ -360,7 +361,8 @@ function Invoke-ArrowMenu {
     }
     Write-Host ""
 
-    $cursor = 0
+    # 커서 초기 위치 = InitialIndex (단일 선택의 기본값 표현). 범위를 벗어나면 0으로.
+    $cursor = if ($InitialIndex -ge 0 -and $InitialIndex -lt $n) { $InitialIndex } else { 0 }
 
     function Render {
         param($first)
@@ -605,14 +607,13 @@ function Ask-YesNo {
     $forceMode = $false
     try { if ($script:Force -eq $true) { $forceMode = $true } } catch {}
 
-    # TTY 대화형(화살표 가능) → 화살표 2지선. default가 첫 항목 = 커서 초기 위치.
+    # TTY 대화형(화살표 가능) → 화살표 2지선.
+    # 항목 순서는 항상 '1) 예  2) 아니오'로 고정한다 (기본값에 따라 순서가 바뀌면 일관성이 깨진다).
+    # 기본값은 순서가 아니라 '커서 초기 위치'로만 표현한다: 기본 Y → 커서 예(0), 기본 N → 커서 아니오(1).
     if ((Test-ArrowMenuSupported) -and -not $forceMode) {
-        if ($DefaultValue -match '^[Yy]$') {
-            $opts = @(@{Value='예'; Label=''}, @{Value='아니오'; Label=''})
-        } else {
-            $opts = @(@{Value='아니오'; Label=''}, @{Value='예'; Label=''})
-        }
-        $ans = Invoke-ArrowMenu -Prompt $_title -Options $opts -CancelLabel "취소"
+        $opts = @(@{Value='예'; Label=''}, @{Value='아니오'; Label=''})
+        $initIdx = if ($DefaultValue -match '^[Yy]$') { 0 } else { 1 }
+        $ans = Invoke-ArrowMenu -Prompt $_title -Options $opts -CancelLabel "취소" -InitialIndex $initIdx
         if ($null -eq $ans) { return $false }   # ESC 취소 = No
         return ($ans -eq '예')
     }
@@ -2261,7 +2262,15 @@ function Ask-SynologyOption {
     Print-SeparatorLine
     Write-Host ""
     Write-Host "🗄️ Synology NAS 배포용 워크플로우를 발견했습니다. ($totalSynologyCount개 파일)"
-    Write-Host "   이 워크플로우를 프로젝트에 포함할까요?"
+    Write-Host ""
+    Write-Host "   📦 Synology(시놀로지)란?"
+    Write-Host "      개인·소규모 팀이 많이 쓰는 NAS(자체 서버) 장비입니다."
+    Write-Host "      이 워크플로우들은 빌드 결과물을 그 Synology 서버에 자동 배포(CI/CD)해 줍니다."
+    Write-Host ""
+    Write-Host "   ❓ 포함할까요?"
+    Write-Host "      • Synology NAS에 직접 배포할 계획이면 → 포함"
+    Write-Host "      • AWS·클라우드·다른 서버를 쓰거나 잘 모르겠으면 → 제외 (기본값, 안전)"
+    Write-Host "      나중에 --synology 옵션으로 언제든 추가할 수 있습니다."
     Write-Host ""
     Write-Host "   포함되는 워크플로우:"
     foreach ($f in $typeFiles) {

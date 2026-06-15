@@ -288,15 +288,18 @@ print_to_user() {
 #       하위 메뉴는 "뒤로", 최상위는 "취소"로 호출자가 지정한다.
 # ─────────────────────────────────────────────────────────────
 interactive_menu() {
-    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값), --cancel-label=라벨
+    # 옵션 파싱 — --multi(다중 선택), --preselect=csv(초기 선택값), --cancel-label=라벨,
+    #            --initial-index=N(단일 선택 커서 초기 위치 = 기본값. 항목 순서는 고정한 채 기본만 표현)
     local multi=false
     local preselect_csv=""
     local cancel_label="취소"
+    local initial_index=0
     while [[ "$1" == --* ]]; do
         case "$1" in
             --multi) multi=true; shift ;;
             --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
             --cancel-label=*) cancel_label="${1#--cancel-label=}"; shift ;;
+            --initial-index=*) initial_index="${1#--initial-index=}"; shift ;;
             *) break ;;
         esac
     done
@@ -350,7 +353,11 @@ interactive_menu() {
         printf "\n%s (↑↓ 이동, 숫자 점프, Enter 확정, ESC %s):\n\n" "$prompt" "$cancel_label" >&2
     fi
 
+    # 커서 초기 위치 = initial_index (단일 선택의 기본값 표현). 범위를 벗어나거나 숫자가 아니면 0.
     local cursor=0
+    if [ "$multi" = false ] && [[ "$initial_index" =~ ^[0-9]+$ ]] && [ "$initial_index" -lt "$n" ]; then
+        cursor="$initial_index"
+    fi
 
     trap 'printf "\033[?25h" >&2; return 130' INT
     printf "\033[?25l" >&2
@@ -533,6 +540,7 @@ legacy_numeric_menu() {
             --multi) multi=true; shift ;;
             --preselect=*) preselect_csv="${1#--preselect=}"; shift ;;
             --cancel-label=*) shift ;;
+            --initial-index=*) shift ;;   # 텍스트 메뉴엔 커서 개념이 없어 파싱만 하고 무시
             *) break ;;
         esac
     done
@@ -659,16 +667,14 @@ ask_yes_no() {
     # "선택"만 남는 무의미한 제목 방어
     case "$_title" in ""|"선택") _title="진행하시겠습니까?" ;; esac
 
-    # TTY 대화형 → 화살표 메뉴(choose_menu). 기본값이 첫 항목 = 커서 초기 위치.
+    # TTY 대화형 → 화살표 메뉴(choose_menu).
+    # 항목 순서는 항상 '1) 예  2) 아니오'로 고정한다 (기본값에 따라 순서가 바뀌면 일관성이 깨진다).
+    # 기본값은 순서가 아니라 '커서 초기 위치'로만 표현한다: 기본 Y → 커서 예(0), 기본 N → 커서 아니오(1).
     # value를 '예'/'아니오'로 두고 label은 비워, 메뉴에 '1) 예 / 2) 아니오'만 깔끔히 표시.
-    # (value/label 둘 다 두면 'yes 예'처럼 중복돼 보였던 문제 해결)
     if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
-        local _ans _rc
-        if [[ "$default" =~ ^[Yy]$ ]]; then
-            _ans=$(choose_menu "$_title" "예|" "아니오|"); _rc=$?
-        else
-            _ans=$(choose_menu "$_title" "아니오|" "예|"); _rc=$?
-        fi
+        local _ans _rc _init_idx
+        if [[ "$default" =~ ^[Yy]$ ]]; then _init_idx=0; else _init_idx=1; fi
+        _ans=$(choose_menu "--initial-index=$_init_idx" "$_title" "예|" "아니오|"); _rc=$?
         # choose_menu가 실패(ESC 취소 등) → 반환 1(=No/취소)
         [ "$_rc" -ne 0 ] && return 1
         [ "$_ans" = "예" ] && return 0
@@ -2654,7 +2660,15 @@ ask_synology_option() {
     print_separator_line
     print_to_user ""
     print_to_user "🗄️ Synology NAS 배포용 워크플로우를 발견했습니다. ($synology_files개 파일)"
-    print_to_user "   이 워크플로우를 프로젝트에 포함할까요?"
+    print_to_user ""
+    print_to_user "   📦 Synology(시놀로지)란?"
+    print_to_user "      개인·소규모 팀이 많이 쓰는 NAS(자체 서버) 장비입니다."
+    print_to_user "      이 워크플로우들은 빌드 결과물을 그 Synology 서버에 자동 배포(CI/CD)해 줍니다."
+    print_to_user ""
+    print_to_user "   ❓ 포함할까요?"
+    print_to_user "      • Synology NAS에 직접 배포할 계획이면 → 포함"
+    print_to_user "      • AWS·클라우드·다른 서버를 쓰거나 잘 모르겠으면 → 제외 (기본값, 안전)"
+    print_to_user "      나중에 --synology 옵션으로 언제든 추가할 수 있습니다."
     print_to_user ""
     print_to_user "   포함되는 워크플로우:"
     for _sd in "${synology_dirs[@]}"; do

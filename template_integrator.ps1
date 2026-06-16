@@ -2355,6 +2355,7 @@ function Get-DefaultForTypeKey {
         'python:VOLUME_CONTAINER_PATH' { return '/mnt/{name}' }
         'spring:DOMAIN_NAME' { return 'example.com' }
         'spring:PRODUCTION_DOMAIN' { return 'example.com' }
+        { $_ -like '*:SSH_AUTH_METHOD' } { return 'password' }
         default { return '' }
     }
 }

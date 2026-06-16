@@ -1,5 +1,5 @@
 # ===================================================================
-# Spring Boot + Synology PR/Issue Preview 시스템
+# Spring Boot PR/Issue Preview 시스템 (SSH + Docker)
 # ===================================================================
 #
 # 🔑 필수 GitHub Secrets
@@ -59,7 +59,7 @@ env:
   #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
   SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
 
-  # SSH 포트 (시놀로지 포트 환경 구축 후 수정 금지)
+  # SSH 포트 (서버 포트 환경 구축 후 수정 금지)
   SSH_PORT: '2022'
 
   # Issue Helper 댓글 마커 (프로젝트별 수정 필요)
@@ -416,7 +416,7 @@ jobs:
           script: |
             set -e
 
-            # 환경 변수 설정 (시놀로지 NAS용)
+            # 환경 변수 설정 (배포 서버용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
 
@@ -1085,7 +1085,7 @@ jobs:
           script: |
             set -e
 
-            # 환경 변수 설정 (시놀로지 NAS용)
+            # 환경 변수 설정 (배포 서버용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
 
@@ -1418,7 +1418,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           script: |
-            # 환경 변수 설정 (시놀로지 NAS용)
+            # 환경 변수 설정 (배포 서버용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
 
@@ -1505,7 +1505,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           script: |
-            # 환경 변수 설정 (시놀로지 NAS용)
+            # 환경 변수 설정 (배포 서버용)
             export PATH=$PATH:/usr/local/bin
 
             NUMBER=${{ github.event.issue.number }}
@@ -1536,7 +1536,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           script: |
-            # 환경 변수 설정 (시놀로지 NAS용)
+            # 환경 변수 설정 (배포 서버용)
             export PATH=$PATH:/usr/local/bin
 
             NUMBER=${{ github.event.issue.number }}

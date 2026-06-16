@@ -1,9 +1,9 @@
 # ===================================================================
-# Spring Boot 무중단 배포 (Traefik Blue-Green, Synology)
+# Spring Boot 무중단 배포 (Traefik Blue-Green, SSH + Docker)
 # ===================================================================
 #
 # deploy 브랜치 푸시 시 Docker 이미지를 빌드하고
-# Traefik 라벨 기반 Blue-Green 토글로 Synology NAS 에 무중단 배포합니다.
+# Traefik 라벨 기반 Blue-Green 토글로 서버(SSH 접속 가능한 호스트)에 무중단 배포합니다.
 #
 # 본 워크플로우는 무중단 배포 옵션입니다.
 # 기본 배포는 PROJECT-SPRING-SIMPLE-CICD.yaml 입니다.
@@ -53,8 +53,9 @@
 # IN_FLIGHT_WAIT: old 컨테이너 제거 전 대기 초 (기본: 10)
 #
 # 💡 사전 조건:
-#   - Synology 에 Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
-#   - DSM 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#   - 배포 서버에 Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
+#   - 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#     (예: Synology DSM 역방향 프록시, Nginx, Caddy 등)
 # ===================================================================
 
 name: PROJECT-SPRING-NONSTOP-TRAEFIK-CICD
@@ -90,7 +91,7 @@ env:
   # 🌐 포트 및 컨테이너 설정
   CONTAINER_INTERNAL_PORT: "8080"
 
-  # 🚦 Traefik 설정 (Synology Traefik 환경 구축 후 수정 금지)
+  # 🚦 Traefik 설정 (서버의 Traefik 환경 구축 후 수정 금지)
   TRAEFIK_NETWORK: "traefik-network"
   TRAEFIK_ENTRYPOINT: "web"
   TRAEFIK_INTERNAL_PORT: "8079"
@@ -424,9 +425,10 @@ jobs:
 #    - EXTRA_NETWORKS (예: selenium-chrome-network)
 #    - HEALTHCHECK_PATH, HEALTHCHECK_ACCEPT_CODES
 #
-# 3) Synology 사전 준비:
+# 3) 서버 사전 준비:
 #    - Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
-#    - DSM 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#    - 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#      (예: Synology DSM 역방향 프록시, Nginx, Caddy 등)
 #
 # 4) 본 워크플로우로 전환:
 #    - 본 파일의 push.branches 주석 해제

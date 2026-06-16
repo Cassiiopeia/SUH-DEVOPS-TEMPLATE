@@ -1,9 +1,9 @@
 # ===================================================================
-# Flutter Android Synology NAS 배포 워크플로우
+# Flutter Android 자체 서버(SMB) 배포 워크플로우
 # ===================================================================
 #
 # deploy 브랜치 푸시 시 Android APK를 빌드하고
-# Synology NAS SMB 공유에 배포합니다.
+# 자체 서버(예: Synology NAS·NAS·Linux)의 SMB 공유에 APK를 배포합니다.
 #
 # ===================================================================
 # 🔑 필수 GitHub Secrets
@@ -14,12 +14,12 @@
 # RELEASE_KEY_ALIAS: key alias
 # RELEASE_KEY_PASSWORD: key 비밀번호
 # GOOGLE_SERVICES_JSON (선택): Firebase google-services.json
-# SERVER_HOST: Synology NAS 호스트
+# SERVER_HOST: 서버 호스트(SMB 접속 주소)
 # SERVER_USER: SMB 사용자명
 # SERVER_PASSWORD: SMB 비밀번호
 # ===================================================================
 
-name: PROJECT-Android-Synology-CICD
+name: PROJECT-Android-SelfHosted-CICD
 
 on:
   push:
@@ -38,7 +38,7 @@ env:
   PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
   FLUTTER_VERSION: "3.35.5"
   JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 17]
-  # SMB 서버 설정 (Synology NAS)
+  # SMB 서버 설정 (자체 서버 — Synology NAS·Linux 등)
   SMB_PORT: "44445" # 기본 445
   SMB_SHARE: "web"
   SMB_PATH_IOS: "/your-project/ios/download" # SMB 경로: /{PROJECT_NAME}/ios/download 형식으로 사용
@@ -261,7 +261,7 @@ jobs:
           echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
           echo "APK file found: $APK_FILE"
 
-      - name: Upload files to Synology NAS via SMB
+      - name: Upload files to server via SMB
         env:
           SMB_USERNAME: ${{ secrets.SERVER_USER }}
           SMB_PASSWORD: ${{ secrets.SERVER_PASSWORD }}

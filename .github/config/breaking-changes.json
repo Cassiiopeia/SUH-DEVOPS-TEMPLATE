@@ -25,5 +25,11 @@
     "severity": "critical",
     "title": "Skills 배포 방식 변경 - 마켓플레이스 전용 전환",
     "message": "Skills(IDE 명령어)가 template_integrator 복사 방식에서 Claude Code 플러그인 마켓플레이스 전용으로 변경되었습니다. 기존 .claude/skills/, .claude/scripts/ 경로가 루트 skills/, scripts/로 이동했습니다. Claude Code 사용자는 'claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE && claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user' 명령어로 설치하세요. Cursor 사용자는 통합 시 자동으로 .cursor 폴더 복사 여부를 물어봅니다. 기존 .claude/skills/, .claude/scripts/ 폴더는 더 이상 업데이트되지 않습니다."
+  },
+
+  "3.0.133": {
+    "severity": "warning",
+    "title": "Spring 배포 워크플로우 SSH 인증 방식(password/key) 추가",
+    "message": "Spring 배포 워크플로우(SYNOLOGY-SIMPLE-CICD, SYNOLOGY-NONSTOP-NGINX-CICD)에 SSH_AUTH_METHOD 환경변수가 추가되어 Synology(password) 외에 AWS EC2 등 .pem 키(key) 인증 서버에도 배포할 수 있습니다. 기존 Synology 배포는 SSH_AUTH_METHOD 기본값이 password라 영향이 없습니다. 워크플로우를 새로 받으면 env의 SSH_AUTH_METHOD 값을 확인하고, key 인증을 쓰는 경우 GitHub Secret에 SSH_KEY(.pem 내용)를 등록하세요. 자세한 설정은 docs/SYNOLOGY-DEPLOYMENT-GUIDE.md의 'SSH 인증 방식과 다른 서버(AWS EC2 등) 배포' 섹션을 참고하세요."
   }
 }

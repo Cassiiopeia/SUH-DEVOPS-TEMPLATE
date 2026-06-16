@@ -1,14 +1,34 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-15T08:40:25Z",
-    "currentVersion": "3.0.131",
+    "lastUpdated": "2026-06-16T01:27:45Z",
+    "currentVersion": "3.0.132",
     "projectType": "basic",
-    "totalReleases": 151,
+    "totalReleases": 152,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.132",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-16",
+      "pr_number": 387,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 다른 프로젝트에서 스킬 실행 시 발생하던 오류 해결\n  * 스킬이 설정 파일을 못 찾던 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "다른 프로젝트에서 스킬 실행 시 발생하던 오류 해결",
+            "스킬이 설정 파일을 못 찾던 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.131",
       "project_type": "basic",

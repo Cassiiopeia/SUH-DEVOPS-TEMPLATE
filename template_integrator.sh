@@ -2033,12 +2033,12 @@ handle_project_edit_menu() {
                 ;;
             synology)
                 # Synology 포함 여부를 다시 묻는다. --force-ask로 이미 설정된 값이 있어도 무조건 재질문.
-                # ask_synology_option이 폴더를 스캔해 발견 시 안내+질문하고 INCLUDE_SYNOLOGY를 갱신한다.
-                local _syn_dirs=() _st
+                # ask_all_optional_workflows이 nexus·secret-backup 폴더를 스캔해 발견 시 안내+질문하고 INCLUDE_NEXUS·INCLUDE_SECRET_BACKUP를 갱신한다.
+                local _opt_dirs=() _st
                 for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
-                    _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+                    _opt_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
                 done
-                ask_synology_option --force-ask "${_syn_dirs[@]}"
+                ask_all_optional_workflows --force-ask "${_opt_dirs[@]}"
                 print_to_user ""
                 ;;
             done)
@@ -2625,109 +2625,82 @@ get_current_template_version() {
     echo "unknown"
 }
 
-# Synology 워크플로우 포함 여부 질문
-# 인자로 여러 type_dir를 받을 수 있다 (멀티타입). 각 타입의 synology 폴더 +
-# 공통 synology 폴더를 모두 합산해 한 번만 질문한다.
-ask_synology_option() {
-    # 첫 인자가 --force-ask면, 이미 설정된 INCLUDE_SYNOLOGY가 있어도 무조건 다시 묻는다.
-    # (확인 화면의 수정 메뉴에서 사용 — 사용자가 명시적으로 다시 고르려는 경우)
+# 선택적(opt-in) 워크플로우 1종의 포함 여부를 묻는다.
+# 인자: [--force-ask] $1=폴더경로 $2=아이콘 $3=짧은이름 $4=한줄설명 $5=include변수명
+# 폴더가 없거나 파일이 0개면 조용히 return.
+# 이미 값이 설정돼 있으면(--force-ask 아니면) 건너뛴다. (CLI/version.yml 우선)
+ask_optional_workflow() {
     local _force_ask=false
-    if [ "$1" = "--force-ask" ]; then
-        _force_ask=true
-        shift
-    fi
-    local type_dirs=("$@")
-    [ ${#type_dirs[@]} -eq 0 ] && return
+    if [ "$1" = "--force-ask" ]; then _force_ask=true; shift; fi
+    local _dir="$1" _icon="$2" _short="$3" _desc="$4" _varname="$5"
 
-    # 검사 대상 synology 폴더 목록 구성 (타입별 + 공통, 중복 제거)
-    local synology_dirs=()
-    local _seen=""
-    local _td
-    for _td in "${type_dirs[@]}"; do
-        local _sd="$_td/synology"
-        if [[ ",$_seen," != *",$_sd,"* ]]; then
-            synology_dirs+=("$_sd"); _seen="$_seen,$_sd"
-        fi
-        local _csd="$(dirname "$_td")/common/synology"
-        if [[ ",$_seen," != *",$_csd,"* ]]; then
-            synology_dirs+=("$_csd"); _seen="$_seen,$_csd"
-        fi
-    done
+    # 현재 변수값 읽기 (bash 3.2 — nameref 없이 eval)
+    local _cur; eval "_cur=\"\${$_varname}\""
 
-    # synology 폴더가 하나도 존재하지 않으면 건너뛰기
-    local _any_dir=false
-    for _sd in "${synology_dirs[@]}"; do
-        [ -d "$_sd" ] && _any_dir=true && break
-    done
-    [ "$_any_dir" = false ] && return
+    [ -d "$_dir" ] || return
 
-    # 이미 CLI로 지정된 경우 건너뛰기 (단, --force-ask면 무시하고 다시 묻는다)
-    if [ "$_force_ask" = false ] && { [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; }; then
+    # 폴더 내 파일 개수
+    local _count=0 f
+    for f in "$_dir"/*.{yaml,yml}; do [ -e "$f" ] && _count=$((_count + 1)); done
+    [ "$_count" -eq 0 ] && return
+
+    # 이미 설정된 값이 있고 force-ask 아니면 건너뜀 (CLI 또는 version.yml에서 온 값)
+    if [ "$_force_ask" = false ] && { [ "$_cur" = true ] || [ "$_cur" = false ]; }; then
         return
     fi
 
-    # 기존 version.yml에서 설정 읽기 시도 (--force-ask면 저장값으로 덮어쓰지 않는다)
-    if [ "$_force_ask" = false ]; then
-        read_template_options
-
-        # 이전 설정이 있으면 건너뛰기
-        if [ "$INCLUDE_SYNOLOGY" = true ] || [ "$INCLUDE_SYNOLOGY" = false ]; then
-            return
-        fi
-    fi
-
-    # TTY 없으면 건너뛰기 (기본값: 제외)
+    # TTY 없으면 기본 제외
     if [ "$TTY_AVAILABLE" = false ]; then
-        INCLUDE_SYNOLOGY=false
-        return
-    fi
-
-    # synology 폴더 내 파일 개수 확인 (전체 대상 폴더 합산)
-    local synology_files=0
-    for _sd in "${synology_dirs[@]}"; do
-        [ -d "$_sd" ] || continue
-        for f in "$_sd"/*.{yaml,yml}; do
-            [ -e "$f" ] && synology_files=$((synology_files + 1))
-        done
-    done
-
-    if [ $synology_files -eq 0 ]; then
-        return
+        eval "$_varname=false"; return
     fi
 
     print_separator_line
     print_to_user ""
-    print_to_user "🗄️ Synology NAS 배포용 워크플로우를 발견했습니다. ($synology_files개 파일)"
-    print_to_user ""
-    print_to_user "   📦 Synology(시놀로지)란?"
-    print_to_user "      개인·소규모 팀이 많이 쓰는 NAS(자체 서버) 장비입니다."
-    print_to_user "      이 워크플로우들은 빌드 결과물을 그 Synology 서버에 자동 배포(CI/CD)해 줍니다."
-    print_to_user ""
-    print_to_user "   ❓ 포함할까요?"
-    print_to_user "      • Synology NAS에 직접 배포할 계획이면 → 포함"
-    print_to_user "      • AWS·클라우드·다른 서버를 쓰거나 잘 모르겠으면 → 제외 (기본값, 안전)"
-    print_to_user "      나중에 --synology 옵션으로 언제든 추가할 수 있습니다."
+    print_to_user "$_icon $_short 워크플로우를 발견했습니다. ($_count개 파일)"
+    print_to_user "   $_desc"
     print_to_user ""
     print_to_user "   포함되는 워크플로우:"
-    for _sd in "${synology_dirs[@]}"; do
-        [ -d "$_sd" ] || continue
-        local _is_common=""
-        [[ "$_sd" == *"/common/synology" ]] && _is_common=" (공통)"
-        for f in "$_sd"/*.{yaml,yml}; do
-            [ -e "$f" ] || continue
-            local fname=$(basename "$f")
-            print_to_user "     • $fname$_is_common"
-        done
+    for f in "$_dir"/*.{yaml,yml}; do
+        [ -e "$f" ] || continue
+        print_to_user "     • $(basename "$f")"
     done
     print_to_user ""
 
-    if ask_yes_no "Synology 워크플로우를 포함할까요?" "N"; then
-        INCLUDE_SYNOLOGY=true
-        print_info "Synology 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
+    if ask_yes_no "$_short 워크플로우를 포함할까요?" "N"; then
+        eval "$_varname=true"
+        print_info "$_short 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
     else
-        INCLUDE_SYNOLOGY=false
-        print_info "Synology 워크플로우를 제외합니다 (나중에 --synology 옵션으로 추가 가능)"
+        eval "$_varname=false"
+        print_info "$_short 워크플로우를 제외합니다 (나중에 옵션으로 추가 가능)"
     fi
+}
+
+# 모든 opt-in 워크플로우를 순서대로 묻는다.
+# 인자: [--force-ask] type_dirs... (project_types_dir 하위 타입 폴더 목록)
+# - Nexus: 각 타입의 nexus/ 폴더 (현재 spring만 존재)
+# - Secret 백업: 공통 secret-backup/ 폴더
+ask_all_optional_workflows() {
+    local _fa=""
+    if [ "$1" = "--force-ask" ]; then _fa="--force-ask"; shift; fi
+    local type_dirs=("$@")
+    [ ${#type_dirs[@]} -eq 0 ] && return
+    local _common_root; _common_root="$(dirname "${type_dirs[0]}")/common"
+
+    # --force-ask가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
+    # (ask_optional_workflow가 변수값으로 판단하므로 여기서 한 번만 읽는다.)
+    [ "$_fa" = "" ] && read_template_options
+
+    # Nexus: 각 타입의 nexus/ 폴더
+    local _td
+    for _td in "${type_dirs[@]}"; do
+        ask_optional_workflow $_fa "$_td/nexus" "📦" "Nexus 라이브러리 publish" \
+            "라이브러리/모듈을 Maven 저장소(Nexus)에 배포하는 워크플로우입니다. 일반 서버 배포가 아니라 라이브러리 프로젝트에만 필요합니다." \
+            INCLUDE_NEXUS
+    done
+    # Secret 백업: 공통 폴더
+    ask_optional_workflow $_fa "$_common_root/secret-backup" "🔐" "Secret 서버 백업" \
+        "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다." \
+        INCLUDE_SECRET_BACKUP
 }
 
 # ===================================================================
@@ -3840,12 +3813,12 @@ interactive_mode() {
 
             # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
             if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-                local _syn_dirs=()
+                local _opt_dirs=()
                 local _st
                 for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
-                    _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+                    _opt_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
                 done
-                ask_synology_option "${_syn_dirs[@]}"
+                ask_all_optional_workflows "${_opt_dirs[@]}"
             fi
 
             # 3) 경로: full/version 모드에서만 필요
@@ -3945,12 +3918,12 @@ execute_integration() {
         # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
         # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
         if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-            local _syn_dirs=()
+            local _opt_dirs=()
             local _st
             for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
-                _syn_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
+                _opt_dirs+=("$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR/$_st")
             done
-            ask_synology_option "${_syn_dirs[@]}"
+            ask_all_optional_workflows "${_opt_dirs[@]}"
         fi
     fi
 

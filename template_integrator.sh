@@ -2760,6 +2760,7 @@ default_for_type_key() {
         spring:VOLUME_HOST_PATH|python:VOLUME_HOST_PATH) echo "/volume1/projects/{name}" ;;
         spring:VOLUME_CONTAINER_PATH|python:VOLUME_CONTAINER_PATH) echo "/mnt/{name}" ;;
         spring:DOMAIN_NAME|spring:PRODUCTION_DOMAIN) echo "example.com" ;;
+        *:SSH_AUTH_METHOD) echo "password" ;;
         *) echo "" ;;
     esac
 }

@@ -2355,8 +2355,8 @@ read_template_options() {
         return
     fi
 
-    # synology 옵션 읽기 (metadata.template.options.synology)
-    # YAML 파싱: template 섹션 내의 synology 값 찾기
+    # 선택적 워크플로우 옵션 읽기 (metadata.template.options.nexus / .secret_backup)
+    # YAML 파싱: template 섹션 내의 options 값들을 찾는다 (하위호환 매핑 없음 — 새 키만)
     local in_template=false
     local in_options=false
 
@@ -2373,21 +2373,21 @@ read_template_options() {
             continue
         fi
 
-        # options 섹션 내부에서 synology 값 확인
+        # options 섹션 내부에서 nexus / secret_backup 값 확인
+        # (한 키만 읽고 끝내면 안 되므로 continue로 둘 다 스캔. 구 synology 키는 어느 분기에도
+        #  안 걸려 자연히 무시된다.)
         if [ "$in_template" = true ] && [ "$in_options" = true ]; then
-            if [[ "$line" =~ ^[[:space:]]+synology:[[:space:]]*(.+) ]]; then
-                local synology_val="${BASH_REMATCH[1]}"
-                # 따옴표 제거 및 trim
-                synology_val=$(echo "$synology_val" | tr -d '"' | tr -d "'" | xargs)
-
-                if [ "$synology_val" = "true" ]; then
-                    INCLUDE_SYNOLOGY=true
-                    print_info "이전 설정 기준 Synology 옵션: 포함 — 같은 설정으로 진행합니다"
-                elif [ "$synology_val" = "false" ]; then
-                    INCLUDE_SYNOLOGY=false
-                    print_info "이전 설정 기준 Synology 옵션: 제외 — 같은 설정으로 진행합니다"
-                fi
-                return
+            if [[ "$line" =~ ^[[:space:]]+nexus:[[:space:]]*(.+) ]]; then
+                local _v=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | xargs)
+                [ "$_v" = "true" ] && INCLUDE_NEXUS=true
+                [ "$_v" = "false" ] && INCLUDE_NEXUS=false
+                continue
+            fi
+            if [[ "$line" =~ ^[[:space:]]+secret_backup:[[:space:]]*(.+) ]]; then
+                local _v=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | xargs)
+                [ "$_v" = "true" ] && INCLUDE_SECRET_BACKUP=true
+                [ "$_v" = "false" ] && INCLUDE_SECRET_BACKUP=false
+                continue
             fi
 
             # 다른 최상위 키 만나면 options 섹션 종료
@@ -2411,6 +2411,10 @@ save_template_options() {
     local template_version="${1:-unknown}"
     local today=$(date -u +"%Y-%m-%d")
 
+    # 미설정(빈 값)이면 false로 보정 — 항상 명시적 true/false를 기록한다.
+    : "${INCLUDE_NEXUS:=false}"
+    : "${INCLUDE_SECRET_BACKUP:=false}"
+
     if [ ! -f "$version_file" ]; then
         return
     fi
@@ -2420,17 +2424,20 @@ save_template_options() {
         # 기존 template 섹션 업데이트
         # macOS/Linux 호환을 위해 임시 파일 방식 사용
 
-        # options.synology 값 업데이트 또는 추가
-        if grep -q "synology:" "$version_file"; then
-            # synology 값 업데이트
-            sed "s/synology:.*$/synology: $INCLUDE_SYNOLOGY/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
-        else
-            # synology 값이 없으면 options 섹션에 추가
-            if grep -q "options:" "$version_file"; then
-                # options 다음 줄에 synology 추가 (macOS 호환)
-                sed "/options:/a\\
-      synology: $INCLUDE_SYNOLOGY" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
-            fi
+        # options.nexus 값 업데이트 또는 추가
+        if grep -q "nexus:" "$version_file"; then
+            sed "s/nexus:.*$/nexus: $INCLUDE_NEXUS/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        elif grep -q "options:" "$version_file"; then
+            sed "/options:/a\\
+      nexus: $INCLUDE_NEXUS" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        fi
+
+        # options.secret_backup 값 업데이트 또는 추가
+        if grep -q "secret_backup:" "$version_file"; then
+            sed "s/secret_backup:.*$/secret_backup: $INCLUDE_SECRET_BACKUP/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        elif grep -q "options:" "$version_file"; then
+            sed "/options:/a\\
+      secret_backup: $INCLUDE_SECRET_BACKUP" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
         fi
 
         # last_update_date 업데이트
@@ -2447,7 +2454,8 @@ save_template_options() {
     integrated_date: "$today"
     last_update_date: "$today"
     options:
-      synology: $INCLUDE_SYNOLOGY
+      nexus: $INCLUDE_NEXUS
+      secret_backup: $INCLUDE_SECRET_BACKUP
 EOF
         print_info "version.yml에 템플릿 설정 저장됨"
     fi

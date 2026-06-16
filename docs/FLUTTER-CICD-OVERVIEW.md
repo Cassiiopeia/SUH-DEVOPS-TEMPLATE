@@ -107,7 +107,7 @@ SUH-DEVOPS-TEMPLATE의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitH
 |-----------|------|--------|
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml` | iOS TestFlight 배포 | deploy 브랜치 push |
 | `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml` | Android Play Store 배포 | deploy 브랜치 push |
-| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD.yaml` | Android Synology NAS 배포 | deploy 브랜치 push |
+| `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml` | Android Synology NAS 배포 | deploy 브랜치 push |
 
 ### 테스트 빌드 워크플로우
 
@@ -195,7 +195,7 @@ PR 또는 이슈에 댓글 작성:
 └── workflows/project-types/flutter/
     ├── PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml
     ├── PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml
-    ├── PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD.yaml
+    ├── PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml
     ├── PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml
     ├── PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml
     └── PROJECT-FLUTTER-ANDROID-TEST-APK.yaml

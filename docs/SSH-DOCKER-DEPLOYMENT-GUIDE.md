@@ -1,32 +1,32 @@
-# Synology NAS 배포 가이드
+# SSH + Docker 배포 가이드
 
-Synology NAS에 애플리케이션을 자동 배포하는 워크플로우 사용 가이드입니다.
+SSH로 접속 가능한 모든 서버(Synology NAS·AWS EC2·GCP·일반 VPS 등)에 애플리케이션을 자동 배포하는 워크플로우 사용 가이드입니다.
 
 ---
 
 ## 개요
 
-SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 5종의 워크플로우를 제공합니다.
+SUH-DEVOPS-TEMPLATE은 "SSH 접속 → Docker 이미지 pull → 컨테이너 교체" 패턴의 배포 워크플로우를 제공합니다. 배포처가 Synology든 AWS EC2든 동일한 워크플로우 하나로 커버하며, 차이는 `SSH_AUTH_METHOD`(password/key)와 경로 설정뿐입니다.
 
 | 워크플로우 | 프로젝트 타입 | 용도 |
 |-----------|-------------|------|
-| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Flutter | APK 빌드 후 SMB로 NAS 업로드 |
-| `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Spring Boot | Docker 이미지 빌드 및 배포 (기본, 단일 컨테이너) |
-| `PROJECT-SPRING-SYNOLOGY-NONSTOP-TRAEFIK-CICD` | Spring Boot | 무중단 배포 (Traefik Blue-Green, opt-in) |
-| `PROJECT-SPRING-SYNOLOGY-NONSTOP-NGINX-CICD` | Spring Boot | 무중단 배포 (Nginx Blue-Green, opt-in) |
-| `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW` | Spring Boot | PR별 Preview 환경 자동 생성 |
+| `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD` | Flutter | APK 빌드 후 SMB로 서버 업로드 |
+| `PROJECT-SPRING-SIMPLE-CICD` | Spring Boot | Docker 이미지 빌드 및 배포 (기본, 단일 컨테이너) |
+| `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | Spring Boot | 무중단 배포 (Traefik Blue-Green, opt-in) |
+| `PROJECT-SPRING-NONSTOP-NGINX-CICD` | Spring Boot | 무중단 배포 (Nginx Blue-Green, opt-in) |
+| `PROJECT-SPRING-PR-PREVIEW` | Spring Boot | PR별 Preview 환경 자동 생성 |
 
-> **참고**: Synology 워크플로우는 template_integrator 실행 시 `--synology` 옵션으로 포함할 수 있습니다.
+> **배포 워크플로우는 기본 포함**됩니다 (별도 옵션 불필요). 라이브러리 publish(`spring/nexus/`)와 Secret 백업(`common/secret-backup/`)만 통합 마법사에서 `--nexus` / `--secret-backup` 옵션(.ps1은 `-Nexus` / `-SecretBackup`)으로 선택합니다.
 > **무중단 배포 옵션**은 기본 `SIMPLE-CICD` 와 함께 배포되며, 사용자가 명시적으로 전환할 때만 활성화됩니다 (트리거 주석 처리 상태).
 
 ---
 
 ## 멀티 프로젝트 타입 배포 시
 
-단일 레포에 여러 타입(예: Spring 백엔드 + Python AI)이 공존해 여러 SYNOLOGY-CICD 워크플로우가 함께 설치된 경우, 같은 NAS에 배포하므로 리소스 충돌을 막기 위해 각 워크플로우의 env를 **서로 다른 값**으로 설정해야 합니다.
+단일 레포에 여러 타입(예: Spring 백엔드 + Python AI)이 공존해 여러 CICD 워크플로우가 함께 설치된 경우, 같은 서버에 배포하므로 리소스 충돌을 막기 위해 각 워크플로우의 env를 **서로 다른 값**으로 설정해야 합니다.
 
 - 각 워크플로우의 `PROJECT_NAME`, `CONTAINER_NAME`, `DEPLOY_PORT`(또는 `PROJECT_DEPLOY_PORT`)를 타입별로 분리합니다.
-- 동일 NAS에 같은 포트로 두 컨테이너를 배포할 수 없습니다 (`port is already allocated`).
+- 동일 서버에 같은 포트로 두 컨테이너를 배포할 수 없습니다 (`port is already allocated`).
 - 예: Spring 백엔드 `8096`, Python AI `8092` 등으로 포트를 분리한 뒤 사용합니다.
 
 | 항목 | Spring 백엔드 | Python AI |
@@ -40,7 +40,9 @@ SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 5종의 워크플로우를 
 
 ## 사전 준비
 
-### 1. Synology NAS 설정
+### 1. 서버 설정 (예: Synology NAS)
+
+> 아래는 Synology NAS(DSM) 기준 예시입니다. AWS EC2·GCP·VPS 등 다른 서버는 해당 OS에 맞게 Docker 설치·SSH 활성화를 진행하세요. AWS EC2 설정은 문서 하단 "다른 서버(AWS EC2 등) 배포" 섹션을 참고하세요.
 
 #### Docker 패키지 설치 (Spring Boot 배포용)
 1. DSM > 패키지 센터 > Docker 설치
@@ -58,11 +60,11 @@ SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 5종의 워크플로우를 
 
 ### 2. GitHub Secrets 공통 설정
 
-모든 Synology 워크플로우에서 공통으로 사용하는 Secrets:
+모든 배포 워크플로우에서 공통으로 사용하는 Secrets:
 
 | Secret | 설명 | 예시 |
 |--------|------|------|
-| `SERVER_HOST` | Synology NAS IP 또는 도메인 | `192.168.1.100` 또는 `nas.example.com` |
+| `SERVER_HOST` | 서버 IP 또는 도메인 (예: Synology NAS, AWS EC2) | `192.168.1.100` 또는 `nas.example.com` |
 | `SERVER_USER` | SSH/SMB 접속 사용자명 | `admin` |
 | `SERVER_PASSWORD` | SSH/SMB 접속 비밀번호 | `{PASSWORD}` |
 
@@ -72,7 +74,7 @@ SUH-DEVOPS-TEMPLATE은 Synology NAS 배포를 위한 5종의 워크플로우를 
 
 ### 워크플로우
 
-**파일**: `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD.yaml`
+**파일**: `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml`
 
 **트리거**:
 - `deploy` 브랜치 푸시
@@ -123,7 +125,7 @@ APK 파일 경로: `//{SERVER_HOST}/{SMB_SHARE}/{PROJECT_NAME}/android/download/
 
 ### 워크플로우
 
-**파일**: `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml`
+**파일**: `PROJECT-SPRING-SIMPLE-CICD.yaml`
 
 **트리거**:
 - `deploy` 브랜치 푸시 (운영 환경)
@@ -183,7 +185,7 @@ env:
 
 ### 워크플로우
 
-**파일**: `PROJECT-SPRING-SYNOLOGY-NONSTOP-TRAEFIK-CICD.yaml`
+**파일**: `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD.yaml`
 
 **트리거** (기본 비활성):
 - `workflow_dispatch` (수동 실행)
@@ -267,7 +269,7 @@ env:
 
 ### 워크플로우
 
-**파일**: `PROJECT-SPRING-SYNOLOGY-NONSTOP-NGINX-CICD.yaml`
+**파일**: `PROJECT-SPRING-NONSTOP-NGINX-CICD.yaml`
 
 **트리거** (기본 비활성):
 - `workflow_dispatch` (수동 실행)
@@ -535,34 +537,53 @@ Error: 404 page not found
 
 ## template_integrator 연동
 
-### Synology 워크플로우 포함하기
+### 배포 워크플로우는 기본 포함
+
+SSH+Docker 배포 워크플로우(SIMPLE-CICD, NONSTOP-*, PR-PREVIEW)는 해당 프로젝트 타입을 선택하면 **별도 옵션 없이 자동 포함**됩니다. 통합 마법사를 그냥 실행하면 됩니다:
 
 ```bash
 # Linux/macOS
-bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh) --synology
+bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)
 
 # Windows PowerShell
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Synology
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")))
 ```
 
-### 대화형 모드
+### 선택 워크플로우 (Nexus / Secret 백업)
 
-`--synology` 옵션 없이 실행하면, 해당 프로젝트 타입에 Synology 워크플로우가 있을 경우 질문이 표시됩니다:
+성격이 다른 두 워크플로우만 opt-in입니다:
+
+- **Nexus 라이브러리 publish** (`spring/nexus/`): 라이브러리/모듈을 Maven 저장소에 배포 — 서버 배포가 아니라 라이브러리 프로젝트용
+- **Secret 서버 백업** (`common/secret-backup/`): GitHub Secret 파일을 SSH로 서버에 업로드·이력관리
+
+```bash
+# Linux/macOS — 둘 다 포함
+bash <(curl -fsSL .../template_integrator.sh) --nexus --secret-backup
+
+# Windows PowerShell
+... -Nexus -SecretBackup
+```
+
+옵션 없이 실행하면, 해당 폴더가 있을 경우 대화형으로 질문이 표시됩니다:
 
 ```
-Synology 워크플로우가 발견되었습니다. (10개 파일)
-Synology NAS에 배포하는 워크플로우를 포함하시겠습니까? (y/N)
+📦 Nexus 라이브러리 publish 워크플로우를 발견했습니다. (2개 파일)
+   Nexus 라이브러리 publish 워크플로우를 포함할까요? (예/아니오)
+
+🔐 Secret 서버 백업 워크플로우를 발견했습니다. (1개 파일)
+   Secret 서버 백업 워크플로우를 포함할까요? (예/아니오)
 ```
 
 ### 설정 저장
 
-선택한 Synology 옵션은 `version.yml`에 저장됩니다:
+선택한 옵션은 `version.yml`에 저장됩니다:
 
 ```yaml
 metadata:
   template:
     options:
-      synology: true  # 또는 false
+      nexus: false          # Nexus publish 포함 여부
+      secret_backup: false  # Secret 백업 포함 여부
 ```
 
 재통합 시 이전 설정이 자동으로 감지되어 적용됩니다.

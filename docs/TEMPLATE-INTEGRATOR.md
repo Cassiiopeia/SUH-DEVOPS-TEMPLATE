@@ -234,7 +234,7 @@ on:
       - 'backend/**'    # Spring CI 만 이 경로 변경 시 발화
 ```
 
-배포 워크플로우(SYNOLOGY-CICD 등)도 타입별로 `PROJECT_NAME` / `CONTAINER_NAME` / `DEPLOY_PORT`를 서로 다른 값으로 설정해야 합니다. 자세한 내용은 [SYNOLOGY-DEPLOYMENT-GUIDE.md](SYNOLOGY-DEPLOYMENT-GUIDE.md)를 참고하세요.
+배포 워크플로우(SIMPLE-CICD 등)도 타입별로 `PROJECT_NAME` / `CONTAINER_NAME` / `DEPLOY_PORT`를 서로 다른 값으로 설정해야 합니다. 자세한 내용은 [SSH-DOCKER-DEPLOYMENT-GUIDE.md](SSH-DOCKER-DEPLOYMENT-GUIDE.md)를 참고하세요.
 
 ---
 

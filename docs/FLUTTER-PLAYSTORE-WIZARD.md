@@ -194,7 +194,7 @@ base64 release-key.jks               # Linux
 - **용도:** PR/이슈에서 테스트 APK 빌드
 
 ### Synology NAS 배포
-- **파일:** `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD.yaml`
+- **파일:** `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml`
 - **트리거:** deploy 브랜치 push
 - **용도:** 사내 Synology NAS에 APK 배포
 

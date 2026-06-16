@@ -45,9 +45,9 @@ suh-github-template/
 │   │   ├── PROJECT-TEMPLATE-INITIALIZER.yaml
 │   │   ├── PROJECT-COMMON-*.yaml
 │   │   └── project-types/
-│   │       ├── common/          # 공통 원본 (+ synology/)
-│   │       ├── flutter/         # Flutter 전용 (+ synology/)
-│   │       ├── spring/          # Spring 전용 (+ synology/)
+│   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in)
+│   │       ├── flutter/         # Flutter 전용 (배포 워크플로우 루트 포함)
+│   │       ├── spring/          # Spring 전용 (배포 루트 + nexus/ opt-in)
 │   │       ├── react/
 │   │       └── next/
 │   ├── scripts/
@@ -118,24 +118,26 @@ snake_case.sh / snake_case.py
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 | 기본 |
 | `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
-| `PROJECT-FLUTTER-ANDROID-SYNOLOGY-CICD` | Synology APK 배포 | synology/ |
+| `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD` | 자체 서버(SMB) APK 배포 | 기본 |
 
 #### Spring
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
-| `PROJECT-SPRING-SIMPLE-CICD` | Synology Docker 배포 (기본, 단일 컨테이너) | synology/ |
-| `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green, opt-in) | synology/ |
-| `PROJECT-SPRING-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green, opt-in) | synology/ |
-| `PROJECT-SPRING-PR-PREVIEW` | PR 프리뷰 배포 | synology/ |
-| `PROJECT-SPRING-NEXUS-CI` | Nexus CI | synology/ |
-| `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | synology/ |
+| `PROJECT-SPRING-SIMPLE-CICD` | SSH+Docker 배포 (기본, 단일 컨테이너) | spring/ 루트 |
+| `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green) | spring/ 루트 |
+| `PROJECT-SPRING-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green) | spring/ 루트 |
+| `PROJECT-SPRING-PR-PREVIEW` | PR 프리뷰 배포 | spring/ 루트 |
+| `PROJECT-SPRING-NEXUS-CI` | Nexus CI | spring/nexus/ |
+| `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | spring/nexus/ |
 
-> `synology/` 워크플로우는 `--synology` 옵션으로만 포함됩니다.
+> 배포 워크플로우(SIMPLE/NONSTOP-*/PR-PREVIEW)는 **기본 포함**됩니다. `nexus/` 워크플로우만 `--nexus` 옵션으로 포함합니다.
 
-#### 공통 Synology
+#### 공통 — Secret 백업 (opt-in)
 | 파일명 | 기능 | 위치 |
 |--------|------|------|
-| `PROJECT-COMMON-SYNOLOGY-SECRET-FILE-UPLOAD` | GitHub Secret → Synology 업로드 | common/synology/ |
+| `PROJECT-COMMON-SECRET-FILE-UPLOAD` | GitHub Secret → 서버(SSH) 업로드 | common/secret-backup/ |
+
+> `--secret-backup` 옵션으로 포함합니다.
 
 #### React / Next
 | 파일명 | 용도 |
@@ -166,8 +168,8 @@ python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output rel
 
 ### template_integrator.sh / .ps1
 기존 프로젝트에 템플릿 기능을 추가하는 원격 실행 스크립트. 신규 통합 / 업데이트 / 되돌리기 모드 지원.
-`--synology` / `--no-synology` 옵션으로 Synology 워크플로우 포함 여부 선택.
-선택 값은 `version.yml`의 `metadata.template.options.synology`에 저장.
+배포 워크플로우(SSH+Docker)는 기본 포함되고, `--nexus` / `--secret-backup` 옵션(.ps1은 `-Nexus` / `-SecretBackup`)으로 선택 워크플로우 포함 여부를 정한다.
+선택 값은 `version.yml`의 `metadata.template.options.nexus` / `.secret_backup`에 저장.
 
 **초기화/통합 시 복사되지 않는 템플릿 전용 파일**:
 ```

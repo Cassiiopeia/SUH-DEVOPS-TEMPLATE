@@ -236,5 +236,5 @@ docker rmi registry/project-pr-123:latest
 
 ## 관련 문서
 
-- [Synology 배포 가이드](SYNOLOGY-DEPLOYMENT-GUIDE.md)
+- [SSH+Docker 배포 가이드](SSH-DOCKER-DEPLOYMENT-GUIDE.md)
 - [트러블슈팅](TROUBLESHOOTING.md)

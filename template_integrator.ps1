@@ -73,10 +73,16 @@ param(
     [switch]$Force,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Synology,
+    [switch]$Nexus,
 
     [Parameter(Mandatory=$false)]
-    [switch]$NoSynology,
+    [switch]$NoNexus,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$SecretBackup,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NoSecretBackup,
 
     [Parameter(Mandatory=$false)]
     [string]$Paths = "",
@@ -126,7 +132,9 @@ $script:IsInteractiveMode = $false
 $script:WorkflowsCopied = 0
 $script:UtilModulesCopied = 0
 $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
-$script:IncludeSynology = $null  # Synology 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
+# 선택적(opt-in) 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
+$script:IncludeNexus = $null          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
+$script:IncludeSecretBackup = $null   # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
 $script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
 $script:PiPackageUrl = "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"  # pi install/update/remove 대상
 
@@ -690,8 +698,10 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Type <TYPE>          프로젝트 타입 (미지정 시 자동 감지)
   -NoBackup             백업 생성 안 함
   -Force                확인 없이 즉시 실행
-  -Synology             Synology 워크플로우 포함 (기본: 제외)
-  -NoSynology           Synology 워크플로우 제외
+  -Nexus                Nexus 라이브러리 publish 워크플로우 포함 (기본: 제외)
+  -NoNexus              Nexus publish 워크플로우 제외
+  -SecretBackup         GitHub Secret 서버 백업 워크플로우 포함 (기본: 제외)
+  -NoSecretBackup       Secret 백업 워크플로우 제외
   -Paths "T=P,..."      타입별 프로젝트 경로 (모노레포용, 예: -Paths "flutter=app,react=client")
   -Help                 이 도움말 표시
 
@@ -1476,18 +1486,20 @@ function Edit-ProjectInfo {
     while ($true) {
         Print-QuestionHeader "💫" "어떤 항목을 수정할까요?"
 
-        # Synology 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 의미가 있다.
-        # (version 모드는 워크플로우를 안 깔아 Synology와 무관 → 메뉴에 노출하지 않는다.)
-        $_synEditable = ($script:Mode -eq "full" -or $script:Mode -eq "workflows")
+        # 선택 워크플로우(Nexus/Secret 백업) 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 의미가 있다.
+        # (version 모드는 워크플로우를 안 깔아 무관 → 메뉴에 노출하지 않는다.)
+        $_optEditable = ($script:Mode -eq "full" -or $script:Mode -eq "workflows")
 
         $_editOptions = @(
             @{Value='type';    Label='프로젝트 타입'},
             @{Value='version'; Label='버전'},
             @{Value='branch';  Label='기본 브랜치'}
         )
-        if ($_synEditable) {
-            $_synState = if ($script:IncludeSynology -eq $true) { '포함' } else { '제외' }
-            $_editOptions += @{Value='synology'; Label="Synology 포함 여부 (현재: $_synState)"}
+        if ($_optEditable) {
+            $_nxState = if ($script:IncludeNexus -eq $true) { '포함' } else { '제외' }
+            $_sbState = if ($script:IncludeSecretBackup -eq $true) { '포함' } else { '제외' }
+            $_editOptions += @{Value='optional'; Label="Nexus publish 포함 여부 (현재: $_nxState)"}
+            $_editOptions += @{Value='optional'; Label="Secret 백업 포함 여부 (현재: $_sbState)"}
         }
         $_editOptions += @{Value='done';    Label='모두 맞음, 계속'}
         $_editOptions += @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
@@ -1555,12 +1567,12 @@ function Edit-ProjectInfo {
                 }
                 Write-Host ""
             }
-            'synology' {
-                # Synology 포함 여부를 다시 묻는다. -ForceAsk로 이미 설정된 값이 있어도 무조건 재질문.
-                # Ask-SynologyOption이 폴더를 스캔해 발견 시 안내+질문하고 $script:IncludeSynology를 갱신한다.
-                $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
-                $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
-                Ask-SynologyOption -TypeDirs $typeDirs -ForceAsk
+            'optional' {
+                # 선택 워크플로우(Nexus/Secret 백업) 포함 여부를 다시 묻는다. -ForceAsk로 이미 설정된 값이 있어도 무조건 재질문.
+                # Ask-AllOptionalWorkflows이 nexus·secret-backup 폴더를 스캔해 발견 시 안내+질문하고 갱신한다.
+                $optTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $typeDirs = @($optTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+                Ask-AllOptionalWorkflows -TypeDirs $typeDirs -ForceAsk
                 Write-Host ""
             }
             'done' {
@@ -1609,10 +1621,12 @@ function Detect-AndConfirmProject {
         }
         Write-Host "       🌙 Version          : $($script:ProjectVersion)"
         Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
-        # 모드 / Synology / 멀티경로 (값이 있을 때만 — sh와 동일)
+        # 모드 / 선택 워크플로우 / 멀티경로 (값이 있을 때만 — sh와 동일)
         if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
-        if ($script:IncludeSynology -eq $true)  { Write-Host "       🗄️ Synology         : 포함" }
-        elseif ($script:IncludeSynology -eq $false) { Write-Host "       🗄️ Synology         : 제외" }
+        if ($script:IncludeNexus -eq $true)  { Write-Host "       📦 Nexus publish    : 포함" }
+        elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
+        if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
+        elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
         if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
             $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
             Write-Host "       📁 프로젝트 경로    : $pathPairs"
@@ -1934,7 +1948,7 @@ metadata:
 }
 
 # ===================================================================
-# Synology 옵션 관리 함수
+# 선택 워크플로우(Nexus/Secret 백업) 옵션 관리 함수
 # ===================================================================
 
 function Read-TemplateOptions {
@@ -1949,7 +1963,7 @@ function Read-TemplateOptions {
         return
     }
 
-    # template.options.synology 값 찾기
+    # template.options.nexus / .secret_backup 값 찾기 (하위호환 매핑 없음 — 새 키만)
     $inTemplate = $false
     $inOptions = $false
 
@@ -1966,20 +1980,21 @@ function Read-TemplateOptions {
             continue
         }
 
-        # options 섹션 내부에서 synology 값 확인
+        # options 섹션 내부에서 nexus / secret_backup 값 확인
+        # (한 키만 읽고 끝내면 안 되므로 continue로 둘 다 스캔. 구 synology 키는 어느 분기에도
+        #  안 걸려 자연히 무시된다.)
         if ($inTemplate -and $inOptions) {
-            if ($line -match "^\s+synology:\s*(.+)") {
-                $synologyVal = $matches[1].Trim().Trim('"').Trim("'")
-
-                if ($synologyVal -eq "true" -or $synologyVal -eq "True") {
-                    $script:IncludeSynology = $true
-                    Print-Info "이전 설정 기준 Synology 옵션: 포함 — 같은 설정으로 진행합니다"
-                }
-                elseif ($synologyVal -eq "false" -or $synologyVal -eq "False") {
-                    $script:IncludeSynology = $false
-                    Print-Info "이전 설정 기준 Synology 옵션: 제외 — 같은 설정으로 진행합니다"
-                }
-                return
+            if ($line -match "^\s+nexus:\s*(.+)") {
+                $v = $matches[1].Trim().Trim('"').Trim("'")
+                if ($v -eq "true" -or $v -eq "True") { $script:IncludeNexus = $true }
+                elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeNexus = $false }
+                continue
+            }
+            if ($line -match "^\s+secret_backup:\s*(.+)") {
+                $v = $matches[1].Trim().Trim('"').Trim("'")
+                if ($v -eq "true" -or $v -eq "True") { $script:IncludeSecretBackup = $true }
+                elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeSecretBackup = $false }
+                continue
             }
 
             # 다른 최상위 키 만나면 options 섹션 종료
@@ -2003,6 +2018,12 @@ function Save-TemplateOptions {
     $versionFile = "version.yml"
     $today = (Get-Date).ToString("yyyy-MM-dd")
 
+    # 미설정($null)이면 false로 보정 — 항상 명시적 true/false를 기록한다.
+    if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
+    if ($null -eq $script:IncludeSecretBackup) { $script:IncludeSecretBackup = $false }
+    $nexusVal = $script:IncludeNexus.ToString().ToLower()
+    $sbVal = $script:IncludeSecretBackup.ToString().ToLower()
+
     if (-not (Test-Path $versionFile)) {
         return
     }
@@ -2011,13 +2032,20 @@ function Save-TemplateOptions {
 
     # 기존에 template 섹션이 있는지 확인
     if ($content -match "template:") {
-        # synology 값 업데이트 또는 추가
-        if ($content -match "synology:") {
-            $content = $content -replace "(?m)synology:.*$", "synology: $($script:IncludeSynology.ToString().ToLower())"
+        # nexus 값 업데이트 또는 추가
+        if ($content -match "nexus:") {
+            $content = $content -replace "(?m)nexus:.*$", "nexus: $nexusVal"
         }
         elseif ($content -match "options:") {
-            # options 다음 줄에 synology 추가
-            $content = $content -replace "(options:)", "`$1`n      synology: $($script:IncludeSynology.ToString().ToLower())"
+            $content = $content -replace "(options:)", "`$1`n      nexus: $nexusVal"
+        }
+
+        # secret_backup 값 업데이트 또는 추가
+        if ($content -match "secret_backup:") {
+            $content = $content -replace "(?m)secret_backup:.*$", "secret_backup: $sbVal"
+        }
+        elseif ($content -match "options:") {
+            $content = $content -replace "(options:)", "`$1`n      secret_backup: $sbVal"
         }
 
         # last_update_date 업데이트
@@ -2036,7 +2064,8 @@ function Save-TemplateOptions {
     integrated_date: "$today"
     last_update_date: "$today"
     options:
-      synology: $($script:IncludeSynology.ToString().ToLower())
+      nexus: $nexusVal
+      secret_backup: $sbVal
 "@
         Add-Content -Path $versionFile -Value $templateSection -Encoding UTF8
         Print-Info "version.yml에 템플릿 설정 저장됨"
@@ -2195,126 +2224,102 @@ function Get-CurrentTemplateVersion {
     return "unknown"
 }
 
-function Ask-SynologyOption {
-    # 여러 TypeDir를 받을 수 있다 (멀티타입). 각 타입의 synology 폴더 +
-    # 공통 synology 폴더를 모두 합산해 한 번만 질문한다.
-    # -ForceAsk: 이미 설정된 IncludeSynology가 있어도 무조건 다시 묻는다
-    #            (확인 화면의 수정 메뉴에서 사용 — 사용자가 명시적으로 다시 고르려는 경우)
+# 선택적(opt-in) 워크플로우 1종의 포함 여부를 묻는다. (.sh ask_optional_workflow와 1:1)
+# -Dir 폴더가 없거나 파일이 0개면 조용히 return.
+# 이미 값이 설정돼 있으면(-ForceAsk 아니면) 건너뛴다. (CLI/version.yml 우선)
+# -VarName: 갱신할 script 변수명 문자열 (예: "IncludeNexus")
+function Ask-OptionalWorkflow {
+    param(
+        [string]$Dir,
+        [string]$Icon,
+        [string]$Short,
+        [string]$Desc,
+        [string]$VarName,
+        [switch]$ForceAsk
+    )
+
+    if (-not (Test-Path $Dir)) { return }
+
+    # 폴더 내 파일 수집
+    $files = @()
+    $yamlFiles = Get-ChildItem -Path $Dir -Filter "*.yaml" -ErrorAction SilentlyContinue
+    $ymlFiles = Get-ChildItem -Path $Dir -Filter "*.yml" -ErrorAction SilentlyContinue
+    if ($yamlFiles) { $files += $yamlFiles }
+    if ($ymlFiles) { $files += $ymlFiles }
+    if ($files.Count -eq 0) { return }
+
+    # 현재 변수값 읽기
+    $cur = Get-Variable -Name $VarName -Scope Script -ValueOnly -ErrorAction SilentlyContinue
+
+    # 이미 설정된 값이 있고 -ForceAsk 아니면 건너뜀 (CLI 또는 version.yml에서 온 값)
+    if (-not $ForceAsk -and $null -ne $cur) { return }
+
+    # 비대화형 환경 감지 → 기본 제외
+    $isNonInteractive = $false
+    try {
+        if (-not [Environment]::UserInteractive) { $isNonInteractive = $true }
+        elseif ([Console]::IsInputRedirected) { $isNonInteractive = $true }
+    }
+    catch { $isNonInteractive = $true }
+    if ($isNonInteractive) {
+        Set-Variable -Name $VarName -Scope Script -Value $false
+        return
+    }
+
+    Print-SeparatorLine
+    Write-Host ""
+    Write-Host "$Icon $Short 워크플로우를 발견했습니다. ($($files.Count)개 파일)"
+    Write-Host "   $Desc"
+    Write-Host ""
+    Write-Host "   포함되는 워크플로우:"
+    foreach ($f in $files) {
+        Write-Host "     • $($f.Name)"
+    }
+    Write-Host ""
+
+    # 선택지(예/아니오)는 Ask-YesNo가 화살표 메뉴로 직접 보여준다.
+    if (Ask-YesNo "$Short 워크플로우를 포함할까요?" "N") {
+        Set-Variable -Name $VarName -Scope Script -Value $true
+        Print-Info "$Short 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
+    }
+    else {
+        Set-Variable -Name $VarName -Scope Script -Value $false
+        Print-Info "$Short 워크플로우를 제외합니다 (나중에 옵션으로 추가 가능)"
+    }
+}
+
+# 모든 opt-in 워크플로우를 순서대로 묻는다. (.sh ask_all_optional_workflows와 1:1)
+# - Nexus: 각 타입의 nexus/ 폴더 (현재 spring만 존재)
+# - Secret 백업: 공통 secret-backup/ 폴더
+function Ask-AllOptionalWorkflows {
     param(
         [string[]]$TypeDirs,
         [switch]$ForceAsk
     )
 
     if (-not $TypeDirs -or $TypeDirs.Count -eq 0) { return }
+    $commonRoot = Join-Path (Split-Path $TypeDirs[0] -Parent) "common"
 
-    # 비대화형 환경 감지 (파이프라인, 리디렉션, 비대화형 세션 등)
-    $isNonInteractive = $false
-    try {
-        if (-not [Environment]::UserInteractive) {
-            $isNonInteractive = $true
-        }
-        elseif ([Console]::IsInputRedirected) {
-            $isNonInteractive = $true
-        }
-    }
-    catch {
-        # Console 접근 실패 시 비대화형으로 간주
-        $isNonInteractive = $true
-    }
+    # CLI 파라미터로 이미 지정된 경우 우선 반영
+    if ($Nexus)          { $script:IncludeNexus = $true }
+    if ($NoNexus)        { $script:IncludeNexus = $false }
+    if ($SecretBackup)   { $script:IncludeSecretBackup = $true }
+    if ($NoSecretBackup) { $script:IncludeSecretBackup = $false }
 
-    if ($isNonInteractive) {
-        $script:IncludeSynology = $false
-        return
-    }
+    # -ForceAsk가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
+    # (Ask-OptionalWorkflow가 변수값으로 판단하므로 여기서 한 번만 읽는다.)
+    if (-not $ForceAsk) { Read-TemplateOptions }
 
-    # 검사 대상 synology 폴더 목록 구성 (타입별 + 공통, 중복 제거)
-    $synologyDirs = New-Object System.Collections.Generic.List[string]
+    # Nexus: 각 타입의 nexus/ 폴더
     foreach ($td in $TypeDirs) {
-        $sd = Join-Path $td "synology"
-        if (-not $synologyDirs.Contains($sd)) { $synologyDirs.Add($sd) }
-        $csd = Join-Path (Split-Path $td -Parent) "common\synology"
-        if (-not $synologyDirs.Contains($csd)) { $synologyDirs.Add($csd) }
+        Ask-OptionalWorkflow -Dir (Join-Path $td "nexus") -Icon "📦" -Short "Nexus 라이브러리 publish" `
+            -Desc "라이브러리/모듈을 Maven 저장소(Nexus)에 배포하는 워크플로우입니다. 일반 서버 배포가 아니라 라이브러리 프로젝트에만 필요합니다." `
+            -VarName "IncludeNexus" -ForceAsk:$ForceAsk
     }
-
-    # synology 폴더가 하나도 존재하지 않으면 건너뛰기
-    $anyDir = $false
-    foreach ($d in $synologyDirs) { if (Test-Path $d) { $anyDir = $true; break } }
-    if (-not $anyDir) { return }
-
-    # CLI 파라미터로 이미 지정된 경우
-    if ($Synology) {
-        $script:IncludeSynology = $true
-        return
-    }
-    if ($NoSynology) {
-        $script:IncludeSynology = $false
-        return
-    }
-
-    # 이미 설정되어 있으면 건너뛰기 (단, -ForceAsk면 무시하고 다시 묻는다)
-    if (-not $ForceAsk -and $null -ne $script:IncludeSynology) {
-        return
-    }
-
-    # 기존 version.yml에서 설정 읽기 시도 (-ForceAsk면 저장값으로 덮어쓰지 않는다)
-    if (-not $ForceAsk) {
-        Read-TemplateOptions
-
-        # 이전 설정이 있으면 건너뛰기
-        if ($null -ne $script:IncludeSynology) {
-            return
-        }
-    }
-
-    # synology 폴더 내 파일 목록 수집 (전체 대상 폴더 합산, 타입별/공통 구분)
-    $typeFiles = @()
-    $commonFiles = @()
-    foreach ($d in $synologyDirs) {
-        if (-not (Test-Path $d)) { continue }
-        $yamlFiles = Get-ChildItem -Path $d -Filter "*.yaml" -ErrorAction SilentlyContinue
-        $ymlFiles = Get-ChildItem -Path $d -Filter "*.yml" -ErrorAction SilentlyContinue
-        $found = @()
-        if ($yamlFiles) { $found += $yamlFiles }
-        if ($ymlFiles) { $found += $ymlFiles }
-        if ($d -like "*\common\synology") { $commonFiles += $found } else { $typeFiles += $found }
-    }
-
-    $totalSynologyCount = $typeFiles.Count + $commonFiles.Count
-    if ($totalSynologyCount -eq 0) {
-        return
-    }
-
-    Print-SeparatorLine
-    Write-Host ""
-    Write-Host "🗄️ Synology NAS 배포용 워크플로우를 발견했습니다. ($totalSynologyCount개 파일)"
-    Write-Host ""
-    Write-Host "   📦 Synology(시놀로지)란?"
-    Write-Host "      개인·소규모 팀이 많이 쓰는 NAS(자체 서버) 장비입니다."
-    Write-Host "      이 워크플로우들은 빌드 결과물을 그 Synology 서버에 자동 배포(CI/CD)해 줍니다."
-    Write-Host ""
-    Write-Host "   ❓ 포함할까요?"
-    Write-Host "      • Synology NAS에 직접 배포할 계획이면 → 포함"
-    Write-Host "      • AWS·클라우드·다른 서버를 쓰거나 잘 모르겠으면 → 제외 (기본값, 안전)"
-    Write-Host "      나중에 --synology 옵션으로 언제든 추가할 수 있습니다."
-    Write-Host ""
-    Write-Host "   포함되는 워크플로우:"
-    foreach ($f in $typeFiles) {
-        Write-Host "     • $($f.Name)"
-    }
-    foreach ($f in $commonFiles) {
-        Write-Host "     • $($f.Name) (공통)"
-    }
-    Write-Host ""
-
-    # 선택지(예/아니오)는 아래 Ask-YesNo가 화살표 메뉴로 직접 보여주므로 여기서 중복 안내하지 않는다.
-    if (Ask-YesNo "Synology 워크플로우를 포함할까요?" "N") {
-        $script:IncludeSynology = $true
-        Print-Info "Synology 워크플로우를 포함합니다 — GitHub Actions에 추가됩니다"
-    }
-    else {
-        $script:IncludeSynology = $false
-        Print-Info "Synology 워크플로우를 제외합니다 (나중에 --synology 옵션으로 추가 가능)"
-    }
+    # Secret 백업: 공통 폴더
+    Ask-OptionalWorkflow -Dir (Join-Path $commonRoot "secret-backup") -Icon "🔐" -Short "Secret 서버 백업" `
+        -Desc "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다." `
+        -VarName "IncludeSecretBackup" -ForceAsk:$ForceAsk
 }
 
 # ===================================================================
@@ -2628,20 +2633,21 @@ function Copy-Workflows-ForType {
         Print-Info "$Type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     }
 
-    # 3. 타입별 Synology 하위폴더 처리 (선택적)
-    $synologyDir = Join-Path $ProjectTypesDir "$Type\synology"
+    # 3. 타입별 Nexus 하위폴더 처리 (opt-in)
+    # 배포 워크플로우는 타입 루트로 올라와 기본 포함됨. nexus/ 만 선택적으로 남는다.
+    $nexusDir = Join-Path $ProjectTypesDir "$Type\nexus"
 
-    if (Test-Path $synologyDir) {
-        if ($script:IncludeSynology -eq $true) {
-            Print-Info "$Type Synology 워크플로우 다운로드 중..."
+    if (Test-Path $nexusDir) {
+        if ($script:IncludeNexus -eq $true) {
+            Print-Info "$Type Nexus 워크플로우 다운로드 중..."
 
-            $synologyWorkflows = @()
-            $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $synologyWorkflows += $yamlFiles }
-            if ($ymlFiles) { $synologyWorkflows += $ymlFiles }
+            $nexusWorkflows = @()
+            $yamlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $nexusWorkflows += $yamlFiles }
+            if ($ymlFiles) { $nexusWorkflows += $ymlFiles }
 
-            foreach ($workflow in $synologyWorkflows) {
+            foreach ($workflow in $nexusWorkflows) {
                 $filename = $workflow.Name
                 $destPath = Join-Path $WORKFLOWS_DIR $filename
 
@@ -2651,30 +2657,30 @@ function Copy-Workflows-ForType {
                     $backupPath = [string]$destPath + ".bak"
                     Move-Item -Path $destPath -Destination $backupPath -Force
                     Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (Synology $Type, 백업: ${filename}.bak)"
+                    Write-Host "  ✓ $filename (Nexus $Type, 백업: ${filename}.bak)"
                 } else {
                     Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (Synology $Type)"
+                    Write-Host "  ✓ $filename (Nexus $Type)"
                 }
-                $Counters.synologyCopied++
+                $Counters.optionalCopied++
                 $Counters.copied++
             }
         } else {
-            # Synology 제외됨 - 사용자에게 알림
-            $synologyFiles = @()
-            $yamlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $synologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $synologyFiles += $yamlFiles }
-            if ($ymlFiles) { $synologyFiles += $ymlFiles }
+            # Nexus 제외됨 - 사용자에게 알림
+            $nexusFiles = @()
+            $yamlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $nexusFiles += $yamlFiles }
+            if ($ymlFiles) { $nexusFiles += $ymlFiles }
 
-            if ($synologyFiles.Count -gt 0) {
-                Print-Info "$Type Synology 워크플로우 $($synologyFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
+            if ($nexusFiles.Count -gt 0) {
+                Print-Info "$Type Nexus 워크플로우 $($nexusFiles.Count)개 제외됨 (-Nexus 옵션으로 포함 가능)"
             }
         }
     }
 
     # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
-    foreach ($srcDir in @($typeDir, $synologyDir)) {
+    foreach ($srcDir in @($typeDir, $nexusDir)) {
         if (-not (Test-Path $srcDir)) { continue }
         foreach ($wf in (Get-ChildItem -Path $srcDir -Include '*.yaml','*.yml' -File -ErrorAction SilentlyContinue)) {
             $target = Join-Path $WORKFLOWS_DIR $wf.Name
@@ -2700,7 +2706,7 @@ function Copy-Workflows {
     }
 
     # 멀티타입 순회에서 Copy-Workflows-ForType이 공유하는 카운터 (해시테이블 ref)
-    $counters = @{ copied = 0; skipped = 0; templateAdded = 0; synologyCopied = 0 }
+    $counters = @{ copied = 0; skipped = 0; templateAdded = 0; optionalCopied = 0 }
     $projectTypesDir = Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR"
 
     # project-types 폴더 존재 확인
@@ -2738,7 +2744,7 @@ function Copy-Workflows {
         Print-Warning "공통 워크플로우 폴더(common)를 찾지 못해 건너뜁니다."
     }
 
-    # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — ProjectTypes 배열 순회
+    # 2~3. 타입별 워크플로우 + 타입별 Nexus(opt-in) 처리 — ProjectTypes 배열 순회
     #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
     $typesToCopy = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
     foreach ($t in $typesToCopy) {
@@ -2749,44 +2755,44 @@ function Copy-Workflows {
     $copied = $counters.copied
     $skipped = $counters.skipped
     $templateAdded = $counters.templateAdded
-    $synologyCopied = $counters.synologyCopied
+    $optionalCopied = $counters.optionalCopied
 
-    # 4. Common Synology 워크플로우 처리 (선택적)
-    $commonSynologyDir = Join-Path $projectTypesDir "common\synology"
-    if (Test-Path $commonSynologyDir) {
-        if ($script:IncludeSynology -eq $true) {
-            Print-Info "공통 Synology 워크플로우 다운로드 중..."
+    # 4. Common Secret 백업 워크플로우 처리 (opt-in)
+    $commonSecretDir = Join-Path $projectTypesDir "common\secret-backup"
+    if (Test-Path $commonSecretDir) {
+        if ($script:IncludeSecretBackup -eq $true) {
+            Print-Info "공통 Secret 백업 워크플로우 다운로드 중..."
 
-            $commonSynWorkflows = @()
-            $yamlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $commonSynWorkflows += $yamlFiles }
-            if ($ymlFiles) { $commonSynWorkflows += $ymlFiles }
+            $commonSecretWorkflows = @()
+            $yamlFiles = Get-ChildItem -Path $commonSecretDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $commonSecretDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $commonSecretWorkflows += $yamlFiles }
+            if ($ymlFiles) { $commonSecretWorkflows += $ymlFiles }
 
-            foreach ($workflow in $commonSynWorkflows) {
+            foreach ($workflow in $commonSecretWorkflows) {
                 $filename = $workflow.Name
                 $destPath = Join-Path $WORKFLOWS_DIR $filename
 
-                # 타입별 synology에서 이미 복사된 파일이면 스킵
+                # 이미 존재하는 파일이면 스킵
                 if (Test-Path $destPath) {
-                    Print-Warning "$($filename): 타입별 Synology에 같은 파일이 있어 타입별 버전을 유지합니다."
+                    Print-Warning "$($filename): 이미 존재하여 건너뜁니다."
                     continue
                 }
 
                 Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                Write-Host "  ✓ $filename (공통 Synology)"
-                $synologyCopied++
+                Write-Host "  ✓ $filename (Secret 백업)"
+                $optionalCopied++
                 $copied++
             }
         } else {
-            $commonSynFiles = @()
-            $yamlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $commonSynologyDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $commonSynFiles += $yamlFiles }
-            if ($ymlFiles) { $commonSynFiles += $ymlFiles }
+            $commonSecretFiles = @()
+            $yamlFiles = Get-ChildItem -Path $commonSecretDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $commonSecretDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $commonSecretFiles += $yamlFiles }
+            if ($ymlFiles) { $commonSecretFiles += $ymlFiles }
 
-            if ($commonSynFiles.Count -gt 0) {
-                Print-Info "공통 Synology 워크플로우 $($commonSynFiles.Count)개 제외됨 (-Synology 옵션으로 포함 가능)"
+            if ($commonSecretFiles.Count -gt 0) {
+                Print-Info "공통 Secret 백업 워크플로우 $($commonSecretFiles.Count)개 제외됨 (-SecretBackup 옵션으로 포함 가능)"
             }
         }
     }
@@ -2796,8 +2802,8 @@ function Copy-Workflows {
     $typesSummary = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes -join ',' } else { $script:ProjectType }
     Print-Success "워크플로우 처리 완료 (타입: $typesSummary)"
     Write-Host "   📥 복사됨: $copied 개"
-    if ($synologyCopied -gt 0) {
-        Write-Host "   🗄️ Synology: $synologyCopied 개"
+    if ($optionalCopied -gt 0) {
+        Write-Host "   🧩 선택 워크플로우: $optionalCopied 개"
     }
     if ($templateAdded -gt 0) {
         Write-Host "   📄 참고용 추가 (.template.yaml): $templateAdded 개"
@@ -3329,7 +3335,7 @@ function Start-InteractiveMode {
     
     # ── 1) 모드 선택 먼저 (사용자 의도부터 파악) ── (sh와 동일 구조)
     # 사용자가 무엇을 하려는지 먼저 묻고, 모드에 따라 필요한 정보만 수집한다.
-    # (예: skills/issues 모드는 프로젝트 타입·버전·Synology·경로가 전혀 필요 없음)
+    # (예: skills/issues 모드는 프로젝트 타입·버전·선택 워크플로우·경로가 전혀 필요 없음)
     Print-QuestionHeader "🚀" "어떤 기능을 통합하시겠습니까?"
 
     # 라벨은 sh와 동일한 한국어 설명. ps1은 Value/Label 분리라 화면엔 Label만 표시됨(영어 키 비노출).
@@ -3353,15 +3359,15 @@ function Start-InteractiveMode {
     Download-Template
 
     # ── 2) 모드별 필요 정보만 수집 ──
-    # 수집 매트릭스: full=타입/버전/Synology/경로, version=타입/버전/경로,
-    #               workflows=타입/Synology, issues=없음, skills=없음
+    # 수집 매트릭스: full=타입/버전/선택WF/경로, version=타입/버전/경로,
+    #               workflows=타입/선택WF, issues=없음, skills=없음
     switch ($script:Mode) {
         { $_ -in @('skills', 'issues') } {
             # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
         }
         default {
-            # full/version/workflows → 타입·버전·브랜치 감지 → Synology·경로 수집 → 최종 확인
-            # 순서가 핵심: Synology·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다. (sh와 동일)
+            # full/version/workflows → 타입·버전·브랜치 감지 → 선택 워크플로우·경로 수집 → 최종 확인
+            # 순서가 핵심: 선택 워크플로우·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다. (sh와 동일)
 
             # 1) 타입/버전/브랜치 먼저 감지 (확인은 아직 안 함)
             if ($script:ProjectTypes.Count -eq 0) {
@@ -3372,11 +3378,11 @@ function Start-InteractiveMode {
             if ([string]::IsNullOrWhiteSpace($script:ProjectVersion)) { $script:ProjectVersion = Detect-Version }
             if ([string]::IsNullOrWhiteSpace($script:DetectedBranch)) { $script:DetectedBranch = Detect-DefaultBranch }
 
-            # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만
+            # 2) 선택 워크플로우(Nexus/Secret 백업): 워크플로우 포함 모드(full/workflows)에서만
             if ($script:Mode -eq "full" -or $script:Mode -eq "workflows") {
-                $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
-                $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
-                Ask-SynologyOption $typeDirs
+                $optTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+                $typeDirs = @($optTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+                Ask-AllOptionalWorkflows -TypeDirs $typeDirs
             }
 
             # 3) 경로: full/version 모드에서만 필요
@@ -3463,12 +3469,12 @@ function Start-Integration {
     if (-not $script:IsInteractiveMode) {
         Download-Template
 
-        # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
-        # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
+        # CLI 모드에서도 선택 워크플로우 질문 (워크플로우 모드에서만)
+        # 멀티타입이면 모든 타입의 nexus 폴더 + 공통 secret-backup을 합쳐 한 번만 질문
         if ($Mode -eq "full" -or $Mode -eq "workflows") {
-            $synTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
-            $typeDirs = @($synTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
-            Ask-SynologyOption $typeDirs
+            $optTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+            $typeDirs = @($optTypes | ForEach-Object { Join-Path $TEMP_DIR "$WORKFLOWS_DIR\$PROJECT_TYPES_DIR\$_" })
+            Ask-AllOptionalWorkflows -TypeDirs $typeDirs
         }
     }
 
@@ -3531,13 +3537,12 @@ function Start-Integration {
         }
     }
 
-    # 2.1 템플릿 옵션 저장 (Synology 설정 등)
+    # 2.1 템플릿 옵션 저장 (Nexus / Secret 백업 등 선택 워크플로우 설정)
     if ($Mode -eq "full" -or $Mode -eq "workflows") {
-        # IncludeSynology가 설정되지 않은 경우 기본값 false 사용
-        # (basic 타입 등 Synology 폴더가 없는 경우를 위한 처리)
-        if ($null -eq $script:IncludeSynology) {
-            $script:IncludeSynology = $false
-        }
+        # 설정되지 않은 경우 기본값 false 사용
+        # (해당 opt-in 폴더가 없는 타입을 위한 처리)
+        if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
+        if ($null -eq $script:IncludeSecretBackup) { $script:IncludeSecretBackup = $false }
         # 다운로드한 템플릿의 실제 버전 전달 (TemplateVersion 사용)
         Save-TemplateOptions $script:TemplateVersion
     }

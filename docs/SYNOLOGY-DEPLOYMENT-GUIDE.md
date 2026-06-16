@@ -573,3 +573,33 @@ metadata:
 
 - [TEMPLATE-INTEGRATOR.md](TEMPLATE-INTEGRATOR.md) - 템플릿 통합 스크립트 가이드
 - [FLUTTER-CICD-OVERVIEW.md](FLUTTER-CICD-OVERVIEW.md) - Flutter CI/CD 전체 가이드
+
+---
+
+## SSH 인증 방식과 다른 서버(AWS EC2 등) 배포
+
+이 배포 워크플로우는 Synology 전용이 아니라, **SSH로 접속 가능한 모든 서버**에 Docker 컨테이너를 배포하는 범용 엔진이다. 서버 종류는 `SSH_AUTH_METHOD` 환경변수와 등록하는 Secret으로 결정된다.
+
+### 인증 방식 선택 (`SSH_AUTH_METHOD`)
+
+워크플로우 `env`의 `SSH_AUTH_METHOD` 값으로 인증 방식을 고른다 (통합 마법사가 질문하며, 기본값은 `password`).
+
+| 값 | 사용 Secret | sudo 처리 | 적합한 서버 |
+|----|-------------|-----------|-------------|
+| `password` | `SERVER_PASSWORD` | `echo $PW \| sudo -S` | Synology NAS, sudo 비밀번호가 필요한 일반 서버 |
+| `key` | `SSH_KEY` (.pem 내용) | passwordless `sudo` | AWS EC2, GCP, passwordless sudo 설정된 VPS |
+
+### AWS EC2에 배포하기
+
+1. 워크플로우 `env`에서 `SSH_AUTH_METHOD: "key"`로 설정 (또는 통합 마법사에서 `key` 선택).
+2. GitHub Secrets에 다음을 등록:
+   - `SERVER_HOST`: EC2 퍼블릭 IP 또는 도메인
+   - `SERVER_USER`: `ubuntu` (Ubuntu AMI) 또는 `ec2-user` (Amazon Linux)
+   - `SSH_KEY`: EC2 키페어 `.pem` 파일의 **전체 내용**을 그대로 붙여넣기
+   - `SSH_PORT`: 보통 `22` (워크플로우 env의 SSH_PORT를 22로 조정)
+3. EC2 보안 그룹에서 GitHub Actions의 SSH 접근을 허용하고, 서버에 Docker가 설치돼 있어야 한다.
+4. DB(PostgreSQL/Redis/Mongo 등)는 서버에 미리 떠 있다고 가정한다. 이 워크플로우는 **앱 컨테이너만** 교체한다.
+
+### 새로운 서버 유형을 추가하려면
+
+`SSH_AUTH_METHOD`는 `password`/`key` 두 가지를 지원한다. 새 서버가 둘 중 하나의 인증을 쓴다면 **워크플로우를 복제할 필요 없이** 해당 값과 Secret만 설정하면 된다. 인증·경로 외에 서버별 특수 로직이 필요하면 `script:` 본문에서 `SSH_AUTH_METHOD` 값으로 분기를 추가한다.

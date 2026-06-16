@@ -13,7 +13,8 @@
 # DOCKERHUB_TOKEN: Docker Hub 액세스 토큰
 # SERVER_HOST: Synology 서버 호스트
 # SERVER_USER: SSH 사용자명
-# SERVER_PASSWORD: SSH 비밀번호
+# SERVER_PASSWORD: SSH 비밀번호 (SSH_AUTH_METHOD=password일 때)
+# SSH_KEY: SSH 개인키 .pem 내용 (SSH_AUTH_METHOD=key일 때, AWS EC2 등)
 # ===================================================================
 #
 # 🚀 사용법:
@@ -30,7 +31,7 @@
 # - 와일드카드 DNS 설정: *.pr.suhsaechan.kr → 서버
 # ===================================================================
 
-name: PROJECT-PYTHON-SYNOLOGY-PR-PREVIEW
+name: PROJECT-PYTHON-PR-PREVIEW
 
 # ===================================================================
 # ⚠️ [영역 1] 프로젝트별 설정 - 다른 프로젝트에서 사용 시 이 섹션만 수정하세요
@@ -51,6 +52,11 @@ env:
   TRAEFIK_NETWORK: traefik-network
   PREVIEW_DOMAIN_SUFFIX: pr.suhsaechan.kr
   PREVIEW_PORT: '8079'
+
+  # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
+  #   password → SERVER_PASSWORD secret 사용
+  #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
+  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
 
   # SSH 포트 (시놀로지 포트 환경 구축 후 수정 금지)
   SSH_PORT: '2022'
@@ -314,17 +320,30 @@ jobs:
 
       - name: 서버에 배포
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
+          envs: SSH_AUTH_METHOD
           script: |
             set -e
 
             # 환경 변수 설정 (시놀로지 NAS용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             # 변수 설정
             PR_NUMBER=${{ github.event.issue.number }}
@@ -346,11 +365,11 @@ jobs:
 
             # 이미지 Pull
             echo "📥 Docker 이미지 Pull 중..."
-            echo $PW | sudo -S docker pull "${IMAGE}"
+            SUDO docker pull "${IMAGE}"
 
             # 기존 컨테이너 삭제
             echo "🗑️ 기존 컨테이너 정리 중..."
-            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+            SUDO docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
             # 볼륨 마운트 옵션 구성
             VOLUME_OPTS="-v /etc/localtime:/etc/localtime:ro"
@@ -360,7 +379,7 @@ jobs:
 
             # 새 컨테이너 실행
             echo "🐳 새 컨테이너 실행 중..."
-            echo $PW | sudo -S docker run -d \
+            SUDO docker run -d \
               --name "${CONTAINER_NAME}" \
               --network "${TRAEFIK_NETWORK}" \
               --label "traefik.enable=true" \
@@ -391,14 +410,14 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
 
               # 1. 컨테이너 상태 확인
-              STATUS=$(echo $PW | sudo -S docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+              STATUS=$(SUDO docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
 
               if [ "$STATUS" = "exited" ]; then
                 echo "❌ 컨테이너 비정상 종료!"
                 echo ""
                 echo "📋 컨테이너 로그 (최근 100줄):"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+                SUDO docker logs --tail 100 "${CONTAINER_NAME}"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 exit 1
               fi
@@ -406,7 +425,7 @@ jobs:
               if [ "$STATUS" = "running" ]; then
                 # 2. HTTP Health Check 시도 (HEALTH_CHECK_PATH가 설정된 경우에만)
                 if [ -n "$HEALTH_PATH" ]; then
-                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
+                  HEALTH=$(SUDO docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
 
                   if [ -n "$HEALTH" ]; then
                     echo "✅ 정상 기동 확인! (HTTP 응답: ${HEALTH_PATH})"
@@ -418,7 +437,7 @@ jobs:
 
                 # 3. HTTP 응답 없으면 로그 패턴 매칭으로 폴백
                 if [ -n "$LOG_PATTERN" ]; then
-                  STARTED=$(echo $PW | sudo -S docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
+                  STARTED=$(SUDO docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
 
                   if [ -n "$STARTED" ]; then
                     echo "✅ 정상 기동 확인! (로그 패턴)"
@@ -439,7 +458,7 @@ jobs:
               echo ""
               echo "📋 컨테이너 로그 (최근 100줄):"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+              SUDO docker logs --tail 100 "${CONTAINER_NAME}"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               exit 1
             fi
@@ -894,17 +913,30 @@ jobs:
       - name: 서버에 배포
         if: steps.check_branch.outputs.exists == 'true'
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
+          envs: SSH_AUTH_METHOD
           script: |
             set -e
 
             # 환경 변수 설정 (시놀로지 NAS용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             # 변수 설정
             ISSUE_NUMBER=${{ needs.get-branch-from-issue.outputs.issue_number }}
@@ -926,11 +958,11 @@ jobs:
 
             # 이미지 Pull
             echo "📥 Docker 이미지 Pull 중..."
-            echo $PW | sudo -S docker pull "${IMAGE}"
+            SUDO docker pull "${IMAGE}"
 
             # 기존 컨테이너 삭제
             echo "🗑️ 기존 컨테이너 정리 중..."
-            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+            SUDO docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
             # 볼륨 마운트 옵션 구성
             VOLUME_OPTS="-v /etc/localtime:/etc/localtime:ro"
@@ -940,7 +972,7 @@ jobs:
 
             # 새 컨테이너 실행
             echo "🐳 새 컨테이너 실행 중..."
-            echo $PW | sudo -S docker run -d \
+            SUDO docker run -d \
               --name "${CONTAINER_NAME}" \
               --network "${TRAEFIK_NETWORK}" \
               --label "traefik.enable=true" \
@@ -971,14 +1003,14 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
 
               # 1. 컨테이너 상태 확인
-              STATUS=$(echo $PW | sudo -S docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+              STATUS=$(SUDO docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
 
               if [ "$STATUS" = "exited" ]; then
                 echo "❌ 컨테이너 비정상 종료!"
                 echo ""
                 echo "📋 컨테이너 로그 (최근 100줄):"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+                SUDO docker logs --tail 100 "${CONTAINER_NAME}"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 exit 1
               fi
@@ -986,7 +1018,7 @@ jobs:
               if [ "$STATUS" = "running" ]; then
                 # 2. HTTP Health Check 시도 (HEALTH_CHECK_PATH가 설정된 경우에만)
                 if [ -n "$HEALTH_PATH" ]; then
-                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
+                  HEALTH=$(SUDO docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
 
                   if [ -n "$HEALTH" ]; then
                     echo "✅ 정상 기동 확인! (HTTP 응답: ${HEALTH_PATH})"
@@ -998,7 +1030,7 @@ jobs:
 
                 # 3. HTTP 응답 없으면 로그 패턴 매칭으로 폴백
                 if [ -n "$LOG_PATTERN" ]; then
-                  STARTED=$(echo $PW | sudo -S docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
+                  STARTED=$(SUDO docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
 
                   if [ -n "$STARTED" ]; then
                     echo "✅ 정상 기동 확인! (로그 패턴)"
@@ -1019,7 +1051,7 @@ jobs:
               echo ""
               echo "📋 컨테이너 로그 (최근 100줄):"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+              SUDO docker logs --tail 100 "${CONTAINER_NAME}"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               exit 1
             fi
@@ -1204,15 +1236,28 @@ jobs:
 
       - name: 컨테이너 & 이미지 삭제
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
+          envs: SSH_AUTH_METHOD
           script: |
             # 환경 변수 설정 (시놀로지 NAS용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             PR_NUMBER=${{ steps.pr_number.outputs.number }}
             PROJECT_NAME="${{ env.PROJECT_NAME }}"
@@ -1228,11 +1273,11 @@ jobs:
 
             # 컨테이너 삭제
             echo "🐳 컨테이너 삭제 중..."
-            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+            SUDO docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
             # 이미지 삭제
             echo "🖼️ 이미지 삭제 중..."
-            echo $PW | sudo -S docker rmi "${IMAGE}" 2>/dev/null || true
+            SUDO docker rmi "${IMAGE}" 2>/dev/null || true
 
             echo "✅ 삭제 완료!"
 
@@ -1284,6 +1329,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           script: |
             # 환경 변수 설정 (시놀로지 NAS용)
@@ -1314,6 +1360,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           script: |
             # 환경 변수 설정 (시놀로지 NAS용)
@@ -1609,17 +1656,30 @@ jobs:
       - name: 서버에 배포
         if: steps.branch_info.outputs.branch_exists == 'true'
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
+          envs: SSH_AUTH_METHOD
           script: |
             set -e
 
             # 환경 변수 설정 (시놀로지 NAS용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             # 변수 설정
             PROJECT_NAME="${{ env.PROJECT_NAME }}"
@@ -1640,11 +1700,11 @@ jobs:
 
             # 이미지 Pull
             echo "📥 Docker 이미지 Pull 중..."
-            echo $PW | sudo -S docker pull "${IMAGE}"
+            SUDO docker pull "${IMAGE}"
 
             # 기존 컨테이너 삭제
             echo "🗑️ 기존 컨테이너 정리 중..."
-            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+            SUDO docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
             # 볼륨 마운트 옵션 구성
             VOLUME_OPTS="-v /etc/localtime:/etc/localtime:ro"
@@ -1654,7 +1714,7 @@ jobs:
 
             # 새 컨테이너 실행
             echo "🐳 새 컨테이너 실행 중..."
-            echo $PW | sudo -S docker run -d \
+            SUDO docker run -d \
               --name "${CONTAINER_NAME}" \
               --network "${TRAEFIK_NETWORK}" \
               --label "traefik.enable=true" \
@@ -1680,21 +1740,21 @@ jobs:
               sleep 5
               RETRY_COUNT=$((RETRY_COUNT + 1))
 
-              STATUS=$(echo $PW | sudo -S docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+              STATUS=$(SUDO docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
 
               if [ "$STATUS" = "exited" ]; then
                 echo "❌ 컨테이너 비정상 종료!"
                 echo ""
                 echo "📋 컨테이너 로그 (최근 100줄):"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+                SUDO docker logs --tail 100 "${CONTAINER_NAME}"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 exit 1
               fi
 
               if [ "$STATUS" = "running" ]; then
                 if [ -n "$HEALTH_PATH" ]; then
-                  HEALTH=$(echo $PW | sudo -S docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
+                  HEALTH=$(SUDO docker exec "${CONTAINER_NAME}" curl -sf "http://localhost:${INTERNAL_PORT}${HEALTH_PATH}" 2>/dev/null || echo "")
 
                   if [ -n "$HEALTH" ]; then
                     echo "✅ 정상 기동 확인! (HTTP 응답: ${HEALTH_PATH})"
@@ -1705,7 +1765,7 @@ jobs:
                 fi
 
                 if [ -n "$LOG_PATTERN" ]; then
-                  STARTED=$(echo $PW | sudo -S docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
+                  STARTED=$(SUDO docker logs --tail 50 "${CONTAINER_NAME}" 2>&1 | grep -E "$LOG_PATTERN" || echo "")
 
                   if [ -n "$STARTED" ]; then
                     echo "✅ 정상 기동 확인! (로그 패턴)"
@@ -1726,7 +1786,7 @@ jobs:
               echo ""
               echo "📋 컨테이너 로그 (최근 100줄):"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo $PW | sudo -S docker logs --tail 100 "${CONTAINER_NAME}"
+              SUDO docker logs --tail 100 "${CONTAINER_NAME}"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               exit 1
             fi
@@ -1926,15 +1986,28 @@ jobs:
 
       - name: 컨테이너 & 이미지 삭제
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
+          envs: SSH_AUTH_METHOD
           script: |
             # 환경 변수 설정 (시놀로지 NAS용)
             export PATH=$PATH:/usr/local/bin
             export PW="${{ secrets.SERVER_PASSWORD }}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             CONTAINER_NAME="${{ steps.container_info.outputs.container_name }}"
             PROJECT_NAME="${{ env.PROJECT_NAME }}"
@@ -1952,11 +2025,11 @@ jobs:
 
             # 컨테이너 삭제
             echo "🐳 컨테이너 삭제 중..."
-            echo $PW | sudo -S docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+            SUDO docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
             # 이미지 삭제
             echo "🖼️ 이미지 삭제 중..."
-            echo $PW | sudo -S docker rmi "${IMAGE}" 2>/dev/null || true
+            SUDO docker rmi "${IMAGE}" 2>/dev/null || true
 
             echo "✅ 삭제 완료!"
 
@@ -2038,6 +2111,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           script: |
             export PATH=$PATH:/usr/local/bin

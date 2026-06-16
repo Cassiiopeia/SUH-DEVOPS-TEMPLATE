@@ -6,7 +6,7 @@
 # nginx config 의 proxy_pass 포트 토글로 Blue-Green 무중단 배포합니다.
 #
 # 본 워크플로우는 무중단 배포 옵션입니다.
-# 기본 배포는 PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 입니다.
+# 기본 배포는 PROJECT-SPRING-SIMPLE-CICD.yaml 입니다.
 # 전환하려면 아래 push.branches 주석 해제 + SIMPLE-CICD 의 push 트리거 주석 처리.
 #
 # ===================================================================
@@ -62,7 +62,7 @@
 #   - SSH 사용자가 sudo 로 nginx -t / reload, docker 명령 실행 가능
 # ===================================================================
 
-name: PROJECT-SPRING-SYNOLOGY-NONSTOP-NGINX-CICD
+name: PROJECT-SPRING-NONSTOP-NGINX-CICD
 
 # ===================================================================
 # 트리거 설정
@@ -530,6 +530,6 @@ jobs:
 #
 # 4) 본 워크플로우로 전환:
 #    - 본 파일의 push.branches 주석 해제
-#    - PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
+#    - PROJECT-SPRING-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
 #
 # ===================================================================

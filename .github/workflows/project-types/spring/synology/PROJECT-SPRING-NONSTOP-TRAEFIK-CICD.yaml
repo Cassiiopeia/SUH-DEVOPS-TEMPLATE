@@ -6,7 +6,7 @@
 # Traefik 라벨 기반 Blue-Green 토글로 Synology NAS 에 무중단 배포합니다.
 #
 # 본 워크플로우는 무중단 배포 옵션입니다.
-# 기본 배포는 PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 입니다.
+# 기본 배포는 PROJECT-SPRING-SIMPLE-CICD.yaml 입니다.
 # 전환하려면 아래 push.branches 주석 해제 + SIMPLE-CICD 의 push 트리거 주석 처리.
 #
 # ===================================================================
@@ -57,7 +57,7 @@
 #   - DSM 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
 # ===================================================================
 
-name: PROJECT-SPRING-SYNOLOGY-NONSTOP-TRAEFIK-CICD
+name: PROJECT-SPRING-NONSTOP-TRAEFIK-CICD
 
 # ===================================================================
 # 트리거 설정
@@ -430,6 +430,6 @@ jobs:
 #
 # 4) 본 워크플로우로 전환:
 #    - 본 파일의 push.branches 주석 해제
-#    - PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
+#    - PROJECT-SPRING-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
 #
 # ===================================================================

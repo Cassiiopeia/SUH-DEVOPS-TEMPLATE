@@ -123,10 +123,10 @@ snake_case.sh / snake_case.py
 #### Spring
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
-| `PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD` | Synology Docker 배포 (기본, 단일 컨테이너) | synology/ |
-| `PROJECT-SPRING-SYNOLOGY-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green, opt-in) | synology/ |
-| `PROJECT-SPRING-SYNOLOGY-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green, opt-in) | synology/ |
-| `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW` | PR 프리뷰 배포 | synology/ |
+| `PROJECT-SPRING-SIMPLE-CICD` | Synology Docker 배포 (기본, 단일 컨테이너) | synology/ |
+| `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green, opt-in) | synology/ |
+| `PROJECT-SPRING-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green, opt-in) | synology/ |
+| `PROJECT-SPRING-PR-PREVIEW` | PR 프리뷰 배포 | synology/ |
 | `PROJECT-SPRING-NEXUS-CI` | Nexus CI | synology/ |
 | `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | synology/ |
 

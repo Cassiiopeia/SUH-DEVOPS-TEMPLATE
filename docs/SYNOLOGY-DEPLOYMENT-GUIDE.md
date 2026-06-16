@@ -357,7 +357,7 @@ env:
 
 ### 워크플로우
 
-**파일**: `PROJECT-SPRING-SYNOLOGY-PR-PREVIEW.yaml`
+**파일**: `PROJECT-SPRING-PR-PREVIEW.yaml`
 
 **트리거**:
 - PR 코멘트에 `@suh-lab pr build/destroy/status` 입력

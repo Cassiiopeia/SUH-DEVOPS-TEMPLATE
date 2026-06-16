@@ -1,14 +1,47 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-16T01:27:45Z",
-    "currentVersion": "3.0.132",
+    "lastUpdated": "2026-06-16T13:47:34Z",
+    "currentVersion": "3.0.137",
     "projectType": "basic",
-    "totalReleases": 152,
+    "totalReleases": 153,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.137",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-16",
+      "pr_number": 389,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새로운 기능**\n  * 배포 워크플로우가 범용 SSH+Docker 방식으로 확대되어 다양한 서버 환경 지원\n  * SSH 인증 방식 선택 기능 추가 (비밀번호/키 기반)\n\n* **개선 사항**\n  * 선택적 워크플로우를 Nexus 라이브러리 배포와 GitHub Secret 백업으로 재구성\n  * 배포 가이드 및 문서 업데이트\n\n* **기타**\n  * 버전 3.0.132로 업데이트",
+      "parsed_changes": {
+        "새로운_기능": {
+          "title": "새로운 기능",
+          "items": [
+            "배포 워크플로우가 범용 SSH+Docker 방식으로 확대되어 다양한 서버 환경 지원",
+            "SSH 인증 방식 선택 기능 추가 (비밀번호/키 기반)"
+          ]
+        },
+        "개선_사항": {
+          "title": "개선 사항",
+          "items": [
+            "선택적 워크플로우를 Nexus 라이브러리 배포와 GitHub Secret 백업으로 재구성",
+            "배포 가이드 및 문서 업데이트"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "버전 3.0.132로 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.132",
       "project_type": "basic",

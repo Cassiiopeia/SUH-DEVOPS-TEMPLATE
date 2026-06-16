@@ -770,8 +770,10 @@ ${BLUE}옵션:${NC}
   -t, --type TYPE          프로젝트 타입 (미지정 시 자동 감지)
   --no-backup              백업 생성 안 함
   --force                  확인 없이 즉시 실행
-  --synology               Synology 워크플로우 포함 (기본: 제외)
-  --no-synology            Synology 워크플로우 제외
+  --nexus                  Nexus 라이브러리 publish 워크플로우 포함 (기본: 제외)
+  --no-nexus               Nexus publish 워크플로우 제외
+  --secret-backup          GitHub Secret 서버 백업 워크플로우 포함 (기본: 제외)
+  --no-secret-backup       Secret 백업 워크플로우 제외
   --paths "T=P,..."        타입별 프로젝트 경로 (모노레포용, 예: --paths "flutter=app,react=client")
   -h, --help               이 도움말 표시
 
@@ -846,7 +848,9 @@ PROJECT_TYPE=""
 PROJECT_TYPES=()   # 멀티타입 배열 — PROJECT_TYPE은 PROJECT_TYPES[0] 미러
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
-INCLUDE_SYNOLOGY=""  # Synology 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
+# 선택적(opt-in) 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
+INCLUDE_NEXUS=""          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
+INCLUDE_SECRET_BACKUP=""  # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
 PROJECT_PATHS_CSV=""  # 타입별 경로 "flutter=app,react=client" — 빈 값이면 미확정 (bash 3.2 호환: 연관배열 금지)
 
 # 지원하는 프로젝트 타입 (next 포함 — sh/ps1 일관성)
@@ -898,12 +902,20 @@ while [[ $# -gt 0 ]]; do
             FORCE_MODE=true
             shift
             ;;
-        --synology|--include-synology)
-            INCLUDE_SYNOLOGY=true
+        --nexus)
+            INCLUDE_NEXUS=true
             shift
             ;;
-        --no-synology)
-            INCLUDE_SYNOLOGY=false
+        --no-nexus)
+            INCLUDE_NEXUS=false
+            shift
+            ;;
+        --secret-backup)
+            INCLUDE_SECRET_BACKUP=true
+            shift
+            ;;
+        --no-secret-backup)
+            INCLUDE_SECRET_BACKUP=false
             shift
             ;;
         --paths)

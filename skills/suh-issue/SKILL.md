@@ -148,14 +148,14 @@ $ARGUMENTS
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
-cd "$PROJECT_ROOT/skills/suh-issue/scripts"
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/cassiiopeia/*/skills/suh-issue/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/suh-issue/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
   search-issues {owner} {repo} "{핵심 키워드 2~3개 공백 구분}"
 ```
 
 출력은 JSON: `{"count": N, "items": [{"number","title","url","state","labels"}, ...]}`. agent가 `items`를 직접 파싱해 판단한다. `state`가 `closed`인 항목은 중복에서 제외하고, `labels`는 범위·유사도 판단에 활용한다. `[ERROR]`가 stderr에 찍히면 중복 검색을 건너뛰고 경고 후 다음 단계로 진행한다.
 
-> **Windows 주의**: `cd "$PROJECT_ROOT/skills/suh-issue/scripts"` 후 `issue_cli.py`로 실행한다. heredoc·임시 파일 파싱·curl 파이프 Python 미사용.
+> **Windows 주의**: 위 표준 호출 패턴(캐시 우선 탐색)으로 스크립트 디렉토리를 잡은 뒤 `issue_cli.py`로 실행한다. heredoc·임시 파일 파싱·curl 파이프 Python 미사용.
 
 **`closed` 이슈 처리**: `state: "closed"`인 이슈는 이미 해결된 것으로 간주하여 중복으로 처리하지 않는다. open 이슈만 동일 판단 대상으로 삼는다.
 
@@ -295,7 +295,7 @@ GitHub에 등록합니다.
 2-1단계와 동일하게 `issue_cli.py`의 `search-issues`를 호출한다 (인라인 Python 금지). agent는 `{owner}`, `{repo}`를 실행 전 실제 값으로 치환한다. PAT는 자동 로드되므로 `GITHUB_PAT=`는 생략 가능하다.
 
 ```bash
-cd "$PROJECT_ROOT/skills/suh-issue/scripts"
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/cassiiopeia/*/skills/suh-issue/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/suh-issue/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
   search-issues {owner} {repo} "{핵심 키워드 2~3개 공백 구분}"
 ```
@@ -336,7 +336,7 @@ config에서 읽은 PAT(`repos[].pat` 또는 `global_pat`)을 사용해 GitHub A
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
-cd "$PROJECT_ROOT/skills/suh-issue/scripts"
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/cassiiopeia/*/skills/suh-issue/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/suh-issue/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
   create-issue {owner} {repo} "{제목}" "{이슈 본문 .md 파일 절대경로}" "{라벨 csv}"
 ```
@@ -344,7 +344,7 @@ PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
 출력은 JSON: `{"number": ..., "url": ..., "title": ...}`. `number`와 `url`을 추출한다.
 존재하지 않는 라벨은 `issue_cli`가 자동 필터링하므로 422 오류가 나지 않는다.
 
-> **Windows 주의**: `cd "$PROJECT_ROOT/skills/suh-issue/scripts"` 후 `issue_cli.py`로 실행한다. heredoc·임시 파일 파싱·curl 파이프 Python 미사용. 인자는 명령행/환경변수로 전달한다.
+> **Windows 주의**: 위 표준 호출 패턴(캐시 우선 탐색)으로 스크립트 디렉토리를 잡은 뒤 `issue_cli.py`로 실행한다. heredoc·임시 파일 파싱·curl 파이프 Python 미사용. 인자는 명령행/환경변수로 전달한다.
 > **담당자 지정**: 현재 `issue_cli`의 `create-issue`는 assignee 미지원. 담당자 설정이 필요하면 생성 후 `update-issue ... --assignees {default_assignee}`로 별도 지정한다.
 
 반환된 실제 이슈 번호로 로컬 파일의 임시 번호(`TMP1` 등) 부분을 실제 번호로 rename한다.

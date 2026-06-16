@@ -143,7 +143,7 @@ GitHub 댓글은 mermaid 블록을 렌더링하므로 흐름도가 그대로 표
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
-cd "$PROJECT_ROOT/skills/suh-report/scripts" || exit 1
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/cassiiopeia/*/skills/suh-report/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/suh-report/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" report_cli.py add-comment {owner} {repo} {이슈번호} "{보고서 .md 파일 절대경로}"
 ```
 

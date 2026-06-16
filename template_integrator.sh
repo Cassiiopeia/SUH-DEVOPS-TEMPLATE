@@ -1846,11 +1846,16 @@ detect_and_confirm_project() {
         print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
         # 모드  : 무엇을 설치하는지 (확인 화면에서 한눈에)
         [ -n "$MODE" ] && print_to_user "       💫 통합 모드        : $(_mode_display_label "$MODE")"
-        # Synology : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
-        if [ "$INCLUDE_SYNOLOGY" = true ]; then
-            print_to_user "       🗄️ Synology         : 포함"
-        elif [ "$INCLUDE_SYNOLOGY" = false ]; then
-            print_to_user "       🗄️ Synology         : 제외"
+        # 선택 워크플로우 : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
+        if [ "$INCLUDE_NEXUS" = true ]; then
+            print_to_user "       📦 Nexus publish    : 포함"
+        elif [ "$INCLUDE_NEXUS" = false ]; then
+            print_to_user "       📦 Nexus publish    : 제외"
+        fi
+        if [ "$INCLUDE_SECRET_BACKUP" = true ]; then
+            print_to_user "       🔐 Secret 백업      : 포함"
+        elif [ "$INCLUDE_SECRET_BACKUP" = false ]; then
+            print_to_user "       🔐 Secret 백업      : 제외"
         fi
         # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
         if [ -n "$PROJECT_PATHS_CSV" ]; then
@@ -1925,13 +1930,14 @@ handle_project_edit_menu() {
 
         # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
         # 하위 메뉴이므로 ESC는 '뒤로'(상위 확인 화면으로) 표기.
-        # Synology 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 노출한다.
-        # (version 모드는 워크플로우를 안 깔아 Synology와 무관.)
+        # 선택 워크플로우(Nexus/Secret 백업) 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 노출한다.
+        # (version 모드는 워크플로우를 안 깔아 무관.)
         local _edit_opts=("프로젝트 타입|" "버전|" "기본 브랜치|")
         if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-            local _syn_state="제외"
-            [ "$INCLUDE_SYNOLOGY" = "true" ] && _syn_state="포함"
-            _edit_opts+=("Synology 포함 여부 (현재: ${_syn_state})|")
+            local _nx_state="제외"; [ "$INCLUDE_NEXUS" = "true" ] && _nx_state="포함"
+            local _sb_state="제외"; [ "$INCLUDE_SECRET_BACKUP" = "true" ] && _sb_state="포함"
+            _edit_opts+=("Nexus publish 포함 여부 (현재: ${_nx_state})|")
+            _edit_opts+=("Secret 백업 포함 여부 (현재: ${_sb_state})|")
         fi
         _edit_opts+=("모두 맞음, 계속|" "뒤로 (변경 없이 확인 화면으로)|")
 
@@ -1948,7 +1954,8 @@ handle_project_edit_menu() {
                 프로젝트\ 타입*) edit_choice="type" ;;
                 버전*)           edit_choice="version" ;;
                 기본\ 브랜치*)   edit_choice="branch" ;;
-                Synology*)       edit_choice="synology" ;;
+                Nexus*)          edit_choice="optional" ;;
+                Secret*)         edit_choice="optional" ;;
                 모두\ 맞음*)     edit_choice="done" ;;
                 뒤로*)           edit_choice="back" ;;
                 *)               edit_choice="back" ;;
@@ -2031,8 +2038,8 @@ handle_project_edit_menu() {
                     print_to_user ""
                 fi
                 ;;
-            synology)
-                # Synology 포함 여부를 다시 묻는다. --force-ask로 이미 설정된 값이 있어도 무조건 재질문.
+            optional)
+                # 선택 워크플로우(Nexus/Secret 백업) 포함 여부를 다시 묻는다. --force-ask로 이미 설정된 값이 있어도 무조건 재질문.
                 # ask_all_optional_workflows이 nexus·secret-backup 폴더를 스캔해 발견 시 안내+질문하고 INCLUDE_NEXUS·INCLUDE_SECRET_BACKUP를 갱신한다.
                 local _opt_dirs=() _st
                 for _st in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do
@@ -2344,7 +2351,7 @@ EOF
 }
 
 # ===================================================================
-# Synology 옵션 관리 함수
+# 선택 워크플로우(Nexus/Secret 백업) 옵션 관리 함수
 # ===================================================================
 
 # version.yml에서 템플릿 옵션 읽기
@@ -2984,8 +2991,8 @@ configure_workflow_env() {
 }
 
 # 워크플로우 다운로드 (폴더 기반, 선택적 업데이트)
-# 단일 타입의 타입별 워크플로우 + 타입별 synology 복사 (멀티타입 순회용 헬퍼)
-# 카운터는 호출측 전역 변수(_wf_copied/_wf_template_added/_wf_skipped/_wf_synology_copied) 공유
+# 단일 타입의 타입별 워크플로우 + 타입별 nexus(opt-in) 복사 (멀티타입 순회용 헬퍼)
+# 카운터는 호출측 전역 변수(_wf_copied/_wf_template_added/_wf_skipped/_wf_optional_copied) 공유
 _copy_workflows_for_type() {
     local type="$1"
     local project_types_dir="$2"
@@ -3083,41 +3090,42 @@ _copy_workflows_for_type() {
         print_info "$type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     fi
 
-    # 타입별 Synology 하위폴더 처리 (선택적)
-    local synology_dir="$project_types_dir/$type/synology"
-    if [ -d "$synology_dir" ]; then
-        if [ "$INCLUDE_SYNOLOGY" = true ]; then
-            print_info "$type Synology 워크플로우 다운로드 중..."
-            for workflow in "$synology_dir"/*.{yaml,yml}; do
+    # 타입별 Nexus 하위폴더 처리 (opt-in)
+    # 배포 워크플로우는 타입 루트로 올라와 기본 포함됨. nexus/ 만 선택적으로 남는다.
+    local nexus_dir="$project_types_dir/$type/nexus"
+    if [ -d "$nexus_dir" ]; then
+        if [ "$INCLUDE_NEXUS" = true ]; then
+            print_info "$type Nexus 워크플로우 다운로드 중..."
+            for workflow in "$nexus_dir"/*.{yaml,yml}; do
                 [ -e "$workflow" ] || continue
                 local filename=$(basename "$workflow")
                 if [ -f "$WORKFLOWS_DIR/$filename" ]; then
                     mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
                     cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Synology $type, 백업: ${filename}.bak)"
+                    echo "  ✓ $filename (Nexus $type, 백업: ${filename}.bak)"
                 else
                     cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Synology $type)"
+                    echo "  ✓ $filename (Nexus $type)"
                 fi
-                _wf_synology_copied=$((_wf_synology_copied + 1))
+                _wf_optional_copied=$((_wf_optional_copied + 1))
                 _wf_copied=$((_wf_copied + 1))
             done
         else
-            local synology_count=0
-            for f in "$synology_dir"/*.{yaml,yml}; do
-                [ -e "$f" ] && synology_count=$((synology_count + 1))
+            local nexus_count=0
+            for f in "$nexus_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && nexus_count=$((nexus_count + 1))
             done
-            if [ $synology_count -gt 0 ]; then
-                print_info "$type Synology 워크플로우 $synology_count개 제외됨 (--synology 옵션으로 포함 가능)"
+            if [ $nexus_count -gt 0 ]; then
+                print_info "$type Nexus 워크플로우 $nexus_count개 제외됨 (--nexus 옵션으로 포함 가능)"
             fi
         fi
     fi
 
     # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
-    # 이 타입의 원본 디렉토리(+synology)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
+    # 이 타입의 원본 디렉토리(+nexus)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
     # @wizard 마커를 가진 것만 configure. (.template.yaml/.bak은 대상 아님)
     local _src_dir _wf _bn _target
-    for _src_dir in "$type_dir" "$synology_dir"; do
+    for _src_dir in "$type_dir" "$nexus_dir"; do
         [ -d "$_src_dir" ] || continue
         for _wf in "$_src_dir"/*.{yaml,yml}; do
             [ -e "$_wf" ] || continue
@@ -3150,7 +3158,7 @@ copy_workflows() {
     _wf_copied=0
     _wf_skipped=0
     _wf_template_added=0
-    _wf_synology_copied=0
+    _wf_optional_copied=0   # opt-in(nexus/secret-backup) 워크플로우 복사 수
     local project_types_dir="$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"
 
     # project-types 폴더 존재 확인
@@ -3161,7 +3169,7 @@ copy_workflows() {
     fi
 
     # 1. Common 워크플로우 다운로드 (항상 최신으로 업데이트)
-    # *.{yaml,yml} 글로브는 common/ 직접 하위 파일만 매칭 (common/synology/ 등 하위 디렉토리 제외)
+    # *.{yaml,yml} 글로브는 common/ 직접 하위 파일만 매칭 (common/secret-backup/ 등 하위 디렉토리 제외)
     print_info "모든 타입에 공통으로 들어가는 기본 워크플로우를 내려받고 있습니다..."
     if [ -d "$project_types_dir/common" ]; then
         for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
@@ -3181,7 +3189,7 @@ copy_workflows() {
         print_warning "공통 워크플로우 폴더(common)를 찾지 못해 건너뜁니다."
     fi
 
-    # 2~3. 타입별 워크플로우 + 타입별 Synology 처리 — PROJECT_TYPES 배열 순회
+    # 2~3. 타입별 워크플로우 + 타입별 Nexus(opt-in) 처리 — PROJECT_TYPES 배열 순회
     #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
     local _types_to_copy=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
     local _t
@@ -3189,33 +3197,33 @@ copy_workflows() {
         _copy_workflows_for_type "$_t" "$project_types_dir"
     done
 
-    # 4. Common Synology 워크플로우 처리 (선택적)
-    local common_synology_dir="$project_types_dir/common/synology"
-    if [ -d "$common_synology_dir" ]; then
-        if [ "$INCLUDE_SYNOLOGY" = true ]; then
-            print_info "공통 Synology 워크플로우 다운로드 중..."
-            for workflow in "$common_synology_dir"/*.{yaml,yml}; do
+    # 4. Common Secret 백업 워크플로우 처리 (opt-in)
+    local common_secret_dir="$project_types_dir/common/secret-backup"
+    if [ -d "$common_secret_dir" ]; then
+        if [ "$INCLUDE_SECRET_BACKUP" = true ]; then
+            print_info "공통 Secret 백업 워크플로우 다운로드 중..."
+            for workflow in "$common_secret_dir"/*.{yaml,yml}; do
                 [ -e "$workflow" ] || continue
                 local filename=$(basename "$workflow")
 
-                # 타입별 synology에서 이미 복사된 파일이면 스킵
+                # 이미 복사된 파일이면 스킵
                 if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                    print_warning "$filename: 타입별 Synology에 같은 파일이 있어 타입별 버전을 유지합니다."
+                    print_warning "$filename: 이미 존재하여 건너뜁니다."
                     continue
                 fi
 
                 cp "$workflow" "$WORKFLOWS_DIR/"
-                echo "  ✓ $filename (공통 Synology)"
-                _wf_synology_copied=$((_wf_synology_copied + 1))
+                echo "  ✓ $filename (Secret 백업)"
+                _wf_optional_copied=$((_wf_optional_copied + 1))
                 _wf_copied=$((_wf_copied + 1))
             done
         else
-            local common_syn_count=0
-            for f in "$common_synology_dir"/*.{yaml,yml}; do
-                [ -e "$f" ] && common_syn_count=$((common_syn_count + 1))
+            local common_sb_count=0
+            for f in "$common_secret_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && common_sb_count=$((common_sb_count + 1))
             done
-            if [ $common_syn_count -gt 0 ]; then
-                print_info "공통 Synology 워크플로우 $common_syn_count개 제외됨 (--synology 옵션으로 포함 가능)"
+            if [ $common_sb_count -gt 0 ]; then
+                print_info "공통 Secret 백업 워크플로우 $common_sb_count개 제외됨 (--secret-backup 옵션으로 포함 가능)"
             fi
         fi
     fi
@@ -3228,8 +3236,8 @@ copy_workflows() {
     unset IFS
     print_success "워크플로우 처리 완료 (타입: $_types_summary)"
     echo "   📥 복사됨: $_wf_copied 개"
-    if [ $_wf_synology_copied -gt 0 ]; then
-        echo "   🗄️ Synology: $_wf_synology_copied 개"
+    if [ $_wf_optional_copied -gt 0 ]; then
+        echo "   🧩 선택 워크플로우: $_wf_optional_copied 개"
     fi
     if [ $_wf_template_added -gt 0 ]; then
         echo "   📄 참고용 추가 (.template.yaml): $_wf_template_added 개"
@@ -3757,7 +3765,7 @@ interactive_mode() {
     
     # ── 1) 모드 선택 먼저 (사용자 의도부터 파악) ──
     # 사용자가 무엇을 하려는지 먼저 묻고, 모드에 따라 필요한 정보만 수집한다.
-    # (예: skills/issues 모드는 프로젝트 타입·버전·Synology·경로가 전혀 필요 없음)
+    # (예: skills/issues 모드는 프로젝트 타입·버전·선택 워크플로우·경로가 전혀 필요 없음)
     print_question_header "🚀" "어떤 기능을 통합하시겠습니까?"
 
     # 라벨에 영어 키(full/version…)가 보이지 않도록, 사용자에게는 한국어 설명만 노출한다.
@@ -3799,15 +3807,15 @@ interactive_mode() {
     download_template
 
     # ── 2) 모드별 필요 정보만 수집 ──
-    # 수집 매트릭스: full=타입/버전/Synology/경로, version=타입/버전/경로,
-    #               workflows=타입/Synology, issues=없음, skills=없음
+    # 수집 매트릭스: full=타입/버전/선택WF/경로, version=타입/버전/경로,
+    #               workflows=타입/선택WF, issues=없음, skills=없음
     case "$MODE" in
         skills|issues)
             # 프로젝트 정보 불필요 → 수집·확인 전부 건너뜀. 바로 실행 단계로.
             ;;
         *)
-            # full/version/workflows → 타입·버전·브랜치 감지 → Synology·경로 수집 → 최종 확인
-            # 순서가 핵심: Synology·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다.
+            # full/version/workflows → 타입·버전·브랜치 감지 → 선택 워크플로우·경로 수집 → 최종 확인
+            # 순서가 핵심: 선택 워크플로우·경로를 확인 화면 '전에' 모아야 확인 화면에 함께 표시된다.
 
             # 1) 타입/버전/브랜치 먼저 감지 (확인은 아직 안 함)
             if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
@@ -3819,7 +3827,7 @@ interactive_mode() {
             [ -z "$VERSION" ] && VERSION=$(detect_version)
             [ -z "$DETECTED_BRANCH" ] && DETECTED_BRANCH=$(detect_default_branch)
 
-            # 2) Synology: 워크플로우 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
+            # 2) 선택 워크플로우(Nexus/Secret 백업): 포함 모드(full/workflows)에서만, 멀티타입은 폴더 합쳐 한 번만
             if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
                 local _opt_dirs=()
                 local _st
@@ -3923,8 +3931,8 @@ execute_integration() {
     if [ "$IS_INTERACTIVE_MODE" = false ]; then
         download_template
 
-        # CLI 모드에서도 Synology 질문 (워크플로우 모드에서만)
-        # 멀티타입이면 모든 타입의 synology 폴더를 합쳐 한 번만 질문
+        # CLI 모드에서도 선택 워크플로우 질문 (워크플로우 모드에서만)
+        # 멀티타입이면 모든 타입의 nexus 폴더 + 공통 secret-backup을 합쳐 한 번만 질문
         if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
             local _opt_dirs=()
             local _st
@@ -3988,13 +3996,12 @@ execute_integration() {
             ;;
     esac
 
-    # 2.1 템플릿 옵션 저장 (Synology 설정 등)
+    # 2.1 템플릿 옵션 저장 (Nexus / Secret 백업 등 선택 워크플로우 설정)
     if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-        # INCLUDE_SYNOLOGY가 설정되지 않은 경우 기본값 false 사용
-        # (basic 타입 등 Synology 폴더가 없는 경우를 위한 처리)
-        if [ -z "$INCLUDE_SYNOLOGY" ]; then
-            INCLUDE_SYNOLOGY=false
-        fi
+        # 설정되지 않은 경우 기본값 false 사용
+        # (해당 opt-in 폴더가 없는 타입을 위한 처리)
+        [ -z "$INCLUDE_NEXUS" ] && INCLUDE_NEXUS=false
+        [ -z "$INCLUDE_SECRET_BACKUP" ] && INCLUDE_SECRET_BACKUP=false
         # 다운로드한 템플릿의 실제 버전 전달 (TEMPLATE_VERSION 사용)
         save_template_options "$TEMPLATE_VERSION"
     fi

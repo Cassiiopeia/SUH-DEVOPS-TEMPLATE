@@ -1,12 +1,12 @@
 # ===================================================================
-# Spring Boot 무중단 배포 (Traefik Blue-Green, Synology)
+# Spring Boot 무중단 배포 (Traefik Blue-Green, SSH + Docker)
 # ===================================================================
 #
 # deploy 브랜치 푸시 시 Docker 이미지를 빌드하고
-# Traefik 라벨 기반 Blue-Green 토글로 Synology NAS 에 무중단 배포합니다.
+# Traefik 라벨 기반 Blue-Green 토글로 서버(SSH 접속 가능한 호스트)에 무중단 배포합니다.
 #
 # 본 워크플로우는 무중단 배포 옵션입니다.
-# 기본 배포는 PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 입니다.
+# 기본 배포는 PROJECT-SPRING-SIMPLE-CICD.yaml 입니다.
 # 전환하려면 아래 push.branches 주석 해제 + SIMPLE-CICD 의 push 트리거 주석 처리.
 #
 # ===================================================================
@@ -17,7 +17,8 @@
 # DOCKERHUB_TOKEN: DockerHub 액세스 토큰
 # SERVER_HOST: 배포 서버 주소
 # SERVER_USER: SSH 사용자명
-# SERVER_PASSWORD: SSH 비밀번호
+# SERVER_PASSWORD: SSH 비밀번호 (SSH_AUTH_METHOD=password일 때)
+# SSH_KEY: SSH 개인키 .pem 내용 (SSH_AUTH_METHOD=key일 때, AWS EC2 등)
 # ===================================================================
 #
 # 🔧 환경변수 설정 (env 섹션에서 설정)
@@ -52,11 +53,12 @@
 # IN_FLIGHT_WAIT: old 컨테이너 제거 전 대기 초 (기본: 10)
 #
 # 💡 사전 조건:
-#   - Synology 에 Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
-#   - DSM 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#   - 배포 서버에 Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
+#   - 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#     (예: Synology DSM 역방향 프록시, Nginx, Caddy 등)
 # ===================================================================
 
-name: PROJECT-SPRING-SYNOLOGY-NONSTOP-TRAEFIK-CICD
+name: PROJECT-SPRING-NONSTOP-TRAEFIK-CICD
 
 # ===================================================================
 # 트리거 설정
@@ -89,7 +91,7 @@ env:
   # 🌐 포트 및 컨테이너 설정
   CONTAINER_INTERNAL_PORT: "8080"
 
-  # 🚦 Traefik 설정 (Synology Traefik 환경 구축 후 수정 금지)
+  # 🚦 Traefik 설정 (서버의 Traefik 환경 구축 후 수정 금지)
   TRAEFIK_NETWORK: "traefik-network"
   TRAEFIK_ENTRYPOINT: "web"
   TRAEFIK_INTERNAL_PORT: "8079"
@@ -99,6 +101,11 @@ env:
   ENABLE_VOLUME_MOUNT: "false"
   VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
   VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask: 컨테이너 내부 경로 [기본: /mnt/__PROJECT_NAME__]
+
+  # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
+  #   password → SERVER_PASSWORD secret 사용
+  #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
+  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"
@@ -208,18 +215,29 @@ jobs:
           BRANCH_REF: ${{ github.ref_name }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           command_timeout: ${{ env.SSH_COMMAND_TIMEOUT }}
           timeout: ${{ env.SSH_CONNECTION_TIMEOUT }}
-          envs: PROJECT_NAME,PRODUCTION_DOMAIN,CONTAINER_INTERNAL_PORT,SPRING_PROFILE,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,EXTRA_NETWORKS,TRAEFIK_NETWORK,TRAEFIK_ENTRYPOINT,TRAEFIK_INTERNAL_PORT,HEALTHCHECK_PATH,HEALTHCHECK_ACCEPT_CODES,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD
+          envs: PROJECT_NAME,PRODUCTION_DOMAIN,CONTAINER_INTERNAL_PORT,SPRING_PROFILE,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,EXTRA_NETWORKS,TRAEFIK_NETWORK,TRAEFIK_ENTRYPOINT,TRAEFIK_INTERNAL_PORT,HEALTHCHECK_PATH,HEALTHCHECK_ACCEPT_CODES,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD,SSH_AUTH_METHOD
           script: |
             set -e
             export PATH=$PATH:/usr/local/bin
             export PW="${SERVER_PASSWORD}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             IMAGE="${DOCKERHUB_USERNAME}/${PROJECT_NAME}:${BRANCH_REF}"
             ROUTER_NAME="${PROJECT_NAME}"
@@ -237,12 +255,12 @@ jobs:
             # 1. 최신 이미지 Pull
             # ============================================================
             echo "📥 이미지 Pull: ${IMAGE}"
-            echo $PW | sudo -S docker pull "${IMAGE}"
+            SUDO docker pull "${IMAGE}"
 
             # ============================================================
             # 2. 현재 active 컨테이너 색 판별 (Traefik 라벨 부착 여부 기준)
             # ============================================================
-            ACTIVE=$(echo $PW | sudo -S docker ps \
+            ACTIVE=$(SUDO docker ps \
               --filter "label=traefik.http.routers.${ROUTER_NAME}.rule" \
               --filter "name=${PROJECT_NAME}-" \
               --format "{{.Names}}" | head -1 || echo "")
@@ -268,7 +286,7 @@ jobs:
             # 3. 동일 슬롯(idle 쪽) 잔존 컨테이너 정리
             # ============================================================
             echo "🗑️ idle 슬롯 정리: ${NEW_NAME}"
-            echo $PW | sudo -S docker rm -f "${NEW_NAME}" 2>/dev/null || true
+            SUDO docker rm -f "${NEW_NAME}" 2>/dev/null || true
 
             # ============================================================
             # 4. 볼륨 마운트 옵션 구성
@@ -277,7 +295,7 @@ jobs:
             if [ "${ENABLE_VOLUME_MOUNT}" = "true" ]; then
               if [ ! -d "${VOLUME_HOST_PATH}" ]; then
                 echo "📁 볼륨 마운트 디렉토리 생성: ${VOLUME_HOST_PATH}"
-                echo $PW | sudo -S mkdir -p "${VOLUME_HOST_PATH}"
+                SUDO mkdir -p "${VOLUME_HOST_PATH}"
               fi
               VOLUME_MOUNT_OPTION="${VOLUME_MOUNT_OPTION} -v ${VOLUME_HOST_PATH}:${VOLUME_CONTAINER_PATH}"
               echo "📦 볼륨 마운트 활성화: ${VOLUME_HOST_PATH} → ${VOLUME_CONTAINER_PATH}"
@@ -289,7 +307,7 @@ jobs:
             # 5. 새 컨테이너 기동 (Traefik 라벨 포함)
             # ============================================================
             echo "🐳 새 컨테이너 기동: ${NEW_NAME}"
-            echo $PW | sudo -S docker run -d \
+            SUDO docker run -d \
               --name "${NEW_NAME}" \
               --network "${TRAEFIK_NETWORK}" \
               --label "traefik.enable=true" \
@@ -307,7 +325,7 @@ jobs:
             if [ -n "${EXTRA_NETWORKS}" ]; then
               for net in ${EXTRA_NETWORKS}; do
                 echo "🔗 추가 네트워크 연결: ${net}"
-                echo $PW | sudo -S docker network connect "${net}" "${NEW_NAME}" 2>/dev/null || true
+                SUDO docker network connect "${net}" "${NEW_NAME}" 2>/dev/null || true
               done
             fi
 
@@ -315,7 +333,7 @@ jobs:
             # 7. Traefik 라벨 디버그 출력 (escape 검증용)
             # ============================================================
             echo "🔍 Traefik 라벨 확인:"
-            echo $PW | sudo -S docker inspect "${NEW_NAME}" --format '{{range $k, $v := .Config.Labels}}  {{$k}} = {{$v}}{{"\n"}}{{end}}' | grep traefik || true
+            SUDO docker inspect "${NEW_NAME}" --format '{{range $k, $v := .Config.Labels}}  {{$k}} = {{$v}}{{"\n"}}{{end}}' | grep traefik || true
 
             # ============================================================
             # 8. 헬스체크 — Traefik 통한 라우팅 확인
@@ -330,12 +348,12 @@ jobs:
               sleep ${HEALTHCHECK_RETRY_INTERVAL}
               RETRY_COUNT=$((RETRY_COUNT + 1))
 
-              STATUS=$(echo $PW | sudo -S docker inspect --format='{{.State.Status}}' "${NEW_NAME}" 2>/dev/null || echo "not_found")
+              STATUS=$(SUDO docker inspect --format='{{.State.Status}}' "${NEW_NAME}" 2>/dev/null || echo "not_found")
 
               if [ "$STATUS" = "exited" ]; then
                 echo "❌ 컨테이너 비정상 종료 (exited). 로그 200줄:"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo $PW | sudo -S docker logs --tail 200 "${NEW_NAME}"
+                SUDO docker logs --tail 200 "${NEW_NAME}"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 echo "ℹ️ 컨테이너 ${NEW_NAME} 유지 (자동 삭제 안 함) — 수동 검증/디버깅"
                 echo "ℹ️ old=${OLD_NAME} 존재 시 그대로 유지 → 사실상 자동 롤백"
@@ -362,7 +380,7 @@ jobs:
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               echo "🔍 ${NEW_NAME} 최근 200줄 로그:"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo $PW | sudo -S docker logs --tail 200 "${NEW_NAME}"
+              SUDO docker logs --tail 200 "${NEW_NAME}"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               echo "ℹ️ 컨테이너 ${NEW_NAME} 유지 (자동 삭제 안 함) — 수동 검증/디버깅"
               echo "ℹ️ old=${OLD_NAME} 존재 시 그대로 유지 → 사실상 자동 롤백"
@@ -372,11 +390,11 @@ jobs:
             # ============================================================
             # 9. in-flight 처리 + old 컨테이너 자동 제거
             # ============================================================
-            if echo $PW | sudo -S docker ps -a --format '{{.Names}}' | grep -Eq "^${OLD_NAME}$"; then
+            if SUDO docker ps -a --format '{{.Names}}' | grep -Eq "^${OLD_NAME}$"; then
               echo "⏱️ in-flight 요청 처리 대기 (${IN_FLIGHT_WAIT}초)"
               sleep ${IN_FLIGHT_WAIT}
               echo "🗑️ old=${OLD_NAME} 제거"
-              echo $PW | sudo -S docker rm -f "${OLD_NAME}"
+              SUDO docker rm -f "${OLD_NAME}"
             else
               echo "ℹ️ old=${OLD_NAME} 없음 — 정리 생략"
             fi
@@ -385,7 +403,7 @@ jobs:
             # 10. dangling 이미지 정리
             # ============================================================
             echo "🧹 dangling(<none>) 이미지 정리..."
-            echo $PW | sudo -S docker image prune -af
+            SUDO docker image prune -af
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "✅ 무중단 배포 완료. active=${NEW_NAME}"
@@ -407,12 +425,13 @@ jobs:
 #    - EXTRA_NETWORKS (예: selenium-chrome-network)
 #    - HEALTHCHECK_PATH, HEALTHCHECK_ACCEPT_CODES
 #
-# 3) Synology 사전 준비:
+# 3) 서버 사전 준비:
 #    - Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
-#    - DSM 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#    - 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#      (예: Synology DSM 역방향 프록시, Nginx, Caddy 등)
 #
 # 4) 본 워크플로우로 전환:
 #    - 본 파일의 push.branches 주석 해제
-#    - PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
+#    - PROJECT-SPRING-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
 #
 # ===================================================================

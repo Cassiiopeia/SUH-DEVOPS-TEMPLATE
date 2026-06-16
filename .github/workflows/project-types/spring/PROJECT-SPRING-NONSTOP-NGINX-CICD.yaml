@@ -1,12 +1,12 @@
 # ===================================================================
-# Spring Boot 무중단 배포 (Nginx Blue-Green, Synology)
+# Spring Boot 무중단 배포 (Nginx Blue-Green, SSH + Docker)
 # ===================================================================
 #
 # deploy 브랜치 푸시 시 Docker 이미지를 빌드하고
 # nginx config 의 proxy_pass 포트 토글로 Blue-Green 무중단 배포합니다.
 #
 # 본 워크플로우는 무중단 배포 옵션입니다.
-# 기본 배포는 PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 입니다.
+# 기본 배포는 PROJECT-SPRING-SIMPLE-CICD.yaml 입니다.
 # 전환하려면 아래 push.branches 주석 해제 + SIMPLE-CICD 의 push 트리거 주석 처리.
 #
 # ===================================================================
@@ -17,7 +17,8 @@
 # DOCKERHUB_TOKEN: DockerHub 액세스 토큰
 # SERVER_HOST: 배포 서버 주소
 # SERVER_USER: SSH 사용자명
-# SERVER_PASSWORD: SSH 비밀번호
+# SERVER_PASSWORD: SSH 비밀번호 (SSH_AUTH_METHOD=password일 때)
+# SSH_KEY: SSH 개인키 .pem 내용 (SSH_AUTH_METHOD=key일 때, AWS EC2 등)
 # ===================================================================
 #
 # 🔧 환경변수 설정 (env 섹션에서 설정)
@@ -61,7 +62,7 @@
 #   - SSH 사용자가 sudo 로 nginx -t / reload, docker 명령 실행 가능
 # ===================================================================
 
-name: PROJECT-SPRING-SYNOLOGY-NONSTOP-NGINX-CICD
+name: PROJECT-SPRING-NONSTOP-NGINX-CICD
 
 # ===================================================================
 # 트리거 설정
@@ -105,6 +106,11 @@ env:
   ENABLE_VOLUME_MOUNT: "false"
   VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
   VOLUME_CONTAINER_PATH: "/app"
+
+  # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
+  #   password → SERVER_PASSWORD secret 사용
+  #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
+  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"
@@ -217,18 +223,29 @@ jobs:
           BRANCH_REF: ${{ github.ref_name }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           command_timeout: ${{ env.SSH_COMMAND_TIMEOUT }}
           timeout: ${{ env.SSH_CONNECTION_TIMEOUT }}
-          envs: PROJECT_NAME,DOMAIN_NAME,SPRING_PROFILE,CONTAINER_INTERNAL_PORT,BLUE_PORT,GREEN_PORT,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,NGINX_RP_CONF,NGINX_BACKUP_DIR,NGINX_BACKUP_KEEP,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,HEALTHCHECK_PATH,DOMAIN_CHECK_RETRIES,DOMAIN_CHECK_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD
+          envs: PROJECT_NAME,DOMAIN_NAME,SPRING_PROFILE,CONTAINER_INTERNAL_PORT,BLUE_PORT,GREEN_PORT,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,NGINX_RP_CONF,NGINX_BACKUP_DIR,NGINX_BACKUP_KEEP,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,HEALTHCHECK_PATH,DOMAIN_CHECK_RETRIES,DOMAIN_CHECK_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD,SSH_AUTH_METHOD
           script: |
             set -e
             export PATH=$PATH:/usr/local/bin
             export PW="${SERVER_PASSWORD}"
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             IMAGE="${DOCKERHUB_USERNAME}/${PROJECT_NAME}:${BRANCH_REF}"
             BLUE_CONTAINER_NAME="${PROJECT_NAME}-blue"
@@ -248,24 +265,24 @@ jobs:
             # 1. 최신 이미지 Pull
             # ============================================================
             echo "📥 이미지 Pull: ${IMAGE}"
-            echo "$PW" | sudo -S docker pull "${IMAGE}"
+            SUDO docker pull "${IMAGE}"
 
             # ============================================================
             # 2. nginx 설정 백업
             # ============================================================
             echo "📁 nginx 백업 디렉토리 생성: ${NGINX_BACKUP_DIR}"
-            echo "$PW" | sudo -S mkdir -p "${NGINX_BACKUP_DIR}"
+            SUDO mkdir -p "${NGINX_BACKUP_DIR}"
 
             BACKUP_FILE="${NGINX_BACKUP_DIR}/server.ReverseProxy.conf.$(date +%Y%m%d_%H%M%S).bak"
             echo "💾 nginx config 백업: ${BACKUP_FILE}"
-            echo "$PW" | sudo -S cp "${NGINX_RP_CONF}" "${BACKUP_FILE}"
+            SUDO cp "${NGINX_RP_CONF}" "${BACKUP_FILE}"
 
             # ============================================================
             # 3. 현재 활성 포트 판별 (nginx config proxy_pass 파싱)
             # ============================================================
             echo "🔍 nginx config 의 현재 활성 포트 탐색"
             ACTIVE_PORT=$(
-              printf '%s\n' "$PW" | sudo -S awk -v dom="${DOMAIN_NAME}" '
+              SUDO awk -v dom="${DOMAIN_NAME}" '
                 BEGIN {
                   inserver=0; depth=0; entry_depth=0;
                   dom_esc = dom;
@@ -318,9 +335,9 @@ jobs:
             # ============================================================
             # 4. 동일 슬롯(idle 쪽) 잔존 컨테이너 정리
             # ============================================================
-            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${NEW_CONTAINER_NAME}\$"; then
+            if SUDO docker ps -a --format '{{.Names}}' | grep -Eq "^${NEW_CONTAINER_NAME}\$"; then
               echo "🗑️ idle 슬롯 정리: ${NEW_CONTAINER_NAME}"
-              echo "$PW" | sudo -S docker rm -f "${NEW_CONTAINER_NAME}"
+              SUDO docker rm -f "${NEW_CONTAINER_NAME}"
             fi
 
             # ============================================================
@@ -330,7 +347,7 @@ jobs:
             if [ "${ENABLE_VOLUME_MOUNT}" = "true" ]; then
               if [ ! -d "${VOLUME_HOST_PATH}" ]; then
                 echo "📁 볼륨 마운트 디렉토리 생성: ${VOLUME_HOST_PATH}"
-                echo "$PW" | sudo -S mkdir -p "${VOLUME_HOST_PATH}"
+                SUDO mkdir -p "${VOLUME_HOST_PATH}"
               fi
               VOLUME_MOUNT_OPTION="${VOLUME_MOUNT_OPTION} -v ${VOLUME_HOST_PATH}:${VOLUME_CONTAINER_PATH}"
               echo "📦 볼륨 마운트 활성화: ${VOLUME_HOST_PATH} → ${VOLUME_CONTAINER_PATH}"
@@ -342,7 +359,7 @@ jobs:
             # 6. 새 컨테이너 기동
             # ============================================================
             echo "🐳 새 컨테이너 기동: ${NEW_CONTAINER_NAME} (포트 ${NEW_PORT})"
-            echo "$PW" | sudo -S docker run -d \
+            SUDO docker run -d \
               -p ${NEW_PORT}:${CONTAINER_INTERNAL_PORT} \
               --name "${NEW_CONTAINER_NAME}" \
               -e TZ=Asia/Seoul \
@@ -368,9 +385,9 @@ jobs:
 
             if [ "${HEALTHCHECK_SUCCESS}" != "true" ]; then
               echo "❌ 헬스체크 실패 → 배포 중단"
-              echo "$PW" | sudo -S docker logs --tail 200 "${NEW_CONTAINER_NAME}" || true
+              SUDO docker logs --tail 200 "${NEW_CONTAINER_NAME}" || true
               echo "🗑️ 신규 컨테이너 정리: ${NEW_CONTAINER_NAME}"
-              echo "$PW" | sudo -S docker rm -f "${NEW_CONTAINER_NAME}" || true
+              SUDO docker rm -f "${NEW_CONTAINER_NAME}" || true
               exit 1
             fi
 
@@ -379,7 +396,7 @@ jobs:
             # ============================================================
             echo "🔧 nginx config 포트 토글: ${ACTIVE_PORT} → ${NEW_PORT}"
             TMP_FILE="$(mktemp)"
-            sudo awk -v dom="${DOMAIN_NAME}" -v new_port="${NEW_PORT}" '
+            SUDO awk -v dom="${DOMAIN_NAME}" -v new_port="${NEW_PORT}" '
               BEGIN {
                 inserver=0; depth=0; entry_depth=0;
                 dom_esc = dom;
@@ -414,29 +431,29 @@ jobs:
             # 9. nginx 설정 검증 + reload (실패 시 백업 복구)
             # ============================================================
             echo "🔧 nginx 설정 적용 및 검증"
-            echo "$PW" | sudo -S cp "${TMP_FILE}" "${NGINX_RP_CONF}"
-            if ! (echo "$PW" | sudo -S nginx -t); then
+            SUDO cp "${TMP_FILE}" "${NGINX_RP_CONF}"
+            if ! (SUDO nginx -t); then
               echo "❌ nginx 설정 검증 실패 → 백업 파일로 복구"
-              echo "$PW" | sudo -S cp "${BACKUP_FILE}" "${NGINX_RP_CONF}"
-              echo "$PW" | sudo -S rm -f "${BACKUP_FILE}"
+              SUDO cp "${BACKUP_FILE}" "${NGINX_RP_CONF}"
+              SUDO rm -f "${BACKUP_FILE}"
               rm -f "${TMP_FILE}"
               echo "🗑️ 신규 컨테이너 정리: ${NEW_CONTAINER_NAME}"
-              echo "$PW" | sudo -S docker rm -f "${NEW_CONTAINER_NAME}" || true
+              SUDO docker rm -f "${NEW_CONTAINER_NAME}" || true
               exit 1
             fi
             echo "✅ nginx 설정 검증 성공"
             rm -f "${TMP_FILE}"
 
             echo "🔄 nginx reload"
-            if ! (echo "$PW" | sudo -S systemctl reload nginx); then
+            if ! (SUDO systemctl reload nginx); then
               echo "⚠️ reload 실패 → restart 시도"
-              if ! (echo "$PW" | sudo -S systemctl restart nginx); then
+              if ! (SUDO systemctl restart nginx); then
                 echo "❌ nginx reload/restart 실패 → 백업 복구"
-                echo "$PW" | sudo -S cp "${BACKUP_FILE}" "${NGINX_RP_CONF}"
-                echo "$PW" | sudo -S systemctl restart nginx
-                echo "$PW" | sudo -S rm -f "${BACKUP_FILE}"
+                SUDO cp "${BACKUP_FILE}" "${NGINX_RP_CONF}"
+                SUDO systemctl restart nginx
+                SUDO rm -f "${BACKUP_FILE}"
                 echo "🗑️ 신규 컨테이너 정리: ${NEW_CONTAINER_NAME}"
-                echo "$PW" | sudo -S docker rm -f "${NEW_CONTAINER_NAME}" || true
+                SUDO docker rm -f "${NEW_CONTAINER_NAME}" || true
                 exit 1
               fi
             fi
@@ -467,9 +484,9 @@ jobs:
             echo "⏱️ in-flight 요청 처리 대기 (${IN_FLIGHT_WAIT}초)"
             sleep ${IN_FLIGHT_WAIT}
 
-            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${OLD_CONTAINER_NAME}\$"; then
+            if SUDO docker ps -a --format '{{.Names}}' | grep -Eq "^${OLD_CONTAINER_NAME}\$"; then
               echo "🗑️ old=${OLD_CONTAINER_NAME} 제거"
-              echo "$PW" | sudo -S docker rm -f "${OLD_CONTAINER_NAME}" || true
+              SUDO docker rm -f "${OLD_CONTAINER_NAME}" || true
             else
               echo "ℹ️ old=${OLD_CONTAINER_NAME} 없음 — 정리 생략"
             fi
@@ -478,11 +495,11 @@ jobs:
             # 12. dangling 이미지 정리 + 백업 보존
             # ============================================================
             echo "🧹 dangling(<none>) 이미지 정리..."
-            echo "$PW" | sudo -S docker image prune -af
+            SUDO docker image prune -af
 
             echo "🧹 백업 파일 최신 ${NGINX_BACKUP_KEEP}개 보존"
             KEEP_PLUS_ONE=$((NGINX_BACKUP_KEEP + 1))
-            echo "$PW" | sudo -S /bin/bash -c "ls -1t '${NGINX_BACKUP_DIR}'/server.ReverseProxy.conf.*.bak 2>/dev/null | tail -n +${KEEP_PLUS_ONE} | xargs -r rm -f"
+            SUDO /bin/bash -c "ls -1t '${NGINX_BACKUP_DIR}'/server.ReverseProxy.conf.*.bak 2>/dev/null | tail -n +${KEEP_PLUS_ONE} | xargs -r rm -f"
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "✅ 무중단 배포 완료. active=${NEW_CONTAINER_NAME} (포트 ${NEW_PORT})"
@@ -513,6 +530,6 @@ jobs:
 #
 # 4) 본 워크플로우로 전환:
 #    - 본 파일의 push.branches 주석 해제
-#    - PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
+#    - PROJECT-SPRING-SIMPLE-CICD.yaml 의 push 트리거 주석 처리
 #
 # ===================================================================

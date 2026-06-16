@@ -7,7 +7,7 @@
 > 이슈 등록부터 커밋, 보고서, 배포까지. 개발자는 코드만 작성하세요.
 
 <!-- AUTO-VERSION-SECTION: DO NOT EDIT MANUALLY -->
-## 최신 버전 : v3.0.131 (2026-06-15)
+## 최신 버전 : v3.0.132 (2026-06-16)
 
 [전체 버전 기록 보기](CHANGELOG.md)
 
@@ -137,7 +137,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 | **이슈 자동화** | 브랜치명/커밋 메시지 자동 제안, QA 이슈 생성 | [상세](docs/ISSUE-AUTOMATION.md) |
 | **Flutter CI/CD** | iOS TestFlight + Android Play Store 자동 배포 | [상세](docs/FLUTTER-CICD-OVERVIEW.md) |
 | **배포 설정 마법사** | Play Store / TestFlight / Firebase App Distribution 5단계 HTML 마법사 | `.github/util/flutter/{playstore,testflight,firebase}-wizard/` |
-| **Synology 배포** | Docker 기반 NAS 무중단 배포 | [상세](docs/SYNOLOGY-DEPLOYMENT-GUIDE.md) |
+| **SSH+Docker 배포** | SSH 접속 서버에 Docker 무중단 배포 (Synology·AWS EC2 등) | [상세](docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md) |
 
 ---
 
@@ -194,12 +194,12 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 
 | 타입 | 버전 파일 | CI/CD |
 |------|----------|-------|
-| `spring` | build.gradle | Synology Docker, Nexus |
+| `spring` | build.gradle | SSH+Docker 배포, Nexus |
 | `flutter` | pubspec.yaml | TestFlight, Play Store |
 | `react` | package.json | Docker |
 | `next` | package.json | Docker |
 | `node` | package.json | Docker |
-| `python` | pyproject.toml | Synology Docker |
+| `python` | pyproject.toml | SSH+Docker 배포 |
 | `react-native` | Info.plist + build.gradle | — |
 | `react-native-expo` | app.json | — |
 | `basic` | version.yml만 | — |
@@ -254,7 +254,7 @@ Settings → Actions → General
 | [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | CodeRabbit 연동, AI 문서화 |
 | [PR Preview](docs/PR-PREVIEW.md) | 임시 서버 배포 시스템 |
 | [Flutter CI/CD](docs/FLUTTER-CICD-OVERVIEW.md) | iOS/Android 자동 배포 |
-| [Synology 배포](docs/SYNOLOGY-DEPLOYMENT-GUIDE.md) | Docker 기반 NAS 배포 |
+| [SSH+Docker 배포](docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md) | SSH 접속 서버에 Docker 배포 (Synology·AWS EC2 등) |
 | [이슈 자동화](docs/ISSUE-AUTOMATION.md) | Issue Helper, QA 봇 |
 | [트러블슈팅](docs/TROUBLESHOOTING.md) | 자주 발생하는 문제 해결 |
 

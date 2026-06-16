@@ -25,5 +25,17 @@
     "severity": "critical",
     "title": "Skills 배포 방식 변경 - 마켓플레이스 전용 전환",
     "message": "Skills(IDE 명령어)가 template_integrator 복사 방식에서 Claude Code 플러그인 마켓플레이스 전용으로 변경되었습니다. 기존 .claude/skills/, .claude/scripts/ 경로가 루트 skills/, scripts/로 이동했습니다. Claude Code 사용자는 'claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE && claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user' 명령어로 설치하세요. Cursor 사용자는 통합 시 자동으로 .cursor 폴더 복사 여부를 물어봅니다. 기존 .claude/skills/, .claude/scripts/ 폴더는 더 이상 업데이트되지 않습니다."
+  },
+
+  "3.0.133": {
+    "severity": "warning",
+    "title": "Spring 배포 워크플로우 SSH 인증 방식(password/key) 추가",
+    "message": "Spring 배포 워크플로우(SYNOLOGY-SIMPLE-CICD, SYNOLOGY-NONSTOP-NGINX-CICD)에 SSH_AUTH_METHOD 환경변수가 추가되어 Synology(password) 외에 AWS EC2 등 .pem 키(key) 인증 서버에도 배포할 수 있습니다. 기존 Synology 배포는 SSH_AUTH_METHOD 기본값이 password라 영향이 없습니다. 워크플로우를 새로 받으면 env의 SSH_AUTH_METHOD 값을 확인하고, key 인증을 쓰는 경우 GitHub Secret에 SSH_KEY(.pem 내용)를 등록하세요. 자세한 설정은 docs/SYNOLOGY-DEPLOYMENT-GUIDE.md의 'SSH 인증 방식과 다른 서버(AWS EC2 등) 배포' 섹션을 참고하세요."
+  },
+
+  "3.0.137": {
+    "severity": "warning",
+    "title": "배포 워크플로우 synology 폴더/옵션 제거 — SSH+Docker 엔진으로 통일",
+    "message": "배포 워크플로우의 synology/ 폴더 구분이 완전히 제거되었습니다. Spring 배포(SIMPLE-CICD, NONSTOP-NGINX-CICD, NONSTOP-TRAEFIK-CICD, PR-PREVIEW)와 Python 배포(SIMPLE-CICD, PR-PREVIEW)는 각 타입 루트로 이동해 기본 포함되고, Flutter Synology APK 배포는 PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD로 개명되었습니다. Nexus는 spring/nexus/, Secret 백업은 common/secret-backup/(PROJECT-COMMON-SECRET-FILE-UPLOAD로 개명)으로 분리되어 통합 마법사에서 --nexus / --secret-backup 옵션(.ps1은 -Nexus / -SecretBackup)으로 선택합니다. version.yml의 옵션 키가 options.synology에서 options.nexus / options.secret_backup으로 변경되었습니다 — 기존 synology 키는 더 이상 사용되지 않으니 통합 마법사를 다시 실행해 새 옵션을 설정하세요. 다른 서버(AWS EC2 등) 배포는 SSH_AUTH_METHOD=key + SSH_KEY secret으로 설정하세요. 자세한 내용은 docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md를 참고하세요."
   }
 }

@@ -1,9 +1,9 @@
 # ===================================================================
-# Python FastAPI CI/CD 배포 (Synology)
+# Python FastAPI CI/CD 배포 (SSH + Docker)
 # ===================================================================
 #
 # deploy 브랜치 푸시 시 Docker 이미지를 빌드하고
-# Synology NAS에 자동 배포합니다.
+# SSH로 접속 가능한 서버(Synology·AWS EC2·VPS 등)에 자동 배포합니다.
 #
 # ===================================================================
 # 🔑 필수 GitHub Secrets
@@ -13,7 +13,8 @@
 # DOCKERHUB_TOKEN: DockerHub 액세스 토큰
 # SERVER_HOST: 배포 서버 주소
 # SERVER_USER: SSH 사용자명
-# SERVER_PASSWORD: SSH 비밀번호
+# SERVER_PASSWORD: SSH 비밀번호 (SSH_AUTH_METHOD=password일 때)
+# SSH_KEY: SSH 개인키 .pem 내용 (SSH_AUTH_METHOD=key일 때, AWS EC2 등)
 # ===================================================================
 #
 # 🔧 환경변수 설정 (env 섹션에서 설정)
@@ -46,7 +47,7 @@
 #   커스텀: "/api/v1/health"
 # ===================================================================
 
-name: PROJECT-PYTHON-SYNOLOGY-CICD
+name: PROJECT-PYTHON-SIMPLE-CICD
 
 # ===================================================================
 # 트리거 설정
@@ -78,6 +79,11 @@ env:
   ENABLE_VOLUME_MOUNT: "false"
   VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
   VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask: 컨테이너 내부 경로 [기본: /mnt/__PROJECT_NAME__]
+
+  # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
+  #   password → SERVER_PASSWORD secret 사용
+  #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
+  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)
@@ -174,16 +180,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # SSH를 통한 원격 서버 배포 실행
+      # SSH 통한 원격 서버 배포 실행
       - name: Deploy
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_AUTH_METHOD: ${{ env.SSH_AUTH_METHOD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ env.SSH_PORT }}
           command_timeout: ${{ env.SSH_COMMAND_TIMEOUT }}
           timeout: ${{ env.SSH_CONNECTION_TIMEOUT }}
+          envs: SSH_AUTH_METHOD
           script: |
             set -e
 
@@ -193,6 +203,17 @@ jobs:
             echo "🔧 환경변수 설정.."
             export PATH=$PATH:/usr/local/bin
             export PW=${{ secrets.SERVER_PASSWORD }}
+
+            # 🔐 SSH 인증 방식에 따른 sudo 추상화
+            #   password 모드: echo $PW | sudo -S  (Synology 등 sudo 비밀번호 필요 서버)
+            #   key 모드: sudo 직접  (AWS EC2 등 passwordless sudo 서버)
+            SSH_AUTH_METHOD="${SSH_AUTH_METHOD:-password}"
+            if [ "${SSH_AUTH_METHOD}" = "key" ]; then
+              SUDO() { sudo "$@"; }
+            else
+              SUDO() { echo "$PW" | sudo -S "$@"; }
+            fi
+            echo "🔐 SSH 인증 방식: ${SSH_AUTH_METHOD}"
 
             # GitHub에서 전달받은 브랜치명
             BRANCH=${{ github.ref_name }}
@@ -228,7 +249,7 @@ jobs:
             # Docker 이미지 풀 (Pull)
             # ============================================================
             echo "⬇️ Docker 이미지 풀: ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}"
-            echo $PW | sudo -S docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}
+            SUDO docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}:${BRANCH}
 
             # ============================================================
             # 기존 컨테이너 정리
@@ -236,9 +257,9 @@ jobs:
             echo "🧹 컨테이너 $CONTAINER_NAME 존재 여부 확인 중..."
 
             # 동일한 이름의 컨테이너가 존재하는지 확인
-            if echo $PW | sudo -S docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+            if SUDO docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
               echo "⚠️ 컨테이너 $CONTAINER_NAME 이(가) 존재합니다. 중지 및 삭제 중..."
-              echo $PW | sudo -S docker rm -f $CONTAINER_NAME
+              SUDO docker rm -f $CONTAINER_NAME
               echo "✅ 컨테이너 $CONTAINER_NAME 이(가) 삭제되었습니다."
             else
               echo "ℹ️ 존재하는 컨테이너 $CONTAINER_NAME 이(가) 없습니다."
@@ -261,7 +282,7 @@ jobs:
               # 디렉토리가 없으면 생성
               if [ ! -d "${{ env.VOLUME_HOST_PATH }}" ]; then
                 echo "📁 볼륨 마운트 디렉토리 생성: ${{ env.VOLUME_HOST_PATH }}"
-                echo $PW | sudo -S mkdir -p "${{ env.VOLUME_HOST_PATH }}"
+                SUDO mkdir -p "${{ env.VOLUME_HOST_PATH }}"
               fi
               VOLUME_OPTS="$VOLUME_OPTS -v ${{ env.VOLUME_HOST_PATH }}:${{ env.VOLUME_CONTAINER_PATH }}"
               echo "📦 볼륨 마운트 활성화: $VOLUME_OPTS"
@@ -269,7 +290,7 @@ jobs:
               echo "ℹ️ 볼륨 마운트 비활성화됨"
             fi
 
-            echo $PW | sudo -S docker run -d \
+            SUDO docker run -d \
               -p ${PORT}:${{ env.CONTAINER_INTERNAL_PORT }} \
               --name $CONTAINER_NAME \
               -e TZ=Asia/Seoul \
@@ -284,9 +305,9 @@ jobs:
 
             # 1단계: 컨테이너 프로세스 확인
             echo "🏥 컨테이너 헬스체크 중..."
-            if ! echo $PW | sudo -S docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+            if ! SUDO docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
               echo "❌ 컨테이너 $CONTAINER_NAME 프로세스가 실행되지 않았습니다"
-              echo $PW | sudo -S docker logs --tail 50 $CONTAINER_NAME || true
+              SUDO docker logs --tail 50 $CONTAINER_NAME || true
               exit 1
             fi
             echo "✅ 컨테이너 프로세스 실행 확인 완료"
@@ -326,7 +347,7 @@ jobs:
             if [ "$HEALTHCHECK_SUCCESS" = "false" ]; then
               echo "📋 로그 패턴 매칭 시작: '${{ env.HEALTHCHECK_LOG_PATTERN }}'"
 
-              if echo $PW | sudo -S docker logs $CONTAINER_NAME 2>&1 | grep -q "${{ env.HEALTHCHECK_LOG_PATTERN }}"; then
+              if SUDO docker logs $CONTAINER_NAME 2>&1 | grep -q "${{ env.HEALTHCHECK_LOG_PATTERN }}"; then
                 echo "✅ 로그 패턴 매칭 성공: 애플리케이션이 정상적으로 시작되었습니다"
                 HEALTHCHECK_SUCCESS=true
               else
@@ -340,7 +361,7 @@ jobs:
                 echo "  - 볼륨: $VOLUME_OPTS"
                 echo ""
                 echo "📋 컨테이너 로그 (최근 50줄):"
-                echo $PW | sudo -S docker logs --tail 50 $CONTAINER_NAME || true
+                SUDO docker logs --tail 50 $CONTAINER_NAME || true
                 exit 1
               fi
             fi

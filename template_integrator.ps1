@@ -1479,11 +1479,42 @@ function Show-ProjectTypeMenu {
 # 프로젝트 정보 수정 메뉴
 # ===================================================================
 
+# 프로젝트 분석 결과 개요 출력 (감지된 타입·버전·브랜치·모드·옵션 워크플로우·경로)
+# Detect-AndConfirmProject(확인 화면)와 Edit-ProjectInfo(수정 직후)에서 동일하게 호출해,
+# 항목을 고칠 때마다 현재 상태를 한눈에 다시 보여준다. (sh print_project_analysis와 대칭)
+function Print-ProjectAnalysis {
+    Print-SectionHeader "🛰️" "프로젝트 분석 결과"
+
+    # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
+    Write-Host ""
+    if ($script:ProjectTypes.Count -gt 1) {
+        Write-Host "       📂 Project Types    : $($script:ProjectTypes -join ',') (멀티)"
+    } else {
+        Write-Host "       📂 Project Type     : $($script:ProjectType)"
+    }
+    Write-Host "       🌙 Version          : $($script:ProjectVersion)"
+    Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
+    # 모드 / 선택 워크플로우 / 멀티경로 (값이 있을 때만 — sh와 동일)
+    if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
+    if ($script:IncludeNexus -eq $true)  { Write-Host "       📦 Nexus publish    : 포함" }
+    elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
+    if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
+    elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
+    if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
+        $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
+        Write-Host "       📁 프로젝트 경로    : $pathPairs"
+    }
+    Write-Host ""
+}
+
 function Edit-ProjectInfo {
     # 루프 구조(sh handle_project_edit_menu와 대칭): 항목을 고쳐도 메뉴로 되돌아와
     # 다른 항목을 이어서 수정할 수 있다. '모두 맞음, 계속' 또는 '뒤로' → 확인 화면으로 복귀.
     # ps1은 숫자 입력 메뉴라 ESC 키가 없어 '뒤로'를 명시적 항목으로 제공한다.
     while ($true) {
+        # 항목을 고칠 때마다 현재 확정된 전체 설정 개요를 먼저 다시 보여준다.
+        # (수정 → 개요 확인 → 다음 선택 흐름 — 변경이 어떻게 반영됐는지 한눈에 파악)
+        Print-ProjectAnalysis
         Print-QuestionHeader "💫" "어떤 항목을 수정할까요?"
 
         # 선택 워크플로우(Nexus/Secret 백업) 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 의미가 있다.
@@ -1610,28 +1641,7 @@ function Detect-AndConfirmProject {
 
     # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
     while (-not $confirmed) {
-        Print-SectionHeader "🛰️" "프로젝트 분석 결과"
-
-        # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
-        Write-Host ""
-        if ($script:ProjectTypes.Count -gt 1) {
-            Write-Host "       📂 Project Types    : $($script:ProjectTypes -join ',') (멀티)"
-        } else {
-            Write-Host "       📂 Project Type     : $($script:ProjectType)"
-        }
-        Write-Host "       🌙 Version          : $($script:ProjectVersion)"
-        Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
-        # 모드 / 선택 워크플로우 / 멀티경로 (값이 있을 때만 — sh와 동일)
-        if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
-        if ($script:IncludeNexus -eq $true)  { Write-Host "       📦 Nexus publish    : 포함" }
-        elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
-        if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
-        elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
-        if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
-            $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
-            Write-Host "       📁 프로젝트 경로    : $pathPairs"
-        }
-        Write-Host ""
+        Print-ProjectAnalysis
 
         # 사용자 확인 — 화살표 3지선(Ask-YesNoEdit가 자체 안내 출력). ESC=stay.
         $userChoice = Ask-YesNoEdit

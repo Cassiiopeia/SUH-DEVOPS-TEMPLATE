@@ -1479,11 +1479,42 @@ function Show-ProjectTypeMenu {
 # 프로젝트 정보 수정 메뉴
 # ===================================================================
 
+# 프로젝트 분석 결과 개요 출력 (감지된 타입·버전·브랜치·모드·옵션 워크플로우·경로)
+# Detect-AndConfirmProject(확인 화면)와 Edit-ProjectInfo(수정 직후)에서 동일하게 호출해,
+# 항목을 고칠 때마다 현재 상태를 한눈에 다시 보여준다. (sh print_project_analysis와 대칭)
+function Print-ProjectAnalysis {
+    Print-SectionHeader "🛰️" "프로젝트 분석 결과"
+
+    # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
+    Write-Host ""
+    if ($script:ProjectTypes.Count -gt 1) {
+        Write-Host "       📂 Project Types    : $($script:ProjectTypes -join ',') (멀티)"
+    } else {
+        Write-Host "       📂 Project Type     : $($script:ProjectType)"
+    }
+    Write-Host "       🌙 Version          : $($script:ProjectVersion)"
+    Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
+    # 모드 / 선택 워크플로우 / 멀티경로 (값이 있을 때만 — sh와 동일)
+    if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
+    if ($script:IncludeNexus -eq $true)  { Write-Host "       📦 Nexus publish    : 포함" }
+    elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
+    if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
+    elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
+    if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
+        $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
+        Write-Host "       📁 프로젝트 경로    : $pathPairs"
+    }
+    Write-Host ""
+}
+
 function Edit-ProjectInfo {
     # 루프 구조(sh handle_project_edit_menu와 대칭): 항목을 고쳐도 메뉴로 되돌아와
     # 다른 항목을 이어서 수정할 수 있다. '모두 맞음, 계속' 또는 '뒤로' → 확인 화면으로 복귀.
     # ps1은 숫자 입력 메뉴라 ESC 키가 없어 '뒤로'를 명시적 항목으로 제공한다.
     while ($true) {
+        # 항목을 고칠 때마다 현재 확정된 전체 설정 개요를 먼저 다시 보여준다.
+        # (수정 → 개요 확인 → 다음 선택 흐름 — 변경이 어떻게 반영됐는지 한눈에 파악)
+        Print-ProjectAnalysis
         Print-QuestionHeader "💫" "어떤 항목을 수정할까요?"
 
         # 선택 워크플로우(Nexus/Secret 백업) 항목은 워크플로우를 설치하는 모드(full/workflows)에서만 의미가 있다.
@@ -1610,28 +1641,7 @@ function Detect-AndConfirmProject {
 
     # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
     while (-not $confirmed) {
-        Print-SectionHeader "🛰️" "프로젝트 분석 결과"
-
-        # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
-        Write-Host ""
-        if ($script:ProjectTypes.Count -gt 1) {
-            Write-Host "       📂 Project Types    : $($script:ProjectTypes -join ',') (멀티)"
-        } else {
-            Write-Host "       📂 Project Type     : $($script:ProjectType)"
-        }
-        Write-Host "       🌙 Version          : $($script:ProjectVersion)"
-        Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
-        # 모드 / 선택 워크플로우 / 멀티경로 (값이 있을 때만 — sh와 동일)
-        if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
-        if ($script:IncludeNexus -eq $true)  { Write-Host "       📦 Nexus publish    : 포함" }
-        elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
-        if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
-        elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
-        if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
-            $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
-            Write-Host "       📁 프로젝트 경로    : $pathPairs"
-        }
-        Write-Host ""
+        Print-ProjectAnalysis
 
         # 사용자 확인 — 화살표 3지선(Ask-YesNoEdit가 자체 안내 출력). ESC=stay.
         $userChoice = Ask-YesNoEdit
@@ -4059,21 +4069,35 @@ function Invoke-GeminiExtensionManage {
         return
     }
 
-    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
-    Print-Step "Gemini CLI extension 업데이트 중..."
-    $null = & gemini extensions update cassiiopeia 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Print-Success "Gemini CLI extension 업데이트 완료"
-        return
-    }
+    # 외부 명령어 호출 시 발생할 수 있는 원격/네이티브 예외에 대비하여 임시로 ErrorActionPreference를 완화하고 try-catch로 격리합니다.
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
 
-    Print-Step "Gemini CLI extension 설치 중..."
-    $null = & gemini extensions install "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Print-Success "Gemini CLI extension 설치 완료"
-    } else {
-        Print-Warning "Gemini CLI extension 설치 실패. 수동으로 설치해주세요:"
-        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    try {
+        # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
+        Print-Step "Gemini CLI extension 업데이트 중..."
+        # cmd /c와 2>&1 리다이렉션을 사용하여 PowerShell의 무조건적인 NativeCommandError 발생을 차단합니다.
+        $null = cmd /c "gemini extensions update cassiiopeia 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Gemini CLI extension 업데이트 완료"
+            return
+        }
+
+        Print-Step "Gemini CLI extension 설치 중..."
+        $null = cmd /c "gemini extensions install `"https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE`" 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Gemini CLI extension 설치 완료"
+        } else {
+            Print-Warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
+            Print-Info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
+            Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+        }
+    } catch {
+        Print-Warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
+        Print-Info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
+        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+    } finally {
+        $ErrorActionPreference = $oldEAP
     }
 }
 
@@ -4095,17 +4119,35 @@ function Invoke-CodexSkillsManage {
 }
 
 function Invoke-CodexMarketplaceRegister {
-    Print-Step "Codex plugin marketplace 등록 중..."
-    $null = & codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Print-Success "Codex marketplace 등록 완료"
-    } else {
-        Print-Info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
-    }
+    # 외부 명령어 호출 시 발생할 수 있는 원격/네이티브 예외에 대비하여 임시로 ErrorActionPreference를 완화하고 try-catch로 격리합니다.
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
 
-    Print-Step "Codex plugin marketplace 업데이트 중..."
-    $null = & codex plugin marketplace upgrade cassiiopeia 2>$null
-    Print-Success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+    try {
+        Print-Step "Codex plugin marketplace 등록 중..."
+        $null = cmd /c "codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Codex marketplace 등록 완료"
+        } else {
+            Print-Info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
+        }
+
+        Print-Step "Codex plugin marketplace 업데이트 중..."
+        $null = cmd /c "codex plugin marketplace upgrade cassiiopeia 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+        } else {
+            Print-Warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
+            Print-Info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
+            Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+        }
+    } catch {
+        Print-Warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
+        Print-Info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
+        Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+    } finally {
+        $ErrorActionPreference = $oldEAP
+    }
 }
 
 function Invoke-CodexNativeSkillsFallback {

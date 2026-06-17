@@ -1809,6 +1809,46 @@ show_project_type_menu() {
 }
 
 # 프로젝트 감지 및 확인
+# 프로젝트 분석 결과 개요 출력 (감지된 타입·버전·브랜치·모드·옵션 워크플로우·경로)
+# detect_and_confirm_project(확인 화면)와 handle_project_edit_menu(수정 직후)에서
+# 동일하게 호출해, 항목을 고칠 때마다 현재 상태를 한눈에 다시 보여준다.
+print_project_analysis() {
+    print_section_header "🛰️" "프로젝트 분석 결과"
+
+    # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
+    local _types_display
+    local IFS=','
+    _types_display="${PROJECT_TYPES[*]}"
+    unset IFS
+
+    print_to_user ""
+    if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
+        print_to_user "       📂 Project Types    : $_types_display (멀티)"
+    else
+        print_to_user "       📂 Project Type     : $PROJECT_TYPE"
+    fi
+    print_to_user "       🌙 Version          : $VERSION"
+    print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
+    # 모드  : 무엇을 설치하는지 (확인 화면에서 한눈에)
+    [ -n "$MODE" ] && print_to_user "       💫 통합 모드        : $(_mode_display_label "$MODE")"
+    # 선택 워크플로우 : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
+    if [ "$INCLUDE_NEXUS" = true ]; then
+        print_to_user "       📦 Nexus publish    : 포함"
+    elif [ "$INCLUDE_NEXUS" = false ]; then
+        print_to_user "       📦 Nexus publish    : 제외"
+    fi
+    if [ "$INCLUDE_SECRET_BACKUP" = true ]; then
+        print_to_user "       🔐 Secret 백업      : 포함"
+    elif [ "$INCLUDE_SECRET_BACKUP" = false ]; then
+        print_to_user "       🔐 Secret 백업      : 제외"
+    fi
+    # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
+    if [ -n "$PROJECT_PATHS_CSV" ]; then
+        print_to_user "       📁 프로젝트 경로    : $(echo "$PROJECT_PATHS_CSV" | sed 's/=/→/g; s/,/, /g')"
+    fi
+    print_to_user ""
+}
+
 detect_and_confirm_project() {
     # 자동 감지 (최초 1회만) — --type으로 PROJECT_TYPES가 이미 채워졌으면 건너뜀
     if [ ${#PROJECT_TYPES[@]} -eq 0 ]; then
@@ -1828,40 +1868,7 @@ detect_and_confirm_project() {
 
     # 확인 루프 - Edit 선택 시 다시 확인 질문으로 돌아옴
     while [ "$confirmed" = false ]; do
-        print_section_header "🛰️" "프로젝트 분석 결과"
-
-        # 감지 결과 표시 — 멀티면 csv로, 단일이면 기존 형식
-        local _types_display
-        local IFS=','
-        _types_display="${PROJECT_TYPES[*]}"
-        unset IFS
-
-        print_to_user ""
-        if [ ${#PROJECT_TYPES[@]} -gt 1 ]; then
-            print_to_user "       📂 Project Types    : $_types_display (멀티)"
-        else
-            print_to_user "       📂 Project Type     : $PROJECT_TYPE"
-        fi
-        print_to_user "       🌙 Version          : $VERSION"
-        print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
-        # 모드  : 무엇을 설치하는지 (확인 화면에서 한눈에)
-        [ -n "$MODE" ] && print_to_user "       💫 통합 모드        : $(_mode_display_label "$MODE")"
-        # 선택 워크플로우 : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
-        if [ "$INCLUDE_NEXUS" = true ]; then
-            print_to_user "       📦 Nexus publish    : 포함"
-        elif [ "$INCLUDE_NEXUS" = false ]; then
-            print_to_user "       📦 Nexus publish    : 제외"
-        fi
-        if [ "$INCLUDE_SECRET_BACKUP" = true ]; then
-            print_to_user "       🔐 Secret 백업      : 포함"
-        elif [ "$INCLUDE_SECRET_BACKUP" = false ]; then
-            print_to_user "       🔐 Secret 백업      : 제외"
-        fi
-        # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
-        if [ -n "$PROJECT_PATHS_CSV" ]; then
-            print_to_user "       📁 프로젝트 경로    : $(echo "$PROJECT_PATHS_CSV" | sed 's/=/→/g; s/,/, /g')"
-        fi
-        print_to_user ""
+        print_project_analysis
 
         # 사용자 확인 — 화살표 3지선 메뉴 (TTY 대화형). 비TTY/FORCE는 기존 키 입력 폴백.
         local user_choice
@@ -1926,6 +1933,9 @@ detect_and_confirm_project() {
 # set -e 환경: 메뉴/입력이 ESC로 비-0 반환해도 함수가 죽지 않도록 모두 || 로 코드를 받는다.
 handle_project_edit_menu() {
     while true; do
+        # 항목을 고칠 때마다 현재 확정된 전체 설정 개요를 먼저 다시 보여준다.
+        # (수정 → 개요 확인 → 다음 선택 흐름 — 변경이 어떻게 반영됐는지 한눈에 파악)
+        print_project_analysis
         print_question_header "💫" "어떤 항목을 수정할까요?"
 
         # 영어 키 노출 방지: 한국어 라벨을 value로 두고 반환값을 매핑
@@ -4533,8 +4543,9 @@ _manage_gemini_extension() {
     if gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
         print_success "Gemini CLI extension 설치 완료"
     else
-        print_warning "Gemini CLI extension 설치 실패. 수동으로 실행해주세요:"
-        echo "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        print_warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
+        print_info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
+        echo -e "    ${CYAN}gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE${NC}" >&2
     fi
 }
 
@@ -4564,8 +4575,13 @@ _do_codex_marketplace_register() {
     fi
 
     print_step "Codex plugin marketplace 업데이트 중..."
-    codex plugin marketplace upgrade cassiiopeia 2>/dev/null || true
-    print_success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+    if codex plugin marketplace upgrade cassiiopeia 2>/dev/null; then
+        print_success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+    else
+        print_warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
+        print_info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
+        echo -e "    ${CYAN}codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE${NC}" >&2
+    fi
 }
 
 _do_codex_native_skills_fallback() {

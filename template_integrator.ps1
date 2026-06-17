@@ -4059,21 +4059,33 @@ function Invoke-GeminiExtensionManage {
         return
     }
 
-    # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
-    Print-Step "Gemini CLI extension 업데이트 중..."
-    $null = & gemini extensions update cassiiopeia 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Print-Success "Gemini CLI extension 업데이트 완료"
-        return
-    }
+    # 외부 명령어 호출 시 발생할 수 있는 원격/네이티브 예외에 대비하여 임시로 ErrorActionPreference를 완화하고 try-catch로 격리합니다.
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
 
-    Print-Step "Gemini CLI extension 설치 중..."
-    $null = & gemini extensions install "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Print-Success "Gemini CLI extension 설치 완료"
-    } else {
-        Print-Warning "Gemini CLI extension 설치 실패. 수동으로 설치해주세요:"
-        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    try {
+        # 라우터에서 '설치/업데이트' 선택됨 → 추가 확인 없이 바로 실행.
+        Print-Step "Gemini CLI extension 업데이트 중..."
+        # cmd /c와 2>&1 리다이렉션을 사용하여 PowerShell의 무조건적인 NativeCommandError 발생을 차단합니다.
+        $null = cmd /c "gemini extensions update cassiiopeia 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Gemini CLI extension 업데이트 완료"
+            return
+        }
+
+        Print-Step "Gemini CLI extension 설치 중..."
+        $null = cmd /c "gemini extensions install `"https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE`" 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Gemini CLI extension 설치 완료"
+        } else {
+            Print-Warning "Gemini CLI extension 관리 중 오류가 발생했습니다."
+            Print-Info "이 작업은 통합 전체에 영향을 주지 않으므로 건너뛰고 다음 단계를 진행합니다."
+        }
+    } catch {
+        Print-Warning "Gemini CLI extension 관리 중 오류가 발생했습니다."
+        Print-Info "이 작업은 통합 전체에 영향을 주지 않으므로 건너뛰고 다음 단계를 진행합니다."
+    } finally {
+        $ErrorActionPreference = $oldEAP
     }
 }
 
@@ -4095,17 +4107,31 @@ function Invoke-CodexSkillsManage {
 }
 
 function Invoke-CodexMarketplaceRegister {
-    Print-Step "Codex plugin marketplace 등록 중..."
-    $null = & codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Print-Success "Codex marketplace 등록 완료"
-    } else {
-        Print-Info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
-    }
+    # 외부 명령어 호출 시 발생할 수 있는 원격/네이티브 예외에 대비하여 임시로 ErrorActionPreference를 완화하고 try-catch로 격리합니다.
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
 
-    Print-Step "Codex plugin marketplace 업데이트 중..."
-    $null = & codex plugin marketplace upgrade cassiiopeia 2>$null
-    Print-Success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+    try {
+        Print-Step "Codex plugin marketplace 등록 중..."
+        $null = cmd /c "codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Codex marketplace 등록 완료"
+        } else {
+            Print-Info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
+        }
+
+        Print-Step "Codex plugin marketplace 업데이트 중..."
+        $null = cmd /c "codex plugin marketplace upgrade cassiiopeia 2>&1"
+        if ($LASTEXITCODE -eq 0) {
+            Print-Success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+        } else {
+            Print-Warning "Codex plugin marketplace 관리 중 오류가 발생했습니다."
+        }
+    } catch {
+        Print-Warning "Codex plugin marketplace 관리 중 오류가 발생했습니다."
+    } finally {
+        $ErrorActionPreference = $oldEAP
+    }
 }
 
 function Invoke-CodexNativeSkillsFallback {

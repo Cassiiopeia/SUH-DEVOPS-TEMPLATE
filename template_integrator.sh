@@ -4533,8 +4533,8 @@ _manage_gemini_extension() {
     if gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
         print_success "Gemini CLI extension 설치 완료"
     else
-        print_warning "Gemini CLI extension 설치 실패. 수동으로 실행해주세요:"
-        echo "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        print_warning "Gemini CLI extension 관리 중 오류가 발생했습니다."
+        print_info "이 작업은 통합 전체에 영향을 주지 않으므로 건너뛰고 다음 단계를 진행합니다."
     fi
 }
 
@@ -4564,8 +4564,11 @@ _do_codex_marketplace_register() {
     fi
 
     print_step "Codex plugin marketplace 업데이트 중..."
-    codex plugin marketplace upgrade cassiiopeia 2>/dev/null || true
-    print_success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+    if codex plugin marketplace upgrade cassiiopeia 2>/dev/null; then
+        print_success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
+    else
+        print_warning "Codex plugin marketplace 관리 중 오류가 발생했습니다."
+    fi
 }
 
 _do_codex_native_skills_fallback() {

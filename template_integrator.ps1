@@ -4078,12 +4078,14 @@ function Invoke-GeminiExtensionManage {
         if ($LASTEXITCODE -eq 0) {
             Print-Success "Gemini CLI extension 설치 완료"
         } else {
-            Print-Warning "Gemini CLI extension 관리 중 오류가 발생했습니다."
-            Print-Info "이 작업은 통합 전체에 영향을 주지 않으므로 건너뛰고 다음 단계를 진행합니다."
+            Print-Warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
+            Print-Info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
+            Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
         }
     } catch {
-        Print-Warning "Gemini CLI extension 관리 중 오류가 발생했습니다."
-        Print-Info "이 작업은 통합 전체에 영향을 주지 않으므로 건너뛰고 다음 단계를 진행합니다."
+        Print-Warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
+        Print-Info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
+        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
     } finally {
         $ErrorActionPreference = $oldEAP
     }
@@ -4125,10 +4127,14 @@ function Invoke-CodexMarketplaceRegister {
         if ($LASTEXITCODE -eq 0) {
             Print-Success "Codex marketplace 등록 완료 (/plugins에서 확인 가능)"
         } else {
-            Print-Warning "Codex plugin marketplace 관리 중 오류가 발생했습니다."
+            Print-Warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
+            Print-Info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
+            Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
         }
     } catch {
-        Print-Warning "Codex plugin marketplace 관리 중 오류가 발생했습니다."
+        Print-Warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
+        Print-Info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
+        Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
     } finally {
         $ErrorActionPreference = $oldEAP
     }

@@ -20,6 +20,8 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 **Config / PAT 확인** — `references/config-rules.md` §2~3 절차를 따른다.
 
+> ⚠️ **config는 탐색 금지.** config.json은 고정 경로 `{HOME}/.suh-template/config/config.json` 한 곳뿐이다 — Read tool로 바로 읽는다. 위 ⚠️ 블록의 `ls ~/.claude/plugins/cache/...` 패턴은 **스크립트(`github_cli.py`) 전용**이며 config는 그 캐시 안에 없다. 캐시를 뒤지면 "config 없음"으로 오판해 등록된 PAT를 다시 묻게 된다.
+
 **MCP-style 서브커맨드 표준** — `references/mcp-subcommand-rules.md`를 따른다.
 
 GitHub API 호출은 재사용 스크립트 `skills/suh-github/scripts/github_cli.py`로만 수행한다. PAT는 `github_cli`가 `GITHUB_PAT` 환경변수 → `config.json`(`github.global_pat`, repo별 `pat` 우선) 순으로 자동 로드하므로 호출부에서 직접 추출하지 않는다.

@@ -62,7 +62,7 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 > Windows Git Bash의 `$HOME`은 `/c/Users/...` (POSIX 경로)라 네이티브 Windows Python `open()`이 파일을 못 연다 → PAT 추출 실패(NO_PAT). 실측 검증된 버그다.
 > 따라서 **agent가 `Read` 도구로 config 파일을 직접 읽어** PAT를 얻는다 — OS·셸 보간 무관하게 항상 동작한다.
 
-1. `Read` 도구로 config 파일을 읽는다.
+1. `Read` 도구로 config 파일을 읽는다. **이 고정 경로 한 곳만 본다 — `ls`·glob으로 탐색하거나 플러그인 캐시(`~/.claude/plugins/cache/...`, 스크립트 전용)를 뒤지지 마라. config는 캐시 안에 없다.**
    - Windows: `C:\Users\<사용자>\.suh-template\config\config.json`
    - macOS/Linux: `~/.suh-template/config/config.json`
    - 파일이 없으면 → "❌ PAT 없음. /issue 스킬로 config를 먼저 등록하세요." 안내 후 종료.

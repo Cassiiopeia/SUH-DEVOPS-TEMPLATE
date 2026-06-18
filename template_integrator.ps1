@@ -2690,9 +2690,16 @@ function Copy-Workflows-ForType {
     }
 
     # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
+    # ⚠️ Get-ChildItem -Include 는 경로 끝에 \* 또는 -Recurse 가 없으면 PS 5.1에서
+    #    조용히 0개를 반환한다(알려진 함정). 그러면 Configure-WorkflowEnv 가 한 번도
+    #    호출되지 않아 __PROJECT_NAME__ 등 @wizard 토큰 치환이 통째로 스킵된다.
+    #    → -Filter 를 yaml/yml 각각 누적하는 방식으로 처리(Windows PS 5.1 + macOS PS Core 공통 동작).
     foreach ($srcDir in @($typeDir, $nexusDir)) {
         if (-not (Test-Path $srcDir)) { continue }
-        foreach ($wf in (Get-ChildItem -Path $srcDir -Include '*.yaml','*.yml' -File -ErrorAction SilentlyContinue)) {
+        $wfFiles = @()
+        $wfFiles += Get-ChildItem -Path $srcDir -Filter '*.yaml' -File -ErrorAction SilentlyContinue
+        $wfFiles += Get-ChildItem -Path $srcDir -Filter '*.yml'  -File -ErrorAction SilentlyContinue
+        foreach ($wf in $wfFiles) {
             $target = Join-Path $WORKFLOWS_DIR $wf.Name
             if (Test-Path $target) { Configure-WorkflowEnv -Type $Type -File $target }
         }

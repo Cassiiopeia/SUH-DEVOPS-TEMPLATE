@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-18T05:52:38Z",
-    "currentVersion": "3.0.143",
+    "lastUpdated": "2026-06-18T05:56:10Z",
+    "currentVersion": "3.0.144",
     "projectType": "basic",
-    "totalReleases": 156,
+    "totalReleases": 157,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.144",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-18",
+      "pr_number": 398,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 설정이 이미 있는데도 다시 묻던 문제를 해결했습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설정이 이미 있는데도 다시 묻던 문제를 해결했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.143",
       "project_type": "basic",

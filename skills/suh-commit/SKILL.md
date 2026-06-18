@@ -23,7 +23,7 @@ description: "브랜치명에서 이슈 번호를 자동 추출해 커밋 메시
 
 ### 자동 승인 모드 판정 — Read 도구로 config에서 직접 추출
 
-`Read` 도구로 config 파일을 읽는다.
+`Read` 도구로 config 파일을 읽는다. **이 고정 경로 한 곳만 본다 — `ls`·glob으로 탐색하거나 플러그인 캐시(`~/.claude/plugins/cache/...`)를 뒤지지 마라.**
 - Windows: `C:\Users\<사용자>\.suh-template\config\config.json`
 - macOS/Linux: `~/.suh-template/config/config.json`
 

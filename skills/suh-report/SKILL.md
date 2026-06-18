@@ -135,6 +135,8 @@ GitHub 댓글은 mermaid 블록을 렌더링하므로 흐름도가 그대로 표
 
 1. **PAT 확인**: `references/config-rules.md` §2~3 절차로 config 읽기. 파일이 없으면 로컬 저장만 하고 종료. 해당 repo의 `pat`(non-null) 또는 `global_pat` 사용.
 
+   > ⚠️ **config는 탐색 금지.** config.json은 고정 경로 `{HOME}/.suh-template/config/config.json` 한 곳뿐 — Read tool로 바로 읽는다. 스크립트(`report_cli.py`) 탐색용 `ls ~/.claude/plugins/cache/...` 패턴을 config 찾기에 쓰지 마라. config는 그 캐시 안에 없다.
+
 2. **repo 확인**: `git remote get-url origin`에서 `owner`/`repo` 추출, 실패 시 config의 `repos`에서 `default: true`인 repo 사용.
 
 3. **댓글 포스팅** — 인라인 Python 작성 금지. `skills/suh-report/scripts/report_cli.py`의 `add-comment` 서브커맨드를 호출한다. 보고서 본문은 이미 저장된 `.md` 파일을 `body_file`로 그대로 전달하므로 한국어·이모지·줄바꿈·mermaid 블록이 안전하게 보존된다. **PAT는 report_cli가 config.json에서 자동 로드하므로 `GITHUB_PAT=`는 생략 가능**하다(환경변수가 있으면 우선 사용).

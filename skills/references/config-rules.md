@@ -166,7 +166,7 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
 
 | 필드 | 필수 | 설명 |
 |------|------|------|
-| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 |
+| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 (글로벌). suh-issue가 이슈 생성 시 자동 적용한다. 빈 문자열이면 담당자 없이 생성. 누락 시 첫 이슈에서 1회 질문 후 저장 |
 | `global_pat` | ✅ | 전체 공용 GitHub PAT (repo + workflow 권한) |
 | `commit.auto_approve` | — | suh-commit 스킬의 커밋 메시지 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제안 메시지 표시 후 즉시 커밋. 누락 시 `false`(수동 승인) |
 | `issue.auto_approve` | — | suh-issue 스킬의 이슈 등록 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제목·라벨·로컬 파일 경로 표시 후 즉시 GitHub 등록. **중복 검사(2-1, 4-1단계)는 항상 실행** — 자동 모드라도 open 동일 이슈 발견 시 중단. 누락 시 `false` |
@@ -178,6 +178,7 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
 | `repos[].pat` | — | 레포별 개별 PAT. `null`이면 `global_pat` 사용 |
 | `repos[].default` | — | `true`인 항목이 기본 선택 repo |
 | `repos[].{commit,issue,changelog_deploy}.auto_approve` | — | 해당 레포에 한정한 자동 승인 오버라이드. 글로벌 값보다 우선 |
+| `repos[].issue.assignee` | — | 이 레포만 다른 이슈 담당자. `default_assignee`(글로벌)보다 우선. 누락 시 글로벌 사용. 사용자가 "이 레포 담당자는 OOO으로" 하면 agent가 저장 |
 | `repos[].changelog_deploy.app_release` | — | 이 레포가 앱스토어/플레이스토어 심사로 직결되는 배포인지(앱 심사 인지). `true`면 changelog-deploy 스킬이 릴리스 노트 승인 게이트에 심사 경고 배너를 띄우고 정제를 더 엄격히 적용. **레포별로만** 저장(글로벌 기본값 없음). 누락 시 스킬이 1.5단계에서 자동 감지 후 한 번 확인해 저장. agent가 자연어 응답을 받아 갱신하며 사용자가 직접 편집하지 않는다 |
 
 **PAT 결정 로직:**

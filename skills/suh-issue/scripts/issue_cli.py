@@ -32,9 +32,21 @@ def cmd_create_issue(args) -> int:
         return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
     body = Path(args.body_file).read_text(encoding="utf-8") if Path(args.body_file).exists() else ""
     labels = [l.strip() for l in args.labels.split(",") if l.strip()] if args.labels else []
+    # 담당자는 csv로 받는다. agent가 config의 assignee(레포별 → default_assignee 우선순위)를
+    # 해석해 넘긴다. 비면 담당자 없이 생성 (기존 동작과 호환).
+    assignees = [a.strip() for a in args.assignees.split(",") if a.strip()] if args.assignees else []
     try:
-        result = create_issue(args.owner, args.repo, args.title, body, labels, pat, [])
-        return emit({**result, "summary": f"이슈 #{result.get('number')} 생성 완료"})
+        result = create_issue(args.owner, args.repo, args.title, body, labels, pat, assignees)
+        # 요청한 담당자 중 실제로 반영되지 않은 사람을 경고로 surface (이슈 자체는 성공).
+        # 유효하지 않은 담당자는 GitHub이 조용히 누락시키므로 여기서 비교해 알린다.
+        applied = result.get("assignees", [])
+        missing = [a for a in assignees if a not in applied]
+        out = {**result, "summary": f"이슈 #{result.get('number')} 생성 완료"}
+        if missing:
+            out["assignee_warning"] = (
+                f"담당자 지정 일부 실패: {', '.join(missing)} (레포 협업자/권한 확인 필요). 이슈는 정상 생성됨."
+            )
+        return emit(out)
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
@@ -95,6 +107,7 @@ def build_parser() -> JSONArgumentParser:
     p_ci.add_argument("title")
     p_ci.add_argument("body_file")
     p_ci.add_argument("labels", help="csv")
+    p_ci.add_argument("--assignees", help="담당자 csv (config의 assignee를 agent가 해석해 전달)")
     p_ci.set_defaults(func=cmd_create_issue)
 
     p_si = sub.add_parser("search-issues", help="중복 검사용 이슈 검색")

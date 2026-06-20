@@ -123,7 +123,14 @@ def create_issue(
     if assignees:
         payload["assignees"] = assignees
     data = _request("POST", f"{_API_BASE}/repos/{owner}/{repo}/issues", payload, pat)
-    return {"number": data["number"], "url": data["html_url"], "title": data["title"]}
+    # 실제 반영된 담당자를 함께 반환한다. 유효하지 않은 담당자(레포 협업자 아님 등)는
+    # GitHub이 조용히 누락시키므로, 호출자가 요청 대비 반영 결과를 비교해 경고할 수 있게 한다.
+    return {
+        "number": data["number"],
+        "url": data["html_url"],
+        "title": data["title"],
+        "assignees": [u["login"] for u in data.get("assignees", [])],
+    }
 
 
 def update_issue(

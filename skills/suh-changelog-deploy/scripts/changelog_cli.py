@@ -2,7 +2,7 @@
 """changelog_cli — suh-changelog-deploy skill 전용 CLI.
 
 deploy PR 자동화 + Actions/CodeRabbit 상태 종합.
-서브커맨드: actions, deploy-status, list-prs, update-pr, create-pr
+서브커맨드: actions, deploy-status, list-prs, update-pr, create-pr, detect-release-context
 
 사용법:
     cd skills/suh-changelog-deploy/scripts
@@ -10,6 +10,8 @@ deploy PR 자동화 + Actions/CodeRabbit 상태 종합.
 """
 from __future__ import annotations
 
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -292,6 +294,95 @@ def cmd_create_pr(args) -> int:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
 
+# 앱 스토어 심사로 직결되는 워크플로우 파일명 키워드 (대소문자 무시 부분일치).
+# 새 스토어/플랫폼이 생기면 이 목록에 키워드만 추가하면 감지가 확장된다 (SKILL.md·판단 로직 무수정).
+_STORE_WORKFLOW_KEYWORDS = ("PLAYSTORE", "TESTFLIGHT", "APPSTORE", "APP-STORE")
+# 앱(스토어 배포) 성격이 강한 프로젝트 타입.
+_APP_PROJECT_TYPES = ("flutter", "react-native", "react-native-expo")
+
+
+def _read_project_types(project_root: Path) -> list[str]:
+    """version.yml에서 project_types 배열을 추출한다 (yaml 의존성 없이 정규식).
+
+    폐쇄망·표준 라이브러리 우선 원칙: PyYAML을 import하지 않고 `project_types: [...]` 라인을
+    문자열로 파싱한다. 파일이 없거나 키가 없으면 빈 리스트를 반환한다 (오류 아님)."""
+    vy = project_root / "version.yml"
+    if not vy.exists():
+        return []
+    try:
+        text = vy.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    # `project_types: ["spring", "react"]` 형태의 한 줄을 찾아 따옴표 안 토큰만 추출.
+    m = re.search(r"^\s*project_types\s*:\s*\[([^\]]*)\]", text, re.MULTILINE)
+    if m:
+        return [t.strip().strip("\"'") for t in m.group(1).split(",") if t.strip()]
+    # 배열이 아닌 단수 `project_type: "flutter"` 폴백.
+    m2 = re.search(r"^\s*project_type\s*:\s*[\"']?([A-Za-z0-9_-]+)", text, re.MULTILINE)
+    return [m2.group(1)] if m2 else []
+
+
+def _scan_store_workflows(project_root: Path) -> list[str]:
+    """.github/workflows 내 파일명을 스캔해 스토어 심사 워크플로우 파일명을 반환한다."""
+    wf_dir = project_root / ".github" / "workflows"
+    if not wf_dir.is_dir():
+        return []
+    found = []
+    try:
+        for entry in sorted(os.listdir(wf_dir)):
+            upper = entry.upper()
+            if any(kw in upper for kw in _STORE_WORKFLOW_KEYWORDS):
+                found.append(entry)
+    except OSError:
+        return []
+    return found
+
+
+def cmd_detect_release_context(args) -> int:
+    """이 레포가 앱 스토어 심사에 직결되는지 '신호'를 모아 JSON으로 반환한다.
+
+    판단(앱 심사 레포 확정·사용자 확인·config 갱신)은 agent가 한다. py는 사실(signals)과
+    약한 hint만 준다. GitHub API를 쓰지 않으므로 PAT가 필요 없다 (로컬 파일만 스캔)."""
+    project_root = Path(args.project_root).resolve() if args.project_root else Path.cwd()
+
+    project_types = _read_project_types(project_root)
+    store_workflows = _scan_store_workflows(project_root)
+    has_store_workflow = bool(store_workflows)
+    has_app_type = any(t.lower() in _APP_PROJECT_TYPES for t in project_types)
+    # version.yml·workflows를 둘 다 못 읽었으면 신호가 없는 unknown 상태.
+    no_signals = not project_types and not (project_root / ".github" / "workflows").is_dir()
+
+    if no_signals:
+        hint = "unknown"
+    elif has_store_workflow and has_app_type:
+        hint = "strong_app"          # 앱 타입 + 스토어 워크플로우 → 앱 심사 거의 확실
+    elif has_store_workflow:
+        hint = "app_release_likely"  # 스토어 워크플로우는 있으나 타입 신호 약함
+    elif has_app_type:
+        hint = "app_release_likely"  # 앱 타입은 있으나 스토어 워크플로우 미발견 (TEST 빌드만 등)
+    else:
+        hint = "backend_only"        # 앱 신호 전무 → 백엔드로 간주
+
+    next_hint = (
+        "agent: app_release 기록 없으면 사용자에게 한 번 확인 후 config에 저장"
+        if hint in ("strong_app", "app_release_likely", "unknown")
+        else "agent: backend_only — 조용히 통과, 경고·질문 없음"
+    )
+
+    return emit({
+        "ok": True,
+        "project_root": str(project_root),
+        "signals": {
+            "project_types": project_types,
+            "store_workflows": store_workflows,
+            "has_store_workflow": has_store_workflow,
+            "has_app_type": has_app_type,
+        },
+        "hint": hint,
+        "next": next_hint,
+    })
+
+
 def build_parser() -> JSONArgumentParser:
     parser = JSONArgumentParser(prog="changelog_cli", description="suh-changelog-deploy skill CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -336,6 +427,11 @@ def build_parser() -> JSONArgumentParser:
     p_cp.add_argument("head")
     p_cp.add_argument("base")
     p_cp.set_defaults(func=cmd_create_pr)
+
+    # 앱 스토어 심사 연관 레포인지 '신호'를 수집한다 (판단·확인은 agent). PAT 불필요 — 로컬 파일만 스캔.
+    p_drc = sub.add_parser("detect-release-context", help="앱 심사 연관 레포 신호 수집 (signals/hint JSON)")
+    p_drc.add_argument("--project-root", help="레포 루트 절대경로 (생략 시 cwd)")
+    p_drc.set_defaults(func=cmd_detect_release_context)
 
     return parser
 

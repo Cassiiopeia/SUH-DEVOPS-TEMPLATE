@@ -20,7 +20,7 @@
         "pat": "{ghp_별도PAT_있으면_입력}",
         "default": false,
         "commit":           { "auto_approve": true },
-        "issue":            { "auto_approve": true },
+        "issue":            { "auto_approve": true, "assignee": "{이 레포만 다른 담당자 GitHub 사용자명}" },
         "changelog_deploy": { "auto_approve": true, "app_release": true }
       }
     ]

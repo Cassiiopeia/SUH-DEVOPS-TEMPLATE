@@ -157,7 +157,7 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
         "default": true,
         "commit":            { "auto_approve": true },
         "issue":             { "auto_approve": true },
-        "changelog_deploy":  { "auto_approve": true }
+        "changelog_deploy":  { "auto_approve": true, "app_release": true }
       }
     ]
   }
@@ -178,6 +178,7 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
 | `repos[].pat` | — | 레포별 개별 PAT. `null`이면 `global_pat` 사용 |
 | `repos[].default` | — | `true`인 항목이 기본 선택 repo |
 | `repos[].{commit,issue,changelog_deploy}.auto_approve` | — | 해당 레포에 한정한 자동 승인 오버라이드. 글로벌 값보다 우선 |
+| `repos[].changelog_deploy.app_release` | — | 이 레포가 앱스토어/플레이스토어 심사로 직결되는 배포인지(앱 심사 인지). `true`면 changelog-deploy 스킬이 릴리스 노트 승인 게이트에 심사 경고 배너를 띄우고 정제를 더 엄격히 적용. **레포별로만** 저장(글로벌 기본값 없음). 누락 시 스킬이 1.5단계에서 자동 감지 후 한 번 확인해 저장. agent가 자연어 응답을 받아 갱신하며 사용자가 직접 편집하지 않는다 |
 
 **PAT 결정 로직:**
 ```

@@ -21,7 +21,7 @@
         "default": false,
         "commit":           { "auto_approve": true },
         "issue":            { "auto_approve": true },
-        "changelog_deploy": { "auto_approve": true }
+        "changelog_deploy": { "auto_approve": true, "app_release": true }
       }
     ]
   },

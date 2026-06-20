@@ -416,10 +416,19 @@ cleanup_template_files() {
         rm -rf .github/scripts/test
         echo "  ✓ .github/scripts/test 폴더 삭제"
     fi
-    
+
     if [ -d ".github/workflows/test" ]; then
         rm -rf .github/workflows/test
         echo "  ✓ .github/workflows/test 폴더 삭제"
+    fi
+
+    # 플러그인 매니페스트 버전 동기화 워크플로우 삭제 (마켓플레이스 전용)
+    # 이 워크플로우는 .claude-plugin/·gemini-extension.json·package.json 등 플러그인 매니페스트
+    # 버전을 version.yml과 맞추는 게 전부다. 그 매니페스트들은 위에서 삭제되거나 사용자 프로젝트엔
+    # 없으므로, 남겨두면 동기화 대상이 없어 무의미하게 돌거나 실패한다.
+    if [ -f ".github/workflows/PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml" ]; then
+        rm -f .github/workflows/PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml
+        echo "  ✓ PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml 삭제 (마켓플레이스 전용)"
     fi
 
     # docs 폴더 삭제 (템플릿 전용 문서)

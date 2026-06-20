@@ -165,10 +165,36 @@ jobs:
             VERSION="${{ steps.version.outputs.version }}"
             git commit -m "플러그인 매니페스트 버전 동기화: $VERSION [skip ci]"
 
-            if git push; then
-              echo "✅ 플러그인 버전 동기화 커밋 완료"
-            else
-              echo "❌ Push 실패"
+            # Race Condition 방지: 다른 버전 워크플로우가 동시에 main을 push하면
+            # 단순 git push가 ! [rejected] (fetch first)로 거부된다.
+            # pull-rebase 후 재시도 (VERSION-CONTROL v2.1과 동일 패턴, 최대 3회).
+            MAX_RETRIES=3
+            RETRY_COUNT=0
+            PUSH_SUCCESS=false
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "🔄 Push 시도 $RETRY_COUNT/$MAX_RETRIES..."
+
+              if git push; then
+                PUSH_SUCCESS=true
+                echo "✅ 플러그인 버전 동기화 커밋 완료"
+                break
+              else
+                echo "⚠️ Push 실패, remote 변경사항 동기화 중..."
+
+                if git pull --rebase origin ${{ github.event.repository.default_branch || 'main' }}; then
+                  echo "✅ Rebase 성공, 다시 push 시도..."
+                else
+                  echo "❌ Rebase 실패, 충돌 해결 필요"
+                  git rebase --abort 2>/dev/null || true
+                  exit 1
+                fi
+              fi
+            done
+
+            if [ "$PUSH_SUCCESS" = false ]; then
+              echo "❌ $MAX_RETRIES회 시도 후에도 push 실패"
               exit 1
             fi
           fi

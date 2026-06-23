@@ -26,7 +26,7 @@
 #
 # 🌐 포트 및 컨테이너:
 # PROJECT_NAME: 프로젝트명 (컨테이너/이미지/Traefik router 이름)
-# PRODUCTION_DOMAIN: 외부 진입 도메인
+# SERVICE_DOMAIN: 외부 진입 도메인
 # CONTAINER_INTERNAL_PORT: Spring Boot 내부 포트 (기본: 8080)
 #
 # 🚦 Traefik:
@@ -54,7 +54,7 @@
 #
 # 💡 사전 조건:
 #   - 배포 서버에 Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
-#   - 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#   - 역방향 프록시: ${SERVICE_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
 #     (예: Synology DSM 역방향 프록시, Nginx, Caddy 등)
 # ===================================================================
 
@@ -77,7 +77,7 @@ on:
 env:
   # 🔧 프로젝트 설정 - 실제 프로젝트명으로 변경하세요
   PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
-  PRODUCTION_DOMAIN: "__PRODUCTION_DOMAIN__"  # @wizard ask:example.com
+  SERVICE_DOMAIN: "__SERVICE_DOMAIN__"  # @wizard ask:example.com
 
   # ☁️ Spring Boot 설정
   SPRING_PROFILE: "prod"
@@ -197,7 +197,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           PROJECT_NAME: ${{ env.PROJECT_NAME }}
-          PRODUCTION_DOMAIN: ${{ env.PRODUCTION_DOMAIN }}
+          SERVICE_DOMAIN: ${{ env.SERVICE_DOMAIN }}
           CONTAINER_INTERNAL_PORT: ${{ env.CONTAINER_INTERNAL_PORT }}
           SPRING_PROFILE: ${{ env.SPRING_PROFILE }}
           ENABLE_VOLUME_MOUNT: ${{ env.ENABLE_VOLUME_MOUNT }}
@@ -224,7 +224,7 @@ jobs:
           port: ${{ env.SSH_PORT }}
           command_timeout: ${{ env.SSH_COMMAND_TIMEOUT }}
           timeout: ${{ env.SSH_CONNECTION_TIMEOUT }}
-          envs: PROJECT_NAME,PRODUCTION_DOMAIN,CONTAINER_INTERNAL_PORT,SPRING_PROFILE,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,EXTRA_NETWORKS,TRAEFIK_NETWORK,TRAEFIK_ENTRYPOINT,TRAEFIK_INTERNAL_PORT,HEALTHCHECK_PATH,HEALTHCHECK_ACCEPT_CODES,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD,SSH_AUTH_METHOD
+          envs: PROJECT_NAME,SERVICE_DOMAIN,CONTAINER_INTERNAL_PORT,SPRING_PROFILE,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,EXTRA_NETWORKS,TRAEFIK_NETWORK,TRAEFIK_ENTRYPOINT,TRAEFIK_INTERNAL_PORT,HEALTHCHECK_PATH,HEALTHCHECK_ACCEPT_CODES,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD,SSH_AUTH_METHOD
           script: |
             set -e
             export PATH=$PATH:/usr/local/bin
@@ -246,7 +246,7 @@ jobs:
             echo "🚀 Blue-Green 무중단 배포 시작"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "📦 프로젝트: ${PROJECT_NAME}"
-            echo "🌐 도메인: ${PRODUCTION_DOMAIN}"
+            echo "🌐 도메인: ${SERVICE_DOMAIN}"
             echo "🖼️ 이미지: ${IMAGE}"
             echo "🔧 Traefik 진입: localhost:${TRAEFIK_INTERNAL_PORT} (entrypoint=${TRAEFIK_ENTRYPOINT})"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -311,7 +311,7 @@ jobs:
               --name "${NEW_NAME}" \
               --network "${TRAEFIK_NETWORK}" \
               --label "traefik.enable=true" \
-              --label "traefik.http.routers.${ROUTER_NAME}.rule=Host(\`${PRODUCTION_DOMAIN}\`)" \
+              --label "traefik.http.routers.${ROUTER_NAME}.rule=Host(\`${SERVICE_DOMAIN}\`)" \
               --label "traefik.http.routers.${ROUTER_NAME}.entrypoints=${TRAEFIK_ENTRYPOINT}" \
               --label "traefik.http.services.${ROUTER_NAME}.loadbalancer.server.port=${CONTAINER_INTERNAL_PORT}" \
               -e TZ=Asia/Seoul \
@@ -362,7 +362,7 @@ jobs:
 
               if [ "$STATUS" = "running" ]; then
                 HTTP_CODE=$(curl -sm 5 -o /dev/null -w "%{http_code}" \
-                  -H "Host: ${PRODUCTION_DOMAIN}" \
+                  -H "Host: ${SERVICE_DOMAIN}" \
                   "http://localhost:${TRAEFIK_INTERNAL_PORT}${HEALTHCHECK_PATH}" 2>/dev/null || echo "000")
 
                 if echo "$HTTP_CODE" | grep -Eq "^(${HEALTHCHECK_ACCEPT_CODES})$"; then
@@ -407,7 +407,7 @@ jobs:
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "✅ 무중단 배포 완료. active=${NEW_NAME}"
-            echo "🌐 도메인: https://${PRODUCTION_DOMAIN}"
+            echo "🌐 도메인: https://${SERVICE_DOMAIN}"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ===================================================================
@@ -419,7 +419,7 @@ jobs:
 #    SERVER_HOST, SERVER_USER, SERVER_PASSWORD
 #
 # 2) 본 워크플로우의 env 블록에서 프로젝트별 설정 수정:
-#    - PROJECT_NAME, PRODUCTION_DOMAIN
+#    - PROJECT_NAME, SERVICE_DOMAIN
 #    - APPLICATION_YML_DIR, CONTAINER_INTERNAL_PORT
 #    - ENABLE_VOLUME_MOUNT, VOLUME_HOST_PATH, VOLUME_CONTAINER_PATH
 #    - EXTRA_NETWORKS (예: selenium-chrome-network)
@@ -427,7 +427,7 @@ jobs:
 #
 # 3) 서버 사전 준비:
 #    - Traefik 컨테이너가 traefik-network 에 띄워져 있어야 함
-#    - 역방향 프록시: ${PRODUCTION_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
+#    - 역방향 프록시: ${SERVICE_DOMAIN}:443 → localhost:${TRAEFIK_INTERNAL_PORT}
 #      (예: Synology DSM 역방향 프록시, Nginx, Caddy 등)
 #
 # 4) 본 워크플로우로 전환:

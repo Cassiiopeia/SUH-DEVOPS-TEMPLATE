@@ -2799,12 +2799,42 @@ resolve_token() {
 
 # labels.yml에서 질문 문구 조회 (없으면 키명). $1=KEY
 LABELS_FILE="${LABELS_FILE:-.github/wizard/labels.yml}"
-wf_label() {
-    local _k="$1" _v=""
-    if [ -f "$LABELS_FILE" ]; then
-        _v=$(sed -nE "s~^${_k}:[[:space:]]*\"?([^\"]*)\"?[[:space:]]*\$~\1~p" "$LABELS_FILE" | head -1)
+# labels.yml에서 단일 필드 1개를 읽는다. $1=조회키(KEY 또는 "type.KEY") $2=필드(label|help|example)
+# 블록 형식(KEY: 다음 2칸 들여쓰기 label/help/example)과 구형 1줄 형식(KEY: "라벨") 모두 지원.
+_wf_read_field() {
+    local _key="$1" _field="$2" _v=""
+    [ -f "$LABELS_FILE" ] || { echo ""; return; }
+    # 1) 구형 1줄: KEY: "..."  (값이 같은 줄에 있는 경우) — label만 의미 있음
+    if [ "$_field" = "label" ]; then
+        _v=$(sed -nE "s~^${_key}:[[:space:]]+\"([^\"]*)\"[[:space:]]*\$~\1~p" "$LABELS_FILE" | head -1)
+        [ -n "$_v" ] && { echo "$_v"; return; }
     fi
-    [ -n "$_v" ] && echo "$_v" || echo "$_k"
+    # 2) 블록 형식: "KEY:" 줄을 찾고, 그 아래 들여쓰기 블록에서 "  field: ..." 추출.
+    #    awk로 KEY 블록(다음 비들여쓰기 키 전까지)을 격리해 해당 field 한 줄을 읽는다.
+    _v=$(awk -v key="$_key" -v fld="$_field" '
+        $0 ~ "^"key":[[:space:]]*$" { inblk=1; next }
+        inblk && /^[^[:space:]]/   { inblk=0 }
+        inblk {
+            line=$0
+            sub(/^[[:space:]]+/, "", line)
+            if (line ~ "^"fld":") {
+                sub("^"fld":[[:space:]]*", "", line)
+                sub(/^"/, "", line); sub(/"[[:space:]]*$/, "", line)
+                print line; exit
+            }
+        }
+    ' "$LABELS_FILE")
+    echo "$_v"
+}
+
+# 조회 우선순위로 필드를 얻는다. $1=type $2=KEY $3=field. 폴백: field=label이면 KEY명, 아니면 빈값.
+wf_field() {
+    local _type="$1" _key="$2" _field="$3" _v=""
+    _v=$(_wf_read_field "${_type}.${_key}" "$_field")
+    [ -n "$_v" ] && { echo "$_v"; return; }
+    _v=$(_wf_read_field "$_key" "$_field")
+    [ -n "$_v" ] && { echo "$_v"; return; }
+    [ "$_field" = "label" ] && echo "$_key" || echo ""
 }
 
 # WF_DEPLOY_CSV에서 type+KEY 조회 (우선순위 1 — 재실행 시 기존값)
@@ -2937,9 +2967,14 @@ configure_workflow_env() {
                 if [ "$WF_USE_DEFAULTS" = true ]; then
                     _val="$_default"
                 else
-                    local _label _in=""
-                    _label=$(wf_label "$_key")
-                    safe_read "  ${_label} [기본: ${_default}]: " _in "" || _in=""
+                    local _label _help _example _in=""
+                    _label=$(wf_field "$_type" "$_key" "label")
+                    _help=$(wf_field "$_type" "$_key" "help")
+                    _example=$(wf_field "$_type" "$_key" "example")
+                    print_to_user "  ▸ ${_label}"
+                    [ -n "$_help" ] && print_to_user "    ${_help}"
+                    [ -n "$_example" ] && print_to_user "    예) ${_example}"
+                    safe_read "  값 입력 [기본: ${_default}]: " _in "" || _in=""
                     [ -z "$_in" ] && _val="$_default" || _val="$_in"
                 fi
                 wf_deploy_set "$_type" "$_key" "$_val"
@@ -2948,10 +2983,10 @@ configure_workflow_env() {
         [ -n "$_val" ] && _wf_set_env "$_file" "$_key" "$_val"
     done < <(grep -nE "#[[:space:]]*@wizard[[:space:]]+(ask|auto):" "$_file" | sed 's/^[0-9]*://')
 
-    # 재귀 토큰 치환: 남은 __PROJECT_NAME__ (VOLUME 경로 등)
-    if grep -q "__PROJECT_NAME__" "$_file" 2>/dev/null; then
+    # 재귀 토큰 치환: 남은 __PROJECT_NAME__ / __APP_ARTIFACT_NAME__ (VOLUME 경로·flutter 산출물명 등)
+    if grep -qE "__PROJECT_NAME__|__APP_ARTIFACT_NAME__" "$_file" 2>/dev/null; then
         local _esc_repo; _esc_repo=$(printf '%s' "$(detect_repo_name)" | sed 's/[&|\\]/\\&/g')
-        sed -i.wftmp "s|__PROJECT_NAME__|$_esc_repo|g" "$_file"; rm -f "$_file.wftmp"
+        sed -i.wftmp -e "s|__PROJECT_NAME__|$_esc_repo|g" -e "s|__APP_ARTIFACT_NAME__|$_esc_repo|g" "$_file"; rm -f "$_file.wftmp"
     fi
 
     # paths-anchor (불변 — 기존 로직 그대로 유지)
@@ -2969,6 +3004,33 @@ configure_workflow_env() {
     fi
 }
 
+# 기존 설치본이 "이 템플릿을 지금 설정대로 깔면 나올 결과"와 내용상 동일한가?
+# 단순 cmp가 안 되는 이유: 원본엔 __TOKEN__/# @wizard 마커가 남아있고 설치본엔
+# 값이 치환돼 있어 항상 다르게 나온다. 그래서 원본을 임시 사본으로 떠서 실제 치환
+# 로직(configure_workflow_env)을 가상 적용한 "설치 예상 최종형"을 만들어 비교한다.
+#   반환 0 = 동일(unchanged) / 1 = 다름 또는 비교 실패(changed로 취급, 업데이트 놓침 방지)
+# 가상 치환은 서브셸 안에서 WF_USE_DEFAULTS=true로 돌려 (1)사용자에게 다시 묻지 않고
+# (2)WF_DEPLOY_CSV 등 부수효과가 실제 설치 흐름으로 새지 않게 격리한다.
+# $1=type  $2=원본 워크플로우 경로  $3=기존(설치된) 파일 경로
+_wf_is_unchanged() {
+    local _type="$1" _src="$2" _existing="$3"
+    [ -f "$_src" ] && [ -f "$_existing" ] || return 1
+    local _tmp
+    _tmp=$(mktemp 2>/dev/null) || return 1          # 임시파일 실패 → changed
+    if ! cp "$_src" "$_tmp" 2>/dev/null; then
+        rm -f "$_tmp"; return 1
+    fi
+    # 서브셸 격리: 여기서 바뀐 WF_USE_DEFAULTS/WF_DEPLOY_CSV는 부모로 전파되지 않는다.
+    (
+        WF_USE_DEFAULTS=true
+        configure_workflow_env "$_type" "$_tmp" >/dev/null 2>&1
+    )
+    if cmp -s "$_tmp" "$_existing"; then
+        rm -f "$_tmp"; return 0                       # unchanged
+    fi
+    rm -f "$_tmp"; return 1                            # changed
+}
+
 # 워크플로우 다운로드 (폴더 기반, 선택적 업데이트)
 # 단일 타입의 타입별 워크플로우 + 타입별 nexus(opt-in) 복사 (멀티타입 순회용 헬퍼)
 # 카운터는 호출측 전역 변수(_wf_copied/_wf_template_added/_wf_skipped/_wf_optional_copied) 공유
@@ -2978,18 +3040,32 @@ _copy_workflows_for_type() {
 
     local type_dir="$project_types_dir/$type"
     if [ -d "$type_dir" ]; then
-        local existing_files=()
+        local existing_files=()    # 기존에 있고 내용이 '바뀐' 파일 (메뉴 대상)
+        local unchanged_files=()   # 기존에 있고 내용이 '동일한' 파일 (조용히 건너뜀)
         local new_files=()
 
         for workflow in "$type_dir"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
             local filename=$(basename "$workflow")
             if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                existing_files+=("$filename")
+                # 설치 예상 최종형과 동일하면 unchanged — 메뉴에 올리지 않는다.
+                if _wf_is_unchanged "$type" "$workflow" "$WORKFLOWS_DIR/$filename"; then
+                    unchanged_files+=("$filename")
+                else
+                    existing_files+=("$filename")
+                fi
             else
                 new_files+=("$filename")
             fi
         done
+
+        # 내용 동일 파일: 조용히 건너뜀 (메뉴 없음 — 변경점 0인데 .bak 덮어쓰던 혼란 제거)
+        if [ ${#unchanged_files[@]} -gt 0 ]; then
+            for filename in "${unchanged_files[@]}"; do
+                echo "  ⏭ $filename (변경 없음, $type)"
+                _wf_skipped=$((_wf_skipped + 1))
+            done
+        fi
 
         # 신규 파일은 바로 복사
         if [ ${#new_files[@]} -gt 0 ]; then
@@ -3062,6 +3138,8 @@ _copy_workflows_for_type() {
                     done
                     ;;
             esac
+        elif [ ${#unchanged_files[@]} -gt 0 ]; then
+            print_info "$type 타입의 기존 워크플로우 ${#unchanged_files[@]}개가 현재 설정과 동일해 건너뜁니다."
         else
             print_info "$type 타입의 기존 워크플로우가 없습니다."
         fi
@@ -3078,6 +3156,11 @@ _copy_workflows_for_type() {
             for workflow in "$nexus_dir"/*.{yaml,yml}; do
                 [ -e "$workflow" ] || continue
                 local filename=$(basename "$workflow")
+                if [ -f "$WORKFLOWS_DIR/$filename" ] && _wf_is_unchanged "$type" "$workflow" "$WORKFLOWS_DIR/$filename"; then
+                    echo "  ⏭ $filename (Nexus $type, 변경 없음)"
+                    _wf_skipped=$((_wf_skipped + 1))
+                    continue
+                fi
                 if [ -f "$WORKFLOWS_DIR/$filename" ]; then
                     mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
                     cp "$workflow" "$WORKFLOWS_DIR/"
@@ -3111,6 +3194,12 @@ _copy_workflows_for_type() {
             _bn=$(basename "$_wf")
             _target="$WORKFLOWS_DIR/$_bn"
             [ -f "$_target" ] || continue          # 건너뛴(S) 파일은 원본 미반영이라 제외
+            # 내용 동일(unchanged)로 분류된 파일은 이미 설치 최종형과 같으므로 재설정 불필요
+            local _skip_cfg=false _uf
+            for _uf in "${unchanged_files[@]:-}"; do
+                [ "$_uf" = "$_bn" ] && { _skip_cfg=true; break; }
+            done
+            [ "$_skip_cfg" = true ] && continue
             configure_workflow_env "$type" "$_target"
         done
     done
@@ -3154,6 +3243,13 @@ copy_workflows() {
         for workflow in "$project_types_dir/common"/*.{yaml,yml}; do
             [ -e "$workflow" ] || continue
             local filename=$(basename "$workflow")
+
+            # 내용이 이미 동일하면 cp 생략 (변경점 0인 파일 덮어쓰기 방지)
+            if [ -f "$WORKFLOWS_DIR/$filename" ] && _wf_is_unchanged "common" "$workflow" "$WORKFLOWS_DIR/$filename"; then
+                echo "  ✓ $filename (변경 없음)"
+                _wf_skipped=$((_wf_skipped + 1))
+                continue
+            fi
 
             # COMMON은 항상 덮어쓰기 (핵심 기능)
             if [ -f "$WORKFLOWS_DIR/$filename" ]; then

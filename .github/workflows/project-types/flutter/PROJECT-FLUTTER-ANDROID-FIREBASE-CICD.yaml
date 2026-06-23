@@ -32,7 +32,7 @@
 #
 # 🔧 프로젝트별 설정 (env 섹션에서 수정)
 # ===================================================================
-# PROJECT_NAME       : 프로젝트 이름
+# APP_ARTIFACT_NAME       : 프로젝트 이름
 # FLUTTER_VERSION    : Flutter SDK 버전
 # JAVA_VERSION       : Java 버전
 # FIREBASE_APP_ID    : Firebase 앱 ID (Firebase Console에서 확인)
@@ -63,7 +63,7 @@ env:
   # 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
   # ============================================
   # 프로젝트 이름
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
+  APP_ARTIFACT_NAME: "__APP_ARTIFACT_NAME__"  # @wizard ask:@repo
   # Flutter/Java 버전
   FLUTTER_VERSION: "3.35.5"
   JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:17

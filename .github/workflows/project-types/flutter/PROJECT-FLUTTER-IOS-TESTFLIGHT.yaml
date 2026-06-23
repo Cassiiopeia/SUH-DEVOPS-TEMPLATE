@@ -14,7 +14,7 @@
 #   1. flutter build ios --no-codesign (Flutter 빌드)
 #   2. xcodebuild archive (Xcode 아카이브 생성)
 #   3. xcodebuild -exportArchive (IPA 생성, ExportOptions.plist 사용)
-#   4. fastlane upload_testflight (마법사 생성 Fastfile 사용)
+#   4. fastlane deploy (마법사 생성 Fastfile 사용, DEPLOY_MODE에 따라 TestFlight/심사 제출)
 #
 # ===================================================================
 # 🔑 필수 GitHub Secrets
@@ -63,11 +63,22 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_mode:
+        description: "배포 모드 (store_only=TestFlight까지 / store_prepare=ASC 제출직전 / store_submit=심사 자동제출)"
+        required: false
+        default: "store_only"
+        type: choice
+        options:
+          - store_only
+          - store_prepare
+          - store_submit
 
 # ============================================
 # 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
 # ============================================
 env:
+  FLUTTER_ROOT: "."  # @wizard auto:flutter-root
   FLUTTER_VERSION: "3.35.5"
   XCODE_VERSION: "26.0"
   PROJECT_TYPE: "flutter"
@@ -83,10 +94,18 @@ env:
   # ============================================
   SKIP_WAITING_FOR_BUILD_PROCESSING: "false"
 
+  # ============================================
+  # 📝 배포 모드 (store_only | store_prepare | store_submit)
+  # ============================================
+  DEPLOY_MODE: ${{ github.event.inputs.deploy_mode || vars.IOS_DEPLOY_MODE || 'store_only' }}
+
 jobs:
   prepare-build:
     name: 환경 설정 및 준비
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_ROOT }}
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
 
     outputs:
@@ -152,12 +171,14 @@ jobs:
           cd ios && pod install
 
       - name: 버전 관리 스크립트 권한 설정
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 FLUTTER_ROOT가 아닌 레포 루트 기준
         run: |
           chmod +x ./.github/scripts/version_manager.sh
           chmod +x ./.github/scripts/changelog_manager.py
 
       - name: 현재 버전 정보 가져오기
         id: current_version
+        working-directory: ${{ github.workspace }}   # version_manager.sh가 레포 루트 version.yml을 읽어야 함
         run: |
           VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
           BUILD_NUMBER=$(./.github/scripts/version_manager.sh get-code | tail -n 1)
@@ -170,6 +191,7 @@ jobs:
 
       - name: 릴리즈 노트 생성
         id: release_notes
+        working-directory: ${{ github.workspace }}   # CHANGELOG.json·changelog_manager.py·final_release_notes.txt(upload 짝)는 레포 루트 기준
         run: |
           VERSION="${{ steps.current_version.outputs.version }}"
 
@@ -213,6 +235,9 @@ jobs:
   build-ios:
     name: iOS 앱 빌드
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_ROOT }}
     needs: prepare-build
 
     steps:
@@ -345,7 +370,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: ios/build/ipa/*.ipa
+          path: ${{ env.FLUTTER_ROOT }}/ios/build/ipa/*.ipa
           retention-days: 1
 
   # ============================================
@@ -354,6 +379,9 @@ jobs:
   deploy-testflight:
     name: TestFlight 배포
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_ROOT }}
     needs: [prepare-build, build-ios]
 
     steps:
@@ -372,7 +400,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ios-ipa
-          path: ios/build/ipa/
+          path: ${{ env.FLUTTER_ROOT }}/ios/build/ipa/
 
       - name: Download release notes
         uses: actions/download-artifact@v4
@@ -391,34 +419,32 @@ jobs:
           echo "✅ Fastfile 확인됨: ios/fastlane/Fastfile"
 
       - name: Install Fastlane
-        working-directory: ios
+        working-directory: ${{ env.FLUTTER_ROOT }}/ios
         run: |
           # multi_json: google-apis transitive 의존성이 선언 누락한 upstream 버그 회피 (gemspec 미선언 → Gem::LoadError)
           printf 'source "https://rubygems.org"\ngem "fastlane"\ngem "multi_json"\n' > Gemfile
           bundle install
           echo "✅ Fastlane installed (Bundler)"
 
-      - name: Upload to TestFlight
+      - name: Upload to TestFlight (+ App Store Submit if store_submit)
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           SKIP_WAITING_FOR_BUILD_PROCESSING: ${{ env.SKIP_WAITING_FOR_BUILD_PROCESSING }}
         run: |
-          # IPA 파일 찾기
-          IPA_PATH=$(find $GITHUB_WORKSPACE/ios/build/ipa -name "*.ipa" | head -1)
+          # IPA 절대경로 탐색
+          IPA_PATH=$(find "$GITHUB_WORKSPACE/${FLUTTER_ROOT}/ios/build/ipa" -name "*.ipa" | head -1)
           echo "📦 Found IPA at: $IPA_PATH"
 
           if [ ! -f "$IPA_PATH" ]; then
-            echo "❌ IPA 파일을 찾을 수 없습니다!"
-            ls -la ios/build/ipa/
-            exit 1
+            echo "❌ IPA 파일을 찾을 수 없습니다!"; ls -la ios/build/ipa/ || true; exit 1
           fi
 
-          # Release notes 준비
-          if [ -f "final_release_notes.txt" ]; then
+          # Release notes 준비 (final_release_notes.txt·truncate 스크립트는 레포 루트 기준 — working-directory가 FLUTTER_ROOT이므로 절대경로 사용)
+          if [ -f "$GITHUB_WORKSPACE/final_release_notes.txt" ]; then
             # App Store Connect "What to Test" 한도(4000 바이트)에 맞춰 절단 (마진 두어 3800byte)
-            bash ./.github/scripts/truncate_release_notes.sh final_release_notes.txt 3800 byte
-            RELEASE_NOTES=$(cat final_release_notes.txt)
+            bash "$GITHUB_WORKSPACE/.github/scripts/truncate_release_notes.sh" "$GITHUB_WORKSPACE/final_release_notes.txt" 3800 byte
+            RELEASE_NOTES=$(cat "$GITHUB_WORKSPACE/final_release_notes.txt")
             echo "📝 Release Notes:"
             echo "$RELEASE_NOTES"
           else
@@ -426,19 +452,19 @@ jobs:
             echo "📝 기본 Release Notes: $RELEASE_NOTES"
           fi
 
-          # 환경변수 설정 (Fastfile에서 사용)
+          export APP_STORE_CONNECT_API_KEY_ID="${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}"
+          export APP_STORE_CONNECT_ISSUER_ID="${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
           export API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8"
           export IPA_PATH="$IPA_PATH"
           export RELEASE_NOTES="$RELEASE_NOTES"
+          export APP_IDENTIFIER="${{ secrets.IOS_BUNDLE_ID || vars.IOS_BUNDLE_ID }}"
+          export DEPLOY_MODE="${{ env.DEPLOY_MODE }}"
+          export APP_VERSION="${{ needs.prepare-build.outputs.version }}"
+          export BUILD_NUMBER="${{ needs.prepare-build.outputs.build_number }}"
 
-          # 디버깅 정보
-          echo "🔧 Working directory: $(pwd)"
-          echo "🔧 IPA_PATH: $IPA_PATH"
-          echo "🔧 API_KEY_PATH: $API_KEY_PATH"
-
-          # Fastlane 실행 (마법사가 생성한 Fastfile 사용)
+          echo "🔧 DEPLOY_MODE: $DEPLOY_MODE / APP_IDENTIFIER: $APP_IDENTIFIER"
           cd ios
-          bundle exec fastlane upload_testflight
+          bundle exec fastlane deploy
 
       - name: Notify TestFlight Upload Success
         if: success()

@@ -2370,11 +2370,21 @@ function Resolve-SpringAppYmlPath { param([string]$Type)
     if(-not $f){ return '' }
     (Resolve-Path -Relative $f.FullName) -replace '^\.[/\\]','' -replace '\\','/'
 }
+# auto:flutter-root — Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+# project_paths.flutter(통합 시점 Resolve-ProjectPaths가 채운 값)를 그대로 워크플로우 env에 박는다. (.sh resolve_flutter_root와 동등)
+function Resolve-FlutterRoot {
+    if ($script:ProjectPaths.Contains('flutter')) {
+        $p = $script:ProjectPaths['flutter']
+        if (-not [string]::IsNullOrEmpty($p)) { return $p }
+    }
+    return '.'
+}
 function Resolve-Token { param([string]$Type,[string]$Name)
     switch ($Name) {
         'repo'                { return (Resolve-Repo) }
         'spring-app-yml-dir'  { return (Resolve-SpringAppYmlDir $Type) }
         'spring-app-yml-path' { return (Resolve-SpringAppYmlPath $Type) }
+        'flutter-root'        { return (Resolve-FlutterRoot) }
         default { return '' }
     }
 }

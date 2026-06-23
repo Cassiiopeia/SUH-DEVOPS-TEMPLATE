@@ -27,6 +27,16 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_mode:
+        description: "배포 모드 (store_only=internal까지 / store_prepare=production draft / store_submit=심사 자동등록)"
+        required: false
+        default: "store_only"
+        type: choice
+        options:
+          - store_only
+          - store_prepare
+          - store_submit
 
 # ============================================
 # 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
@@ -38,11 +48,19 @@ env:
   FLUTTER_VERSION: "3.35.5"
   JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:17
   PROJECT_TYPE: "flutter"
+  # Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+  # 통합 시점에 integrator의 flutter-root resolver가 project_paths.flutter 값으로 1회 치환.
+  FLUTTER_ROOT: "."  # @wizard auto:flutter-root
+  # 배포 모드 (store_only | store_prepare | store_submit)
+  DEPLOY_MODE: ${{ github.event.inputs.deploy_mode || vars.ANDROID_DEPLOY_MODE || 'store_only' }}
 
 jobs:
   prepare-build:
     name: 환경 설정 및 준비
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_ROOT }}
     # CHANGELOG 워크플로우가 성공한 경우에만 실행
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
 
@@ -86,6 +104,7 @@ jobs:
 
       # 버전 관리 스크립트 권한 설정
       - name: 버전 관리 스크립트 권한 설정
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 FLUTTER_ROOT가 아닌 레포 루트 기준
         run: |
           chmod +x ./.github/scripts/version_manager.sh
           chmod +x ./.github/scripts/changelog_manager.py
@@ -93,6 +112,7 @@ jobs:
       # version_manager.sh를 사용하여 현재 버전 정보 가져오기
       - name: 현재 버전 정보 가져오기
         id: current_version
+        working-directory: ${{ github.workspace }}   # version_manager.sh가 레포 루트 version.yml을 읽어야 함
         run: |
           # VERSION 가져오기 (x.y.z 형식)
           VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
@@ -120,6 +140,7 @@ jobs:
       # CHANGELOG.json에서 릴리즈 노트 추출 - changelog_manager.py 사용
       - name: 릴리즈 노트 생성
         id: release_notes
+        working-directory: ${{ github.workspace }}   # CHANGELOG.json·changelog_manager.py·final_release_notes.txt(upload 짝)는 레포 루트 기준
         run: |
           VERSION="${{ steps.current_version.outputs.version }}"
 
@@ -173,6 +194,9 @@ jobs:
     name: Android AAB 빌드
     runs-on: ubuntu-latest
     needs: prepare-build
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_ROOT }}
 
     steps:
       - name: Checkout repository
@@ -489,13 +513,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: ${{ env.FLUTTER_ROOT }}/build/app/outputs/bundle/release/app-release.aab
           retention-days: 1
 
   deploy-playstore:
     name: Play Store 내부 테스트 배포
     runs-on: ubuntu-latest
     needs: [prepare-build, build-android]
+    defaults:
+      run:
+        working-directory: ${{ env.FLUTTER_ROOT }}
 
     steps:
       - name: Checkout repository
@@ -516,7 +543,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android-aab
-          path: build/app/outputs/bundle/release/
+          path: ${{ env.FLUTTER_ROOT }}/build/app/outputs/bundle/release/
 
       # 릴리즈 노트 다운로드
       - name: Download release notes
@@ -532,7 +559,7 @@ jobs:
           ruby-version: "3.4.1"
 
       - name: Install Fastlane
-        working-directory: android
+        working-directory: ${{ env.FLUTTER_ROOT }}/android
         run: |
           # multi_json: google-apis transitive 의존성이 선언 누락한 upstream 버그 회피 (gemspec 미선언 → Gem::LoadError)
           printf 'source "https://rubygems.org"\ngem "fastlane"\ngem "multi_json"\n' > Gemfile
@@ -552,6 +579,8 @@ jobs:
 
       # Play Store에 업로드
       - name: Upload to Play Store Internal Testing
+        env:
+          DEPLOY_MODE: ${{ env.DEPLOY_MODE }}
         run: |
           echo "=========================================="
           echo "🚀 Play Store 배포 시작"
@@ -629,10 +658,11 @@ jobs:
           CHANGELOG_DIR="android/fastlane/metadata/android/ko-KR/changelogs"
           mkdir -p "$CHANGELOG_DIR"
 
-          if [ -f "final_release_notes.txt" ]; then
+          if [ -f "$GITHUB_WORKSPACE/final_release_notes.txt" ]; then
             # Google Play release notes 한도(500 글자)에 맞춰 절단 (마진 두어 480자)
-            bash ./.github/scripts/truncate_release_notes.sh final_release_notes.txt 480 char
-            cp final_release_notes.txt "$CHANGELOG_DIR/${VERSION_CODE}.txt"
+            # final_release_notes.txt·truncate 스크립트는 레포 루트 기준 — working-directory가 FLUTTER_ROOT이므로 절대경로 사용
+            bash "$GITHUB_WORKSPACE/.github/scripts/truncate_release_notes.sh" "$GITHUB_WORKSPACE/final_release_notes.txt" 480 char
+            cp "$GITHUB_WORKSPACE/final_release_notes.txt" "$CHANGELOG_DIR/${VERSION_CODE}.txt"
             echo "✅ Changelog 준비 완료 (버전 코드: $VERSION_CODE)"
           else
             echo "v$VERSION_NAME 업데이트" > "$CHANGELOG_DIR/${VERSION_CODE}.txt"

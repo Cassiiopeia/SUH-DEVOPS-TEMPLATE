@@ -777,6 +777,13 @@ function Show-Summary {
     Write-Host ""
     Write-Host "  3. Push to deploy branch to test build"
     Write-Host ""
+    Write-Host "🎛️  배포 모드 설정 (선택):"
+    Write-Host "   GitHub repo Variables에 ANDROID_DEPLOY_MODE 를 설정하면 기본 배포 범위를 정할 수 있습니다."
+    Write-Host "     store_only    : 내부 테스트(internal) 업로드까지만 (기본)"
+    Write-Host "     store_prepare : production draft 승급 (콘솔에서 '출시 시작' 대기)"
+    Write-Host "     store_submit  : production 심사 자동 등록 (정식 출시 1회 수동 이후부터 가능)"
+    Write-Host "   워크플로우 수동 실행 시 deploy_mode 입력이 이 변수보다 우선합니다."
+    Write-Host ""
     Write-Host "================================================================" -ForegroundColor Cyan
 }
 

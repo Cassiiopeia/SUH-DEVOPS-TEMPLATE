@@ -764,6 +764,12 @@ print_completion() {
     echo ""
     echo "  3. deploy 브랜치로 푸시하여 빌드 테스트"
     echo ""
+    echo "🎛️  배포 모드 설정 (선택):"
+    echo "   GitHub repo Variables에 ANDROID_DEPLOY_MODE 를 설정하면 기본 배포 범위를 정할 수 있습니다."
+    echo "     store_only    : 내부 테스트(internal) 업로드까지만 (기본)"
+    echo "     store_prepare : production draft 승급 (콘솔에서 '출시 시작' 대기)"
+    echo "     store_submit  : production 심사 자동 등록 (정식 출시 1회 수동 이후부터 가능)"
+    echo "   워크플로우 수동 실행 시 deploy_mode 입력이 이 변수보다 우선합니다."
 
 }
 

@@ -2357,14 +2357,14 @@ function Get-RepoName {
 # resolver 함수 — auto: 토큰을 실제 값으로 해소 (.sh resolve_* 와 동일)
 function Resolve-Repo { Get-RepoName }
 function Resolve-SpringAppYmlDir { param([string]$Type)
-    $base='.'; $p=(Get-PathForType $Type); if($p){$base=$p}
+    $base='.'; if($script:ProjectPaths.Contains($Type)){ $base=$script:ProjectPaths[$Type] }
     $f=Get-ChildItem -Path $base -Recurse -Filter 'application*.yml' -ErrorAction SilentlyContinue |
        Where-Object { $_.FullName -match 'src[/\\]main[/\\]resources' } | Select-Object -First 1
     if(-not $f){ return '' }
     ((Resolve-Path -Relative $f.FullName) -replace '^\.[/\\]','' -replace '\\','/') -replace '/[^/]+$',''
 }
 function Resolve-SpringAppYmlPath { param([string]$Type)
-    $base='.'; $p=(Get-PathForType $Type); if($p){$base=$p}
+    $base='.'; if($script:ProjectPaths.Contains($Type)){ $base=$script:ProjectPaths[$Type] }
     $f=Get-ChildItem -Path $base -Recurse -Filter 'application*.yml' -ErrorAction SilentlyContinue |
        Where-Object { $_.FullName -match 'src[/\\]main[/\\]resources' } | Select-Object -First 1
     if(-not $f){ return '' }

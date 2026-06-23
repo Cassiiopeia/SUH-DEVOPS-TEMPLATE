@@ -593,15 +593,25 @@ patch_build_gradle() {
         exit 1
     fi
 
-    # Python 3 설치 확인
-    if ! command -v python3 &> /dev/null; then
-        print_error "Python 3가 설치되어 있지 않습니다"
-        print_warning "Python 3를 설치한 후 다시 시도하세요"
+    # Python 설치 확인.
+    # ⚠️ Windows는 python3가 "WindowsApps/python3" 스텁(실행 시 안내문만 출력하고 종료)을 가리키는 경우가 흔하다.
+    #    command -v 만으로는 스텁도 "있음"으로 잡혀 폴백이 안 된다 → 실제 실행(-c)까지 검증해 진짜 Python을 고른다.
+    local PYTHON _py _path
+    PYTHON=""
+    for _py in python3 python; do
+        _path=$(command -v "$_py" 2>/dev/null) || continue
+        "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && { PYTHON="$_path"; break; }
+    done
+    if [ -z "$PYTHON" ]; then
+        print_error "실행 가능한 Python을 찾을 수 없습니다 (python3/python 모두 없음 또는 스텁)"
+        print_warning "Python 3를 설치한 후 다시 시도하세요 (Windows는 Microsoft Store 스텁이 아닌 정식 설치본 필요)"
         exit 1
     fi
 
-    # Python 스크립트 실행
-    python3 "$patch_script" "$gradle_file"
+    # Python 스크립트 실행.
+    # ⚠️ PYTHONIOENCODING=utf-8 필수: 한국어 Windows 콘솔 기본 인코딩(cp949)은 패치 스크립트가
+    #    출력하는 이모지(✅/⚠️/❌)를 인코딩하지 못해 UnicodeEncodeError로 죽는다.
+    PYTHONIOENCODING=utf-8 "$PYTHON" "$patch_script" "$gradle_file"
 
     if [ $? -ne 0 ]; then
         print_error "build.gradle.kts 패치 실패!"

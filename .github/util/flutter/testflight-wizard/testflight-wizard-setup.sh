@@ -65,6 +65,27 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+# 크로스플랫폼 in-place sed.
+#   BSD sed(macOS): -i 뒤에 백업 접미사(빈 문자열 '')가 필수.
+#   GNU sed(Linux/Windows Git Bash): -i 뒤에 바로 식. '' 를 주면 식으로 오인해 깨진다.
+# 첫 호출 시 1회만 OS 종류를 감지해 캐시한다. 사용법은 GNU 형태와 동일: sed_inplace 's/a/b/' file
+SED_FLAVOR=""
+sed_inplace() {
+    if [ -z "$SED_FLAVOR" ]; then
+        # BSD sed는 --version을 모른다(에러). GNU sed만 --version 성공.
+        if sed --version >/dev/null 2>&1; then
+            SED_FLAVOR="gnu"
+        else
+            SED_FLAVOR="bsd"
+        fi
+    fi
+    if [ "$SED_FLAVOR" = "gnu" ]; then
+        sed -i "$@"
+    else
+        sed -i '' "$@"
+    fi
+}
+
 # 도움말
 show_help() {
     cat << EOF
@@ -328,10 +349,10 @@ update_info_plist_encryption() {
         print_info "ITSAppUsesNonExemptEncryption이 이미 설정되어 있습니다"
         # 기존 값을 업데이트
         if [ "$USES_NON_EXEMPT_ENCRYPTION" = "true" ]; then
-            sed -i '' 's/<key>ITSAppUsesNonExemptEncryption<\/key>[[:space:]]*<false\/>/<key>ITSAppUsesNonExemptEncryption<\/key>\
+            sed_inplace 's/<key>ITSAppUsesNonExemptEncryption<\/key>[[:space:]]*<false\/>/<key>ITSAppUsesNonExemptEncryption<\/key>\
 	<true\/>/g' "$info_plist_path"
         else
-            sed -i '' 's/<key>ITSAppUsesNonExemptEncryption<\/key>[[:space:]]*<true\/>/<key>ITSAppUsesNonExemptEncryption<\/key>\
+            sed_inplace 's/<key>ITSAppUsesNonExemptEncryption<\/key>[[:space:]]*<true\/>/<key>ITSAppUsesNonExemptEncryption<\/key>\
 	<false\/>/g' "$info_plist_path"
         fi
         print_success "ITSAppUsesNonExemptEncryption 값 업데이트 완료"
@@ -351,7 +372,7 @@ update_info_plist_encryption() {
     fi
 
     # macOS sed 사용 - </dict> 앞에 새 키 추가
-    sed -i '' "s/<\/dict>/<key>ITSAppUsesNonExemptEncryption<\/key>\\
+    sed_inplace "s/<\/dict>/<key>ITSAppUsesNonExemptEncryption<\/key>\\
 	<${encryption_value}\/>\\
 <\/dict>/g" "$info_plist_path"
 
@@ -404,12 +425,12 @@ update_bundle_id() {
         cp "$pbxproj_path" "${pbxproj_path}.bundleid.bak"
 
         # Runner 앱의 Bundle ID 변경 (정확히 매칭)
-        sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = $CURRENT_BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" "$pbxproj_path"
+        sed_inplace "s/PRODUCT_BUNDLE_IDENTIFIER = $CURRENT_BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" "$pbxproj_path"
 
         # RunnerTests의 Bundle ID도 함께 변경 (Runner 앱의 Bundle ID + .RunnerTests)
         local CURRENT_TESTS_BUNDLE_ID="${CURRENT_BUNDLE_ID}.RunnerTests"
         local NEW_TESTS_BUNDLE_ID="${BUNDLE_ID}.RunnerTests"
-        sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = $CURRENT_TESTS_BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $NEW_TESTS_BUNDLE_ID;/g" "$pbxproj_path"
+        sed_inplace "s/PRODUCT_BUNDLE_IDENTIFIER = $CURRENT_TESTS_BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $NEW_TESTS_BUNDLE_ID;/g" "$pbxproj_path"
 
         # 변경 확인
         if grep -q "PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;" "$pbxproj_path"; then
@@ -455,10 +476,10 @@ patch_xcode_project() {
             print_info "CODE_SIGN_STYLE = Manual 추가 중..."
             # Automatic을 Manual로 변경하거나 새로 추가
             if grep -q "CODE_SIGN_STYLE = Automatic" "$pbxproj_path"; then
-                sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$pbxproj_path"
+                sed_inplace "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$pbxproj_path"
             else
                 # DEVELOPMENT_TEAM 라인 다음에 CODE_SIGN_STYLE 추가
-                sed -i '' "s/DEVELOPMENT_TEAM = $TEAM_ID;/DEVELOPMENT_TEAM = $TEAM_ID;\\
+                sed_inplace "s/DEVELOPMENT_TEAM = $TEAM_ID;/DEVELOPMENT_TEAM = $TEAM_ID;\\
 				CODE_SIGN_STYLE = Manual;/g" "$pbxproj_path"
             fi
             print_success "CODE_SIGN_STYLE = Manual 설정 완료"
@@ -466,7 +487,7 @@ patch_xcode_project() {
 
         # PROVISIONING_PROFILE_SPECIFIER 업데이트
         if grep -q "PROVISIONING_PROFILE_SPECIFIER" "$pbxproj_path"; then
-            sed -i '' "s/\"PROVISIONING_PROFILE_SPECIFIER\" = \"[^\"]*\";/\"PROVISIONING_PROFILE_SPECIFIER\" = \"$PROFILE_NAME\";/g" "$pbxproj_path"
+            sed_inplace "s/\"PROVISIONING_PROFILE_SPECIFIER\" = \"[^\"]*\";/\"PROVISIONING_PROFILE_SPECIFIER\" = \"$PROFILE_NAME\";/g" "$pbxproj_path"
             print_success "PROVISIONING_PROFILE_SPECIFIER 업데이트 완료"
         fi
 
@@ -478,40 +499,40 @@ patch_xcode_project() {
     # DEVELOPMENT_TEAM이 있지만 다른 값이면 교체
     if grep -q "DEVELOPMENT_TEAM = " "$pbxproj_path"; then
         print_info "기존 DEVELOPMENT_TEAM 값을 업데이트합니다"
-        sed -i '' "s/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$pbxproj_path"
+        sed_inplace "s/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$pbxproj_path"
         print_success "DEVELOPMENT_TEAM 업데이트 완료"
 
         # CODE_SIGN_STYLE = Manual 설정
         if grep -q "CODE_SIGN_STYLE = Automatic" "$pbxproj_path"; then
-            sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$pbxproj_path"
+            sed_inplace "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g" "$pbxproj_path"
             print_success "CODE_SIGN_STYLE = Manual 설정 완료"
         elif ! grep -q "CODE_SIGN_STYLE = Manual" "$pbxproj_path"; then
-            sed -i '' "s/DEVELOPMENT_TEAM = $TEAM_ID;/DEVELOPMENT_TEAM = $TEAM_ID;\\
+            sed_inplace "s/DEVELOPMENT_TEAM = $TEAM_ID;/DEVELOPMENT_TEAM = $TEAM_ID;\\
 				CODE_SIGN_STYLE = Manual;/g" "$pbxproj_path"
             print_success "CODE_SIGN_STYLE = Manual 추가 완료"
         fi
 
         # CODE_SIGN_IDENTITY 설정
         if ! grep -q 'CODE_SIGN_IDENTITY = "Apple Distribution"' "$pbxproj_path"; then
-            sed -i '' "s/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual;\\
+            sed_inplace "s/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual;\\
 				CODE_SIGN_IDENTITY = \"Apple Distribution\";/g" "$pbxproj_path"
             print_success "CODE_SIGN_IDENTITY = Apple Distribution 추가 완료"
         fi
 
         # PROVISIONING_PROFILE_SPECIFIER 설정 (핵심!)
         if ! grep -q "PROVISIONING_PROFILE_SPECIFIER" "$pbxproj_path"; then
-            sed -i '' "s/CODE_SIGN_IDENTITY = \"Apple Distribution\";/CODE_SIGN_IDENTITY = \"Apple Distribution\";\\
+            sed_inplace "s/CODE_SIGN_IDENTITY = \"Apple Distribution\";/CODE_SIGN_IDENTITY = \"Apple Distribution\";\\
 				\"PROVISIONING_PROFILE_SPECIFIER\" = \"$PROFILE_NAME\";/g" "$pbxproj_path"
             print_success "PROVISIONING_PROFILE_SPECIFIER = $PROFILE_NAME 추가 완료"
         else
             # 기존 값이 있으면 업데이트
-            sed -i '' "s/\"PROVISIONING_PROFILE_SPECIFIER\" = \"[^\"]*\";/\"PROVISIONING_PROFILE_SPECIFIER\" = \"$PROFILE_NAME\";/g" "$pbxproj_path"
+            sed_inplace "s/\"PROVISIONING_PROFILE_SPECIFIER\" = \"[^\"]*\";/\"PROVISIONING_PROFILE_SPECIFIER\" = \"$PROFILE_NAME\";/g" "$pbxproj_path"
             print_success "PROVISIONING_PROFILE_SPECIFIER 업데이트 완료"
         fi
 
         # 구버전 CODE_SIGN_IDENTITY 설정 업데이트
         if grep -q '"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"' "$pbxproj_path"; then
-            sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"/g' "$pbxproj_path"
+            sed_inplace 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"/g' "$pbxproj_path"
             print_success "CODE_SIGN_IDENTITY[sdk=iphoneos*] 업데이트 완료"
         fi
 
@@ -551,7 +572,7 @@ patch_xcode_project() {
     # - CODE_SIGN_STYLE: Manual (자동 서명 비활성화)
     # - CODE_SIGN_IDENTITY: Apple Distribution (배포용 인증서)
     # - PROVISIONING_PROFILE_SPECIFIER: 프로비저닝 프로파일 이름
-    sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;\\
+    sed_inplace "s/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;\\
 				DEVELOPMENT_TEAM = $TEAM_ID;\\
 				CODE_SIGN_STYLE = Manual;\\
 				CODE_SIGN_IDENTITY = \"Apple Distribution\";\\
@@ -559,7 +580,7 @@ patch_xcode_project() {
 
     # 구버전 CODE_SIGN_IDENTITY 설정이 있으면 Apple Distribution으로 변경
     if grep -q '"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"' "$pbxproj_path"; then
-        sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"/g' "$pbxproj_path"
+        sed_inplace 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"/g' "$pbxproj_path"
         print_success "CODE_SIGN_IDENTITY[sdk=iphoneos*] 업데이트 완료"
     fi
 

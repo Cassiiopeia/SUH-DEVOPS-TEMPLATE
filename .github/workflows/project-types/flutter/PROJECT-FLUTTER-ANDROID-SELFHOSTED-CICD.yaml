@@ -35,13 +35,13 @@ on:
 # ============================================
 env:
   # 프로젝트 이름 (APK 파일명, 아티팩트명, 히스토리 파일명에 사용)
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
+  APP_ARTIFACT_NAME: "__APP_ARTIFACT_NAME__"  # @wizard ask:@repo
   FLUTTER_VERSION: "3.35.5"
   JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:17
   # SMB 서버 설정 (자체 서버 — Synology NAS·Linux 등)
   SMB_PORT: "44445" # 기본 445
   SMB_SHARE: "web"
-  SMB_PATH_IOS: "/your-project/ios/download" # SMB 경로: /{PROJECT_NAME}/ios/download 형식으로 사용
+  SMB_PATH_IOS: "/your-project/ios/download" # SMB 경로: /{APP_ARTIFACT_NAME}/ios/download 형식으로 사용
 jobs:
   build-android:
     name: Build Android APK
@@ -209,16 +209,16 @@ jobs:
       - name: Rename and Prepare APK
         run: |
           mkdir -p ./android/app/build/outputs/apk/release/
-          mv ./build/app/outputs/flutter-apk/app-release.apk ./android/app/build/outputs/apk/release/${{ env.PROJECT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk
-          echo "APK renamed to ${{ env.PROJECT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk"
+          mv ./build/app/outputs/flutter-apk/app-release.apk ./android/app/build/outputs/apk/release/${{ env.APP_ARTIFACT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk
+          echo "APK renamed to ${{ env.APP_ARTIFACT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk"
           ls -la ./android/app/build/outputs/apk/release/
 
       # APK를 아티팩트로 업로드
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-apk
-          path: ./android/app/build/outputs/apk/release/${{ env.PROJECT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk
+          name: ${{ env.APP_ARTIFACT_NAME }}-apk
+          path: ./android/app/build/outputs/apk/release/${{ env.APP_ARTIFACT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk
           retention-days: 1
 
   deploy-android:
@@ -245,7 +245,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-apk
+          name: ${{ env.APP_ARTIFACT_NAME }}-apk
           path: android/app/build/outputs/
 
       - name: List downloaded structure (Debug)
@@ -269,7 +269,7 @@ jobs:
           SMB_SERVER=${{ secrets.SERVER_HOST }}
           SMB_PORT=${{ env.SMB_PORT }}
           SMB_SHARE=${{ env.SMB_SHARE }}
-          SMB_PATH="/${{ env.PROJECT_NAME }}${{ env.SMB_PATH_ANDROID }}"
+          SMB_PATH="/${{ env.APP_ARTIFACT_NAME }}${{ env.SMB_PATH_ANDROID }}"
           echo "Uploading APK file ${{ env.APK_NAME }} to SMB..."
           echo "SMB Path: $SMB_PATH"
           smbclient "//$SMB_SERVER/$SMB_SHARE" -p "$SMB_PORT" -U "$SMB_USERNAME%$SMB_PASSWORD" -m SMB3 -d 10 -c "mkdir $SMB_PATH; cd $SMB_PATH; put ${{ env.APK_FILE }} ${{ env.APK_NAME }}"
@@ -285,7 +285,7 @@ jobs:
           FILE_SIZE=$(stat -c%s "${{ env.APK_FILE }}")
           COMMIT_LINK="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
           FULL_COMMIT_HASH="${{ github.sha }}"
-          HISTORY_FILE="${{ env.PROJECT_NAME }}-android-cicd-history.json"
+          HISTORY_FILE="${{ env.APP_ARTIFACT_NAME }}-android-cicd-history.json"
 
           NEW_BUILD_INFO=$(jq -n \
             --arg apk_name "${{ env.APK_NAME }}" \
@@ -298,7 +298,7 @@ jobs:
           SMB_SERVER=${{ secrets.SERVER_HOST }}
           SMB_PORT=${{ env.SMB_PORT }}
           SMB_SHARE=${{ env.SMB_SHARE }}
-          SMB_PATH="/${{ env.PROJECT_NAME }}${{ env.SMB_PATH_ANDROID }}"
+          SMB_PATH="/${{ env.APP_ARTIFACT_NAME }}${{ env.SMB_PATH_ANDROID }}"
 
           smbclient "//$SMB_SERVER/$SMB_SHARE" -p "$SMB_PORT" -U "$SMB_USERNAME%$SMB_PASSWORD" -m SMB3 -d 10 -c "cd $SMB_PATH; get $HISTORY_FILE" || echo '{"files": []}' > $HISTORY_FILE
           echo "Downloaded or initialized $HISTORY_FILE"

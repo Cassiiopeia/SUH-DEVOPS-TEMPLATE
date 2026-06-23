@@ -26,7 +26,7 @@
 #
 # 🌐 포트 및 컨테이너:
 # PROJECT_NAME: 프로젝트명 (컨테이너/이미지 이름)
-# DOMAIN_NAME: 외부 도메인 (nginx server_name 과 일치)
+# SERVICE_DOMAIN: 외부 도메인 (nginx server_name 과 일치)
 # CONTAINER_INTERNAL_PORT: Spring Boot 내부 포트 (기본: 8080)
 # BLUE_PORT: Blue 호스트 노출 포트 (기본: 8080)
 # GREEN_PORT: Green 호스트 노출 포트 (기본: 8081)
@@ -57,7 +57,7 @@
 # 💡 사전 조건:
 #   - 서버에 nginx 설치 + sites-enabled config 존재
 #   - 해당 config 의 server 블록에 다음 라인 존재:
-#       server_name ${DOMAIN_NAME};
+#       server_name ${SERVICE_DOMAIN};
 #       proxy_pass http://127.0.0.1:${BLUE_PORT};   # 또는 ${GREEN_PORT}
 #   - SSH 사용자가 sudo 로 nginx -t / reload, docker 명령 실행 가능
 # ===================================================================
@@ -81,7 +81,7 @@ on:
 env:
   # 🔧 프로젝트 설정 - 실제 프로젝트명으로 변경하세요
   PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
-  DOMAIN_NAME: "__DOMAIN_NAME__"  # @wizard ask:example.com
+  SERVICE_DOMAIN: "__SERVICE_DOMAIN__"  # @wizard ask:example.com
 
   # ☁️ Spring Boot 설정
   SPRING_PROFILE: "prod"
@@ -203,7 +203,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           PROJECT_NAME: ${{ env.PROJECT_NAME }}
-          DOMAIN_NAME: ${{ env.DOMAIN_NAME }}
+          SERVICE_DOMAIN: ${{ env.SERVICE_DOMAIN }}
           SPRING_PROFILE: ${{ env.SPRING_PROFILE }}
           CONTAINER_INTERNAL_PORT: ${{ env.CONTAINER_INTERNAL_PORT }}
           BLUE_PORT: ${{ env.BLUE_PORT }}
@@ -232,7 +232,7 @@ jobs:
           port: ${{ env.SSH_PORT }}
           command_timeout: ${{ env.SSH_COMMAND_TIMEOUT }}
           timeout: ${{ env.SSH_CONNECTION_TIMEOUT }}
-          envs: PROJECT_NAME,DOMAIN_NAME,SPRING_PROFILE,CONTAINER_INTERNAL_PORT,BLUE_PORT,GREEN_PORT,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,NGINX_RP_CONF,NGINX_BACKUP_DIR,NGINX_BACKUP_KEEP,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,HEALTHCHECK_PATH,DOMAIN_CHECK_RETRIES,DOMAIN_CHECK_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD,SSH_AUTH_METHOD
+          envs: PROJECT_NAME,SERVICE_DOMAIN,SPRING_PROFILE,CONTAINER_INTERNAL_PORT,BLUE_PORT,GREEN_PORT,ENABLE_VOLUME_MOUNT,VOLUME_HOST_PATH,VOLUME_CONTAINER_PATH,NGINX_RP_CONF,NGINX_BACKUP_DIR,NGINX_BACKUP_KEEP,HEALTHCHECK_MAX_RETRIES,HEALTHCHECK_RETRY_INTERVAL,HEALTHCHECK_PATH,DOMAIN_CHECK_RETRIES,DOMAIN_CHECK_INTERVAL,IN_FLIGHT_WAIT,BRANCH_REF,DOCKERHUB_USERNAME,SERVER_PASSWORD,SSH_AUTH_METHOD
           script: |
             set -e
             export PATH=$PATH:/usr/local/bin
@@ -255,7 +255,7 @@ jobs:
             echo "🚀 Nginx Blue-Green 무중단 배포 시작"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "📦 프로젝트: ${PROJECT_NAME}"
-            echo "🌐 도메인: ${DOMAIN_NAME}"
+            echo "🌐 도메인: ${SERVICE_DOMAIN}"
             echo "🖼️ 이미지: ${IMAGE}"
             echo "🎨 Blue=${BLUE_PORT} | Green=${GREEN_PORT}"
             echo "🔧 Nginx config: ${NGINX_RP_CONF}"
@@ -282,7 +282,7 @@ jobs:
             # ============================================================
             echo "🔍 nginx config 의 현재 활성 포트 탐색"
             ACTIVE_PORT=$(
-              SUDO awk -v dom="${DOMAIN_NAME}" '
+              SUDO awk -v dom="${SERVICE_DOMAIN}" '
                 BEGIN {
                   inserver=0; depth=0; entry_depth=0;
                   dom_esc = dom;
@@ -396,7 +396,7 @@ jobs:
             # ============================================================
             echo "🔧 nginx config 포트 토글: ${ACTIVE_PORT} → ${NEW_PORT}"
             TMP_FILE="$(mktemp)"
-            SUDO awk -v dom="${DOMAIN_NAME}" -v new_port="${NEW_PORT}" '
+            SUDO awk -v dom="${SERVICE_DOMAIN}" -v new_port="${NEW_PORT}" '
               BEGIN {
                 inserver=0; depth=0; entry_depth=0;
                 dom_esc = dom;
@@ -461,11 +461,11 @@ jobs:
             # ============================================================
             # 10. 도메인 접근 검증
             # ============================================================
-            echo "🌐 도메인 접근 검증 (${DOMAIN_NAME})"
+            echo "🌐 도메인 접근 검증 (${SERVICE_DOMAIN})"
             DOMAIN_OK=false
             for i in $(seq 1 ${DOMAIN_CHECK_RETRIES}); do
-              if curl -fsS "https://${DOMAIN_NAME}${HEALTHCHECK_PATH}" >/dev/null 2>&1 || \
-                 curl -fsS "https://${DOMAIN_NAME}/" >/dev/null 2>&1 ; then
+              if curl -fsS "https://${SERVICE_DOMAIN}${HEALTHCHECK_PATH}" >/dev/null 2>&1 || \
+                 curl -fsS "https://${SERVICE_DOMAIN}/" >/dev/null 2>&1 ; then
                 echo "✅ 도메인 접근 검증 성공 (시도 ${i})"
                 DOMAIN_OK=true
                 break
@@ -503,7 +503,7 @@ jobs:
 
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "✅ 무중단 배포 완료. active=${NEW_CONTAINER_NAME} (포트 ${NEW_PORT})"
-            echo "🌐 도메인: https://${DOMAIN_NAME}"
+            echo "🌐 도메인: https://${SERVICE_DOMAIN}"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ===================================================================
@@ -515,7 +515,7 @@ jobs:
 #    SERVER_HOST, SERVER_USER, SERVER_PASSWORD
 #
 # 2) 본 워크플로우의 env 블록에서 프로젝트별 설정 수정:
-#    - PROJECT_NAME, DOMAIN_NAME
+#    - PROJECT_NAME, SERVICE_DOMAIN
 #    - APPLICATION_YML_DIR, CONTAINER_INTERNAL_PORT
 #    - BLUE_PORT, GREEN_PORT (서로 다른 호스트 포트)
 #    - NGINX_RP_CONF, NGINX_BACKUP_DIR
@@ -524,7 +524,7 @@ jobs:
 # 3) 서버 사전 준비:
 #    - nginx 설치 + sites-enabled config 존재
 #    - 해당 config server 블록에 다음 라인 존재:
-#        server_name ${DOMAIN_NAME};
+#        server_name ${SERVICE_DOMAIN};
 #        proxy_pass http://127.0.0.1:${BLUE_PORT};   # 또는 ${GREEN_PORT}
 #    - SSH 사용자가 sudo 로 nginx -t / reload, docker 명령 실행 가능
 #

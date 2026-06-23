@@ -1,14 +1,47 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-23T07:32:34Z",
-    "currentVersion": "3.0.161",
+    "lastUpdated": "2026-06-23T08:01:14Z",
+    "currentVersion": "3.0.163",
     "projectType": "basic",
-    "totalReleases": 161,
+    "totalReleases": 162,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.163",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-23",
+      "pr_number": 411,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 설치 마법사가 입력 항목마다 설명과 예시를 보여줍니다\n  * 헷갈리던 입력 항목 이름을 용도에 맞게 정리했습니다\n\n* **버그 수정**\n  * Windows에서 안내 문구가 깨지던 문제 해결\n  * macOS·Windows에서 마법사가 중단되던 문제 해결\n\n* **개선**\n  * 입력값이 어디에 쓰이는지 더 명확해졌습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "설치 마법사가 입력 항목마다 설명과 예시를 보여줍니다",
+            "헷갈리던 입력 항목 이름을 용도에 맞게 정리했습니다"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows에서 안내 문구가 깨지던 문제 해결",
+            "macOS·Windows에서 마법사가 중단되던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "입력값이 어디에 쓰이는지 더 명확해졌습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.161",
       "project_type": "basic",

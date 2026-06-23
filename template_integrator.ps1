@@ -2388,6 +2388,42 @@ function Resolve-Token { param([string]$Type,[string]$Name)
         default { return '' }
     }
 }
+# labels.yml에서 단일 필드 1개 조회. $Key=조회키(KEY 또는 "type.KEY") $Field=label|help|example
+# 블록 형식(KEY: 다음 2칸 들여쓰기)과 구형 1줄(KEY: "라벨") 모두 지원.
+function Read-WfField { param([string]$Key, [string]$Field)
+    $lf = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
+    if (-not (Test-Path $lf)) { return '' }
+    $lines = Get-Content $lf -Encoding UTF8
+    $kEsc = [regex]::Escape($Key)
+    $fEsc = [regex]::Escape($Field)
+    if ($Field -eq 'label') {
+        foreach($l in $lines){
+            if($l -match "^${kEsc}:\s+`"([^`"]*)`"\s*$"){ return $Matches[1] }
+        }
+    }
+    $inblk = $false
+    foreach($l in $lines){
+        if($l -match "^${kEsc}:\s*$"){ $inblk = $true; continue }
+        if($inblk -and $l -match '^\S'){ $inblk = $false }
+        if($inblk){
+            if($l -match "^\s+${fEsc}:\s*(.*)$"){
+                $v = $Matches[1].Trim()
+                if($v -match '^"(.*)"$'){ $v = $Matches[1] }
+                return $v
+            }
+        }
+    }
+    return ''
+}
+
+# 조회 우선순위로 필드를 얻는다. $Type/$Key/$Field. 폴백: field=label이면 KEY명, 아니면 빈값.
+function Get-WfField { param([string]$Type, [string]$Key, [string]$Field)
+    $v = Read-WfField "$Type.$Key" $Field
+    if ($v) { return $v }
+    $v = Read-WfField $Key $Field
+    if ($v) { return $v }
+    if ($Field -eq 'label') { return $Key } else { return '' }
+}
 function Get-WfLabel { param([string]$Key)
     $lf = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
     if (Test-Path $lf) {
@@ -2475,7 +2511,16 @@ function Configure-WorkflowEnv {
                 $saved = Get-WfDeploy $Type $key
                 if ($saved) { $def = $saved }
                 if ($script:WfUseDefaults) { $val = $def }
-                else { $inp = Read-UserInput ("  " + (Get-WfLabel $key)) $def; $val = if([string]::IsNullOrWhiteSpace($inp)){$def}else{$inp} }
+                else {
+                    $lbl = Get-WfField $Type $key 'label'
+                    $hlp = Get-WfField $Type $key 'help'
+                    $exm = Get-WfField $Type $key 'example'
+                    Write-ColorOutput ("  ▸ " + $lbl) -ForegroundColor Cyan
+                    if ($hlp) { Write-ColorOutput ("    " + $hlp) -ForegroundColor DarkGray }
+                    if ($exm) { Write-ColorOutput ("    예) " + $exm) -ForegroundColor DarkGray }
+                    $inp = Read-UserInput ("  값 입력 [기본: " + $def + "]") $def
+                    $val = if([string]::IsNullOrWhiteSpace($inp)){$def}else{$inp}
+                }
                 Set-WfDeploy $Type $key $val
             }
             if ($null -ne $val -and $val -ne '') {
@@ -2489,7 +2534,7 @@ function Configure-WorkflowEnv {
     $newLines | Set-Content $File -Encoding UTF8
 
     # 토큰 재귀 치환: 남은 __PROJECT_NAME__
-    (Get-Content $File -Raw) -replace '__PROJECT_NAME__', $repo | Set-Content $File -NoNewline -Encoding UTF8
+    (Get-Content $File -Raw) -replace '__PROJECT_NAME__', $repo -replace '__APP_ARTIFACT_NAME__', $repo | Set-Content $File -NoNewline -Encoding UTF8
 
     # paths 앵커 주입 (멀티타입 모노레포)
     if ((Get-Content $File -Raw) -match '#\s*@wizard\s+paths-anchor') {
@@ -2514,6 +2559,39 @@ function Configure-WorkflowEnv {
     }
 }
 
+# 기존 설치본이 "이 템플릿을 지금 설정대로 깔면 나올 결과"와 내용상 동일한가?
+# 단순 비교가 안 되는 이유: 원본엔 __TOKEN__/# @wizard 마커가 남아있고 설치본엔
+# 값이 치환돼 있어 항상 다르게 나온다. 그래서 원본을 임시 사본으로 떠서 실제 치환
+# 로직(Configure-WorkflowEnv)을 가상 적용한 "설치 예상 최종형"을 만들어 비교한다.
+#   $true = 동일(unchanged) / $false = 다름 또는 비교 실패(changed로 취급)
+# 가상 치환은 WfUseDefaults=true로 강제해 사용자에게 다시 묻지 않고, WfDeploy/WfUseDefaults
+# 상태를 저장·복원해 부수효과가 실제 설치 흐름으로 새지 않게 격리한다.
+# 줄바꿈(CRLF/LF) 차이로 인한 거짓 'changed'를 막기 위해 LF 정규화 후 문자열 비교.
+function Test-WorkflowUnchanged {
+    param([string]$Type, [string]$SrcPath, [string]$ExistingPath)
+    if (-not (Test-Path $SrcPath) -or -not (Test-Path $ExistingPath)) { return $false }
+    $tmp = $null
+    # 상태 저장 (비교가 실제 설정을 오염시키지 않도록)
+    $savedDefaults = $script:WfUseDefaults
+    $savedDeploy   = $script:WfDeploy
+    try {
+        $tmp = [System.IO.Path]::GetTempFileName()
+        Copy-Item $SrcPath $tmp -Force
+        $script:WfUseDefaults = $true
+        $script:WfDeploy = [ordered]@{}     # 비교용 격리 컨텍스트
+        Configure-WorkflowEnv -Type $Type -File $tmp | Out-Null
+        $a = (Get-Content $tmp -Raw) -replace "`r`n", "`n"
+        $b = (Get-Content $ExistingPath -Raw) -replace "`r`n", "`n"
+        return ($a -eq $b)
+    } catch {
+        return $false                        # 비교 실패 → changed로 취급
+    } finally {
+        if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+        $script:WfUseDefaults = $savedDefaults
+        $script:WfDeploy      = $savedDeploy
+    }
+}
+
 # ===================================================================
 # 워크플로우 다운로드
 # ===================================================================
@@ -2527,11 +2605,15 @@ function Copy-Workflows-ForType {
         [hashtable]$Counters
     )
 
+    # typeDir 유무와 무관하게 Nexus/설정 단계에서 참조되므로 함수 진입부에서 초기화
+    $unchangedFiles = @()
+
     # 2. 타입별 워크플로우 처리 (선택적 업데이트)
     $typeDir = Join-Path $ProjectTypesDir $Type
     if (Test-Path $typeDir) {
         # 먼저 이미 존재하는 파일 목록 수집
-        $existingFiles = @()
+        $existingFiles = @()    # 기존에 있고 내용이 '바뀐' 파일 (메뉴 대상)
+        # $unchangedFiles 는 함수 진입부에서 초기화됨 (기존에 있고 내용이 '동일한' 파일)
         $newFiles = @()
 
         # PowerShell 5.1 호환성: 배열 초기화 후 추가
@@ -2546,9 +2628,22 @@ function Copy-Workflows-ForType {
             $destPath = Join-Path $WORKFLOWS_DIR $filename
 
             if (Test-Path $destPath) {
-                $existingFiles += $workflow
+                # 설치 예상 최종형과 동일하면 unchanged — 메뉴에 올리지 않는다.
+                if (Test-WorkflowUnchanged -Type $Type -SrcPath $workflow.FullName -ExistingPath $destPath) {
+                    $unchangedFiles += $workflow
+                } else {
+                    $existingFiles += $workflow
+                }
             } else {
                 $newFiles += $workflow
+            }
+        }
+
+        # 내용 동일 파일: 조용히 건너뜀 (메뉴 없음 — 변경점 0인데 .bak 덮어쓰던 혼란 제거)
+        if ($unchangedFiles.Count -gt 0) {
+            foreach ($workflow in $unchangedFiles) {
+                Write-Host "  ⏭ $($workflow.Name) (변경 없음, $Type)"
+                $Counters.skipped++
             }
         }
 
@@ -2631,6 +2726,8 @@ function Copy-Workflows-ForType {
                     }
                 }
             }
+        } elseif ($unchangedFiles.Count -gt 0) {
+            Print-Info "$Type 타입의 기존 워크플로우 $($unchangedFiles.Count)개가 현재 설정과 동일해 건너뜁니다."
         } else {
             Print-Info "$Type 타입의 기존 워크플로우가 없습니다."
         }
@@ -2655,6 +2752,13 @@ function Copy-Workflows-ForType {
             foreach ($workflow in $nexusWorkflows) {
                 $filename = $workflow.Name
                 $destPath = Join-Path $WORKFLOWS_DIR $filename
+
+                # 내용이 이미 동일하면 복사 생략 (변경점 0인 파일 덮어쓰기 방지)
+                if ((Test-Path $destPath) -and (Test-WorkflowUnchanged -Type $Type -SrcPath $workflow.FullName -ExistingPath $destPath)) {
+                    Write-Host "  ⏭ $filename (Nexus $Type, 변경 없음)"
+                    $Counters.skipped++
+                    continue
+                }
 
                 # 이미 존재하는 경우 처리
                 if (Test-Path $destPath) {
@@ -2696,6 +2800,8 @@ function Copy-Workflows-ForType {
         $wfFiles += Get-ChildItem -Path $srcDir -Filter '*.yml'  -File -ErrorAction SilentlyContinue
         foreach ($wf in $wfFiles) {
             $target = Join-Path $WORKFLOWS_DIR $wf.Name
+            # 내용 동일(unchanged)로 분류된 파일은 이미 설치 최종형과 같으므로 재설정 불필요
+            if ($unchangedFiles | Where-Object { $_.Name -eq $wf.Name }) { continue }
             if (Test-Path $target) { Configure-WorkflowEnv -Type $Type -File $target }
         }
     }
@@ -2742,6 +2848,13 @@ function Copy-Workflows {
         foreach ($workflow in $workflows) {
             $filename = $workflow.Name
             $destPath = Join-Path $WORKFLOWS_DIR $filename
+
+            # 내용이 이미 동일하면 복사 생략 (변경점 0인 파일 덮어쓰기 방지)
+            if ((Test-Path $destPath) -and (Test-WorkflowUnchanged -Type "common" -SrcPath $workflow.FullName -ExistingPath $destPath)) {
+                Write-Host "  ✓ $filename (변경 없음)"
+                $counters.skipped++
+                continue
+            }
 
             # COMMON은 항상 덮어쓰기 (핵심 기능)
             if (Test-Path $destPath) {

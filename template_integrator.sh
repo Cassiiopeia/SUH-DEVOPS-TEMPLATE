@@ -3294,6 +3294,22 @@ copy_config_folder() {
     print_success ".github/config 폴더 복사 완료 ($copied개 파일)"
 }
 
+# .github/wizard 폴더 복사 (labels.yml — @wizard ask 마커 질문 문구)
+# 워크플로우와 함께 가야 통합된 프로젝트의 '하나씩 입력' 모드에서 한글 질문이 뜬다.
+copy_wizard_labels() {
+    local src_wizard_dir="$TEMP_DIR/.github/wizard"
+    local dst_wizard_dir=".github/wizard"
+
+    if [ ! -d "$src_wizard_dir" ]; then
+        return   # 템플릿에 없으면 안전 스킵
+    fi
+
+    print_step ".github/wizard 폴더 복사 중..."
+    mkdir -p "$dst_wizard_dir"
+    cp -r "$src_wizard_dir/"* "$dst_wizard_dir/" 2>/dev/null || true
+    print_success ".github/wizard 폴더 복사 완료 (labels.yml)"
+}
+
 # 이슈 템플릿 다운로드
 copy_issue_templates() {
     print_step "이슈/PR 템플릿 다운로드 중..."
@@ -3928,6 +3944,7 @@ execute_integration() {
             update_version_yml_deploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             copy_scripts
             copy_config_folder
+            copy_wizard_labels   # 워크플로우 @wizard 마커 질문 문구(labels.yml)
             for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_issue_templates
             copy_discussion_templates
@@ -3948,6 +3965,7 @@ execute_integration() {
             update_version_yml_deploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             copy_scripts
             copy_config_folder
+            copy_wizard_labels   # 워크플로우 @wizard 마커 질문 문구(labels.yml)
             for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_setup_guide
             ;;

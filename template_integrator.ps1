@@ -2902,6 +2902,27 @@ function Copy-ConfigFolder {
 }
 
 # ===================================================================
+# .github/wizard 폴더 복사 (labels.yml — @wizard ask 마커 질문 문구)
+# 워크플로우와 함께 가야 통합된 프로젝트의 '하나씩 입력' 모드에서 한글 질문이 뜬다.
+# ===================================================================
+
+function Copy-WizardLabels {
+    $srcWizardDir = Join-Path $TEMP_DIR ".github\wizard"
+    $dstWizardDir = ".github\wizard"
+
+    if (-not (Test-Path $srcWizardDir)) {
+        return   # 템플릿에 없으면 안전 스킵
+    }
+
+    Print-Step ".github/wizard 폴더 복사 중..."
+    if (-not (Test-Path $dstWizardDir)) {
+        New-Item -Path $dstWizardDir -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$srcWizardDir\*" -Destination $dstWizardDir -Recurse -Force -ErrorAction SilentlyContinue
+    Print-Success ".github/wizard 폴더 복사 완료 (labels.yml)"
+}
+
+# ===================================================================
 # 이슈 템플릿 다운로드
 # ===================================================================
 
@@ -3495,6 +3516,7 @@ function Start-Integration {
             Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
+            Copy-WizardLabels
             Copy-IssueTemplates
             Copy-DiscussionTemplates
             Copy-CodeRabbitConfig
@@ -3517,6 +3539,7 @@ function Start-Integration {
             Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
+            Copy-WizardLabels
             Copy-SetupGuide
             # util 모듈 — ProjectTypes 배열 순회
             $utilTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }

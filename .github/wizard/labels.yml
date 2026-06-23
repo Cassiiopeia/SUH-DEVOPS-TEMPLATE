@@ -1,0 +1,10 @@
+# @wizard ask 마커의 사용자 질문 문구. 키=env 키, 값=한글 라벨.
+# 여기 없는 ask 키는 env 키명으로 질문된다(폴백). 기본값·resolver는 여기 두지 않는다(마커 소관).
+PROJECT_NAME: "프로젝트 이름"
+JAVA_VERSION: "JDK 버전"
+DEPLOY_PORT: "배포 포트"
+DOMAIN_NAME: "서비스 도메인"
+PRODUCTION_DOMAIN: "서비스 도메인"
+VOLUME_HOST_PATH: "호스트 볼륨 경로"
+VOLUME_CONTAINER_PATH: "컨테이너 내부 경로"
+SSH_AUTH_METHOD: "SSH 인증 방식(password/key)"

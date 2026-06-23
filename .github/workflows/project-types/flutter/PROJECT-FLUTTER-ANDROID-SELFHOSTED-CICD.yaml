@@ -35,9 +35,9 @@ on:
 # ============================================
 env:
   # 프로젝트 이름 (APK 파일명, 아티팩트명, 히스토리 파일명에 사용)
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
   FLUTTER_VERSION: "3.35.5"
-  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 17]
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:17
   # SMB 서버 설정 (자체 서버 — Synology NAS·Linux 등)
   SMB_PORT: "44445" # 기본 445
   SMB_SHARE: "web"

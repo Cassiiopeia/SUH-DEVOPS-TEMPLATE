@@ -2907,6 +2907,7 @@ configure_workflow_env() {
     while IFS= read -r _line; do
         _key=$(printf '%s' "$_line" | sed -nE 's|^[[:space:]]*([A-Z_]+):.*#[[:space:]]*@wizard[[:space:]].*|\1|p')
         [ -z "$_key" ] && continue
+        _val=""
         _action=$(printf '%s' "$_line" | sed -nE 's~.*#[[:space:]]*@wizard[[:space:]]+(ask|auto):.*~\1~p')
         _arg=$(printf '%s' "$_line" | sed -nE 's~.*#[[:space:]]*@wizard[[:space:]]+(ask|auto):(.*)$~\2~p' | sed 's/[[:space:]]*$//')
         [ -z "$_action" ] && continue

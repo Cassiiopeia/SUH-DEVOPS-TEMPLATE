@@ -211,7 +211,7 @@ create_fastfile() {
 
     local fastlane_dir="$PROJECT_PATH/ios/fastlane"
     local fastfile_path="$fastlane_dir/Fastfile"
-    local template_fastfile="$TEMPLATE_DIR/Fastfile"
+    local template_fastfile="$TEMPLATE_DIR/Fastfile.ios.template"
 
     # fastlane 디렉토리 생성
     mkdir -p "$fastlane_dir"
@@ -643,6 +643,12 @@ print_completion() {
     echo ""
     echo "  3. deploy 브랜치로 푸시하여 빌드 테스트"
     echo ""
+    echo "🎛️  배포 모드 설정 (선택):"
+    echo "   GitHub repo Variables에 IOS_DEPLOY_MODE 를 설정하면 기본 배포 범위를 정할 수 있습니다."
+    echo "     store_only    : TestFlight 업로드까지만 (기본)"
+    echo "     store_prepare : App Store 제출 직전까지 (사람이 ASC에서 Add for Review)"
+    echo "     store_submit  : App Store 심사 자동 제출 (정식 출시 1회 수동 이후부터 가능)"
+    echo "   워크플로우 수동 실행 시 deploy_mode 입력이 이 변수보다 우선합니다."
 }
 
 # ===================================================================

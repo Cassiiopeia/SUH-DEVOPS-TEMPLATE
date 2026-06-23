@@ -2777,6 +2777,14 @@ resolve_spring_app_yml_path() {
     find "$_base" -path "*/src/main/resources/application*.yml" 2>/dev/null | head -1 | sed 's#^\./##'
 }
 
+# auto:flutter-root — Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+# project_paths.flutter(통합 시점 resolve_project_paths가 채운 값)를 그대로 워크플로우 env에 박는다.
+resolve_flutter_root() {
+    local _p
+    _p=$(get_path_for_type "flutter")
+    [ -z "$_p" ] && echo "." || echo "$_p"
+}
+
 # resolver 디스패처. $1=type $2=resolver명 → 값(없으면 빈문자열)
 resolve_token() {
     local _t="$1" _name="$2"
@@ -2784,6 +2792,7 @@ resolve_token() {
         repo)                 resolve_repo ;;
         spring-app-yml-dir)   resolve_spring_app_yml_dir "$_t" ;;
         spring-app-yml-path)  resolve_spring_app_yml_path "$_t" ;;
+        flutter-root)         resolve_flutter_root ;;
         *) echo "" ;;
     esac
 }

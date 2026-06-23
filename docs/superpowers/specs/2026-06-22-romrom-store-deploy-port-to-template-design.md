@@ -2,8 +2,8 @@
 
 - 작성일: 2026-06-22
 - 관련 이슈(RomRom-FE): #930(Android/PlayStore 거짓 성공 제거), #931(iOS/AppStore 심사 자동 제출 누락), #934(배포 모드 3단계 통일), #935(마법사·Fastfile 가이드 명확화)
-- 관련 템플릿 이슈: SUH-DEVOPS-TEMPLATE #399
-- 선행 스펙(맥락): `2026-06-19-flutter-store-review-submit-automation-design.md`, `2026-06-19-playstore-review-submit-root-cause.md`
+- 관련 템플릿 이슈: SUH-DEVOPS-TEMPLATE #399 — **이 스펙이 정본(canonical)이며 #399 본문을 본 스펙 범위로 확장한다.**
+- **흡수 스펙(superseded)**: `2026-06-19-flutter-store-review-submit-automation-design.md` (+ 그 계획 `plans/2026-06-19-flutter-store-review-submit-automation.md`). 6-19의 좁은 범위(Android promote lane·iOS submit_review lane·워크플로우 env 옵션·마법사 UI 질문·회귀검증, Task 1~7)는 본 스펙 §3·§4·§5·§7의 **진부분집합**으로, 본 스펙이 흡수한다. 6-19은 더 이상 독립 실행하지 않으며, 구현 추적은 본 스펙 + #399 한 갈래로 단일화한다. (`2026-06-19-playstore-review-submit-root-cause.md`는 근본원인 분석 문서로 그대로 참조 유지.)
 - **선행 스펙(의존)**: `2026-06-22-wizard-marker-redesign-design.md` — 개선 (B)의 경로 주입이 이 마커 재설계 위에 올라간다. **작업 순서: 마커 재설계 먼저 → 본 스펙(Flutter).**
 
 ## 1. 목표 (두 갈래)

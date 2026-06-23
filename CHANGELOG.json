@@ -1,14 +1,48 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-23T04:54:52Z",
-    "currentVersion": "3.0.159",
+    "lastUpdated": "2026-06-23T07:32:34Z",
+    "currentVersion": "3.0.161",
     "projectType": "basic",
-    "totalReleases": 160,
+    "totalReleases": 161,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.161",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-23",
+      "pr_number": 408,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * iOS 앱을 App Store 심사까지 자동 제출할 수 있습니다\n  * 배포 범위를 3단계(업로드만/제출직전/심사제출)로 선택할 수 있습니다\n  * Flutter 프로젝트가 하위 폴더에 있어도 자동 배포가 동작합니다\n\n* **버그 수정**\n  * 안드로이드 배포가 실제로는 실패했는데 성공으로 표시되던 문제를 해결했습니다\n\n* **개선**\n  * iOS 배포 설정이 한 곳에서 일관되게 관리됩니다\n  * 배포 마법사에 배포 단계 안내가 추가되었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "iOS 앱을 App Store 심사까지 자동 제출할 수 있습니다",
+            "배포 범위를 3단계(업로드만/제출직전/심사제출)로 선택할 수 있습니다",
+            "Flutter 프로젝트가 하위 폴더에 있어도 자동 배포가 동작합니다"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "안드로이드 배포가 실제로는 실패했는데 성공으로 표시되던 문제를 해결했습니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "iOS 배포 설정이 한 곳에서 일관되게 관리됩니다",
+            "배포 마법사에 배포 단계 안내가 추가되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.159",
       "project_type": "basic",

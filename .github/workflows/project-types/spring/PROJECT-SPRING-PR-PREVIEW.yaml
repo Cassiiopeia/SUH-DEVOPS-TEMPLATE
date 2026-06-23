@@ -33,13 +33,13 @@ name: PROJECT-SPRING-PR-PREVIEW
 # ===================================================================
 env:
   # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용) (프로젝트별 수정 필요)
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
 
   # Spring Boot 빌드 설정 (프로젝트별 수정 필요)
-  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 21]
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:21
   GRADLE_BUILD_CMD: './gradlew clean build -x test -Dspring.profiles.active=prod'
   JAR_PATH: 'Suh-Web/build/libs/*.jar'  # 멀티모듈이면 빌드 산출물 경로를 직접 수정하세요
-  APPLICATION_YML_PATH: "__APPLICATION_YML_PATH__"  # @wizard auto-find: application-prod.yml 전체 경로
+  APPLICATION_YML_PATH: "__APPLICATION_YML_PATH__"  # @wizard auto:spring-app-yml-path
 
   # Docker 설정 (프로젝트별 수정 필요)
   DOCKERFILE_PATH: './Dockerfile'
@@ -57,7 +57,7 @@ env:
   # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
   #   password → SERVER_PASSWORD secret 사용
   #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
-  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
+  SSH_AUTH_METHOD: "password"  # @wizard ask:password
 
   # SSH 포트 (서버 포트 환경 구축 후 수정 금지)
   SSH_PORT: '2022'

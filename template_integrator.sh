@@ -2758,22 +2758,44 @@ detect_repo_name() {
     basename "$(pwd)"
 }
 
-# 타입별 상식 기본값 — ask 마커의 디폴트 (우선순위 2)
-# $1=type $2=KEY → 기본값(없으면 빈 문자열). {name}은 호출측이 PROJECT_NAME으로 치환.
-default_for_type_key() {
-    local _t="$1" _k="$2"
-    case "$_t:$_k" in
-        spring:DEPLOY_PORT) echo "8080" ;;
-        python:DEPLOY_PORT) echo "8000" ;;
-        react:DEPLOY_PORT|next:DEPLOY_PORT|node:DEPLOY_PORT) echo "3000" ;;
-        spring:JAVA_VERSION) echo "21" ;;
-        flutter:JAVA_VERSION) echo "17" ;;
-        spring:VOLUME_HOST_PATH|python:VOLUME_HOST_PATH) echo "/volume1/projects/{name}" ;;
-        spring:VOLUME_CONTAINER_PATH|python:VOLUME_CONTAINER_PATH) echo "/mnt/{name}" ;;
-        spring:DOMAIN_NAME|spring:PRODUCTION_DOMAIN) echo "example.com" ;;
-        *:SSH_AUTH_METHOD) echo "password" ;;
+# ── resolver 레지스트리 ──────────────────────────────────────────────
+# 동적 기본값(@name)·auto:name 둘 다 사용. $1=type. 반환은 stdout.
+resolve_repo() { detect_repo_name; }
+
+resolve_spring_app_yml_dir() {
+    local _t="$1" _base
+    _base=$(get_path_for_type "$_t"); [ -z "$_base" ] && _base="."
+    local _f
+    _f=$(find "$_base" -path "*/src/main/resources/application*.yml" 2>/dev/null | head -1)
+    [ -z "$_f" ] && { echo ""; return; }
+    dirname "$_f" | sed 's#^\./##'
+}
+
+resolve_spring_app_yml_path() {
+    local _t="$1" _base
+    _base=$(get_path_for_type "$_t"); [ -z "$_base" ] && _base="."
+    find "$_base" -path "*/src/main/resources/application*.yml" 2>/dev/null | head -1 | sed 's#^\./##'
+}
+
+# resolver 디스패처. $1=type $2=resolver명 → 값(없으면 빈문자열)
+resolve_token() {
+    local _t="$1" _name="$2"
+    case "$_name" in
+        repo)                 resolve_repo ;;
+        spring-app-yml-dir)   resolve_spring_app_yml_dir "$_t" ;;
+        spring-app-yml-path)  resolve_spring_app_yml_path "$_t" ;;
         *) echo "" ;;
     esac
+}
+
+# labels.yml에서 질문 문구 조회 (없으면 키명). $1=KEY
+LABELS_FILE="${LABELS_FILE:-.github/wizard/labels.yml}"
+wf_label() {
+    local _k="$1" _v=""
+    if [ -f "$LABELS_FILE" ]; then
+        _v=$(sed -nE "s~^${_k}:[[:space:]]*\"?([^\"]*)\"?[[:space:]]*\$~\1~p" "$LABELS_FILE" | head -1)
+    fi
+    [ -n "$_v" ] && echo "$_v" || echo "$_k"
 }
 
 # WF_DEPLOY_CSV에서 type+KEY 조회 (우선순위 1 — 재실행 시 기존값)
@@ -2808,17 +2830,14 @@ wf_deploy_set() {
     WF_DEPLOY_CSV="${_out:+$_out;}$_t|$_k=$_v"
 }
 
-# env 키 한 줄의 값만 안전 치환 (BSD/GNU sed 양립, 값의 특수문자 이스케이프)
-# $1=파일 $2=KEY $3=값
+# env 키 값 치환 + 그 줄의 # @wizard 주석 삭제. $1=파일 $2=KEY $3=값
 _wf_set_env() {
-    local _file="$1" _key="$2" _val="$3"
-    # 구분자는 ~ (값·정규식에 ~ 충돌 거의 없음). 치환부 위험문자(&, \, ~)만 이스케이프
-    local _esc
+    local _file="$1" _key="$2" _val="$3" _esc
     _esc=$(printf '%s' "$_val" | sed 's/[&~\\]/\\&/g')
-    # 값 치환: KEY: "..." 의 따옴표 안만 교체
+    # 값 치환: KEY: "..." 따옴표 안
     sed -i.wftmp -E "s~^([[:space:]]*${_key}:[[:space:]]*\")[^\"]*(\")~\1${_esc}\2~" "$_file" 2>/dev/null
-    # 마커를 'set'으로 갱신 (처리됨 표시 — 멱등성 + 사람 안내). 패턴 내 | 는 구분자 ~ 와 무충돌
-    sed -i.wftmp -E "s~(^[[:space:]]*${_key}:.*)# @wizard (ask|auto-find|auto)[^\"]*\$~\1# @wizard set (직접 수정 가능)~" "$_file" 2>/dev/null
+    # 그 줄 끝의 # @wizard ... 주석 제거(공백째)
+    sed -i.wftmp -E "s~(^[[:space:]]*${_key}:.*[^[:space:]])[[:space:]]*#[[:space:]]*@wizard[[:space:]].*\$~\1~" "$_file" 2>/dev/null
     rm -f "$_file.wftmp"
 }
 
@@ -2868,135 +2887,75 @@ update_version_yml_deploy() {
 configure_workflow_env() {
     local _type="$1" _file="$2"
     [ -f "$_file" ] || return 0
-
-    # 안전 폴백: @wizard 마커가 없으면 손대지 않음 (사용자 자작·외부 워크플로우 보호)
     grep -q "@wizard" "$_file" 2>/dev/null || return 0
 
-    local _repo
-    _repo=$(detect_repo_name)
-
-    # ── "전부 기본값 일괄" 모드: 최초 1회만 질문 ──
-    if [ -z "$WF_USE_DEFAULTS" ]; then
+    # 일괄 기본값 모드 1회 질문 (기존 로직 유지)
+    if [ -z "${WF_USE_DEFAULTS:-}" ]; then
         if [ "$FORCE_MODE" = true ] || [ "$TTY_AVAILABLE" != true ]; then
-            WF_USE_DEFAULTS=true   # 비대화형은 자동 전부기본값
+            WF_USE_DEFAULTS=true
         else
             print_to_user ""
             print_step "배포 워크플로우 환경설정을 채웁니다"
-            print_to_user "  엔터만 누르면 각 항목의 기본값이 들어갑니다."
             local _ans=""
-            safe_read "  전부 기본값으로 빠르게 채울까요? (Y=전부기본 / n=하나씩 입력) [Y]: " _ans "-n 1" || _ans=""
+            safe_read "  전부 기본값으로 빠르게 채울까요? (Y=전부기본 / n=하나씩) [Y]: " _ans "-n 1" || _ans=""
             print_to_user ""
-            case "$_ans" in
-                n|N) WF_USE_DEFAULTS=false ;;
-                *)   WF_USE_DEFAULTS=true ;;
-            esac
+            case "$_ans" in n|N) WF_USE_DEFAULTS=false ;; *) WF_USE_DEFAULTS=true ;; esac
         fi
     fi
 
-    # ── 마커 줄 스캔 ──
-    # 형식: "  KEY: "..."  # @wizard <action>: <설명> [기본: <리터럴>]"
-    local _line _key _action _literal _curval _default _val
+    local _line _key _action _arg _val
     while IFS= read -r _line; do
-        # KEY 추출 (마커 줄의 'KEY:' 부분)
-        _key=$(printf '%s' "$_line" | sed -nE 's|^[[:space:]]*([A-Z_]+):.*# @wizard.*|\1|p')
+        _key=$(printf '%s' "$_line" | sed -nE 's|^[[:space:]]*([A-Z_]+):.*#[[:space:]]*@wizard[[:space:]].*|\1|p')
         [ -z "$_key" ] && continue
-        # action 추출 (ask / auto / auto-find)
-        _action=$(printf '%s' "$_line" | sed -nE 's~.*# @wizard (ask|auto-find|auto).*~\1~p')
+        _val=""
+        _action=$(printf '%s' "$_line" | sed -nE 's~.*#[[:space:]]*@wizard[[:space:]]+(ask|auto):.*~\1~p')
+        _arg=$(printf '%s' "$_line" | sed -nE 's~.*#[[:space:]]*@wizard[[:space:]]+(ask|auto):(.*)$~\2~p' | sed 's/[[:space:]]*$//')
         [ -z "$_action" ] && continue
-        # 마커의 [기본: X] 리터럴
-        _literal=$(printf '%s' "$_line" | sed -nE 's|.*\[기본:[[:space:]]*([^]]*)\].*|\1|p')
-        _literal=$(printf '%s' "$_literal" | sed 's/[[:space:]]*$//')
 
         case "$_action" in
             auto)
-                # PROJECT_NAME 등 자동값
-                if [ "$_key" = "PROJECT_NAME" ]; then
-                    _val="$_repo"
-                else
-                    _val="$_literal"
-                fi
-                ;;
-            auto-find)
-                # application.yml 위치 등 — 해당 타입 경로 기준 탐색
-                local _base
-                _base=$(get_path_for_type "$_type"); [ -z "$_base" ] && _base="."
-                _val=$(find "$_base" -path "*/src/main/resources/application*.yml" 2>/dev/null | head -1)
-                if [ -n "$_val" ]; then
-                    # APPLICATION_YML_DIR이면 디렉토리, PATH면 파일 경로
-                    case "$_key" in
-                        *_DIR) _val=$(dirname "$_val") ;;
-                    esac
-                    _val=$(printf '%s' "$_val" | sed 's#^\./##')
-                else
-                    # 못 찾음: 리터럴이 실제 경로면 사용, 토큰/안내문이면 빈값(→ 잔류토큰 경고로 사용자가 직접 채움)
-                    case "$_literal" in
-                        *__*|"") _val="" ;;
-                        *) _val="$_literal" ;;
-                    esac
-                fi
+                _val=$(resolve_token "$_type" "$_arg")
                 ;;
             ask)
-                # 기본값 우선순위: version.yml 기존값 > 타입별 기본 > 마커 리터럴
-                _default=$(wf_deploy_get "$_type" "$_key")
-                if [ -z "$_default" ]; then
-                    _default=$(default_for_type_key "$_type" "$_key")
-                    # {name} 치환
-                    _default=$(printf '%s' "$_default" | sed "s~{name}~$_repo~g")
-                fi
-                # PROJECT_NAME은 ask여도 기본값=레포명 (마커의 '레포명' 한글 리터럴은 안내문일 뿐)
-                if [ "$_key" = "PROJECT_NAME" ] && [ -z "$_default" ]; then
-                    _default="$_repo"
-                fi
-                # 마커 리터럴 폴백 — 단, 리터럴이 한글 안내문/토큰이면 무시
-                if [ -z "$_default" ]; then
-                    case "$_literal" in
-                        *__*|*레포*|*이름*|*프로젝트*) : ;;   # 안내문/토큰 → 폴백 안 함
-                        *) _default="$_literal" ;;
-                    esac
-                fi
-
+                # 기본값: @name이면 resolver, 아니면 리터럴. 재실행 기존값 우선.
+                local _default
+                case "$_arg" in
+                    @*) _default=$(resolve_token "$_type" "${_arg#@}") ;;
+                    *)  _default="$_arg" ;;
+                esac
+                local _saved; _saved=$(wf_deploy_get "$_type" "$_key")
+                [ -n "$_saved" ] && _default="$_saved"
                 if [ "$WF_USE_DEFAULTS" = true ]; then
                     _val="$_default"
                 else
-                    # 하나씩 입력 (엔터=기본값)
-                    local _in=""
-                    safe_read "  ${_key} [기본: ${_default}]: " _in "" || _in=""
-                    if [ -z "$_in" ]; then _val="$_default"; else _val="$_in"; fi
+                    local _label _in=""
+                    _label=$(wf_label "$_key")
+                    safe_read "  ${_label} [기본: ${_default}]: " _in "" || _in=""
+                    [ -z "$_in" ] && _val="$_default" || _val="$_in"
                 fi
-                # ask 결과는 재사용/저장 위해 기억
                 wf_deploy_set "$_type" "$_key" "$_val"
                 ;;
         esac
-
         [ -n "$_val" ] && _wf_set_env "$_file" "$_key" "$_val"
-    done < <(grep -nE "# @wizard (ask|auto-find|auto)" "$_file" | sed 's/^[0-9]*://')
+    done < <(grep -nE "#[[:space:]]*@wizard[[:space:]]+(ask|auto):" "$_file" | sed 's/^[0-9]*://')
 
-    # ── 토큰 재귀 치환: 값에 남은 __PROJECT_NAME__ 해소 ──
+    # 재귀 토큰 치환: 남은 __PROJECT_NAME__ (VOLUME 경로 등)
     if grep -q "__PROJECT_NAME__" "$_file" 2>/dev/null; then
-        local _esc_repo
-        _esc_repo=$(printf '%s' "$_repo" | sed 's/[&|\\]/\\&/g')
-        sed -i.wftmp "s|__PROJECT_NAME__|$_esc_repo|g" "$_file"
-        rm -f "$_file.wftmp"
+        local _esc_repo; _esc_repo=$(printf '%s' "$(detect_repo_name)" | sed 's/[&|\\]/\\&/g')
+        sed -i.wftmp "s|__PROJECT_NAME__|$_esc_repo|g" "$_file"; rm -f "$_file.wftmp"
     fi
 
-    # ── paths 앵커 주입 (멀티타입 + 모노레포만, flutter·NONSTOP은 앵커 자체가 없어 자동 제외) ──
-    if grep -q "# @wizard paths-anchor" "$_file" 2>/dev/null; then
-        local _ppath
-        _ppath=$(get_path_for_type "$_type")
+    # paths-anchor (불변 — 기존 로직 그대로 유지)
+    if grep -q "#[[:space:]]*@wizard paths-anchor" "$_file" 2>/dev/null; then
+        local _ppath; _ppath=$(get_path_for_type "$_type")
         if [ -n "$_ppath" ] && [ "$_ppath" != "." ]; then
-            # 앵커 줄의 들여쓰기를 유지하며 paths 필터로 치환
-            local _indent
-            _indent=$(grep "# @wizard paths-anchor" "$_file" | sed -E 's/([[:space:]]*).*/\1/' | head -1)
-            sed -i.wftmp "s~^[[:space:]]*# @wizard paths-anchor.*~${_indent}paths: ['${_ppath}/**']~" "$_file"
-            rm -f "$_file.wftmp"
+            local _indent; _indent=$(grep "@wizard paths-anchor" "$_file" | sed -E 's/([[:space:]]*).*/\1/' | head -1)
+            sed -i.wftmp "s~^[[:space:]]*#[[:space:]]*@wizard paths-anchor.*~${_indent}paths: ['${_ppath}/**']~" "$_file"; rm -f "$_file.wftmp"
         fi
-        # 루트(.) 이거나 모노레포 아니면 앵커 주석 그대로 둠 (무해 — 주석이라 실행 영향 없음)
     fi
 
-    # ── 잔류 토큰 경고 ──
     if grep -qE "__[A-Z_]+__" "$_file" 2>/dev/null; then
-        local _leftover
-        _leftover=$(grep -oE "__[A-Z_]+__" "$_file" | sort -u | tr '\n' ' ')
+        local _leftover; _leftover=$(grep -oE "__[A-Z_]+__" "$_file" | sort -u | tr '\n' ' ')
         print_warning "  $(basename "$_file"): 미치환 토큰 남음($_leftover) — 직접 채워주세요"
     fi
 }
@@ -3333,6 +3292,22 @@ copy_config_folder() {
     # 복사된 파일 개수 계산
     local copied=$(ls -1 "$dst_config_dir" 2>/dev/null | wc -l | tr -d ' ')
     print_success ".github/config 폴더 복사 완료 ($copied개 파일)"
+}
+
+# .github/wizard 폴더 복사 (labels.yml — @wizard ask 마커 질문 문구)
+# 워크플로우와 함께 가야 통합된 프로젝트의 '하나씩 입력' 모드에서 한글 질문이 뜬다.
+copy_wizard_labels() {
+    local src_wizard_dir="$TEMP_DIR/.github/wizard"
+    local dst_wizard_dir=".github/wizard"
+
+    if [ ! -d "$src_wizard_dir" ]; then
+        return   # 템플릿에 없으면 안전 스킵
+    fi
+
+    print_step ".github/wizard 폴더 복사 중..."
+    mkdir -p "$dst_wizard_dir"
+    cp -r "$src_wizard_dir/"* "$dst_wizard_dir/" 2>/dev/null || true
+    print_success ".github/wizard 폴더 복사 완료 (labels.yml)"
 }
 
 # 이슈 템플릿 다운로드
@@ -3969,6 +3944,7 @@ execute_integration() {
             update_version_yml_deploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             copy_scripts
             copy_config_folder
+            copy_wizard_labels   # 워크플로우 @wizard 마커 질문 문구(labels.yml)
             for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_issue_templates
             copy_discussion_templates
@@ -3989,6 +3965,7 @@ execute_integration() {
             update_version_yml_deploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             copy_scripts
             copy_config_folder
+            copy_wizard_labels   # 워크플로우 @wizard 마커 질문 문구(labels.yml)
             for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_setup_guide
             ;;

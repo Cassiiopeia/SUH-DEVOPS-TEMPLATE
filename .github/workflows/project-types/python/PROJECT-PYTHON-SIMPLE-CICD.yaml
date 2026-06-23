@@ -64,10 +64,10 @@ on:
 # ===================================================================
 env:
   # 프로젝트 고유 식별자
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
 
   # 🌐 포트 설정
-  DEPLOY_PORT: "__DEPLOY_PORT__"  # @wizard ask: 배포 포트 [기본: 8000]
+  DEPLOY_PORT: "__DEPLOY_PORT__"  # @wizard ask:8000
 
   # 🐍 Python 설정
   PYTHON_VERSION: "3.13"
@@ -77,13 +77,13 @@ env:
 
   # 🗂️ 볼륨 마운트 설정 (빈값이면 마운트 안함)
   ENABLE_VOLUME_MOUNT: "false"
-  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
-  VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask: 컨테이너 내부 경로 [기본: /mnt/__PROJECT_NAME__]
+  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask:/volume1/projects/__PROJECT_NAME__
+  VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask:/mnt/__PROJECT_NAME__
 
   # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
   #   password → SERVER_PASSWORD secret 사용
   #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
-  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
+  SSH_AUTH_METHOD: "password"  # @wizard ask:password
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)

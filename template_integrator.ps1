@@ -2354,26 +2354,38 @@ function Get-RepoName {
     return (Split-Path -Leaf (Get-Location).Path)
 }
 
-# 타입별 상식 기본값 (ask 디폴트 우선순위 2). {name}은 호출측이 치환.
-function Get-DefaultForTypeKey {
-    param([string]$Type, [string]$Key)
-    switch ("${Type}:${Key}") {
-        'spring:DEPLOY_PORT' { return '8080' }
-        'python:DEPLOY_PORT' { return '8000' }
-        'react:DEPLOY_PORT'  { return '3000' }
-        'next:DEPLOY_PORT'   { return '3000' }
-        'node:DEPLOY_PORT'   { return '3000' }
-        'spring:JAVA_VERSION'  { return '21' }
-        'flutter:JAVA_VERSION' { return '17' }
-        'spring:VOLUME_HOST_PATH' { return '/volume1/projects/{name}' }
-        'python:VOLUME_HOST_PATH' { return '/volume1/projects/{name}' }
-        'spring:VOLUME_CONTAINER_PATH' { return '/mnt/{name}' }
-        'python:VOLUME_CONTAINER_PATH' { return '/mnt/{name}' }
-        'spring:DOMAIN_NAME' { return 'example.com' }
-        'spring:PRODUCTION_DOMAIN' { return 'example.com' }
-        { $_ -like '*:SSH_AUTH_METHOD' } { return 'password' }
+# resolver 함수 — auto: 토큰을 실제 값으로 해소 (.sh resolve_* 와 동일)
+function Resolve-Repo { Get-RepoName }
+function Resolve-SpringAppYmlDir { param([string]$Type)
+    $base='.'; if($script:ProjectPaths.Contains($Type)){ $base=$script:ProjectPaths[$Type] }
+    $f=Get-ChildItem -Path $base -Recurse -Filter 'application*.yml' -ErrorAction SilentlyContinue |
+       Where-Object { $_.FullName -match 'src[/\\]main[/\\]resources' } | Select-Object -First 1
+    if(-not $f){ return '' }
+    ((Resolve-Path -Relative $f.FullName) -replace '^\.[/\\]','' -replace '\\','/') -replace '/[^/]+$',''
+}
+function Resolve-SpringAppYmlPath { param([string]$Type)
+    $base='.'; if($script:ProjectPaths.Contains($Type)){ $base=$script:ProjectPaths[$Type] }
+    $f=Get-ChildItem -Path $base -Recurse -Filter 'application*.yml' -ErrorAction SilentlyContinue |
+       Where-Object { $_.FullName -match 'src[/\\]main[/\\]resources' } | Select-Object -First 1
+    if(-not $f){ return '' }
+    (Resolve-Path -Relative $f.FullName) -replace '^\.[/\\]','' -replace '\\','/'
+}
+function Resolve-Token { param([string]$Type,[string]$Name)
+    switch ($Name) {
+        'repo'                { return (Resolve-Repo) }
+        'spring-app-yml-dir'  { return (Resolve-SpringAppYmlDir $Type) }
+        'spring-app-yml-path' { return (Resolve-SpringAppYmlPath $Type) }
         default { return '' }
     }
+}
+function Get-WfLabel { param([string]$Key)
+    $lf = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
+    if (Test-Path $lf) {
+        foreach($l in Get-Content $lf){
+            if($l -match "^${Key}:\s*`"?([^`"]*)`"?\s*$"){ return $Matches[1] }
+        }
+    }
+    return $Key
 }
 
 # WfDeploy 조회/저장 (우선순위 1 — 재실행 기존값)
@@ -2443,51 +2455,23 @@ function Configure-WorkflowEnv {
 
     $lines = Get-Content $File
     $newLines = foreach ($line in $lines) {
-        if ($line -match '^\s*([A-Z_]+):.*#\s*@wizard\s+(ask|auto-find|auto)') {
-            $key = $Matches[1]; $action = $Matches[2]
-            $literal = ''
-            if ($line -match '\[기본:\s*([^\]]*)\]') { $literal = $Matches[1].Trim() }
-            $val = $null
-
-            switch ($action) {
-                'auto' {
-                    if ($key -eq 'PROJECT_NAME') { $val = $repo } else { $val = $literal }
-                }
-                'auto-find' {
-                    $base = '.'
-                    if ($script:ProjectPaths.Contains($Type)) { $base = $script:ProjectPaths[$Type] }
-                    $found = Get-ChildItem -Path $base -Recurse -Filter 'application*.yml' -ErrorAction SilentlyContinue |
-                             Where-Object { $_.FullName -match 'src[/\\]main[/\\]resources' } | Select-Object -First 1
-                    if ($found) {
-                        $p = (Resolve-Path -Relative $found.FullName) -replace '^\.[/\\]', '' -replace '\\', '/'
-                        if ($key -like '*_DIR') { $p = ($p -replace '/[^/]+$', '') }
-                        $val = $p
-                    } else {
-                        if ($literal -match '__' -or $literal -eq '') { $val = $null } else { $val = $literal }
-                    }
-                }
-                'ask' {
-                    $def = Get-WfDeploy $Type $key
-                    if (-not $def) { $def = (Get-DefaultForTypeKey $Type $key) -replace '\{name\}', $repo }
-                    if ((-not $def) -and $key -eq 'PROJECT_NAME') { $def = $repo }
-                    if (-not $def) {
-                        if (-not ($literal -match '__|레포|이름|프로젝트')) { $def = $literal }
-                    }
-                    if ($script:WfUseDefaults) {
-                        $val = $def
-                    } else {
-                        $inp = Read-UserInput "  $key" $def
-                        $val = if ([string]::IsNullOrWhiteSpace($inp)) { $def } else { $inp }
-                    }
-                    Set-WfDeploy $Type $key $val
-                }
+        if ($line -match '^\s*([A-Z_]+):.*#\s*@wizard\s+(ask|auto):(.*)$') {
+            $key=$Matches[1]; $action=$Matches[2]; $arg=$Matches[3].Trim()
+            $val=$null
+            if ($action -eq 'auto') {
+                $val = Resolve-Token $Type $arg
+            } else {
+                if ($arg -like '@*') { $def = Resolve-Token $Type ($arg.Substring(1)) } else { $def = $arg }
+                $saved = Get-WfDeploy $Type $key
+                if ($saved) { $def = $saved }
+                if ($script:WfUseDefaults) { $val = $def }
+                else { $inp = Read-UserInput ("  " + (Get-WfLabel $key)) $def; $val = if([string]::IsNullOrWhiteSpace($inp)){$def}else{$inp} }
+                Set-WfDeploy $Type $key $val
             }
-
             if ($null -ne $val -and $val -ne '') {
-                # 값 치환 + 마커를 set으로 갱신
-                $escVal = $val
-                $line = $line -replace "(^\s*${key}:\s*`")[^`"]*(`")", "`${1}$escVal`${2}"
-                $line = $line -replace "#\s*@wizard\s+(ask|auto-find|auto).*$", "# @wizard set (직접 수정 가능)"
+                $line = $line -replace "(^\s*${key}:\s*`")[^`"]*(`")", "`${1}$val`${2}"
+                # 그 줄의 # @wizard 주석 삭제
+                $line = $line -replace "\s*#\s*@wizard\s+(ask|auto):.*$", ""
             }
         }
         $line
@@ -2915,6 +2899,27 @@ function Copy-ConfigFolder {
     # 복사된 파일 개수 계산
     $copied = (Get-ChildItem $dstConfigDir -File -ErrorAction SilentlyContinue | Measure-Object).Count
     Print-Success ".github/config 폴더 복사 완료 ($copied개 파일)"
+}
+
+# ===================================================================
+# .github/wizard 폴더 복사 (labels.yml — @wizard ask 마커 질문 문구)
+# 워크플로우와 함께 가야 통합된 프로젝트의 '하나씩 입력' 모드에서 한글 질문이 뜬다.
+# ===================================================================
+
+function Copy-WizardLabels {
+    $srcWizardDir = Join-Path $TEMP_DIR ".github\wizard"
+    $dstWizardDir = ".github\wizard"
+
+    if (-not (Test-Path $srcWizardDir)) {
+        return   # 템플릿에 없으면 안전 스킵
+    }
+
+    Print-Step ".github/wizard 폴더 복사 중..."
+    if (-not (Test-Path $dstWizardDir)) {
+        New-Item -Path $dstWizardDir -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$srcWizardDir\*" -Destination $dstWizardDir -Recurse -Force -ErrorAction SilentlyContinue
+    Print-Success ".github/wizard 폴더 복사 완료 (labels.yml)"
 }
 
 # ===================================================================
@@ -3511,6 +3516,7 @@ function Start-Integration {
             Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
+            Copy-WizardLabels
             Copy-IssueTemplates
             Copy-DiscussionTemplates
             Copy-CodeRabbitConfig
@@ -3533,6 +3539,7 @@ function Start-Integration {
             Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
+            Copy-WizardLabels
             Copy-SetupGuide
             # util 모듈 — ProjectTypes 배열 순회
             $utilTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }

@@ -80,16 +80,16 @@ on:
 # ===================================================================
 env:
   # 🔧 프로젝트 설정 - 실제 프로젝트명으로 변경하세요
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
-  DOMAIN_NAME: "__DOMAIN_NAME__"  # @wizard ask: 서비스 도메인 [기본: example.com]
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
+  DOMAIN_NAME: "__DOMAIN_NAME__"  # @wizard ask:example.com
 
   # ☁️ Spring Boot 설정
   SPRING_PROFILE: "prod"
-  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 21]
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:21
   GRADLE_OPTS: "-Dspring.profiles.active=prod"
 
   # 📁 경로 설정
-  APPLICATION_YML_DIR: "__APPLICATION_YML_DIR__"  # @wizard auto-find: application.yml이 있는 resources 디렉토리
+  APPLICATION_YML_DIR: "__APPLICATION_YML_DIR__"  # @wizard auto:spring-app-yml-dir
   DOCKERFILE_PATH: "./Dockerfile"
 
   # 🌐 포트 및 컨테이너 설정
@@ -104,13 +104,13 @@ env:
 
   # 📦 볼륨 마운트 설정
   ENABLE_VOLUME_MOUNT: "false"
-  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
+  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask:/volume1/projects/__PROJECT_NAME__
   VOLUME_CONTAINER_PATH: "/app"
 
   # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
   #   password → SERVER_PASSWORD secret 사용
   #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
-  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
+  SSH_AUTH_METHOD: "password"  # @wizard ask:password
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"

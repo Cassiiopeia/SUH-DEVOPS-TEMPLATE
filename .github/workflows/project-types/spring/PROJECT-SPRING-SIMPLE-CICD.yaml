@@ -74,20 +74,20 @@ on:
 # ===================================================================
 env:
   # 🔧 프로젝트 설정 - 실제 프로젝트명으로 변경하세요
-  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask: 프로젝트 이름 [기본: 레포명]
+  PROJECT_NAME: "__PROJECT_NAME__"  # @wizard ask:@repo
 
   # ☁️ Spring Boot 설정
   SPRING_PROFILE: "prod"
-  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask: JDK 버전 [기본: 21]
+  JAVA_VERSION: "__JAVA_VERSION__"  # @wizard ask:21
   GRADLE_OPTS: "-Dspring.profiles.active=prod"
 
   # 📁 경로 설정
-  APPLICATION_YML_DIR: "__APPLICATION_YML_DIR__"  # @wizard auto-find: application.yml이 있는 resources 디렉토리
+  APPLICATION_YML_DIR: "__APPLICATION_YML_DIR__"  # @wizard auto:spring-app-yml-dir
   DOCKERFILE_PATH: "./Dockerfile"
 
   # 🌐 포트 설정
   CONTAINER_INTERNAL_PORT: "8080"  # Spring Boot 내부 포트 (고정값)
-  DEPLOY_PORT: "__DEPLOY_PORT__"  # @wizard ask: 배포 포트 [기본: 8080]
+  DEPLOY_PORT: "__DEPLOY_PORT__"  # @wizard ask:8080
 
   # 🐳 컨테이너 이름 설정
   # 비워두면 PROJECT_NAME을 기본값으로 사용 (예: mapsy-back)
@@ -98,13 +98,13 @@ env:
   # true: 볼륨 마운트 활성화 (디렉토리 없으면 자동 생성)
   # false: 볼륨 마운트 비활성화 (기본값)
   ENABLE_VOLUME_MOUNT: "false"
-  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask: 호스트 볼륨 경로 [기본: /volume1/projects/__PROJECT_NAME__]
-  VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask: 컨테이너 내부 경로 [기본: /mnt/__PROJECT_NAME__]
+  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask:/volume1/projects/__PROJECT_NAME__
+  VOLUME_CONTAINER_PATH: "/mnt/__PROJECT_NAME__"  # @wizard ask:/mnt/__PROJECT_NAME__
 
   # 🔐 SSH 인증 방식: "password"(Synology·일반 서버) | "key"(AWS EC2·.pem)
   #   password → SERVER_PASSWORD secret 사용
   #   key      → SSH_KEY secret 사용 (.pem 파일 전체 내용을 secret 값으로)
-  SSH_AUTH_METHOD: "password"  # @wizard ask: SSH 인증 방식(password/key) [기본: password]
+  SSH_AUTH_METHOD: "password"  # @wizard ask:password
 
   # 🔌 SSH 연결 설정
   SSH_PORT: "2022"  # SSH 포트 (Synology 기본: 2022)

@@ -2813,36 +2813,45 @@ _wf_labels_path() {
 # 워크플로우 파일명 → 사람이 읽는 짧은 이름.
 # labels.yml의 _workflow_names: 블록에서 "키가 파일명에 포함되면" 그 값 사용(긴 키 우선).
 # 매핑 없으면 파일명에서 .yaml/.yml 확장자만 제거해 그대로 반환.
+# _workflow_names 매핑을 전역 캐시(WF_WFNAME_KEYS/WF_WFNAME_VAL)에 1회만 로드.
+# 호출마다 labels.yml을 풀스캔하면 Windows Git Bash에서 fork 비용으로 극단적으로 느려진다(실측 수십 초).
+# 매핑은 통합 1회 동안 불변이므로 캐싱이 안전하다.
+declare -ga WF_WFNAME_KEYS 2>/dev/null || true
+declare -gA WF_WFNAME_VAL 2>/dev/null || true
+WF_WFNAME_LOADED=""
+_wf_load_workflow_names() {
+    [ -n "$WF_WFNAME_LOADED" ] && return 0
+    WF_WFNAME_LOADED=1
+    WF_WFNAME_KEYS=(); WF_WFNAME_VAL=()
+    local _lf _line _k _v _rest _inblk=false
+    _lf=$(_wf_labels_path); [ -n "$_lf" ] || return 0
+    while IFS= read -r _line; do
+        case "$_line" in
+            _workflow_names:*) _inblk=true; continue ;;
+        esac
+        [ "$_inblk" = true ] || continue
+        case "$_line" in [!\ ]*) _inblk=false; continue ;; esac
+        # "  KEY: "값"" → bash 내장 파싱(sed fork 회피)
+        _k="${_line#"${_line%%[![:space:]]*}"}"   # leading ws strip
+        case "$_k" in
+            *:\ \"*\") _v="${_k#*: \"}"; _v="${_v%\"}"; _k="${_k%%:*}" ;;
+            *) continue ;;
+        esac
+        [ -z "$_k" ] && continue
+        WF_WFNAME_KEYS+=("$_k"); WF_WFNAME_VAL[$_k]="$_v"
+    done < "$_lf"
+}
 wf_workflow_name() {
-    local _file="$1" _base _lf _line _key _val _best="" _bestlen=0
+    local _file="$1" _base _k _best="" _bestlen=0
     _base="${_file##*/}"                 # 경로 제거
-    _lf=$(_wf_labels_path)
-    if [ -n "$_lf" ]; then
-        # _workflow_names: 블록 안의 "  KEY: "값"" 라인을 스캔
-        local _inblk=false
-        while IFS= read -r _line; do
-            case "$_line" in
-                _workflow_names:*) _inblk=true; continue ;;
-            esac
-            if [ "$_inblk" = true ]; then
-                # 비들여쓰기 라인 만나면 블록 끝
-                case "$_line" in
-                    [!\ ]*) _inblk=false; continue ;;
-                esac
-                _key=$(printf '%s' "$_line" | sed -nE 's/^[[:space:]]+([A-Za-z0-9_-]+):[[:space:]]*".*"[[:space:]]*$/\1/p')
-                [ -z "$_key" ] && continue
-                case "$_base" in
-                    *"$_key"*)
-                        # 가장 긴 키 매칭 우선
-                        if [ "${#_key}" -gt "$_bestlen" ]; then
-                            _val=$(printf '%s' "$_line" | sed -nE 's/^[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*"(.*)"[[:space:]]*$/\1/p')
-                            _best="$_val"; _bestlen="${#_key}"
-                        fi
-                        ;;
-                esac
-            fi
-        done < "$_lf"
-    fi
+    _wf_load_workflow_names
+    for _k in "${WF_WFNAME_KEYS[@]}"; do
+        case "$_base" in
+            *"$_k"*)
+                if [ "${#_k}" -gt "$_bestlen" ]; then _best="${WF_WFNAME_VAL[$_k]}"; _bestlen="${#_k}"; fi
+                ;;
+        esac
+    done
     if [ -n "$_best" ]; then echo "$_best"; return; fi
     # 폴백: 확장자만 제거
     echo "${_base%.y*ml}"
@@ -3003,7 +3012,7 @@ declare -gA WF_ASK_FILES 2>/dev/null || true
 wf_collect_asks() {
     WF_ASK_KEYS=(); WF_ASK_DEFAULT=(); WF_ASK_SCOPE=(); WF_ASK_FILES=()
     local _base_dir="$1"; shift
-    local _type _dir _f _base _line _key _action _arg _default _saved
+    local _type _dir _f _base _line _key _arg _default _saved _hn _grepout
     for _type in "$@"; do
         _dir="$_base_dir/$_type"
         [ -d "$_dir" ] || continue
@@ -3011,25 +3020,33 @@ wf_collect_asks() {
             [ -f "$_f" ] || continue
             grep -q "@wizard" "$_f" 2>/dev/null || continue
             _base="${_f##*/}"
+            _hn=$(wf_workflow_name "$_base")   # 파일당 1회 (라인마다 호출하면 fork 폭증)
+            # 프로세스 치환(< <(grep)) 대신 변수+here-string: Windows Git Bash에서 프로세스 치환 FD가
+            # 루프 내 중첩 서브셸로 상속돼 극단적으로 느려지는 것을 피한다.
+            _grepout=$(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f")
             while IFS= read -r _line; do
-                _key=$(printf '%s' "$_line" | sed -nE 's|^[[:space:]]*([A-Z_]+):.*#[[:space:]]*@wizard[[:space:]]+ask:.*|\1|p')
-                [ -z "$_key" ] && continue
-                _arg=$(printf '%s' "$_line" | sed -nE 's~.*#[[:space:]]*@wizard[[:space:]]+ask:(.*)$~\1~p' | sed 's/[[:space:]]*$//')
-                # 기본값: @name이면 resolver, 아니면 리터럴. 재통합 저장값 우선.
-                case "$_arg" in
-                    @*) _default=$(resolve_token "$_type" "${_arg#@}") ;;
-                    *)  _default="$_arg" ;;
-                esac
-                _saved=$(wf_deploy_get "$_type" "$_key"); [ -n "$_saved" ] && _default="$_saved"
-                # KEY 처음 보면 등록
+                [ -z "$_line" ] && continue
+                # _key: 앞 공백 제거 후 ':' 앞부분 (bash 내장 — sed fork 회피)
+                _key="${_line#"${_line%%[![:space:]]*}"}"
+                _key="${_key%%:*}"
+                case "$_key" in *[!A-Z_]*|"") continue ;; esac
+                # _arg: '@wizard ask:' 뒤, 끝 공백 제거 (bash 내장)
+                case "$_line" in *"@wizard ask:"*) _arg="${_line##*@wizard ask:}" ;; *) continue ;; esac
+                _arg="${_arg%"${_arg##*[![:space:]]}"}"
+                # KEY 처음 보면 등록 (기본값 계산은 처음 1회만 — 중복 KEY는 fork 불필요)
                 if [ -z "${WF_ASK_DEFAULT[$_key]+x}" ]; then
+                    # 기본값: @name이면 resolver, 아니면 리터럴. 재통합 저장값 우선.
+                    case "$_arg" in
+                        @*) _default=$(resolve_token "$_type" "${_arg#@}") ;;
+                        *)  _default="$_arg" ;;
+                    esac
+                    _saved=$(wf_deploy_get "$_type" "$_key"); [ -n "$_saved" ] && _default="$_saved"
                     WF_ASK_KEYS+=("$_key")
                     WF_ASK_DEFAULT[$_key]="$_default"
                 fi
                 # 사용처 파일 누적 (type|humanname)
-                local _hn; _hn=$(wf_workflow_name "$_base")
                 WF_ASK_FILES[$_key]="${WF_ASK_FILES[$_key]:+${WF_ASK_FILES[$_key]}\n}${_type}|${_hn}"
-            done < <(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f")
+            done <<< "$_grepout"
         done
     done
     # 사용처 문자열 조립 (Task 4의 wf_scope_string 사용)
@@ -3037,6 +3054,104 @@ wf_collect_asks() {
     for _k in "${WF_ASK_KEYS[@]}"; do
         WF_ASK_SCOPE[$_k]=$(wf_scope_string "${WF_ASK_FILES[$_k]}")
     done
+}
+
+# KEY가 처음 등장한 type 반환 (label 조회용 — 타입오버라이드 우선순위 때문)
+_wf_first_type_for() {
+    local _k="$1"
+    printf '%b' "${WF_ASK_FILES[$_k]}" | head -1 | sed 's/|.*//'
+}
+
+# 모든 KEY를 기본값으로, 각 KEY가 등장한 모든 type에 prefill (wf_deploy_set 캐시)
+_wf_prefill_all() {
+    local _k _t _line
+    for _k in "${WF_ASK_KEYS[@]}"; do
+        while IFS= read -r _line; do
+            [ -z "$_line" ] && continue
+            _t="${_line%%|*}"
+            wf_deploy_set "$_t" "$_k" "${WF_ASK_DEFAULT[$_k]}"
+        done <<< "$(printf '%b' "${WF_ASK_FILES[$_k]}")"
+    done
+}
+
+# 지정한 KEY들만 사용자에게 입력받아, 각 KEY가 등장한 모든 type에 prefill.
+# 인자: 처리할 KEY 목록(WF_ASK_KEYS 멤버만 KEY로 인정 — type 이름이 섞여 와도 무시).
+_wf_prefill_interactive() {
+    local _arg _k _t _line _label _help _ex _in _val
+    for _arg in "$@"; do
+        case " ${WF_ASK_KEYS[*]} " in *" $_arg "*) _k="$_arg" ;; *) continue ;; esac
+        _t=$(_wf_first_type_for "$_k")
+        _label=$(wf_field "$_t" "$_k" "label")
+        _help=$(wf_field "$_t" "$_k" "help")
+        _ex=$(wf_field "$_t" "$_k" "example")
+        print_to_user "  ▸ ${_label}  [${WF_ASK_SCOPE[$_k]}]"
+        [ -n "$_help" ] && print_to_user "    ${_help}"
+        [ -n "$_ex" ] && print_to_user "    예) ${_ex}"
+        _in=""
+        safe_read "  값 입력 [기본: ${WF_ASK_DEFAULT[$_k]}]: " _in "" || _in=""
+        [ -z "$_in" ] && _val="${WF_ASK_DEFAULT[$_k]}" || _val="$_in"
+        while IFS= read -r _line; do
+            [ -z "$_line" ] && continue
+            _t="${_line%%|*}"
+            wf_deploy_set "$_t" "$_k" "$_val"
+        done <<< "$(printf '%b' "${WF_ASK_FILES[$_k]}")"
+    done
+}
+
+# 배포 env 설정 계획: 표 미리보기 + 메뉴(전부기본/하나씩/골라서) + 값 확정(prefill).
+# $1=project_types_dir 베이스, $2.. = 설치 대상 type 목록. 호출 후 WF_USE_DEFAULTS=true 고정.
+wf_prompt_env_plan() {
+    [ -n "${WF_USE_DEFAULTS:-}" ] && return 0     # 이미 정해졌으면 재실행 안 함
+    local _base_dir="$1"; shift
+    # 비대화형/FORCE → 표·메뉴 없이 전부 기본값
+    if [ "$FORCE_MODE" = true ] || [ "$TTY_AVAILABLE" != true ]; then
+        wf_collect_asks "$_base_dir" "$@"
+        _wf_prefill_all
+        WF_USE_DEFAULTS=true
+        return 0
+    fi
+    wf_collect_asks "$_base_dir" "$@"
+    [ ${#WF_ASK_KEYS[@]} -eq 0 ] && { WF_USE_DEFAULTS=true; return 0; }
+
+    print_to_user ""
+    print_step "배포 워크플로우 환경설정을 채웁니다"
+    print_to_user ""
+    print_to_user "   설치되는 배포 워크플로우가 사용할 값입니다. 아래가 기본값이며,"
+    print_to_user "   그대로 두거나 원하는 것만 바꿀 수 있습니다."
+    print_to_user ""
+    # 기본값 미리보기 표
+    local _k _label
+    for _k in "${WF_ASK_KEYS[@]}"; do
+        _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
+        printf '   %-26s %-18s %s\n' "$_label" "${WF_ASK_DEFAULT[$_k]}" "${WF_ASK_SCOPE[$_k]}" >&2
+    done
+
+    local _choice _rc=0
+    _choice=$(interactive_menu "어떻게 채울까요?" \
+        "all|위 기본값 그대로 전부 설치" \
+        "each|하나씩 직접 입력" \
+        "some|몇 개만 골라서 바꾸기 (나머지는 기본값)") || _rc=$?
+    if [ "$_rc" -ne 0 ]; then WF_USE_DEFAULTS=true; _wf_prefill_all; return 0; fi   # ESC=전부기본
+
+    case "$_choice" in
+        all)  _wf_prefill_all ;;
+        each) _wf_prefill_interactive "${WF_ASK_KEYS[@]}" ;;
+        some)
+            local _opts=() _sel _rc2=0
+            for _k in "${WF_ASK_KEYS[@]}"; do
+                _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
+                _opts+=("$_k|${_label}   ${WF_ASK_DEFAULT[$_k]}   ${WF_ASK_SCOPE[$_k]}")
+            done
+            _sel=$(interactive_menu --multi "바꿀 항목을 고르세요" "${_opts[@]}") || _rc2=$?
+            _wf_prefill_all                       # 일단 전부 기본값
+            if [ "$_rc2" -eq 0 ] && [ -n "$_sel" ]; then
+                local _csv_k; IFS=',' read -ra _csv_k <<< "$_sel"
+                _wf_prefill_interactive "${_csv_k[@]}"   # 고른 것만 덮어쓰기 입력
+            fi
+            ;;
+    esac
+    WF_USE_DEFAULTS=true
+    return 0
 }
 
 # 워크플로우 1개의 env 토큰을 프로젝트에 맞게 치환 (토큰+마커 엔진의 핵심)
@@ -3386,6 +3501,9 @@ copy_workflows() {
     #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
     local _types_to_copy=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
     local _t
+    # (타입 순회 전) 배포 env 계획 1회 수립 — 기본값 표·메뉴·prefill. 이후 configure_workflow_env는
+    # WF_USE_DEFAULTS=true + 캐시값(wf_deploy_*)만 사용하므로 가상 비교 경로도 무손상.
+    wf_prompt_env_plan "$project_types_dir" "${_types_to_copy[@]}"
     for _t in "${_types_to_copy[@]}"; do
         _copy_workflows_for_type "$_t" "$project_types_dir"
     done

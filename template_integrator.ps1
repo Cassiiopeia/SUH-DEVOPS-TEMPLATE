@@ -2400,15 +2400,15 @@ function Resolve-Token { param([string]$Type,[string]$Name)
         default { return '' }
     }
 }
-# 실제로 읽을 labels.yml 경로를 고른다 (.sh _wf_labels_path와 1:1).
-#   1) 작업 디렉토리 dst(LabelsFile 또는 기본 .github/wizard/labels.yml) — 재통합/이미 복사된 경우
-#   2) 다운로드 원본 $TEMP_DIR\.github\wizard\labels.yml — 신규 통합에서 Copy-WizardLabels가
+# 실제로 읽을 wizard-prompts.yml 경로를 고른다 (.sh _wf_labels_path와 1:1).
+#   1) 작업 디렉토리 dst(LabelsFile 또는 기본 .github/config/wizard-prompts.yml) — 재통합/이미 복사된 경우
+#   2) 다운로드 원본 $TEMP_DIR\.github\config\wizard-prompts.yml — 신규 통합에서 Copy-ConfigFolder가
 #      Configure-WorkflowEnv 보다 늦게 실행되어 dst에 아직 파일이 없을 때 폴백.
 # 이 폴백이 없으면 신규 통합 시 label/help/example이 모두 빈값이 되어 KEY명만 출력된다.
 function Get-WfLabelsPath {
-    $dst = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
+    $dst = if($script:LabelsFile){$script:LabelsFile}else{'.github/config/wizard-prompts.yml'}
     if (Test-Path $dst) { return $dst }
-    $src = Join-Path $TEMP_DIR ".github\wizard\labels.yml"
+    $src = Join-Path $TEMP_DIR ".github\config\wizard-prompts.yml"
     if (Test-Path $src) { return $src }
     return ''
 }
@@ -3282,27 +3282,6 @@ function Copy-ConfigFolder {
 }
 
 # ===================================================================
-# .github/wizard 폴더 복사 (labels.yml — @wizard ask 마커 질문 문구)
-# 워크플로우와 함께 가야 통합된 프로젝트의 '하나씩 입력' 모드에서 한글 질문이 뜬다.
-# ===================================================================
-
-function Copy-WizardLabels {
-    $srcWizardDir = Join-Path $TEMP_DIR ".github\wizard"
-    $dstWizardDir = ".github\wizard"
-
-    if (-not (Test-Path $srcWizardDir)) {
-        return   # 템플릿에 없으면 안전 스킵
-    }
-
-    Print-Step ".github/wizard 폴더 복사 중..."
-    if (-not (Test-Path $dstWizardDir)) {
-        New-Item -Path $dstWizardDir -ItemType Directory -Force | Out-Null
-    }
-    Copy-Item -Path "$srcWizardDir\*" -Destination $dstWizardDir -Recurse -Force -ErrorAction SilentlyContinue
-    Print-Success ".github/wizard 폴더 복사 완료 (labels.yml)"
-}
-
-# ===================================================================
 # 이슈 템플릿 다운로드
 # ===================================================================
 
@@ -3896,7 +3875,6 @@ function Start-Integration {
             Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
-            Copy-WizardLabels
             Copy-IssueTemplates
             Copy-DiscussionTemplates
             Copy-CodeRabbitConfig
@@ -3919,7 +3897,6 @@ function Start-Integration {
             Update-VersionYmlDeploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             Copy-Scripts
             Copy-ConfigFolder
-            Copy-WizardLabels
             Copy-SetupGuide
             # util 모듈 — ProjectTypes 배열 순회
             $utilTypes = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }

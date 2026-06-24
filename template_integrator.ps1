@@ -2510,6 +2510,20 @@ function Update-VersionYmlDeploy {
     Print-Info "version.yml에 deploy 설정을 기록했습니다 (재통합 시 기본값으로 제안)"
 }
 
+# "type|name" 쌍들의 사용처 문자열 조립 (.sh wf_scope_string과 1:1).
+# 단일 타입: "{타입} {name1·name2}", 여러 타입: "type1·type2·...".
+function Get-WfScopeString { param([string[]]$Pairs)
+    $types = @(); $names = @()
+    foreach ($p in $Pairs) {
+        if (-not $p) { continue }
+        $t = $p.Split('|',2)[0]; $n = $p.Split('|',2)[1]
+        if ($types -notcontains $t) { $types += $t }
+        if ($names -notcontains $n) { $names += $n }
+    }
+    if ($types.Count -le 1) { return (($types -join '·') + ' ' + ($names -join '·')) }
+    return ($types -join '·')
+}
+
 # ask KEY를 전 워크플로우에서 수집 -> [ordered] key->@{Default;Scope} (.sh wf_collect_asks와 1:1).
 # $BaseDir = project_types_dir 베이스(Copy-Workflows-ForType에 넘기는 것과 동일, 보통 "$TEMP_DIR\$WORKFLOWS_DIR\$PROJECT_TYPES_DIR").
 # 결과 테이블 외에 $script:WfAskFiles(key->@("type|name",..))도 채워 prefill/표에서 재사용한다.

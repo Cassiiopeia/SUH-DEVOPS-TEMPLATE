@@ -2970,6 +2970,26 @@ update_version_yml_deploy() {
     print_info "version.yml에 deploy 설정을 기록했습니다 (재통합 시 기본값으로 제안)"
 }
 
+# "type|name" 줄들의 사용처 문자열 조립.
+# 단일 타입: "{타입} {name1·name2·...}" (name 중복 제거).
+# 여러 타입: "type1·type2·..." (타입만, 중복 제거).
+# 입력은 wf_collect_asks가 누적한 리터럴 \n 마커 포함 문자열(printf '%b'로 개행 복원).
+wf_scope_string() {
+    local _pairs="$1" _line _t _n
+    local _types="" _names=""
+    while IFS= read -r _line; do
+        [ -z "$_line" ] && continue
+        _t="${_line%%|*}"; _n="${_line#*|}"
+        case "·$_types·" in *"·$_t·"*) ;; *) _types="${_types:+$_types·}$_t" ;; esac
+        case "·$_names·" in *"·$_n·"*) ;; *) _names="${_names:+$_names·}$_n" ;; esac
+    done <<< "$(printf '%b' "$_pairs")"
+    # 타입이 여러 개면(·포함) 타입만, 하나면 "타입 name들"
+    case "$_types" in
+        *·*) echo "$_types" ;;
+        *)   echo "${_types} ${_names}" ;;
+    esac
+}
+
 # ask KEY를 전 워크플로우에서 수집. 결과는 전역 배열에 채운다.
 # WF_ASK_KEYS: KEY 등장 순서(중복 제거). WF_ASK_DEFAULT/WF_ASK_SCOPE: KEY별 기본값/사용처.
 declare -gA WF_ASK_DEFAULT 2>/dev/null || true

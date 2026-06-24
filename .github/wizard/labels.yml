@@ -44,3 +44,19 @@ SSH_AUTH_METHOD:
   label: "SSH 인증 방식"
   help: "배포 서버 접속 방식입니다. 둘 중 하나를 그대로 입력하세요."
   example: "password 또는 key"
+
+# workflow filename (partial match) -> human readable short name
+# wizard uses this to build "[usage]" in env questions.
+_workflow_names:
+  NONSTOP-NGINX: "무중단배포(Nginx)"
+  NONSTOP-TRAEFIK: "무중단배포(Traefik)"
+  PR-PREVIEW: "PR 프리뷰"
+  SIMPLE-CICD: "단일 서버 배포"
+  REACT-CICD: "프론트 배포"
+  REACT-CI: "프론트 빌드"
+  NEXT-CICD: "프론트 배포"
+  NEXT-CI: "프론트 빌드"
+  PYTHON-CI: "빌드 검증"
+  FLUTTER-ANDROID-SELFHOSTED: "안드로이드 자체배포"
+  FLUTTER-ANDROID-PLAYSTORE: "플레이스토어 배포"
+  FLUTTER-ANDROID-FIREBASE: "Firebase 배포"

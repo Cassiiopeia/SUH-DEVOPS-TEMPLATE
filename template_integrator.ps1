@@ -2586,6 +2586,25 @@ function Get-WfFirstTypeFor { param([string]$Key)
 }
 
 # 모든 KEY를 기본값으로 모든 등장 type에 prefill (.sh _wf_prefill_all과 1:1)
+# KEY 1개를 'label·사용처·설명·예시·기본값' 카드로 출력 (.sh _wf_print_field_card와 1:1).
+function Show-WfFieldCard { param([string]$Key, [int]$Idx = 0, [int]$Tot = 0)
+    $t = Get-WfFirstTypeFor $Key
+    $lbl = Get-WfField $t $Key "label"
+    $hlp = Get-WfField $t $Key "help"
+    $ex = Get-WfField $t $Key "example"
+    $scope = $script:WfAskTable[$Key].Scope
+    $def = $script:WfAskTable[$Key].Default
+    if ($Idx -gt 0 -and $Tot -gt 0) {
+        Write-ColorOutput ("   ▸ ($Idx/$Tot) " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
+    } else {
+        Write-ColorOutput ("   ▸ " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
+    }
+    if ($hlp) { Write-ColorOutput ("       " + $hlp) -ForegroundColor DarkGray }
+    if ($ex) { Write-ColorOutput ("       예) " + $ex) -ForegroundColor DarkGray }
+    Write-Host "       기본값: $def"
+    Write-Host ""
+}
+
 function Set-WfPrefillAll {
     foreach ($k in $script:WfAskTable.Keys) {
         $pairs = $script:WfAskFiles[$k]
@@ -2600,23 +2619,25 @@ function Set-WfPrefillAll {
 
 # 지정한 KEY들만 사용자에게 입력받아 모든 등장 type에 prefill (.sh _wf_prefill_interactive와 1:1)
 function Set-WfPrefillInteractive { param([string[]]$Keys)
-    foreach ($arg in $Keys) {
-        if (-not $script:WfAskTable.Contains($arg)) { continue }
-        $k = $arg
+    # 처리할 KEY만 추려 전체 개수를 먼저 센다(진행 표시 N/총).
+    $todo = @()
+    foreach ($arg in $Keys) { if ($script:WfAskTable.Contains($arg)) { $todo += $arg } }
+    if ($todo.Count -eq 0) { return }
+    Write-Host ""
+    Write-Host "   값을 입력하세요. 그대로 두려면 아무것도 입력하지 말고 Enter를 누르면 기본값이 적용됩니다."
+    Write-Host ""
+    $i = 0
+    foreach ($k in $todo) {
+        $i++
         $t = Get-WfFirstTypeFor $k
         $lbl = Get-WfField $t $k "label"
-        $hlp = Get-WfField $t $k "help"
-        $ex = Get-WfField $t $k "example"
-        $scope = $script:WfAskTable[$k].Scope
-        
-        Write-ColorOutput ("  ▸ " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
-        if ($hlp) { Write-ColorOutput ("    " + $hlp) -ForegroundColor DarkGray }
-        if ($ex) { Write-ColorOutput ("    예) " + $ex) -ForegroundColor DarkGray }
-        
+        # 카드(번호/총 포함)로 무엇을 입력하는지 충분히 안내
+        Show-WfFieldCard $k $i $todo.Count
         $def = $script:WfAskTable[$k].Default
-        $ans = Read-UserInput "  값 입력" $def
+        $ans = Read-UserInput "       ↳ 값 입력 (Enter=기본값 «$def» 유지)" $def
         $val = if ([string]::IsNullOrWhiteSpace($ans)) { $def } else { $ans }
-        
+        Write-Host ("         → {0} = {1}" -f $lbl, $val)
+        Write-Host ""
         $pairs = $script:WfAskFiles[$k]
         foreach ($p in $pairs) {
             $t = $p.Split('|', 2)[0]
@@ -2647,43 +2668,27 @@ function Invoke-WfEnvPlan { param([string]$BaseDir, [string[]]$Types)
     Write-Host ""
     Print-Step "배포 워크플로우 환경설정을 채웁니다"
     Write-Host ""
-    Write-Host "   설치되는 배포 워크플로우가 사용할 값입니다. 아래가 기본값이며,"
-    Write-Host "   그대로 두거나 원하는 것만 바꿀 수 있습니다."
+    Write-Host "   설치되는 배포 워크플로우가 사용할 값입니다. 항목마다 '무엇에 쓰이는지·설명·예시'와"
+    Write-Host "   기본값을 함께 보여드립니다. 그대로 둬도 되고, 원하는 것만 바꿀 수 있습니다."
     Write-Host ""
 
-    # 기본값 미리보기 (가로 폭 110자 미만 시 반응형 세로형 카드 블록으로 전환)
-    $cols = 80
-    try {
-        if ($Host.UI.RawUI.WindowSize.Width) { $cols = $Host.UI.RawUI.WindowSize.Width }
-    } catch {}
-
-    if ($cols -lt 110) {
-        foreach ($k in $script:WfAskTable.Keys) {
-            $t = Get-WfFirstTypeFor $k
-            $lbl = Get-WfField $t $k "label"
-            $def = $script:WfAskTable[$k].Default
-            $scope = $script:WfAskTable[$k].Scope
-            
-            Write-ColorOutput ("   ▸ " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
-            Write-Host "     기본값: $def"
-            Write-Host ""
-        }
-    } else {
-        foreach ($k in $script:WfAskTable.Keys) {
-            $t = Get-WfFirstTypeFor $k
-            $lbl = Get-WfField $t $k "label"
-            $def = $script:WfAskTable[$k].Default
-            $scope = $script:WfAskTable[$k].Scope
-            
-            Write-Host ("   {0,-26} {1,-18} {2}" -f $lbl, $def, $scope)
-        }
+    # 기본값 미리보기 — 항목마다 label·사용처·설명·예시·기본값을 모두 보여주는 카드.
+    # (표 대신 카드로 통일: 폭과 무관하게 설명/예시까지 안 잘리고 가독성 일정)
+    $i = 0; $n = $script:WfAskTable.Count
+    foreach ($k in $script:WfAskTable.Keys) {
+        $i++
+        Show-WfFieldCard $k $i $n
     }
+
+    Write-Host "   ─────────────────────────────────────────────"
+    Write-Host "   ① 전부 기본값으로 바로 설치   ② 하나씩 직접 입력"
+    Write-Host "   ③ 몇 개만 골라서 바꾸기 (고른 것만 입력, 나머지는 기본값)"
     Write-Host ""
 
     $opts = @(
-        @{ Value = "all"; Label = "위 기본값 그대로 전부 설치" }
-        @{ Value = "each"; Label = "하나씩 직접 입력" }
-        @{ Value = "some"; Label = "몇 개만 골라서 바꾸기 (나머지는 기본값)" }
+        @{ Value = "all"; Label = "① 위 기본값 그대로 전부 설치 (입력 없이 바로 진행)" }
+        @{ Value = "each"; Label = "② 하나씩 직접 입력 (모든 항목을 순서대로)" }
+        @{ Value = "some"; Label = "③ 몇 개만 골라서 바꾸기 (고른 것만 입력 · 나머지는 기본값)" }
     )
     $choice = Invoke-ChooseMenu -Prompt "어떻게 채울까요?" -Options $opts
     if ($null -eq $choice) {
@@ -2705,10 +2710,9 @@ function Invoke-WfEnvPlan { param([string]$BaseDir, [string[]]$Types)
                 $t = Get-WfFirstTypeFor $k
                 $lbl = Get-WfField $t $k "label"
                 $def = $script:WfAskTable[$k].Default
-                $scope = $script:WfAskTable[$k].Scope
-                $someOpts += @{ Value = $k; Label = ("{0}   {1}   {2}" -f $lbl, $def, $scope) }
+                $someOpts += @{ Value = $k; Label = ("{0}  (기본: {1})" -f $lbl, $def) }
             }
-            $sel = Invoke-ChooseMenu -Multi -Prompt "바꿀 항목을 고르세요" -Options $someOpts
+            $sel = Invoke-ChooseMenu -Multi -Prompt "바꿀 항목을 고르세요 (Space로 선택 · Enter로 확정)" -Options $someOpts
             Set-WfPrefillAll
             if ($null -ne $sel -and $sel.Trim() -ne "") {
                 $selKeys = $sel.Split(',')

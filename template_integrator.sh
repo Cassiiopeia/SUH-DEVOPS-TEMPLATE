@@ -3068,6 +3068,25 @@ _wf_first_type_for() {
 }
 
 # 모든 KEY를 기본값으로, 각 KEY가 등장한 모든 type에 prefill (wf_deploy_set 캐시)
+# KEY 1개를 'label·사용처·설명·예시·기본값' 카드로 출력. $1=KEY $2=현재번호(옵션) $3=전체(옵션)
+_wf_print_field_card() {
+    local _k="$1" _idx="${2:-}" _tot="${3:-}" _t _label _help _ex _head
+    _t=$(_wf_first_type_for "$_k")
+    _label=$(wf_field "$_t" "$_k" "label")
+    _help=$(wf_field "$_t" "$_k" "help")
+    _ex=$(wf_field "$_t" "$_k" "example")
+    if [ -n "$_idx" ] && [ -n "$_tot" ]; then
+        _head="   ▸ (${_idx}/${_tot}) ${_label}  [${WF_ASK_SCOPE[$_k]}]"
+    else
+        _head="   ▸ ${_label}  [${WF_ASK_SCOPE[$_k]}]"
+    fi
+    print_to_user "$_head"
+    [ -n "$_help" ] && print_to_user "       ${_help}"
+    [ -n "$_ex" ] && print_to_user "       예) ${_ex}"
+    print_to_user "       기본값: ${WF_ASK_DEFAULT[$_k]}"
+    print_to_user ""
+}
+
 _wf_prefill_all() {
     local _k _t _line _def
     for _k in "${WF_ASK_KEYS[@]}"; do
@@ -3083,19 +3102,27 @@ _wf_prefill_all() {
 # 지정한 KEY들만 사용자에게 입력받아, 각 KEY가 등장한 모든 type에 prefill.
 # 인자: 처리할 KEY 목록(WF_ASK_KEYS 멤버만 KEY로 인정 — type 이름이 섞여 와도 무시).
 _wf_prefill_interactive() {
-    local _arg _k _t _line _label _help _ex _in _val
+    local _arg _k _t _line _in _val
+    # 처리할 KEY만 추려 전체 개수를 먼저 센다(진행 표시 N/총).
+    local _todo=()
     for _arg in "$@"; do
-        case " ${WF_ASK_KEYS[*]} " in *" $_arg "*) _k="$_arg" ;; *) continue ;; esac
+        case " ${WF_ASK_KEYS[*]} " in *" $_arg "*) _todo+=("$_arg") ;; esac
+    done
+    local _tot=${#_todo[@]} _i=0
+    [ "$_tot" -eq 0 ] && return 0
+    print_to_user ""
+    print_to_user "   값을 입력하세요. 그대로 두려면 아무것도 입력하지 말고 Enter를 누르면 기본값이 적용됩니다."
+    print_to_user ""
+    for _k in "${_todo[@]}"; do
+        _i=$((_i + 1))
         _t=$(_wf_first_type_for "$_k")
-        _label=$(wf_field "$_t" "$_k" "label")
-        _help=$(wf_field "$_t" "$_k" "help")
-        _ex=$(wf_field "$_t" "$_k" "example")
-        print_to_user "  ▸ ${_label}  [${WF_ASK_SCOPE[$_k]}]"
-        [ -n "$_help" ] && print_to_user "    ${_help}"
-        [ -n "$_ex" ] && print_to_user "    예) ${_ex}"
+        # 카드(번호/총 포함)로 무엇을 입력하는지 충분히 안내
+        _wf_print_field_card "$_k" "$_i" "$_tot"
         _in=""
-        safe_read "  값 입력 [기본: ${WF_ASK_DEFAULT[$_k]}]: " _in "" || _in=""
+        safe_read "       ↳ 값 입력 (Enter=기본값 «${WF_ASK_DEFAULT[$_k]}» 유지): " _in "" || _in=""
         [ -z "$_in" ] && _val="${WF_ASK_DEFAULT[$_k]}" || _val="$_in"
+        print_to_user "         → $(wf_field "$_t" "$_k" "label") = ${_val}"
+        print_to_user ""
         while IFS= read -r _line; do
             [ -z "$_line" ] && continue
             _t="${_line%%|*}"
@@ -3122,46 +3149,39 @@ wf_prompt_env_plan() {
     print_to_user ""
     print_step "배포 워크플로우 환경설정을 채웁니다"
     print_to_user ""
-    print_to_user "   설치되는 배포 워크플로우가 사용할 값입니다. 아래가 기본값이며,"
-    print_to_user "   그대로 두거나 원하는 것만 바꿀 수 있습니다."
+    print_to_user "   설치되는 배포 워크플로우가 사용할 값입니다. 항목마다 '무엇에 쓰이는지·설명·예시'와"
+    print_to_user "   기본값을 함께 보여드립니다. 그대로 둬도 되고, 원하는 것만 바꿀 수 있습니다."
     print_to_user ""
-    # 기본값 미리보기 (가로 폭 110자 미만 시 반응형 세로형 카드 블록으로 전환)
-    local _cols
-    _cols=$(tput cols 2>/dev/null || echo 80)
+    # 기본값 미리보기 — 항목마다 label·사용처·설명·예시·기본값을 모두 보여주는 카드.
+    # (표 대신 카드로 통일: 폭과 무관하게 설명/예시까지 안 잘리고 가독성 일정)
+    local _k _i=0 _n=${#WF_ASK_KEYS[@]}
+    for _k in "${WF_ASK_KEYS[@]}"; do
+        _i=$((_i + 1))
+        _wf_print_field_card "$_k" "$_i" "$_n"
+    done
 
-    local _k _label _scope
-    if [ "$_cols" -lt 110 ]; then
-        for _k in "${WF_ASK_KEYS[@]}"; do
-            _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
-            _scope="${WF_ASK_SCOPE[$_k]:-}"
-            print_to_user "   ▸ ${_label}  [${_scope}]"
-            print_to_user "     기본값: ${WF_ASK_DEFAULT[$_k]}"
-            print_to_user ""
-        done
-    else
-        for _k in "${WF_ASK_KEYS[@]}"; do
-            _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
-            printf '   %-26s %-18s %s\n' "$_label" "${WF_ASK_DEFAULT[$_k]}" "${WF_ASK_SCOPE[$_k]}" >&2
-        done
-    fi
+    print_to_user "   ─────────────────────────────────────────────"
+    print_to_user "   ① 전부 기본값으로 바로 설치   ② 하나씩 직접 입력"
+    print_to_user "   ③ 몇 개만 골라서 바꾸기 (고른 것만 입력, 나머지는 기본값)"
+    print_to_user ""
 
     local _choice _rc=0
     _choice=$(interactive_menu "어떻게 채울까요?" \
-        "all|위 기본값 그대로 전부 설치" \
-        "each|하나씩 직접 입력" \
-        "some|몇 개만 골라서 바꾸기 (나머지는 기본값)") || _rc=$?
+        "all|① 위 기본값 그대로 전부 설치 (입력 없이 바로 진행)" \
+        "each|② 하나씩 직접 입력 (모든 항목을 순서대로)" \
+        "some|③ 몇 개만 골라서 바꾸기 (고른 것만 입력 · 나머지는 기본값)") || _rc=$?
     if [ "$_rc" -ne 0 ]; then WF_USE_DEFAULTS=true; _wf_prefill_all; return 0; fi   # ESC=전부기본
 
     case "$_choice" in
         all)  _wf_prefill_all ;;
         each) _wf_prefill_interactive "${WF_ASK_KEYS[@]}" ;;
         some)
-            local _opts=() _sel _rc2=0
+            local _opts=() _sel _rc2=0 _label
             for _k in "${WF_ASK_KEYS[@]}"; do
                 _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
-                _opts+=("$_k|${_label}   ${WF_ASK_DEFAULT[$_k]}   ${WF_ASK_SCOPE[$_k]}")
+                _opts+=("$_k|${_label}  (기본: ${WF_ASK_DEFAULT[$_k]})")
             done
-            _sel=$(interactive_menu --multi "바꿀 항목을 고르세요" "${_opts[@]}") || _rc2=$?
+            _sel=$(interactive_menu --multi "바꿀 항목을 고르세요 (Space로 선택 · Enter로 확정)" "${_opts[@]}") || _rc2=$?
             _wf_prefill_all                       # 일단 전부 기본값
             if [ "$_rc2" -eq 0 ] && [ -n "$_sel" ]; then
                 local _csv_k; IFS=',' read -ra _csv_k <<< "$_sel"

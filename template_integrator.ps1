@@ -2530,20 +2530,25 @@ function Get-WfScopeString { param([string[]]$Pairs)
 function Get-WfAskTable { param([string]$BaseDir, [string[]]$Types)
     $table = [ordered]@{}
     $files = @{}   # key -> @("type|humanname", ...)
+    $script:WfAskTypeDefault = @{} # 타입별 고유 기본값 캐시 초기화
     foreach ($t in $Types) {
         $dir = Join-Path $BaseDir $t
         if (-not (Test-Path $dir)) { continue }
         $wf = @(); $wf += Get-ChildItem -Path $dir -Filter '*.yaml' -File -ErrorAction SilentlyContinue
         $wf += Get-ChildItem -Path $dir -Filter '*.yml' -File -ErrorAction SilentlyContinue
         foreach ($f in $wf) {
-            $raw = Get-Content $f.FullName -Raw
+            $raw = Get-Content $f.FullName -Raw -Encoding UTF8
             if ($raw -notmatch '@wizard') { continue }
-            foreach ($line in (Get-Content $f.FullName)) {
+            foreach ($line in (Get-Content $f.FullName -Encoding UTF8)) {
                 if ($line -match '^\s*([A-Z_]+):.*#\s*@wizard\s+ask:(.*)$') {
                     $key = $Matches[1]; $arg = $Matches[2].Trim()
+                    
+                    # 타입별 고유 기본값 구하여 캐싱
                     if ($arg -like '@*') { $def = Resolve-Token $t ($arg.Substring(1)) } else { $def = $arg }
                     $saved = Get-WfDeploy $t $key
                     if ($saved) { $def = $saved }
+                    $script:WfAskTypeDefault[$t + '|' + $key] = $def
+
                     if (-not $table.Contains($key)) {
                         $table[$key] = @{ Default = $def; Scope = '' }
                         $files[$key] = @()
@@ -2560,11 +2565,136 @@ function Get-WfAskTable { param([string]$BaseDir, [string[]]$Types)
     return $table
 }
 
+# KEY가 처음 등장한 type 반환 (.sh _wf_first_type_for와 1:1)
+function Get-WfFirstTypeFor { param([string]$Key)
+    if (-not $script:WfAskFiles -or -not $script:WfAskFiles.Contains($Key)) { return '' }
+    $p = $script:WfAskFiles[$Key][0]
+    if ($p) { return $p.Split('|', 2)[0] }
+    return ''
+}
+
+# 모든 KEY를 기본값으로 모든 등장 type에 prefill (.sh _wf_prefill_all과 1:1)
+function Set-WfPrefillAll {
+    foreach ($k in $script:WfAskTable.Keys) {
+        $pairs = $script:WfAskFiles[$k]
+        foreach ($p in $pairs) {
+            $t = $p.Split('|', 2)[0]
+            $val = $script:WfAskTypeDefault[$t + '|' + $k]
+            if ($null -eq $val) { $val = $script:WfAskTable[$k].Default }
+            Set-WfDeploy $t $k $val
+        }
+    }
+}
+
+# 지정한 KEY들만 사용자에게 입력받아 모든 등장 type에 prefill (.sh _wf_prefill_interactive와 1:1)
+function Set-WfPrefillInteractive { param([string[]]$Keys)
+    foreach ($arg in $Keys) {
+        if (-not $script:WfAskTable.Contains($arg)) { continue }
+        $k = $arg
+        $t = Get-WfFirstTypeFor $k
+        $lbl = Get-WfField $t $k "label"
+        $hlp = Get-WfField $t $k "help"
+        $ex = Get-WfField $t $k "example"
+        $scope = $script:WfAskTable[$k].Scope
+        
+        Write-ColorOutput ("  ▸ " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
+        if ($hlp) { Write-ColorOutput ("    " + $hlp) -ForegroundColor DarkGray }
+        if ($ex) { Write-ColorOutput ("    예) " + $ex) -ForegroundColor DarkGray }
+        
+        $def = $script:WfAskTable[$k].Default
+        $ans = Read-UserInput "  값 입력" $def
+        $val = if ([string]::IsNullOrWhiteSpace($ans)) { $def } else { $ans }
+        
+        $pairs = $script:WfAskFiles[$k]
+        foreach ($p in $pairs) {
+            $t = $p.Split('|', 2)[0]
+            Set-WfDeploy $t $k $val
+        }
+    }
+}
+
+# 배포 env 설정 계획: 표 미리보기 + 메뉴(전부기본/하나씩/골라서) + 값 확정(prefill) (.sh wf_prompt_env_plan과 1:1)
+function Invoke-WfEnvPlan { param([string]$BaseDir, [string[]]$Types)
+    if ($null -ne $script:WfUseDefaults) { return }
+
+    $force = $false
+    try { if ($script:Force -eq $true) { $force = $true } } catch {}
+
+    $script:WfAskTable = Get-WfAskTable $BaseDir $Types
+    if (-not $script:WfAskTable -or $script:WfAskTable.Count -eq 0) {
+        $script:WfUseDefaults = $true
+        return
+    }
+
+    if ($force) {
+        Set-WfPrefillAll
+        $script:WfUseDefaults = $true
+        return
+    }
+
+    Write-Host ""
+    Print-Step "배포 워크플로우 환경설정을 채웁니다"
+    Write-Host ""
+    Write-Host "   설치되는 배포 워크플로우가 사용할 값입니다. 아래가 기본값이며,"
+    Write-Host "   그대로 두거나 원하는 것만 바꿀 수 있습니다."
+    Write-Host ""
+
+    # 표 출력
+    foreach ($k in $script:WfAskTable.Keys) {
+        $t = Get-WfFirstTypeFor $k
+        $lbl = Get-WfField $t $k "label"
+        $def = $script:WfAskTable[$k].Default
+        $scope = $script:WfAskTable[$k].Scope
+        
+        Write-Host ("   {0,-26} {1,-18} {2}" -f $lbl, $def, $scope)
+    }
+    Write-Host ""
+
+    $opts = @(
+        @{ Value = "all"; Label = "위 기본값 그대로 전부 설치" }
+        @{ Value = "each"; Label = "하나씩 직접 입력" }
+        @{ Value = "some"; Label = "몇 개만 골라서 바꾸기 (나머지는 기본값)" }
+    )
+    $choice = Invoke-ChooseMenu -Prompt "어떻게 채울까요?" -Options $opts
+    if ($null -eq $choice) {
+        Set-WfPrefillAll
+        $script:WfUseDefaults = $true
+        return
+    }
+
+    switch ($choice) {
+        "all" {
+            Set-WfPrefillAll
+        }
+        "each" {
+            Set-WfPrefillInteractive @($script:WfAskTable.Keys)
+        }
+        "some" {
+            $someOpts = @()
+            foreach ($k in $script:WfAskTable.Keys) {
+                $t = Get-WfFirstTypeFor $k
+                $lbl = Get-WfField $t $k "label"
+                $def = $script:WfAskTable[$k].Default
+                $scope = $script:WfAskTable[$k].Scope
+                $someOpts += @{ Value = $k; Label = ("{0}   {1}   {2}" -f $lbl, $def, $scope) }
+            }
+            $sel = Invoke-ChooseMenu -Multi -Prompt "바꿀 항목을 고르세요" -Options $someOpts
+            Set-WfPrefillAll
+            if ($null -ne $sel -and $sel.Trim() -ne "") {
+                $selKeys = $sel.Split(',')
+                Set-WfPrefillInteractive $selKeys
+            }
+        }
+    }
+
+    $script:WfUseDefaults = $true
+}
+
 # 워크플로우 1개 env 토큰 치환 (.sh configure_workflow_env와 동일 동작)
 function Configure-WorkflowEnv {
     param([string]$Type, [string]$File)
     if (-not (Test-Path $File)) { return }
-    $content = Get-Content $File -Raw
+    $content = Get-Content $File -Raw -Encoding UTF8
     if ($content -notmatch '@wizard') { return }   # 안전 폴백: 마커 없으면 미관여
 
     $repo = Get-RepoName
@@ -2582,7 +2712,7 @@ function Configure-WorkflowEnv {
         }
     }
 
-    $lines = Get-Content $File
+    $lines = Get-Content $File -Encoding UTF8
     $newLines = foreach ($line in $lines) {
         if ($line -match '^\s*([A-Z_]+):.*#\s*@wizard\s+(ask|auto):(.*)$') {
             $key=$Matches[1]; $action=$Matches[2]; $arg=$Matches[3].Trim()
@@ -2598,7 +2728,13 @@ function Configure-WorkflowEnv {
                     $lbl = Get-WfField $Type $key 'label'
                     $hlp = Get-WfField $Type $key 'help'
                     $exm = Get-WfField $Type $key 'example'
-                    Write-ColorOutput ("  ▸ " + $lbl) -ForegroundColor Cyan
+                    $scope = ''
+                    if ($script:WfAskTable -and $script:WfAskTable.Contains($key)) { $scope = $script:WfAskTable[$key].Scope }
+                    if ($scope) {
+                        Write-ColorOutput ("  ▸ " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
+                    } else {
+                        Write-ColorOutput ("  ▸ " + $lbl) -ForegroundColor Cyan
+                    }
                     if ($hlp) { Write-ColorOutput ("    " + $hlp) -ForegroundColor DarkGray }
                     if ($exm) { Write-ColorOutput ("    예) " + $exm) -ForegroundColor DarkGray }
                     # Read-UserInput이 프롬프트 뒤에 "(기본: X)"를 자동 첨부하므로
@@ -2619,14 +2755,14 @@ function Configure-WorkflowEnv {
     $newLines | Set-Content $File -Encoding UTF8
 
     # 토큰 재귀 치환: 남은 __PROJECT_NAME__
-    (Get-Content $File -Raw) -replace '__PROJECT_NAME__', $repo -replace '__APP_ARTIFACT_NAME__', $repo | Set-Content $File -NoNewline -Encoding UTF8
+    (Get-Content $File -Raw -Encoding UTF8) -replace '__PROJECT_NAME__', $repo -replace '__APP_ARTIFACT_NAME__', $repo | Set-Content $File -NoNewline -Encoding UTF8
 
     # paths 앵커 주입 (멀티타입 모노레포)
-    if ((Get-Content $File -Raw) -match '#\s*@wizard\s+paths-anchor') {
+    if ((Get-Content $File -Raw -Encoding UTF8) -match '#\s*@wizard\s+paths-anchor') {
         $ppath = ''
         if ($script:ProjectPaths.Contains($Type)) { $ppath = $script:ProjectPaths[$Type] }
         if ($ppath -and $ppath -ne '.') {
-            $pl = Get-Content $File
+            $pl = Get-Content $File -Encoding UTF8
             $pl = foreach ($l in $pl) {
                 if ($l -match '^(\s*)#\s*@wizard\s+paths-anchor') {
                     "$($Matches[1])paths: ['$ppath/**']"
@@ -2637,7 +2773,7 @@ function Configure-WorkflowEnv {
     }
 
     # 잔류 토큰 경고
-    $raw = Get-Content $File -Raw
+    $raw = Get-Content $File -Raw -Encoding UTF8
     if ($raw -match '__[A-Z_]+__') {
         $left = ([regex]::Matches($raw, '__[A-Z_]+__') | ForEach-Object { $_.Value } | Sort-Object -Unique) -join ' '
         Print-Warning "  $(Split-Path -Leaf $File): 미치환 토큰 남음($left) — 직접 채워주세요"
@@ -2665,8 +2801,8 @@ function Test-WorkflowUnchanged {
         $script:WfUseDefaults = $true
         $script:WfDeploy = [ordered]@{}     # 비교용 격리 컨텍스트
         Configure-WorkflowEnv -Type $Type -File $tmp | Out-Null
-        $a = (Get-Content $tmp -Raw) -replace "`r`n", "`n"
-        $b = (Get-Content $ExistingPath -Raw) -replace "`r`n", "`n"
+        $a = (Get-Content $tmp -Raw -Encoding UTF8) -replace "`r`n", "`n"
+        $b = (Get-Content $ExistingPath -Raw -Encoding UTF8) -replace "`r`n", "`n"
         return ($a -eq $b)
     } catch {
         return $false                        # 비교 실패 → changed로 취급
@@ -2957,6 +3093,8 @@ function Copy-Workflows {
     # 2~3. 타입별 워크플로우 + 타입별 Nexus(opt-in) 처리 — ProjectTypes 배열 순회
     #       타입별 파일명은 PROJECT-{TYPE}- prefix로 완전 분리되어 충돌 0.
     $typesToCopy = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    # (타입 순회 시작 전) 배포 env 계획을 한 번 수립 — 표·메뉴·prefill
+    Invoke-WfEnvPlan -BaseDir $projectTypesDir -Types $typesToCopy
     foreach ($t in $typesToCopy) {
         Copy-Workflows-ForType -Type $t -ProjectTypesDir $projectTypesDir -Counters $counters
     }

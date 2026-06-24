@@ -3003,6 +3003,7 @@ wf_scope_string() {
 # WF_ASK_KEYS: KEY 등장 순서(중복 제거). WF_ASK_DEFAULT/WF_ASK_SCOPE: KEY별 기본값/사용처.
 declare -gA WF_ASK_DEFAULT 2>/dev/null || true
 declare -gA WF_ASK_SCOPE 2>/dev/null || true
+declare -gA WF_ASK_TYPE_DEFAULT 2>/dev/null || true
 WF_ASK_KEYS=()
 # KEY -> 등장 파일들의 "type|name" 누적 (사용처 조립용)
 declare -gA WF_ASK_FILES 2>/dev/null || true
@@ -3010,7 +3011,7 @@ declare -gA WF_ASK_FILES 2>/dev/null || true
 # $1=project_types_dir 베이스(=_copy_workflows_for_type에 넘기는 것과 동일: 보통 "$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"),
 # $2.. = 설치 대상 type 목록. 실제 설치되는 워크플로우와 같은 소스를 스캔해야 사용처/기본값이 정확하다.
 wf_collect_asks() {
-    WF_ASK_KEYS=(); WF_ASK_DEFAULT=(); WF_ASK_SCOPE=(); WF_ASK_FILES=()
+    WF_ASK_KEYS=(); WF_ASK_DEFAULT=(); WF_ASK_SCOPE=(); WF_ASK_FILES=(); WF_ASK_TYPE_DEFAULT=()
     local _base_dir="$1"; shift
     local _type _dir _f _base _line _key _arg _default _saved _hn _grepout
     for _type in "$@"; do
@@ -3033,16 +3034,20 @@ wf_collect_asks() {
                 # _arg: '@wizard ask:' 뒤, 끝 공백 제거 (bash 내장)
                 case "$_line" in *"@wizard ask:"*) _arg="${_line##*@wizard ask:}" ;; *) continue ;; esac
                 _arg="${_arg%"${_arg##*[![:space:]]}"}"
-                # KEY 처음 보면 등록 (기본값 계산은 처음 1회만 — 중복 KEY는 fork 불필요)
+                
+                # 타입별 고유 기본값은 무조건 수집 및 저장
+                local _type_default
+                case "$_arg" in
+                    @*) _type_default=$(resolve_token "$_type" "${_arg#@}") ;;
+                    *)  _type_default="$_arg" ;;
+                esac
+                _saved=$(wf_deploy_get "$_type" "$_key"); [ -n "$_saved" ] && _type_default="$_saved"
+                WF_ASK_TYPE_DEFAULT["${_type}|${_key}"]="$_type_default"
+
+                # KEY 처음 보면 등록
                 if [ -z "${WF_ASK_DEFAULT[$_key]+x}" ]; then
-                    # 기본값: @name이면 resolver, 아니면 리터럴. 재통합 저장값 우선.
-                    case "$_arg" in
-                        @*) _default=$(resolve_token "$_type" "${_arg#@}") ;;
-                        *)  _default="$_arg" ;;
-                    esac
-                    _saved=$(wf_deploy_get "$_type" "$_key"); [ -n "$_saved" ] && _default="$_saved"
                     WF_ASK_KEYS+=("$_key")
-                    WF_ASK_DEFAULT[$_key]="$_default"
+                    WF_ASK_DEFAULT[$_key]="$_type_default"
                 fi
                 # 사용처 파일 누적 (type|humanname)
                 WF_ASK_FILES[$_key]="${WF_ASK_FILES[$_key]:+${WF_ASK_FILES[$_key]}\n}${_type}|${_hn}"
@@ -3064,12 +3069,13 @@ _wf_first_type_for() {
 
 # 모든 KEY를 기본값으로, 각 KEY가 등장한 모든 type에 prefill (wf_deploy_set 캐시)
 _wf_prefill_all() {
-    local _k _t _line
+    local _k _t _line _def
     for _k in "${WF_ASK_KEYS[@]}"; do
         while IFS= read -r _line; do
             [ -z "$_line" ] && continue
             _t="${_line%%|*}"
-            wf_deploy_set "$_t" "$_k" "${WF_ASK_DEFAULT[$_k]}"
+            _def="${WF_ASK_TYPE_DEFAULT["${_t}|${_k}"]:-${WF_ASK_DEFAULT[$_k]}}"
+            wf_deploy_set "$_t" "$_k" "$_def"
         done <<< "$(printf '%b' "${WF_ASK_FILES[$_k]}")"
     done
 }
@@ -3200,11 +3206,16 @@ configure_workflow_env() {
                 if [ "$WF_USE_DEFAULTS" = true ]; then
                     _val="$_default"
                 else
-                    local _label _help _example _in=""
+                    local _label _help _example _in="" _scope
                     _label=$(wf_field "$_type" "$_key" "label")
                     _help=$(wf_field "$_type" "$_key" "help")
                     _example=$(wf_field "$_type" "$_key" "example")
-                    print_to_user "  ▸ ${_label}"
+                    _scope="${WF_ASK_SCOPE[$_key]:-}"
+                    if [ -n "$_scope" ]; then
+                        print_to_user "  ▸ ${_label}  [${_scope}]"
+                    else
+                        print_to_user "  ▸ ${_label}"
+                    fi
                     [ -n "$_help" ] && print_to_user "    ${_help}"
                     [ -n "$_example" ] && print_to_user "    예) ${_example}"
                     safe_read "  값 입력 [기본: ${_default}]: " _in "" || _in=""

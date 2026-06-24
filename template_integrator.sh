@@ -3125,12 +3125,25 @@ wf_prompt_env_plan() {
     print_to_user "   설치되는 배포 워크플로우가 사용할 값입니다. 아래가 기본값이며,"
     print_to_user "   그대로 두거나 원하는 것만 바꿀 수 있습니다."
     print_to_user ""
-    # 기본값 미리보기 표
-    local _k _label
-    for _k in "${WF_ASK_KEYS[@]}"; do
-        _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
-        printf '   %-26s %-18s %s\n' "$_label" "${WF_ASK_DEFAULT[$_k]}" "${WF_ASK_SCOPE[$_k]}" >&2
-    done
+    # 기본값 미리보기 (가로 폭 110자 미만 시 반응형 세로형 카드 블록으로 전환)
+    local _cols
+    _cols=$(tput cols 2>/dev/null || echo 80)
+
+    local _k _label _scope
+    if [ "$_cols" -lt 110 ]; then
+        for _k in "${WF_ASK_KEYS[@]}"; do
+            _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
+            _scope="${WF_ASK_SCOPE[$_k]:-}"
+            print_to_user "   ▸ ${_label}  [${_scope}]"
+            print_to_user "     기본값: ${WF_ASK_DEFAULT[$_k]}"
+            print_to_user ""
+        done
+    else
+        for _k in "${WF_ASK_KEYS[@]}"; do
+            _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
+            printf '   %-26s %-18s %s\n' "$_label" "${WF_ASK_DEFAULT[$_k]}" "${WF_ASK_SCOPE[$_k]}" >&2
+        done
+    fi
 
     local _choice _rc=0
     _choice=$(interactive_menu "어떻게 채울까요?" \

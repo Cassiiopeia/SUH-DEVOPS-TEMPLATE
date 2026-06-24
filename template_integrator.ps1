@@ -2639,14 +2639,32 @@ function Invoke-WfEnvPlan { param([string]$BaseDir, [string[]]$Types)
     Write-Host "   그대로 두거나 원하는 것만 바꿀 수 있습니다."
     Write-Host ""
 
-    # 표 출력
-    foreach ($k in $script:WfAskTable.Keys) {
-        $t = Get-WfFirstTypeFor $k
-        $lbl = Get-WfField $t $k "label"
-        $def = $script:WfAskTable[$k].Default
-        $scope = $script:WfAskTable[$k].Scope
-        
-        Write-Host ("   {0,-26} {1,-18} {2}" -f $lbl, $def, $scope)
+    # 기본값 미리보기 (가로 폭 110자 미만 시 반응형 세로형 카드 블록으로 전환)
+    $cols = 80
+    try {
+        if ($Host.UI.RawUI.WindowSize.Width) { $cols = $Host.UI.RawUI.WindowSize.Width }
+    } catch {}
+
+    if ($cols -lt 110) {
+        foreach ($k in $script:WfAskTable.Keys) {
+            $t = Get-WfFirstTypeFor $k
+            $lbl = Get-WfField $t $k "label"
+            $def = $script:WfAskTable[$k].Default
+            $scope = $script:WfAskTable[$k].Scope
+            
+            Write-ColorOutput ("   ▸ " + $lbl + "  [" + $scope + "]") -ForegroundColor Cyan
+            Write-Host "     기본값: $def"
+            Write-Host ""
+        }
+    } else {
+        foreach ($k in $script:WfAskTable.Keys) {
+            $t = Get-WfFirstTypeFor $k
+            $lbl = Get-WfField $t $k "label"
+            $def = $script:WfAskTable[$k].Default
+            $scope = $script:WfAskTable[$k].Scope
+            
+            Write-Host ("   {0,-26} {1,-18} {2}" -f $lbl, $def, $scope)
+        }
     }
     Write-Host ""
 

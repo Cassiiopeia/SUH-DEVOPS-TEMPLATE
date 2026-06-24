@@ -2810,6 +2810,43 @@ _wf_labels_path() {
     [ -f "$_src" ] && { echo "$_src"; return; }
     echo ""
 }
+# 워크플로우 파일명 → 사람이 읽는 짧은 이름.
+# labels.yml의 _workflow_names: 블록에서 "키가 파일명에 포함되면" 그 값 사용(긴 키 우선).
+# 매핑 없으면 파일명에서 .yaml/.yml 확장자만 제거해 그대로 반환.
+wf_workflow_name() {
+    local _file="$1" _base _lf _line _key _val _best="" _bestlen=0
+    _base="${_file##*/}"                 # 경로 제거
+    _lf=$(_wf_labels_path)
+    if [ -n "$_lf" ]; then
+        # _workflow_names: 블록 안의 "  KEY: "값"" 라인을 스캔
+        local _inblk=false
+        while IFS= read -r _line; do
+            case "$_line" in
+                _workflow_names:*) _inblk=true; continue ;;
+            esac
+            if [ "$_inblk" = true ]; then
+                # 비들여쓰기 라인 만나면 블록 끝
+                case "$_line" in
+                    [!\ ]*) _inblk=false; continue ;;
+                esac
+                _key=$(printf '%s' "$_line" | sed -nE 's/^[[:space:]]+([A-Za-z0-9_-]+):[[:space:]]*".*"[[:space:]]*$/\1/p')
+                [ -z "$_key" ] && continue
+                case "$_base" in
+                    *"$_key"*)
+                        # 가장 긴 키 매칭 우선
+                        if [ "${#_key}" -gt "$_bestlen" ]; then
+                            _val=$(printf '%s' "$_line" | sed -nE 's/^[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*"(.*)"[[:space:]]*$/\1/p')
+                            _best="$_val"; _bestlen="${#_key}"
+                        fi
+                        ;;
+                esac
+            fi
+        done < "$_lf"
+    fi
+    if [ -n "$_best" ]; then echo "$_best"; return; fi
+    # 폴백: 확장자만 제거
+    echo "${_base%.y*ml}"
+}
 # labels.yml에서 단일 필드 1개를 읽는다. $1=조회키(KEY 또는 "type.KEY") $2=필드(label|help|example)
 # 블록 형식(KEY: 다음 2칸 들여쓰기 label/help/example)과 구형 1줄 형식(KEY: "라벨") 모두 지원.
 _wf_read_field() {

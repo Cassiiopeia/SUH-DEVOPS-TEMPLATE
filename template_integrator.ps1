@@ -2400,6 +2400,27 @@ function Get-WfLabelsPath {
     if (Test-Path $src) { return $src }
     return ''
 }
+# 워크플로우 파일명 -> 사람이 읽는 짧은 이름 (.sh wf_workflow_name과 1:1).
+function Get-WfWorkflowName { param([string]$FileName)
+    $base = Split-Path $FileName -Leaf
+    $lf = Get-WfLabelsPath
+    $best = ''; $bestLen = 0
+    if ($lf) {
+        $inblk = $false
+        foreach ($l in Get-Content $lf -Encoding UTF8) {
+            if ($l -match '^_workflow_names:') { $inblk = $true; continue }
+            if ($inblk) {
+                if ($l -match '^\S') { $inblk = $false; continue }
+                if ($l -match '^\s+([A-Za-z0-9_-]+):\s*"(.*)"\s*$') {
+                    $k = $Matches[1]; $v = $Matches[2]
+                    if ($base -like "*$k*" -and $k.Length -gt $bestLen) { $best = $v; $bestLen = $k.Length }
+                }
+            }
+        }
+    }
+    if ($best) { return $best }
+    return ($base -replace '\.ya?ml$','')
+}
 # labels.yml에서 단일 필드 1개 조회. $Key=조회키(KEY 또는 "type.KEY") $Field=label|help|example
 # 블록 형식(KEY: 다음 2칸 들여쓰기)과 구형 1줄(KEY: "라벨") 모두 지원.
 function Read-WfField { param([string]$Key, [string]$Field)

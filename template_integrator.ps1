@@ -2510,6 +2510,42 @@ function Update-VersionYmlDeploy {
     Print-Info "version.yml에 deploy 설정을 기록했습니다 (재통합 시 기본값으로 제안)"
 }
 
+# ask KEY를 전 워크플로우에서 수집 -> [ordered] key->@{Default;Scope} (.sh wf_collect_asks와 1:1).
+# $BaseDir = project_types_dir 베이스(Copy-Workflows-ForType에 넘기는 것과 동일, 보통 "$TEMP_DIR\$WORKFLOWS_DIR\$PROJECT_TYPES_DIR").
+# 결과 테이블 외에 $script:WfAskFiles(key->@("type|name",..))도 채워 prefill/표에서 재사용한다.
+function Get-WfAskTable { param([string]$BaseDir, [string[]]$Types)
+    $table = [ordered]@{}
+    $files = @{}   # key -> @("type|humanname", ...)
+    foreach ($t in $Types) {
+        $dir = Join-Path $BaseDir $t
+        if (-not (Test-Path $dir)) { continue }
+        $wf = @(); $wf += Get-ChildItem -Path $dir -Filter '*.yaml' -File -ErrorAction SilentlyContinue
+        $wf += Get-ChildItem -Path $dir -Filter '*.yml' -File -ErrorAction SilentlyContinue
+        foreach ($f in $wf) {
+            $raw = Get-Content $f.FullName -Raw
+            if ($raw -notmatch '@wizard') { continue }
+            foreach ($line in (Get-Content $f.FullName)) {
+                if ($line -match '^\s*([A-Z_]+):.*#\s*@wizard\s+ask:(.*)$') {
+                    $key = $Matches[1]; $arg = $Matches[2].Trim()
+                    if ($arg -like '@*') { $def = Resolve-Token $t ($arg.Substring(1)) } else { $def = $arg }
+                    $saved = Get-WfDeploy $t $key
+                    if ($saved) { $def = $saved }
+                    if (-not $table.Contains($key)) {
+                        $table[$key] = @{ Default = $def; Scope = '' }
+                        $files[$key] = @()
+                    }
+                    $files[$key] += ($t + '|' + (Get-WfWorkflowName $f.Name))
+                }
+            }
+        }
+    }
+    foreach ($key in @($table.Keys)) {
+        $table[$key].Scope = Get-WfScopeString $files[$key]   # Task 4
+    }
+    $script:WfAskFiles = $files
+    return $table
+}
+
 # 워크플로우 1개 env 토큰 치환 (.sh configure_workflow_env와 동일 동작)
 function Configure-WorkflowEnv {
     param([string]$Type, [string]$File)

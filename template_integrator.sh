@@ -2970,6 +2970,55 @@ update_version_yml_deploy() {
     print_info "version.yml에 deploy 설정을 기록했습니다 (재통합 시 기본값으로 제안)"
 }
 
+# ask KEY를 전 워크플로우에서 수집. 결과는 전역 배열에 채운다.
+# WF_ASK_KEYS: KEY 등장 순서(중복 제거). WF_ASK_DEFAULT/WF_ASK_SCOPE: KEY별 기본값/사용처.
+declare -gA WF_ASK_DEFAULT 2>/dev/null || true
+declare -gA WF_ASK_SCOPE 2>/dev/null || true
+WF_ASK_KEYS=()
+# KEY -> 등장 파일들의 "type|name" 누적 (사용처 조립용)
+declare -gA WF_ASK_FILES 2>/dev/null || true
+
+# $1=project_types_dir 베이스(=_copy_workflows_for_type에 넘기는 것과 동일: 보통 "$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"),
+# $2.. = 설치 대상 type 목록. 실제 설치되는 워크플로우와 같은 소스를 스캔해야 사용처/기본값이 정확하다.
+wf_collect_asks() {
+    WF_ASK_KEYS=(); WF_ASK_DEFAULT=(); WF_ASK_SCOPE=(); WF_ASK_FILES=()
+    local _base_dir="$1"; shift
+    local _type _dir _f _base _line _key _action _arg _default _saved
+    for _type in "$@"; do
+        _dir="$_base_dir/$_type"
+        [ -d "$_dir" ] || continue
+        for _f in "$_dir"/*.yaml "$_dir"/*.yml; do
+            [ -f "$_f" ] || continue
+            grep -q "@wizard" "$_f" 2>/dev/null || continue
+            _base="${_f##*/}"
+            while IFS= read -r _line; do
+                _key=$(printf '%s' "$_line" | sed -nE 's|^[[:space:]]*([A-Z_]+):.*#[[:space:]]*@wizard[[:space:]]+ask:.*|\1|p')
+                [ -z "$_key" ] && continue
+                _arg=$(printf '%s' "$_line" | sed -nE 's~.*#[[:space:]]*@wizard[[:space:]]+ask:(.*)$~\1~p' | sed 's/[[:space:]]*$//')
+                # 기본값: @name이면 resolver, 아니면 리터럴. 재통합 저장값 우선.
+                case "$_arg" in
+                    @*) _default=$(resolve_token "$_type" "${_arg#@}") ;;
+                    *)  _default="$_arg" ;;
+                esac
+                _saved=$(wf_deploy_get "$_type" "$_key"); [ -n "$_saved" ] && _default="$_saved"
+                # KEY 처음 보면 등록
+                if [ -z "${WF_ASK_DEFAULT[$_key]+x}" ]; then
+                    WF_ASK_KEYS+=("$_key")
+                    WF_ASK_DEFAULT[$_key]="$_default"
+                fi
+                # 사용처 파일 누적 (type|humanname)
+                local _hn; _hn=$(wf_workflow_name "$_base")
+                WF_ASK_FILES[$_key]="${WF_ASK_FILES[$_key]:+${WF_ASK_FILES[$_key]}\n}${_type}|${_hn}"
+            done < <(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f")
+        done
+    done
+    # 사용처 문자열 조립 (Task 4의 wf_scope_string 사용)
+    local _k
+    for _k in "${WF_ASK_KEYS[@]}"; do
+        WF_ASK_SCOPE[$_k]=$(wf_scope_string "${WF_ASK_FILES[$_k]}")
+    done
+}
+
 # 워크플로우 1개의 env 토큰을 프로젝트에 맞게 치환 (토큰+마커 엔진의 핵심)
 # $1=type $2=워크플로우 파일 절대경로
 configure_workflow_env() {

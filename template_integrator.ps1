@@ -372,11 +372,23 @@ function Invoke-ArrowMenu {
     # 커서 초기 위치 = InitialIndex (단일 선택의 기본값 표현). 범위를 벗어나면 0으로.
     $cursor = if ($InitialIndex -ge 0 -and $InitialIndex -lt $n) { $InitialIndex } else { 0 }
 
+    # ── 스크롤 안전 커서 앵커 (.sh interactive_menu와 1:1) ──
+    # 문제: 긴 라벨이 터미널 폭을 넘어 wrap되면 "한 항목=한 줄" 가정이 깨져 ESC[nA(n줄 위로)가
+    #       실제 출력 줄 수와 어긋나고, redraw마다 잔상이 누적돼 "점점 늘어나는" 버그가 된다.
+    # 해법: 메뉴가 차지할 만큼(wrap 여유 포함=n*2) 빈 줄을 먼저 출력해 스크롤을 미리 일으킨 뒤,
+    #       그만큼 커서를 되올려(ESC[<rows>A) 그 지점을 앵커로 저장(ESC 7). 이후 redraw는
+    #       앵커 복원(ESC 8) + 화면 끝까지 삭제(ESC[J)라 wrap 줄 수와 무관하게 항상 깨끗하다.
+    $reserve = ($n * 2) + 1
+    for ($r = 0; $r -lt $reserve; $r++) { [Console]::Write("`n") }
+    [Console]::Write("$esc[${reserve}A")
+    [Console]::Write("$esc" + "7")
+
     function Render {
         param($first)
-        if (-not $first) { [Console]::Write("$esc[${n}A") }
+        # 앵커로 복원(ESC 8) 후 화면 끝까지 삭제(ESC[J) — wrap된 줄도 모두 지워 잔상 방지.
+        [Console]::Write("$esc" + "8")
+        [Console]::Write("$esc[J")
         for ($i = 0; $i -lt $n; $i++) {
-            [Console]::Write("$esc[2K`r")
             $opt = $Options[$i]
             $disp = if ([string]::IsNullOrWhiteSpace($opt.Label)) { $opt.Value } else { $opt.Label }
             # 표시자 — 멀티는 체크박스, 단일은 커서표시

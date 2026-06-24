@@ -2799,14 +2799,26 @@ resolve_token() {
 
 # labels.yml에서 질문 문구 조회 (없으면 키명). $1=KEY
 LABELS_FILE="${LABELS_FILE:-.github/wizard/labels.yml}"
+# 실제로 읽을 labels.yml 경로를 고른다.
+#   1) 작업 디렉토리 dst(LABELS_FILE) — 재통합/이미 복사된 경우
+#   2) 다운로드 원본 $TEMP_DIR/.github/wizard/labels.yml — 신규 통합에서 copy_wizard_labels가
+#      configure_workflow_env 보다 늦게 실행되어 dst에 아직 파일이 없을 때 폴백.
+# 이 폴백이 없으면 신규 통합 시 label/help/example이 모두 빈값이 되어 KEY명만 출력된다.
+_wf_labels_path() {
+    if [ -f "$LABELS_FILE" ]; then echo "$LABELS_FILE"; return; fi
+    local _src="$TEMP_DIR/.github/wizard/labels.yml"
+    [ -f "$_src" ] && { echo "$_src"; return; }
+    echo ""
+}
 # labels.yml에서 단일 필드 1개를 읽는다. $1=조회키(KEY 또는 "type.KEY") $2=필드(label|help|example)
 # 블록 형식(KEY: 다음 2칸 들여쓰기 label/help/example)과 구형 1줄 형식(KEY: "라벨") 모두 지원.
 _wf_read_field() {
-    local _key="$1" _field="$2" _v=""
-    [ -f "$LABELS_FILE" ] || { echo ""; return; }
+    local _key="$1" _field="$2" _v="" _lf
+    _lf=$(_wf_labels_path)
+    [ -n "$_lf" ] || { echo ""; return; }
     # 1) 구형 1줄: KEY: "..."  (값이 같은 줄에 있는 경우) — label만 의미 있음
     if [ "$_field" = "label" ]; then
-        _v=$(sed -nE "s~^${_key}:[[:space:]]+\"([^\"]*)\"[[:space:]]*\$~\1~p" "$LABELS_FILE" | head -1)
+        _v=$(sed -nE "s~^${_key}:[[:space:]]+\"([^\"]*)\"[[:space:]]*\$~\1~p" "$_lf" | head -1)
         [ -n "$_v" ] && { echo "$_v"; return; }
     fi
     # 2) 블록 형식: "KEY:" 줄을 찾고, 그 아래 들여쓰기 블록에서 "  field: ..." 추출.
@@ -2823,7 +2835,7 @@ _wf_read_field() {
                 print line; exit
             }
         }
-    ' "$LABELS_FILE")
+    ' "$_lf")
     echo "$_v"
 }
 

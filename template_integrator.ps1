@@ -2388,11 +2388,23 @@ function Resolve-Token { param([string]$Type,[string]$Name)
         default { return '' }
     }
 }
+# 실제로 읽을 labels.yml 경로를 고른다 (.sh _wf_labels_path와 1:1).
+#   1) 작업 디렉토리 dst(LabelsFile 또는 기본 .github/wizard/labels.yml) — 재통합/이미 복사된 경우
+#   2) 다운로드 원본 $TEMP_DIR\.github\wizard\labels.yml — 신규 통합에서 Copy-WizardLabels가
+#      Configure-WorkflowEnv 보다 늦게 실행되어 dst에 아직 파일이 없을 때 폴백.
+# 이 폴백이 없으면 신규 통합 시 label/help/example이 모두 빈값이 되어 KEY명만 출력된다.
+function Get-WfLabelsPath {
+    $dst = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
+    if (Test-Path $dst) { return $dst }
+    $src = Join-Path $TEMP_DIR ".github\wizard\labels.yml"
+    if (Test-Path $src) { return $src }
+    return ''
+}
 # labels.yml에서 단일 필드 1개 조회. $Key=조회키(KEY 또는 "type.KEY") $Field=label|help|example
 # 블록 형식(KEY: 다음 2칸 들여쓰기)과 구형 1줄(KEY: "라벨") 모두 지원.
 function Read-WfField { param([string]$Key, [string]$Field)
-    $lf = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
-    if (-not (Test-Path $lf)) { return '' }
+    $lf = Get-WfLabelsPath
+    if (-not $lf) { return '' }
     $lines = Get-Content $lf -Encoding UTF8
     $kEsc = [regex]::Escape($Key)
     $fEsc = [regex]::Escape($Field)
@@ -2425,9 +2437,9 @@ function Get-WfField { param([string]$Type, [string]$Key, [string]$Field)
     if ($Field -eq 'label') { return $Key } else { return '' }
 }
 function Get-WfLabel { param([string]$Key)
-    $lf = if($script:LabelsFile){$script:LabelsFile}else{'.github/wizard/labels.yml'}
-    if (Test-Path $lf) {
-        foreach($l in Get-Content $lf){
+    $lf = Get-WfLabelsPath
+    if ($lf) {
+        foreach($l in Get-Content $lf -Encoding UTF8){
             if($l -match "^${Key}:\s*`"?([^`"]*)`"?\s*$"){ return $Matches[1] }
         }
     }
@@ -2518,7 +2530,9 @@ function Configure-WorkflowEnv {
                     Write-ColorOutput ("  ▸ " + $lbl) -ForegroundColor Cyan
                     if ($hlp) { Write-ColorOutput ("    " + $hlp) -ForegroundColor DarkGray }
                     if ($exm) { Write-ColorOutput ("    예) " + $exm) -ForegroundColor DarkGray }
-                    $inp = Read-UserInput ("  값 입력 [기본: " + $def + "]") $def
+                    # Read-UserInput이 프롬프트 뒤에 "(기본: X)"를 자동 첨부하므로
+                    # 여기서 [기본: X]를 또 넣으면 "값 입력 [기본: X] (기본: X)"로 중복된다.
+                    $inp = Read-UserInput "  값 입력" $def
                     $val = if([string]::IsNullOrWhiteSpace($inp)){$def}else{$inp}
                 }
                 Set-WfDeploy $Type $key $val

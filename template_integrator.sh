@@ -4611,8 +4611,9 @@ _manage_claude_section() {
                             if [ -n "$old_cache_path" ] && [ -n "$new_cache_path" ] && [ "$old_cache_path" != "$new_cache_path" ]; then
                                 if [ -d "$old_cache_path/config" ]; then
                                     mkdir -p "$new_cache_path/config"
-                                    cp "$old_cache_path/config/"*.json "$new_cache_path/config/" 2>/dev/null && \
-                                        print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"
+                                    # set -e 안전: 매칭 json이 없으면 cp가 실패(비-0) → 블록 마지막 명령이라 전파됨. || true로 흡수.
+                                    { cp "$old_cache_path/config/"*.json "$new_cache_path/config/" 2>/dev/null && \
+                                        print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"; } || true
                                 fi
                             fi
                         else
@@ -4656,8 +4657,9 @@ _manage_claude_section() {
                 if [ -n "$old_cache_path_f" ] && [ -n "$new_cache_path_f" ] && [ "$old_cache_path_f" != "$new_cache_path_f" ]; then
                     if [ -d "$old_cache_path_f/config" ]; then
                         mkdir -p "$new_cache_path_f/config"
-                        cp "$old_cache_path_f/config/"*.json "$new_cache_path_f/config/" 2>/dev/null && \
-                            print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"
+                        # set -e 안전: 매칭 json 없으면 cp 실패(비-0) → FORCE 흐름 마지막 명령이라 전파됨. || true로 흡수.
+                        { cp "$old_cache_path_f/config/"*.json "$new_cache_path_f/config/" 2>/dev/null && \
+                            print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"; } || true
                     fi
                 fi
             fi

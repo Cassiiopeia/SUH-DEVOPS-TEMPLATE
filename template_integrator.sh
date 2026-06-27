@@ -112,6 +112,14 @@ NC=''
 TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
 TEMP_DIR=".template_download_temp"
 
+# 임시 다운로드 폴더 정리 — 정상 종료뿐 아니라 중단(ESC/Ctrl+C)·set -e 에러로
+# 종료될 때도 호출돼 .template_download_temp가 프로젝트에 잔존하지 않도록 보장한다.
+# (정상 흐름에서는 본문에서 한 번 더 명시적으로 rm 하지만, trap이 안전망이 된다.)
+cleanup_temp_dir() {
+    [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ] && rm -rf "$TEMP_DIR" 2>/dev/null || true
+}
+trap cleanup_temp_dir EXIT
+
 # 상수 정의
 readonly TEMPLATE_RAW_URL="https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main"
 readonly VERSION_FILE="version.yml"
@@ -1622,28 +1630,36 @@ detect_version() {
     fi
     
     # build.gradle (Spring Boot)
+    # macOS 호환: grep -oP(\K)는 GNU 전용 → BSD grep에서 'invalid option -- P'.
+    # grep -E로 라인만 찾고 sed -E로 첫 버전 토큰을 추출 (BSD/GNU 모두 동작).
     if [ -f "build.gradle" ]; then
-        detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" build.gradle | head -1)
+        detected_version=$(grep -E "version[[:space:]]*=" build.gradle 2>/dev/null \
+            | sed -E "s/.*version[[:space:]]*=[[:space:]]*['\"]?([0-9]+\.[0-9]+\.[0-9]+).*/\1/" \
+            | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
         if [ -n "$detected_version" ]; then
             print_info "✓ build.gradle에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
     fi
-    
+
     # pubspec.yaml (Flutter)
     if [ -f "pubspec.yaml" ]; then
-        detected_version=$(grep -oP "version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" pubspec.yaml | head -1)
+        detected_version=$(grep -E "^version:" pubspec.yaml 2>/dev/null \
+            | sed -E "s/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/" \
+            | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
         if [ -n "$detected_version" ]; then
             print_info "✓ pubspec.yaml에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
     fi
-    
+
     # pyproject.toml (Python)
     if [ -f "pyproject.toml" ]; then
-        detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" pyproject.toml | head -1)
+        detected_version=$(grep -E "version[[:space:]]*=" pyproject.toml 2>/dev/null \
+            | sed -E "s/.*version[[:space:]]*=[[:space:]]*['\"]?([0-9]+\.[0-9]+\.[0-9]+).*/\1/" \
+            | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
         if [ -n "$detected_version" ]; then
             print_info "✓ pyproject.toml에서 버전 감지: v$detected_version"
             echo "$detected_version"

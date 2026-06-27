@@ -1,14 +1,37 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-27T07:53:21Z",
-    "currentVersion": "3.0.174",
+    "lastUpdated": "2026-06-27T08:55:41Z",
+    "currentVersion": "3.0.179",
     "projectType": "basic",
-    "totalReleases": 165,
+    "totalReleases": 166,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.179",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-27",
+      "pr_number": 419,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * macOS에서 설치 마법사가 중간에 종료되던 문제 해결\n  * macOS에서 버전을 자동으로 인식하지 못하던 문제 해결\n  * 설치 명령어 실행 시 첫 줄에 오류 메시지가 뜨던 문제 해결\n  * macOS에서 배포 환경설정 항목이 하나만 표시되던 문제 해결\n  * 설치 중단 시 임시 폴더가 남던 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "macOS에서 설치 마법사가 중간에 종료되던 문제 해결",
+            "macOS에서 버전을 자동으로 인식하지 못하던 문제 해결",
+            "설치 명령어 실행 시 첫 줄에 오류 메시지가 뜨던 문제 해결",
+            "macOS에서 배포 환경설정 항목이 하나만 표시되던 문제 해결",
+            "설치 중단 시 임시 폴더가 남던 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.174",
       "project_type": "basic",

@@ -2679,21 +2679,26 @@ ask_optional_workflow() {
     # 현재 변수값 읽기 (bash 3.2 — nameref 없이 eval)
     local _cur; eval "_cur=\"\${$_varname}\""
 
-    [ -d "$_dir" ] || return
+    # ⚠️ set -e 안전: 모든 early return을 'return 0'으로 명시한다.
+    # 인자 없는 `return`은 직전 명령의 종료코드를 전파한다. 예: `[ -d "$_dir" ] || return`은
+    # 폴더가 없을 때 `[ -d ]`의 비-0(1)을 그대로 반환 → 이 함수가 호출자(ask_all_optional_workflows)의
+    # 마지막 명령이면 함수 전체가 1을 반환하고, set -e가 호출부에서 스크립트를 통째로 죽인다.
+    # (실측: spring(nexus 있음)+secret-backup 폴더 없음 조합에서 "아니오" 선택 시 마법사가 그대로 종료됐다.)
+    [ -d "$_dir" ] || return 0
 
     # 폴더 내 파일 개수
     local _count=0 f
     for f in "$_dir"/*.{yaml,yml}; do [ -e "$f" ] && _count=$((_count + 1)); done
-    [ "$_count" -eq 0 ] && return
+    [ "$_count" -eq 0 ] && return 0
 
     # 이미 설정된 값이 있고 force-ask 아니면 건너뜀 (CLI 또는 version.yml에서 온 값)
     if [ "$_force_ask" = false ] && { [ "$_cur" = true ] || [ "$_cur" = false ]; }; then
-        return
+        return 0
     fi
 
     # TTY 없으면 기본 제외
     if [ "$TTY_AVAILABLE" = false ]; then
-        eval "$_varname=false"; return
+        eval "$_varname=false"; return 0
     fi
 
     print_separator_line
@@ -2715,6 +2720,8 @@ ask_optional_workflow() {
         eval "$_varname=false"
         print_info "$_short 워크플로우를 제외합니다 (나중에 옵션으로 추가 가능)"
     fi
+    # set -e 안전: '아니오' 선택 시 ask_yes_no가 1을 반환하므로 함수가 비-0으로 끝나지 않도록 명시.
+    return 0
 }
 
 # 모든 opt-in 워크플로우를 순서대로 묻는다.
@@ -2743,6 +2750,8 @@ ask_all_optional_workflows() {
     ask_optional_workflow $_fa "$_common_root/secret-backup" "🔐" "Secret 서버 백업" \
         "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다." \
         INCLUDE_SECRET_BACKUP
+    # set -e 안전: 마지막 호출의 종료코드가 함수 밖으로 새지 않도록 명시.
+    return 0
 }
 
 # ===================================================================
@@ -2826,19 +2835,91 @@ _wf_labels_path() {
     [ -f "$_src" ] && { echo "$_src"; return; }
     echo ""
 }
+
+# ===================================================================
+# bash 3.2 호환 연관배열(맵) 대체 — 변수명 인코딩 기반 get/set
+# ===================================================================
+# WHY: macOS 기본 /bin/bash는 3.2.57(2007년 박제판)이라 `declare -A`(연관배열)을
+#      지원하지 않는다. 3.2에서 연관배열을 쓰면 모든 문자열 키가 인덱스 0으로
+#      뭉개져 마지막 1개 값만 남는다(실측 확인). 그래서 워크플로우 env 키를
+#      여러 개 수집해도 1개만 수집되는 치명 버그가 났다(.ps1은 해시테이블이라 정상).
+# 해결: 맵을 안 쓰고, "MAP명 + sanitize한 키"를 합친 일반 변수명에 값을 저장한다.
+#      키에 영문대문자·언더스코어 외에 `|`·`/`·`.`·`-` 등이 들어올 수 있으므로
+#      (예: "spring|JAVA_VERSION", "SPRING-SIMPLE-CICD") 변수명으로 못 쓰는 모든
+#      문자를 `_HEX`로 치환해 충돌 없이 안전한 변수명으로 만든다.
+#      이 방식은 bash 3.2/4+ 양쪽에서 동일하게 동작한다.
+
+# 키를 변수명으로 쓸 수 있게 sanitize. [A-Za-z0-9_] 외 문자는 _<2자리hex>로 인코딩.
+# 서로 다른 키가 같은 변수명으로 충돌하지 않도록 _ 자체도 인코딩 대상에 포함시키지
+# 않고(그대로 둠) 비허용 문자만 _HEX로 바꾼다. printf %02x로 1:1 가역.
+_kv_enc() {
+    local _s="$1" _out="" _i _c
+    for (( _i=0; _i<${#_s}; _i++ )); do
+        _c="${_s:_i:1}"
+        case "$_c" in
+            [A-Za-z0-9_]) _out="${_out}${_c}" ;;
+            *) _out="${_out}_$(printf '%02x' "'$_c")" ;;
+        esac
+    done
+    printf '%s' "$_out"
+}
+
+# _kv_set MAP KEY VALUE — MAP[KEY]=VALUE 와 동일. 임의 값(경로·한글·공백·\n) 안전.
+_kv_set() {
+    local _map="$1" _key="$2" _val="$3" _vn
+    _vn="__KV_${_map}__$(_kv_enc "$_key")"
+    # eval로 동적 변수에 대입. 값은 단일따옴표로 감싸되 내부 작은따옴표만 이스케이프.
+    eval "${_vn}=\$_val"
+    return 0
+}
+
+# _kv_get MAP KEY — MAP[KEY] 값을 stdout으로. 없으면 빈 문자열.
+_kv_get() {
+    local _map="$1" _key="$2" _vn
+    _vn="__KV_${_map}__$(_kv_enc "$_key")"
+    eval "printf '%s' \"\${${_vn}:-}\""
+    return 0
+}
+
+# _kv_has MAP KEY — 키 존재 여부(빈 문자열로 set된 것도 존재로 인정). 0=있음 1=없음.
+# WHY: 기존 코드의 `${WF_ASK_DEFAULT[$_key]+x}`(존재 검사) 의미를 보존하기 위함.
+_kv_has() {
+    local _map="$1" _key="$2" _vn
+    _vn="__KV_${_map}__$(_kv_enc "$_key")"
+    eval "[ -n \"\${${_vn}+x}\" ]"
+}
+
+# _kv_clear MAP — 해당 MAP의 모든 변수 제거(맵 리셋). 재호출 시 멱등성 보장용.
+# WHY: bash 3.2/4 모두 지원하는 접두 이름 확장 `${!prefix@}`로 변수명을 얻어 unset한다.
+#      `set | sed`로 파싱하면 값에 한글이 섞일 때 macOS BSD sed가 "illegal byte sequence"로
+#      깨진다(실측). 이름 확장은 fork·locale 의존 없이 안전하다.
+_kv_clear() {
+    # WHY 분리 선언: bash 3.2는 같은 `local a=.. b=$a` 한 줄에서 a를 b가 못 본다(빈값으로 확장).
+    #               그래서 _pfx를 반드시 별도 줄에서 계산해야 한다(실측 함정).
+    local _map="$1" _vn _pfx
+    _pfx="__KV_${_map}__"
+    for _vn in $(eval "echo \${!${_pfx}@}"); do
+        unset "$_vn" 2>/dev/null || true
+    done
+    return 0
+}
+
 # 워크플로우 파일명 → 사람이 읽는 짧은 이름.
 # wizard-prompts.yml의 _workflow_names: 블록에서 "키가 파일명에 포함되면" 그 값 사용(긴 키 우선).
 # 매핑 없으면 파일명에서 .yaml/.yml 확장자만 제거해 그대로 반환.
 # _workflow_names 매핑을 전역 캐시(WF_WFNAME_KEYS/WF_WFNAME_VAL)에 1회만 로드.
 # 호출마다 wizard-prompts.yml을 풀스캔하면 Windows Git Bash에서 fork 비용으로 극단적으로 느려진다(실측 수십 초).
 # 매핑은 통합 1회 동안 불변이므로 캐싱이 안전하다.
-declare -ga WF_WFNAME_KEYS 2>/dev/null || true
-declare -gA WF_WFNAME_VAL 2>/dev/null || true
+# WF_WFNAME_KEYS는 일반 배열(순서/멤버십만)이라 3.2에서도 OK.
+# -g는 bash 3.2에서 'invalid option'이지만 이 선언은 스크립트 최상위라 어차피 전역이므로
+# -g 없이 선언한다(2>/dev/null || true로 감싸도 -A 연관배열은 무력화돼 버그가 났던 것).
+WF_WFNAME_KEYS=()
+# WF_WFNAME_VAL(연관배열)은 _kv_*(맵 대체)로 전환 — 키는 워크플로우명 부분문자열.
 WF_WFNAME_LOADED=""
 _wf_load_workflow_names() {
     [ -n "$WF_WFNAME_LOADED" ] && return 0
     WF_WFNAME_LOADED=1
-    WF_WFNAME_KEYS=(); WF_WFNAME_VAL=()
+    WF_WFNAME_KEYS=(); _kv_clear WF_WFNAME_VAL
     local _lf _line _k _v _rest _inblk=false
     _lf=$(_wf_labels_path); [ -n "$_lf" ] || return 0
     while IFS= read -r _line; do
@@ -2854,7 +2935,7 @@ _wf_load_workflow_names() {
             *) continue ;;
         esac
         [ -z "$_k" ] && continue
-        WF_WFNAME_KEYS+=("$_k"); WF_WFNAME_VAL[$_k]="$_v"
+        WF_WFNAME_KEYS+=("$_k"); _kv_set WF_WFNAME_VAL "$_k" "$_v"
     done < "$_lf"
 }
 wf_workflow_name() {
@@ -2864,7 +2945,7 @@ wf_workflow_name() {
     for _k in "${WF_WFNAME_KEYS[@]}"; do
         case "$_base" in
             *"$_k"*)
-                if [ "${#_k}" -gt "$_bestlen" ]; then _best="${WF_WFNAME_VAL[$_k]}"; _bestlen="${#_k}"; fi
+                if [ "${#_k}" -gt "$_bestlen" ]; then _best="$(_kv_get WF_WFNAME_VAL "$_k")"; _bestlen="${#_k}"; fi
                 ;;
         esac
     done
@@ -3015,19 +3096,23 @@ wf_scope_string() {
     esac
 }
 
-# ask KEY를 전 워크플로우에서 수집. 결과는 전역 배열에 채운다.
-# WF_ASK_KEYS: KEY 등장 순서(중복 제거). WF_ASK_DEFAULT/WF_ASK_SCOPE: KEY별 기본값/사용처.
-declare -gA WF_ASK_DEFAULT 2>/dev/null || true
-declare -gA WF_ASK_SCOPE 2>/dev/null || true
-declare -gA WF_ASK_TYPE_DEFAULT 2>/dev/null || true
+# ask KEY를 전 워크플로우에서 수집. 결과는 전역에 채운다.
+# WF_ASK_KEYS: KEY 등장 순서(중복 제거, 일반 배열이라 3.2 OK).
+# 나머지 KEY별 데이터(기본값/사용처/타입별기본값/사용처파일)는 연관배열 대신 _kv_*(맵 대체)로 저장.
+# WHY: bash 3.2는 `declare -A`를 지원하지 않아 모든 키가 인덱스 0으로 뭉개진다 → env 키 1개만 수집되는 버그.
+#   WF_ASK_DEFAULT      : KEY -> 기본값
+#   WF_ASK_SCOPE        : KEY -> 사용처 문자열
+#   WF_ASK_TYPE_DEFAULT : "type|KEY" -> 타입별 기본값
+#   WF_ASK_FILES        : KEY -> 등장 파일들의 "type|name" 누적(\n 구분, 사용처 조립용)
 WF_ASK_KEYS=()
-# KEY -> 등장 파일들의 "type|name" 누적 (사용처 조립용)
-declare -gA WF_ASK_FILES 2>/dev/null || true
 
 # $1=project_types_dir 베이스(=_copy_workflows_for_type에 넘기는 것과 동일: 보통 "$TEMP_DIR/$WORKFLOWS_DIR/$PROJECT_TYPES_DIR"),
 # $2.. = 설치 대상 type 목록. 실제 설치되는 워크플로우와 같은 소스를 스캔해야 사용처/기본값이 정확하다.
 wf_collect_asks() {
-    WF_ASK_KEYS=(); WF_ASK_DEFAULT=(); WF_ASK_SCOPE=(); WF_ASK_FILES=(); WF_ASK_TYPE_DEFAULT=()
+    # 멱등성: 재호출 시 이전 맵 잔여값 제거(연관배열 `X=()` 리셋의 대체).
+    WF_ASK_KEYS=()
+    _kv_clear WF_ASK_DEFAULT; _kv_clear WF_ASK_SCOPE
+    _kv_clear WF_ASK_FILES; _kv_clear WF_ASK_TYPE_DEFAULT
     local _base_dir="$1"; shift
     local _type _dir _f _base _line _key _arg _default _saved _hn _grepout
     for _type in "$@"; do
@@ -3040,7 +3125,9 @@ wf_collect_asks() {
             _hn=$(wf_workflow_name "$_base")   # 파일당 1회 (라인마다 호출하면 fork 폭증)
             # 프로세스 치환(< <(grep)) 대신 변수+here-string: Windows Git Bash에서 프로세스 치환 FD가
             # 루프 내 중첩 서브셸로 상속돼 극단적으로 느려지는 것을 피한다.
-            _grepout=$(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f")
+            # set -e 안전: '@wizard ask:' 라인이 없는 워크플로우(파일에 @wizard는 있으나 ask 마커 없음)면
+            # grep이 매치 0건으로 exit 1 → 단독 대입이라 set -e가 마법사를 종료시킨다. || true로 빈 결과 허용.
+            _grepout=$(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f") || true
             while IFS= read -r _line; do
                 [ -z "$_line" ] && continue
                 # _key: 앞 공백 제거 후 ':' 앞부분 (bash 내장 — sed fork 회피)
@@ -3058,29 +3145,30 @@ wf_collect_asks() {
                     *)  _type_default="$_arg" ;;
                 esac
                 _saved=$(wf_deploy_get "$_type" "$_key"); [ -n "$_saved" ] && _type_default="$_saved"
-                WF_ASK_TYPE_DEFAULT["${_type}|${_key}"]="$_type_default"
+                _kv_set WF_ASK_TYPE_DEFAULT "${_type}|${_key}" "$_type_default"
 
-                # KEY 처음 보면 등록
-                if [ -z "${WF_ASK_DEFAULT[$_key]+x}" ]; then
+                # KEY 처음 보면 등록 (_kv_has = 존재 검사, 기존 `+x` 의미 보존)
+                if ! _kv_has WF_ASK_DEFAULT "$_key"; then
                     WF_ASK_KEYS+=("$_key")
-                    WF_ASK_DEFAULT[$_key]="$_type_default"
+                    _kv_set WF_ASK_DEFAULT "$_key" "$_type_default"
                 fi
-                # 사용처 파일 누적 (type|humanname)
-                WF_ASK_FILES[$_key]="${WF_ASK_FILES[$_key]:+${WF_ASK_FILES[$_key]}\n}${_type}|${_hn}"
+                # 사용처 파일 누적 (type|humanname). 기존 값 뒤에 \n 구분으로 이어붙임.
+                local _prev; _prev=$(_kv_get WF_ASK_FILES "$_key")
+                _kv_set WF_ASK_FILES "$_key" "${_prev:+${_prev}\n}${_type}|${_hn}"
             done <<< "$_grepout"
         done
     done
-    # 사용처 문자열 조립 (Task 4의 wf_scope_string 사용)
+    # 사용처 문자열 조립 (wf_scope_string 사용)
     local _k
     for _k in "${WF_ASK_KEYS[@]}"; do
-        WF_ASK_SCOPE[$_k]=$(wf_scope_string "${WF_ASK_FILES[$_k]}")
+        _kv_set WF_ASK_SCOPE "$_k" "$(wf_scope_string "$(_kv_get WF_ASK_FILES "$_k")")"
     done
 }
 
 # KEY가 처음 등장한 type 반환 (label 조회용 — 타입오버라이드 우선순위 때문)
 _wf_first_type_for() {
     local _k="$1"
-    printf '%b' "${WF_ASK_FILES[$_k]}" | head -1 | sed 's/|.*//'
+    printf '%b' "$(_kv_get WF_ASK_FILES "$_k")" | head -1 | sed 's/|.*//'
 }
 
 # 모든 KEY를 기본값으로, 각 KEY가 등장한 모든 type에 prefill (wf_deploy_set 캐시)
@@ -3091,27 +3179,30 @@ _wf_print_field_card() {
     _label=$(wf_field "$_t" "$_k" "label")
     _help=$(wf_field "$_t" "$_k" "help")
     _ex=$(wf_field "$_t" "$_k" "example")
+    local _scope; _scope=$(_kv_get WF_ASK_SCOPE "$_k")
     if [ -n "$_idx" ] && [ -n "$_tot" ]; then
-        _head="   ▸ (${_idx}/${_tot}) ${_label}  [${WF_ASK_SCOPE[$_k]}]"
+        _head="   ▸ (${_idx}/${_tot}) ${_label}  [${_scope}]"
     else
-        _head="   ▸ ${_label}  [${WF_ASK_SCOPE[$_k]}]"
+        _head="   ▸ ${_label}  [${_scope}]"
     fi
     print_to_user "$_head"
     [ -n "$_help" ] && print_to_user "       ${_help}"
     [ -n "$_ex" ] && print_to_user "       예) ${_ex}"
-    print_to_user "       기본값: ${WF_ASK_DEFAULT[$_k]}"
+    print_to_user "       기본값: $(_kv_get WF_ASK_DEFAULT "$_k")"
     print_to_user ""
 }
 
 _wf_prefill_all() {
-    local _k _t _line _def
+    local _k _t _line _def _td
     for _k in "${WF_ASK_KEYS[@]}"; do
         while IFS= read -r _line; do
             [ -z "$_line" ] && continue
             _t="${_line%%|*}"
-            _def="${WF_ASK_TYPE_DEFAULT["${_t}|${_k}"]:-${WF_ASK_DEFAULT[$_k]}}"
+            # 타입별 기본값 우선, 없으면 KEY 공통 기본값 (기존 `:-` 폴백 의미 보존)
+            _td=$(_kv_get WF_ASK_TYPE_DEFAULT "${_t}|${_k}")
+            [ -n "$_td" ] && _def="$_td" || _def="$(_kv_get WF_ASK_DEFAULT "$_k")"
             wf_deploy_set "$_t" "$_k" "$_def"
-        done <<< "$(printf '%b' "${WF_ASK_FILES[$_k]}")"
+        done <<< "$(printf '%b' "$(_kv_get WF_ASK_FILES "$_k")")"
     done
 }
 
@@ -3135,15 +3226,16 @@ _wf_prefill_interactive() {
         # 카드(번호/총 포함)로 무엇을 입력하는지 충분히 안내
         _wf_print_field_card "$_k" "$_i" "$_tot"
         _in=""
-        safe_read "       ↳ 값 입력 (Enter=기본값 «${WF_ASK_DEFAULT[$_k]}» 유지): " _in "" || _in=""
-        [ -z "$_in" ] && _val="${WF_ASK_DEFAULT[$_k]}" || _val="$_in"
+        local _kdef; _kdef=$(_kv_get WF_ASK_DEFAULT "$_k")
+        safe_read "       ↳ 값 입력 (Enter=기본값 «${_kdef}» 유지): " _in "" || _in=""
+        [ -z "$_in" ] && _val="$_kdef" || _val="$_in"
         print_to_user "         → $(wf_field "$_t" "$_k" "label") = ${_val}"
         print_to_user ""
         while IFS= read -r _line; do
             [ -z "$_line" ] && continue
             _t="${_line%%|*}"
             wf_deploy_set "$_t" "$_k" "$_val"
-        done <<< "$(printf '%b' "${WF_ASK_FILES[$_k]}")"
+        done <<< "$(printf '%b' "$(_kv_get WF_ASK_FILES "$_k")")"
     done
 }
 
@@ -3195,7 +3287,7 @@ wf_prompt_env_plan() {
             local _opts=() _sel _rc2=0 _label
             for _k in "${WF_ASK_KEYS[@]}"; do
                 _label=$(wf_field "$(_wf_first_type_for "$_k")" "$_k" "label")
-                _opts+=("$_k|${_label}  (기본: ${WF_ASK_DEFAULT[$_k]})")
+                _opts+=("$_k|${_label}  (기본: $(_kv_get WF_ASK_DEFAULT "$_k"))")
             done
             _sel=$(interactive_menu --multi "바꿀 항목을 고르세요 (Space로 선택 · Enter로 확정)" "${_opts[@]}") || _rc2=$?
             _wf_prefill_all                       # 일단 전부 기본값
@@ -3259,7 +3351,7 @@ configure_workflow_env() {
                     _label=$(wf_field "$_type" "$_key" "label")
                     _help=$(wf_field "$_type" "$_key" "help")
                     _example=$(wf_field "$_type" "$_key" "example")
-                    _scope="${WF_ASK_SCOPE[$_key]:-}"
+                    _scope="$(_kv_get WF_ASK_SCOPE "$_key")"
                     if [ -n "$_scope" ]; then
                         print_to_user "  ▸ ${_label}  [${_scope}]"
                     else
@@ -3382,10 +3474,12 @@ _copy_workflows_for_type() {
             local choice="skip"
             if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
                 local _wf_label
+                # set -e 안전: ESC 취소 시 choose_menu가 비-0 반환 → 단독 `var=$(...)` 라인이라
+                # set -e가 마법사를 통째로 종료한다. `|| _wf_label=""`로 흡수(아래 case의 *) → 건너뛰기로 폴백).
                 _wf_label=$(choose_menu "기존 워크플로우를 어떻게 할까요?" \
                     "기존 유지 + 새 버전을 참고용(.template.yaml)으로 추가|" \
                     "건너뛰기 — 기존 파일만 유지|" \
-                    "덮어쓰기 — 기존 파일을 .bak 백업 후 교체|")
+                    "덮어쓰기 — 기존 파일을 .bak 백업 후 교체|") || _wf_label=""
                 case "$_wf_label" in
                     기존\ 유지*) choice="T" ;;
                     건너뛰기*)   choice="S" ;;
@@ -4227,7 +4321,11 @@ interactive_mode() {
                     [ "$_pt" = "basic" ] && continue
                     if [ -z "$(get_path_for_type "$_pt")" ]; then _need_paths=true; break; fi
                 done
-                [ "$_need_paths" = true ] && resolve_project_paths
+                # set -e 안전: 이 줄이 interactive_mode의 마지막 명령이라, _need_paths=false면
+                # `[ = true ]`가 비-0 → 함수가 비-0 반환 → main의 `if interactive; fi` 마지막 명령이라
+                # set -e가 execute_integration 호출 전에 스크립트를 죽인다(확인까지 하고 통합이 무산됨).
+                # `|| true`로 종료코드를 흡수한다.
+                { [ "$_need_paths" = true ] && resolve_project_paths; } || true
             fi
             ;;
     esac
@@ -4598,8 +4696,9 @@ _manage_claude_section() {
                             if [ -n "$old_cache_path" ] && [ -n "$new_cache_path" ] && [ "$old_cache_path" != "$new_cache_path" ]; then
                                 if [ -d "$old_cache_path/config" ]; then
                                     mkdir -p "$new_cache_path/config"
-                                    cp "$old_cache_path/config/"*.json "$new_cache_path/config/" 2>/dev/null && \
-                                        print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"
+                                    # set -e 안전: 매칭 json이 없으면 cp가 실패(비-0) → 블록 마지막 명령이라 전파됨. || true로 흡수.
+                                    { cp "$old_cache_path/config/"*.json "$new_cache_path/config/" 2>/dev/null && \
+                                        print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"; } || true
                                 fi
                             fi
                         else
@@ -4643,8 +4742,9 @@ _manage_claude_section() {
                 if [ -n "$old_cache_path_f" ] && [ -n "$new_cache_path_f" ] && [ "$old_cache_path_f" != "$new_cache_path_f" ]; then
                     if [ -d "$old_cache_path_f/config" ]; then
                         mkdir -p "$new_cache_path_f/config"
-                        cp "$old_cache_path_f/config/"*.json "$new_cache_path_f/config/" 2>/dev/null && \
-                            print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"
+                        # set -e 안전: 매칭 json 없으면 cp 실패(비-0) → FORCE 흐름 마지막 명령이라 전파됨. || true로 흡수.
+                        { cp "$old_cache_path_f/config/"*.json "$new_cache_path_f/config/" 2>/dev/null && \
+                            print_success "config.json 마이그레이션 완료 (이전 버전 설정 유지)"; } || true
                     fi
                 fi
             fi
@@ -4760,8 +4860,11 @@ _remove_codex_section() {
     else
         print_info "  제거할 Codex skills가 없어 건너뜁니다"
     fi
-    command -v codex &> /dev/null && \
-        print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
+    # set -e 안전: codex 미설치면 `command -v`가 비-0 → 함수가 비-0 반환 → 호출하는 case가
+    # 비-0이 되어 set -e가 뒤따르는 PI 제거·정리·완료메시지 전에 마법사를 죽인다. `|| true`로 흡수.
+    { command -v codex &> /dev/null && \
+        print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"; } || true
+    return 0
 }
 
 _remove_pi_section() {

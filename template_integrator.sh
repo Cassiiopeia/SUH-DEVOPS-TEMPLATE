@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 # ===================================================================
 # GitHub 템플릿 통합 스크립트 v1.0.0
@@ -111,6 +111,14 @@ NC=''
 # 템플릿 저장소 URL
 TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
 TEMP_DIR=".template_download_temp"
+
+# 임시 다운로드 폴더 정리 — 정상 종료뿐 아니라 중단(ESC/Ctrl+C)·set -e 에러로
+# 종료될 때도 호출돼 .template_download_temp가 프로젝트에 잔존하지 않도록 보장한다.
+# (정상 흐름에서는 본문에서 한 번 더 명시적으로 rm 하지만, trap이 안전망이 된다.)
+cleanup_temp_dir() {
+    [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ] && rm -rf "$TEMP_DIR" 2>/dev/null || true
+}
+trap cleanup_temp_dir EXIT
 
 # 상수 정의
 readonly TEMPLATE_RAW_URL="https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main"
@@ -1622,28 +1630,36 @@ detect_version() {
     fi
     
     # build.gradle (Spring Boot)
+    # macOS 호환: grep -oP(\K)는 GNU 전용 → BSD grep에서 'invalid option -- P'.
+    # grep -E로 라인만 찾고 sed -E로 첫 버전 토큰을 추출 (BSD/GNU 모두 동작).
     if [ -f "build.gradle" ]; then
-        detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" build.gradle | head -1)
+        detected_version=$(grep -E "version[[:space:]]*=" build.gradle 2>/dev/null \
+            | sed -E "s/.*version[[:space:]]*=[[:space:]]*['\"]?([0-9]+\.[0-9]+\.[0-9]+).*/\1/" \
+            | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
         if [ -n "$detected_version" ]; then
             print_info "✓ build.gradle에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
     fi
-    
+
     # pubspec.yaml (Flutter)
     if [ -f "pubspec.yaml" ]; then
-        detected_version=$(grep -oP "version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" pubspec.yaml | head -1)
+        detected_version=$(grep -E "^version:" pubspec.yaml 2>/dev/null \
+            | sed -E "s/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/" \
+            | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
         if [ -n "$detected_version" ]; then
             print_info "✓ pubspec.yaml에서 버전 감지: v$detected_version"
             echo "$detected_version"
             return
         fi
     fi
-    
+
     # pyproject.toml (Python)
     if [ -f "pyproject.toml" ]; then
-        detected_version=$(grep -oP "version\s*=\s*['\"]?\K[0-9]+\.[0-9]+\.[0-9]+" pyproject.toml | head -1)
+        detected_version=$(grep -E "version[[:space:]]*=" pyproject.toml 2>/dev/null \
+            | sed -E "s/.*version[[:space:]]*=[[:space:]]*['\"]?([0-9]+\.[0-9]+\.[0-9]+).*/\1/" \
+            | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
         if [ -n "$detected_version" ]; then
             print_info "✓ pyproject.toml에서 버전 감지: v$detected_version"
             echo "$detected_version"
@@ -2797,24 +2813,24 @@ resolve_token() {
     esac
 }
 
-# labels.yml에서 질문 문구 조회 (없으면 키명). $1=KEY
-LABELS_FILE="${LABELS_FILE:-.github/wizard/labels.yml}"
-# 실제로 읽을 labels.yml 경로를 고른다.
+# wizard-prompts.yml에서 질문 문구 조회 (없으면 키명). $1=KEY
+LABELS_FILE="${LABELS_FILE:-.github/config/wizard-prompts.yml}"
+# 실제로 읽을 wizard-prompts.yml 경로를 고른다.
 #   1) 작업 디렉토리 dst(LABELS_FILE) — 재통합/이미 복사된 경우
-#   2) 다운로드 원본 $TEMP_DIR/.github/wizard/labels.yml — 신규 통합에서 copy_wizard_labels가
+#   2) 다운로드 원본 $TEMP_DIR/.github/config/wizard-prompts.yml — 신규 통합에서 copy_config_folder가
 #      configure_workflow_env 보다 늦게 실행되어 dst에 아직 파일이 없을 때 폴백.
 # 이 폴백이 없으면 신규 통합 시 label/help/example이 모두 빈값이 되어 KEY명만 출력된다.
 _wf_labels_path() {
     if [ -f "$LABELS_FILE" ]; then echo "$LABELS_FILE"; return; fi
-    local _src="$TEMP_DIR/.github/wizard/labels.yml"
+    local _src="$TEMP_DIR/.github/config/wizard-prompts.yml"
     [ -f "$_src" ] && { echo "$_src"; return; }
     echo ""
 }
 # 워크플로우 파일명 → 사람이 읽는 짧은 이름.
-# labels.yml의 _workflow_names: 블록에서 "키가 파일명에 포함되면" 그 값 사용(긴 키 우선).
+# wizard-prompts.yml의 _workflow_names: 블록에서 "키가 파일명에 포함되면" 그 값 사용(긴 키 우선).
 # 매핑 없으면 파일명에서 .yaml/.yml 확장자만 제거해 그대로 반환.
 # _workflow_names 매핑을 전역 캐시(WF_WFNAME_KEYS/WF_WFNAME_VAL)에 1회만 로드.
-# 호출마다 labels.yml을 풀스캔하면 Windows Git Bash에서 fork 비용으로 극단적으로 느려진다(실측 수십 초).
+# 호출마다 wizard-prompts.yml을 풀스캔하면 Windows Git Bash에서 fork 비용으로 극단적으로 느려진다(실측 수십 초).
 # 매핑은 통합 1회 동안 불변이므로 캐싱이 안전하다.
 declare -ga WF_WFNAME_KEYS 2>/dev/null || true
 declare -gA WF_WFNAME_VAL 2>/dev/null || true
@@ -2856,7 +2872,7 @@ wf_workflow_name() {
     # 폴백: 확장자만 제거
     echo "${_base%.y*ml}"
 }
-# labels.yml에서 단일 필드 1개를 읽는다. $1=조회키(KEY 또는 "type.KEY") $2=필드(label|help|example)
+# wizard-prompts.yml에서 단일 필드 1개를 읽는다. $1=조회키(KEY 또는 "type.KEY") $2=필드(label|help|example)
 # 블록 형식(KEY: 다음 2칸 들여쓰기 label/help/example)과 구형 1줄 형식(KEY: "라벨") 모두 지원.
 _wf_read_field() {
     local _key="$1" _field="$2" _v="" _lf
@@ -3679,22 +3695,6 @@ copy_config_folder() {
     print_success ".github/config 폴더 복사 완료 ($copied개 파일)"
 }
 
-# .github/wizard 폴더 복사 (labels.yml — @wizard ask 마커 질문 문구)
-# 워크플로우와 함께 가야 통합된 프로젝트의 '하나씩 입력' 모드에서 한글 질문이 뜬다.
-copy_wizard_labels() {
-    local src_wizard_dir="$TEMP_DIR/.github/wizard"
-    local dst_wizard_dir=".github/wizard"
-
-    if [ ! -d "$src_wizard_dir" ]; then
-        return   # 템플릿에 없으면 안전 스킵
-    fi
-
-    print_step ".github/wizard 폴더 복사 중..."
-    mkdir -p "$dst_wizard_dir"
-    cp -r "$src_wizard_dir/"* "$dst_wizard_dir/" 2>/dev/null || true
-    print_success ".github/wizard 폴더 복사 완료 (labels.yml)"
-}
-
 # 이슈 템플릿 다운로드
 copy_issue_templates() {
     print_step "이슈/PR 템플릿 다운로드 중..."
@@ -4329,7 +4329,6 @@ execute_integration() {
             update_version_yml_deploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             copy_scripts
             copy_config_folder
-            copy_wizard_labels   # 워크플로우 @wizard 마커 질문 문구(labels.yml)
             for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_issue_templates
             copy_discussion_templates
@@ -4350,7 +4349,6 @@ execute_integration() {
             update_version_yml_deploy   # 워크플로우 env 설정값을 version.yml deploy 블록에 기록
             copy_scripts
             copy_config_folder
-            copy_wizard_labels   # 워크플로우 @wizard 마커 질문 문구(labels.yml)
             for _ut in "${PROJECT_TYPES[@]:-$PROJECT_TYPE}"; do copy_util_modules "$_ut"; done
             copy_setup_guide
             ;;

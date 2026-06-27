@@ -2679,21 +2679,26 @@ ask_optional_workflow() {
     # 현재 변수값 읽기 (bash 3.2 — nameref 없이 eval)
     local _cur; eval "_cur=\"\${$_varname}\""
 
-    [ -d "$_dir" ] || return
+    # ⚠️ set -e 안전: 모든 early return을 'return 0'으로 명시한다.
+    # 인자 없는 `return`은 직전 명령의 종료코드를 전파한다. 예: `[ -d "$_dir" ] || return`은
+    # 폴더가 없을 때 `[ -d ]`의 비-0(1)을 그대로 반환 → 이 함수가 호출자(ask_all_optional_workflows)의
+    # 마지막 명령이면 함수 전체가 1을 반환하고, set -e가 호출부에서 스크립트를 통째로 죽인다.
+    # (실측: spring(nexus 있음)+secret-backup 폴더 없음 조합에서 "아니오" 선택 시 마법사가 그대로 종료됐다.)
+    [ -d "$_dir" ] || return 0
 
     # 폴더 내 파일 개수
     local _count=0 f
     for f in "$_dir"/*.{yaml,yml}; do [ -e "$f" ] && _count=$((_count + 1)); done
-    [ "$_count" -eq 0 ] && return
+    [ "$_count" -eq 0 ] && return 0
 
     # 이미 설정된 값이 있고 force-ask 아니면 건너뜀 (CLI 또는 version.yml에서 온 값)
     if [ "$_force_ask" = false ] && { [ "$_cur" = true ] || [ "$_cur" = false ]; }; then
-        return
+        return 0
     fi
 
     # TTY 없으면 기본 제외
     if [ "$TTY_AVAILABLE" = false ]; then
-        eval "$_varname=false"; return
+        eval "$_varname=false"; return 0
     fi
 
     print_separator_line
@@ -2715,6 +2720,8 @@ ask_optional_workflow() {
         eval "$_varname=false"
         print_info "$_short 워크플로우를 제외합니다 (나중에 옵션으로 추가 가능)"
     fi
+    # set -e 안전: '아니오' 선택 시 ask_yes_no가 1을 반환하므로 함수가 비-0으로 끝나지 않도록 명시.
+    return 0
 }
 
 # 모든 opt-in 워크플로우를 순서대로 묻는다.
@@ -2743,6 +2750,8 @@ ask_all_optional_workflows() {
     ask_optional_workflow $_fa "$_common_root/secret-backup" "🔐" "Secret 서버 백업" \
         "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다." \
         INCLUDE_SECRET_BACKUP
+    # set -e 안전: 마지막 호출의 종료코드가 함수 밖으로 새지 않도록 명시.
+    return 0
 }
 
 # ===================================================================
@@ -4227,7 +4236,11 @@ interactive_mode() {
                     [ "$_pt" = "basic" ] && continue
                     if [ -z "$(get_path_for_type "$_pt")" ]; then _need_paths=true; break; fi
                 done
-                [ "$_need_paths" = true ] && resolve_project_paths
+                # set -e 안전: 이 줄이 interactive_mode의 마지막 명령이라, _need_paths=false면
+                # `[ = true ]`가 비-0 → 함수가 비-0 반환 → main의 `if interactive; fi` 마지막 명령이라
+                # set -e가 execute_integration 호출 전에 스크립트를 죽인다(확인까지 하고 통합이 무산됨).
+                # `|| true`로 종료코드를 흡수한다.
+                { [ "$_need_paths" = true ] && resolve_project_paths; } || true
             fi
             ;;
     esac
@@ -4760,8 +4773,11 @@ _remove_codex_section() {
     else
         print_info "  제거할 Codex skills가 없어 건너뜁니다"
     fi
-    command -v codex &> /dev/null && \
-        print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"
+    # set -e 안전: codex 미설치면 `command -v`가 비-0 → 함수가 비-0 반환 → 호출하는 case가
+    # 비-0이 되어 set -e가 뒤따르는 PI 제거·정리·완료메시지 전에 마법사를 죽인다. `|| true`로 흡수.
+    { command -v codex &> /dev/null && \
+        print_info "  marketplace 등록 해제는 수동: codex plugin marketplace remove cassiiopeia"; } || true
+    return 0
 }
 
 _remove_pi_section() {

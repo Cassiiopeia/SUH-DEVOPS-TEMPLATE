@@ -3391,10 +3391,12 @@ _copy_workflows_for_type() {
             local choice="skip"
             if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
                 local _wf_label
+                # set -e 안전: ESC 취소 시 choose_menu가 비-0 반환 → 단독 `var=$(...)` 라인이라
+                # set -e가 마법사를 통째로 종료한다. `|| _wf_label=""`로 흡수(아래 case의 *) → 건너뛰기로 폴백).
                 _wf_label=$(choose_menu "기존 워크플로우를 어떻게 할까요?" \
                     "기존 유지 + 새 버전을 참고용(.template.yaml)으로 추가|" \
                     "건너뛰기 — 기존 파일만 유지|" \
-                    "덮어쓰기 — 기존 파일을 .bak 백업 후 교체|")
+                    "덮어쓰기 — 기존 파일을 .bak 백업 후 교체|") || _wf_label=""
                 case "$_wf_label" in
                     기존\ 유지*) choice="T" ;;
                     건너뛰기*)   choice="S" ;;

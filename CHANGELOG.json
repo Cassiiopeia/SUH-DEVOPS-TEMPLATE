@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-27T07:49:44Z",
-    "currentVersion": "3.0.173",
+    "lastUpdated": "2026-06-27T07:53:21Z",
+    "currentVersion": "3.0.174",
     "projectType": "basic",
-    "totalReleases": 164,
+    "totalReleases": 165,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.174",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-27",
+      "pr_number": 417,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 설치 명령어 실행 시 첫 줄에 오류 메시지가 뜨던 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "설치 명령어 실행 시 첫 줄에 오류 메시지가 뜨던 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.173",
       "project_type": "basic",

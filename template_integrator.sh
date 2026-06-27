@@ -3049,7 +3049,9 @@ wf_collect_asks() {
             _hn=$(wf_workflow_name "$_base")   # 파일당 1회 (라인마다 호출하면 fork 폭증)
             # 프로세스 치환(< <(grep)) 대신 변수+here-string: Windows Git Bash에서 프로세스 치환 FD가
             # 루프 내 중첩 서브셸로 상속돼 극단적으로 느려지는 것을 피한다.
-            _grepout=$(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f")
+            # set -e 안전: '@wizard ask:' 라인이 없는 워크플로우(파일에 @wizard는 있으나 ask 마커 없음)면
+            # grep이 매치 0건으로 exit 1 → 단독 대입이라 set -e가 마법사를 종료시킨다. || true로 빈 결과 허용.
+            _grepout=$(grep -E '^[[:space:]]*[A-Z_]+:.*@wizard[[:space:]]+ask:' "$_f") || true
             while IFS= read -r _line; do
                 [ -z "$_line" ] && continue
                 # _key: 앞 공백 제거 후 ':' 앞부분 (bash 내장 — sed fork 회피)

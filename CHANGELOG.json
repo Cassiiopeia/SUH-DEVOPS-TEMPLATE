@@ -1,14 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-27T08:55:41Z",
-    "currentVersion": "3.0.179",
+    "lastUpdated": "2026-06-28T06:28:31Z",
+    "currentVersion": "3.0.181",
     "projectType": "basic",
-    "totalReleases": 166,
+    "totalReleases": 167,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.181",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-06-28",
+      "pr_number": 421,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 설정 입력 시 첫 글자가 중복으로 표시되던 문제 해결\n  * 입력한 글자를 지울 수 없던 문제 해결\n\n* **개선**\n  * 입력 칸에서 방향키·한글 입력이 자연스럽게 동작합니다",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "설정 입력 시 첫 글자가 중복으로 표시되던 문제 해결",
+            "입력한 글자를 지울 수 없던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "입력 칸에서 방향키·한글 입력이 자연스럽게 동작합니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.179",
       "project_type": "basic",

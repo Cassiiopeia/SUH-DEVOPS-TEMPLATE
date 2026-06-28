@@ -284,6 +284,27 @@ EXP
 
 ---
 
+#### ⚠️ macOS는 bash 3.2 + BSD 도구다 — `.sh` 작성·검증 시 절대 잊지 말 것 (agent 필독, 실측)
+
+> **핵심: 윈도우(`.ps1`·Git Bash)에서 잘 돌아도 macOS에서 깨질 수 있다.** macOS 기본 `/bin/bash`는 라이선스 문제로 **3.2.57(2007년)에 박제**돼 있고, 기본 grep/sed도 **BSD 계열**이다. `.sh`는 항상 **`/bin/bash`(3.2) + BSD 도구**로 검증한다. "윈도우에서만 테스트했다"가 실제 사용자(macOS) 버그를 통째로 놓치게 한 주원인이다. (실측: 이슈 #415·#418 — 윈도우 정상, macOS만 깨짐.)
+
+**bash 3.2에서 못 쓰는 것 (4+ 전용 → macOS에서 조용히 오작동)**
+- **연관배열 `declare -A` 금지.** bash 3.2는 미지원 → 모든 문자열 키가 **인덱스 0으로 뭉개져** "키가 1개만 남는" 버그가 된다(실측 #418: @wizard env 키가 6개인데 1개만 수집). 동적 key-value가 필요하면 스크립트에 이미 있는 **`_kv_set`/`_kv_get`/`_kv_has`/`_kv_clear` 헬퍼**(eval 동적변수 + 16진 키 인코딩, 3.2/4 공용)를 쓴다.
+- **`declare -g` 금지.** bash 3.2에서 `invalid option`. 최상위 레벨이면 어차피 전역이니 `-g` 없이 선언한다.
+- `mapfile`/`readarray`, `${var,,}`/`${var^^}`(대소문자), `&>>`도 4+ 전용 → 사용 금지.
+
+**BSD 도구 함정 (macOS 기본 grep/sed ≠ GNU)**
+- **`grep -P`/`-oP`/`\K` 금지** (PCRE는 GNU 전용). `grep -E`로 라인 잡고 `sed -E`로 추출한다. (실측 #415: `grep: invalid option -- P`로 버전 감지 실패.)
+- **`grep`이 매치 0건이면 `exit 1`** → `set -e`에서 `var=$(grep ...)` 단독 대입이 스크립트를 죽인다. `|| true`로 흡수하거나 `| head`/`| sed` 파이프로 끝낸다(pipefail 없으면 파이프 마지막 명령 코드만 봄). (실측 #415.)
+- `sed -i`는 BSD가 `sed -i ''` / `sed -i.bak` 형태로 인자가 다르다. `readlink -f`·`date -d`·`xargs -r`도 BSD 미지원.
+
+**`set -e` + 함수 끝 종료코드 (메뉴 아닌 일반 함수도 해당)**
+- 위 "var=$(menu_fn)" 함정의 일반화: **함수의 마지막 명령이 비-0이면**, 그 함수가 호출부의 마지막 명령일 때 `set -e`가 스크립트를 통째로 죽인다. `[ -d x ] || return`(폴더 없으면 1 전파), `[ cond ] && cmd`(조건 거짓이면 1), `command -v foo && ...`(미설치면 1), `cp ... && ...`(실패면 1) 모두 위험. → early return은 `return 0` 명시, 끝줄 `조건 && 명령`은 `{ ...; } || true`로 감싼다. (실측 #415: Nexus/Secret 메뉴·interactive_mode·codex 제거·config cp 등 5곳.)
+
+**검증 방법**: `bash -n`(문법)만으론 부족하다. **반드시 `/bin/bash`(3.2)로 실제 실행**한다. 함수만 떼어 `source` 후 호출하거나, `--force --mode full --type spring,flutter,react,python`로 전체 통합이 **종료코드 0으로 완주**하는지 본다. `which bash`가 brew bash(`/opt/homebrew/bin/bash`, 4+)를 가리키면 `/bin/bash`로 명시 실행해 3.2를 강제한다.
+
+---
+
 ## ⚠️ 워크플로우 YAML 검증 — 로컬 파서를 GitHub 실제 동작으로 착각하지 말 것 (agent 필독)
 
 > **핵심 원칙: 로컬 YAML 검증 도구(`actionlint`·Ruby `psych`·Python `pyyaml`)가 빨갛게 떠도, 그 워크플로우가 GitHub에서 실제로 깨진다는 뜻이 아니다.** 도구가 못 읽는 것과 GitHub이 못 돌리는 것은 **다르다.** 멀쩡히 돌던 워크플로우를 "검증 도구가 오류라고 했으니" 멋대로 고치지 마라 — 이건 실측으로 확인된 함정이다.

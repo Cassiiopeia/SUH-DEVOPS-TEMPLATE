@@ -224,12 +224,10 @@ print_question() {
 }
 
 # 안전한 read 함수 (/dev/tty 사용)
-# 반환: 0=정상 입력, 1=TTY 없음(비대화형), 2=ESC로 취소
-# ESC 처리: 자유텍스트 입력($options 빈값)에서만 동작. 첫 키를 raw 모드로 한 글자
-#           읽어 ESC면 취소(2)로 반환한다. 일반 문자면 그 글자를 첫 글자로 삼고
-#           나머지를 라인으로 읽어 합쳐 기존 줄 입력과 동일하게 동작시킨다.
-#           (read -r 한 줄 입력은 ESC가 리터럴 '^['로 박혀 취소로 인식되지 못했던
-#            버그를 해결 — 버전/브랜치 입력 중 ESC가 ^[^[로 찍히던 문제)
+# 반환: 0=정상 입력, 1=TTY 없음(비대화형) 또는 EOF
+# 라인 입력($options 빈값)은 `read -e`(readline)로 받아 backspace·방향키·한글이
+# 모두 정상 동작한다. ESC 단독 취소는 지원하지 않으며(bash 3.2 제약), 호출부에서
+# "빈 입력 Enter = 기존 값 유지"로 동등하게 처리한다. 자세한 경위는 #420 참고.
 safe_read() {
     local prompt="$1"
     local varname="$2"
@@ -243,38 +241,15 @@ safe_read() {
         elif [ -n "$options" ]; then
             IFS= read -r $options "$varname" < /dev/tty
         else
-            # 첫 키를 raw 1바이트로 읽어 ESC 여부 판별
-            local _first
-            IFS= read -rsn1 _first < /dev/tty || { printf "%s" "" > /dev/tty; return 1; }
-
-            if [ "$_first" = $'\e' ]; then
-                # ESC 뒤 시퀀스(화살표 등)를 정수 타임아웃으로 흡수.
-                # 추가 바이트가 있으면 화살표 등 → 취소 아님(빈값으로 처리), 없으면 진짜 ESC.
-                local _b1
-                if IFS= read -rsn1 -t 1 _b1 < /dev/tty 2>/dev/null && [ -n "$_b1" ]; then
-                    IFS= read -rsn1 -t 1 _ < /dev/tty 2>/dev/null || true
-                    printf "\n" > /dev/tty
-                    printf -v "$varname" '%s' ""
-                    return 0
-                fi
-                # 단독 ESC → 취소
-                printf "\n" > /dev/tty
-                printf -v "$varname" '%s' ""
-                return 2
-            fi
-
-            if [ "$_first" = $'\n' ] || [ "$_first" = $'\r' ] || [ -z "$_first" ]; then
-                # 즉시 Enter → 빈 입력
-                printf "\n" > /dev/tty
-                printf -v "$varname" '%s' ""
-                return 0
-            fi
-
-            # 일반 문자 → 첫 글자 echo 후 나머지 라인 읽어 합침
-            printf "%s" "$_first" > /dev/tty
-            local _rest
-            IFS= read -r _rest < /dev/tty || _rest=""
-            printf -v "$varname" '%s' "${_first}${_rest}"
+            # 라인 입력은 readline(`read -e`)으로 받는다.
+            # 과거엔 ESC 취소 감지를 위해 "첫 1바이트 raw peek + 나머지 라인"으로 쪼갰는데,
+            # 그 첫 글자가 readline 편집 버퍼 밖에 있어 backspace로 지워지지 않고 화면에
+            # 중복으로 박히는 버그가 있었다(#420). bash 3.2는 `read -e -i`(prefill)와
+            # `bind` 기반 ESC 처리를 모두 지원하지 않아 peek와 라인 편집을 양립시킬 수 없다.
+            # → `read -e` 한 줄로 통일한다. backspace·방향키·Home/End·한글 입력 모두 정상.
+            #   단독 ESC 취소(return 2)는 사라지지만, 호출부는 "빈 입력 Enter = 기존 값 유지"로
+            #   동등하게 처리되므로 기능 손실이 없다.
+            IFS= read -e -r "$varname" < /dev/tty || { printf -v "$varname" '%s' ""; return 1; }
         fi
         return 0
     else
@@ -2021,12 +1996,16 @@ handle_project_edit_menu() {
             version)
                 local new_version _rc=0
                 print_to_user ""
-                safe_read "새 버전을 입력하세요 (예: 1.0.0, ESC=뒤로): " new_version "" || _rc=$?
-                if [ "$_rc" -eq 2 ]; then
-                    # ESC → 이전 메뉴로 돌아감(기존 값 유지)
-                    print_info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
+                safe_read "새 버전을 입력하세요 (예: 1.0.0, Enter=유지): " new_version "" || _rc=$?
+                if [ "$_rc" -ne 0 ]; then
+                    # 입력 못 읽음(비대화형/EOF) → 기존 값 유지
+                    print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
                     print_to_user ""
-                elif [ "$_rc" -eq 0 ]; then
+                elif [ -z "$new_version" ]; then
+                    # 빈 입력(Enter) → 기존 값 유지
+                    print_info "변경 없이 기존 설정을 유지합니다."
+                    print_to_user ""
+                else
                     print_to_user ""
                     if [[ "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                         VERSION="$new_version"
@@ -2035,9 +2014,6 @@ handle_project_edit_menu() {
                         print_error "버전 형식이 올바르지 않습니다 (x.y.z 형태로 입력) — 기존 값을 유지합니다."
                     fi
                     print_to_user ""
-                else
-                    print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
-                    print_to_user ""
                 fi
                 ;;
             branch)
@@ -2045,22 +2021,19 @@ handle_project_edit_menu() {
                 print_to_user ""
                 print_to_user "💡 이 설정은 GitHub Actions 워크플로우에서 사용할 기본 브랜치입니다."
                 print_to_user ""
-                safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop, ESC=뒤로): " new_branch "" || _rc=$?
-                if [ "$_rc" -eq 2 ]; then
-                    # ESC → 이전 메뉴로 돌아감(기존 값 유지)
-                    print_info "이전 메뉴로 돌아갑니다 — 기존 설정을 유지합니다."
+                safe_read "기본 브랜치 이름을 입력하세요 (예: main, develop, Enter=유지): " new_branch "" || _rc=$?
+                if [ "$_rc" -ne 0 ]; then
+                    # 입력 못 읽음(비대화형/EOF) → 기존 값 유지
+                    print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
                     print_to_user ""
-                elif [ "$_rc" -eq 0 ]; then
-                    print_to_user ""
-                    if [ -n "$new_branch" ]; then
-                        DETECTED_BRANCH="$new_branch"
-                        print_success "기본 브랜치를 '$DETECTED_BRANCH'(으)로 변경했습니다"
-                    else
-                        print_error "브랜치 이름이 비어 있어 변경하지 않고 기존 값을 유지합니다."
-                    fi
+                elif [ -z "$new_branch" ]; then
+                    # 빈 입력(Enter) → 기존 값 유지
+                    print_info "변경 없이 기존 설정을 유지합니다."
                     print_to_user ""
                 else
-                    print_warning "입력을 읽지 못했습니다 — 기존 값을 그대로 유지합니다."
+                    print_to_user ""
+                    DETECTED_BRANCH="$new_branch"
+                    print_success "기본 브랜치를 '$DETECTED_BRANCH'(으)로 변경했습니다"
                     print_to_user ""
                 fi
                 ;;

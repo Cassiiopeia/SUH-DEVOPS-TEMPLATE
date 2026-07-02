@@ -541,6 +541,8 @@ Error: 404 page not found
 
 SSH+Docker 배포 워크플로우(SIMPLE-CICD, NONSTOP-*, PR-PREVIEW)는 해당 프로젝트 타입을 선택하면 **별도 옵션 없이 자동 포함**됩니다. 통합 마법사를 그냥 실행하면 됩니다:
 
+> **예외 — Nexus 라이브러리 프로젝트**: `--nexus`(라이브러리 publish)로 통합하는 Spring 프로젝트는 서버에 배포하지 않으므로, 위 서버 배포 워크플로우가 **자동으로 제외**됩니다. (Spring 원본에서 이 워크플로우들은 `spring/server-deploy/` 폴더로 묶여 있고, Nexus 프로젝트일 때 폴더째 건너뜁니다.)
+
 ```bash
 # Linux/macOS
 bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)

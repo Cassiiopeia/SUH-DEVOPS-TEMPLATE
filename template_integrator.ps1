@@ -2990,8 +2990,119 @@ function Copy-Workflows-ForType {
         Print-Info "$Type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     }
 
+    # 2.5 타입별 server-deploy 하위폴더 처리 (기본 포함, 단 Nexus 프로젝트면 폴더째 제외)
+    # SSH+Docker 서버 배포(SIMPLE-CICD·NONSTOP-*·PR-PREVIEW)는 이 폴더로 묶여 있다.
+    # Nexus(라이브러리 publish) 프로젝트는 서버에 배포하지 않으므로 이 폴더 전체를 건너뛴다.
+    # → "서버 배포 워크플로우"를 새로 추가할 땐 이 server-deploy 폴더에 파일만 넣으면
+    #   IncludeNexus=true일 때 자동으로 제외된다(마법사 코드 수정 불필요).
+    $serverDeployDir = Join-Path $ProjectTypesDir "$Type\server-deploy"
+
+    if (Test-Path $serverDeployDir) {
+        if ($script:IncludeNexus -eq $true) {
+            # 라이브러리(Nexus) 프로젝트 → 서버 배포 워크플로우 폴더째 제외
+            $sdFiles = @()
+            $yamlFiles = Get-ChildItem -Path $serverDeployDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $serverDeployDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $sdFiles += $yamlFiles }
+            if ($ymlFiles) { $sdFiles += $ymlFiles }
+            if ($sdFiles.Count -gt 0) {
+                Print-Info "$Type 서버 배포 워크플로우 $($sdFiles.Count)개 제외됨 (Nexus 라이브러리 프로젝트라 서버 배포가 불필요)"
+            }
+        } else {
+            # 일반 서버 배포 프로젝트 → 루트 워크플로우와 동일하게 기본 포함 (신규/변경/동일 3분류)
+            $sdWorkflows = @()
+            $yamlFiles = Get-ChildItem -Path $serverDeployDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $serverDeployDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $sdWorkflows += $yamlFiles }
+            if ($ymlFiles) { $sdWorkflows += $ymlFiles }
+
+            $sdExisting = @(); $sdUnchanged = @(); $sdNew = @()
+            foreach ($workflow in $sdWorkflows) {
+                $destPath = Join-Path $WORKFLOWS_DIR $workflow.Name
+                if (Test-Path $destPath) {
+                    if (Test-WorkflowUnchanged -Type $Type -SrcPath $workflow.FullName -ExistingPath $destPath) {
+                        $sdUnchanged += $workflow
+                    } else {
+                        $sdExisting += $workflow
+                    }
+                } else {
+                    $sdNew += $workflow
+                }
+            }
+
+            if ($sdUnchanged.Count -gt 0) {
+                foreach ($workflow in $sdUnchanged) {
+                    Write-Host "  ⏭ $($workflow.Name) (변경 없음, $Type 서버 배포)"
+                    $Counters.skipped++
+                }
+            }
+
+            if ($sdNew.Count -gt 0) {
+                Print-Info "$Type 서버 배포 워크플로우를 내려받고 있습니다..."
+                foreach ($workflow in $sdNew) {
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $($workflow.Name) (신규, $Type 서버 배포)"
+                    $Counters.copied++
+                }
+            }
+
+            if ($sdExisting.Count -gt 0) {
+                Write-Host ""
+                Print-Warning "이미 존재하는 서버 배포 워크플로우($Type): $($sdExisting.Count)개"
+                foreach ($workflow in $sdExisting) {
+                    Write-Host "   • $($workflow.Name)"
+                }
+
+                $sdChoice = "S"
+                if (-not $Force) {
+                    $sdLabel = Invoke-ChooseMenu -Prompt "기존 서버 배포 워크플로우를 어떻게 할까요?" -Options @(
+                        @{Value='T'; Label='기존 유지 + 새 버전을 참고용(.template.yaml)으로 추가'},
+                        @{Value='S'; Label='건너뛰기 — 기존 파일만 유지'},
+                        @{Value='O'; Label='덮어쓰기 — 기존 파일을 .bak 백업 후 교체'}
+                    )
+                    $sdChoice = if ($sdLabel) { $sdLabel } else { "S" }
+                }
+                Write-Host ""
+
+                switch ($sdChoice.ToUpper()) {
+                    "T" {
+                        Print-Info "기존 파일은 두고 새 버전을 .template.yaml로 추가합니다 (수동 반영용 참고)..."
+                        foreach ($workflow in $sdExisting) {
+                            $filename = $workflow.Name
+                            $templateName = $filename -replace '\.yaml$', '.template.yaml'
+                            $templatePath = Join-Path $WORKFLOWS_DIR $templateName
+                            if (Test-Path $templatePath) { Remove-Item -Path $templatePath -Force }
+                            Copy-Item -Path $workflow.FullName -Destination $templatePath -Force
+                            Write-Host "  ✓ $templateName (참고용 추가)"
+                            $Counters.templateAdded++
+                        }
+                    }
+                    "O" {
+                        Print-Info "기존 파일을 .bak으로 백업한 뒤 새 버전으로 교체합니다..."
+                        foreach ($workflow in $sdExisting) {
+                            $filename = $workflow.Name
+                            $destPath = Join-Path $WORKFLOWS_DIR $filename
+                            $backupPath = [string]$destPath + ".bak"
+                            Move-Item -Path $destPath -Destination $backupPath -Force
+                            Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                            Write-Host "  ✓ $filename (백업: ${filename}.bak)"
+                            $Counters.copied++
+                        }
+                    }
+                    default {
+                        Print-Info "기존 서버 배포 워크플로우를 그대로 유지합니다..."
+                        foreach ($workflow in $sdExisting) {
+                            Write-Host "  ⏭ $($workflow.Name) (건너뜀)"
+                            $Counters.skipped++
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     # 3. 타입별 Nexus 하위폴더 처리 (opt-in)
-    # 배포 워크플로우는 타입 루트로 올라와 기본 포함됨. nexus/ 만 선택적으로 남는다.
+    # 배포 워크플로우는 server-deploy로 묶여 기본 포함됨. nexus/ 만 선택적으로 남는다.
     $nexusDir = Join-Path $ProjectTypesDir "$Type\nexus"
 
     if (Test-Path $nexusDir) {
@@ -3048,7 +3159,7 @@ function Copy-Workflows-ForType {
     #    조용히 0개를 반환한다(알려진 함정). 그러면 Configure-WorkflowEnv 가 한 번도
     #    호출되지 않아 __PROJECT_NAME__ 등 @wizard 토큰 치환이 통째로 스킵된다.
     #    → -Filter 를 yaml/yml 각각 누적하는 방식으로 처리(Windows PS 5.1 + macOS PS Core 공통 동작).
-    foreach ($srcDir in @($typeDir, $nexusDir)) {
+    foreach ($srcDir in @($typeDir, $serverDeployDir, $nexusDir)) {
         if (-not (Test-Path $srcDir)) { continue }
         $wfFiles = @()
         $wfFiles += Get-ChildItem -Path $srcDir -Filter '*.yaml' -File -ErrorAction SilentlyContinue

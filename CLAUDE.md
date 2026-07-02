@@ -47,7 +47,7 @@ suh-github-template/
 │   │   └── project-types/
 │   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in)
 │   │       ├── flutter/         # Flutter 전용 (배포 워크플로우 루트 포함)
-│   │       ├── spring/          # Spring 전용 (배포 루트 + nexus/ opt-in)
+│   │       ├── spring/          # Spring 전용 (server-deploy/ 기본포함·Nexus면제외 + nexus/ opt-in)
 │   │       ├── react/
 │   │       └── next/
 │   ├── scripts/
@@ -123,14 +123,17 @@ snake_case.sh / snake_case.py
 #### Spring
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
-| `PROJECT-SPRING-SIMPLE-CICD` | SSH+Docker 배포 (기본, 단일 컨테이너) | spring/ 루트 |
-| `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green) | spring/ 루트 |
-| `PROJECT-SPRING-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green) | spring/ 루트 |
-| `PROJECT-SPRING-PR-PREVIEW` | PR 프리뷰 배포 | spring/ 루트 |
+| `PROJECT-SPRING-SIMPLE-CICD` | SSH+Docker 배포 (기본, 단일 컨테이너) | spring/server-deploy/ |
+| `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green) | spring/server-deploy/ |
+| `PROJECT-SPRING-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green) | spring/server-deploy/ |
+| `PROJECT-SPRING-PR-PREVIEW` | PR 프리뷰 배포 | spring/server-deploy/ |
+| `PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH` | GitHub Packages 라이브러리 배포 | spring/ 루트 |
 | `PROJECT-SPRING-NEXUS-CI` | Nexus CI | spring/nexus/ |
 | `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | spring/nexus/ |
 
-> 배포 워크플로우(SIMPLE/NONSTOP-*/PR-PREVIEW)는 **기본 포함**됩니다. `nexus/` 워크플로우만 `--nexus` 옵션으로 포함합니다.
+> 서버 배포 워크플로우(SIMPLE/NONSTOP-*/PR-PREVIEW)는 `server-deploy/`로 묶여 **기본 포함**됩니다. 단, **`--nexus`(라이브러리 publish) 프로젝트면 서버 배포가 불필요하므로 `server-deploy/` 폴더째 자동 제외**됩니다. `nexus/` 워크플로우는 `--nexus` 옵션으로 포함합니다.
+>
+> **확장 규칙(agent 필독)**: 새 "서버 배포" 성격의 Spring 워크플로우를 추가할 땐 `spring/server-deploy/`에 파일만 넣으면 된다. integrator가 `INCLUDE_NEXUS=true`일 때 이 폴더를 통째로 건너뛰므로 마법사 코드 수정이 필요 없다. (빌드/라이브러리 publish 워크플로우는 `server-deploy/`에 넣지 않는다.)
 
 #### 공통 — Secret 백업 (opt-in)
 | 파일명 | 기능 | 위치 |

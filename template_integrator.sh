@@ -3507,8 +3507,111 @@ _copy_workflows_for_type() {
         print_info "$type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     fi
 
+    # 타입별 server-deploy 하위폴더 처리 (기본 포함, 단 Nexus 프로젝트면 폴더째 제외)
+    # SSH+Docker 서버 배포(SIMPLE-CICD·NONSTOP-*·PR-PREVIEW)는 이 폴더로 묶여 있다.
+    # Nexus(라이브러리 publish) 프로젝트는 서버에 배포하지 않으므로 이 폴더 전체를 건너뛴다.
+    # → "서버 배포 워크플로우"를 새로 추가할 땐 이 server-deploy/ 폴더에 파일만 넣으면
+    #   INCLUDE_NEXUS=true일 때 자동으로 제외된다(마법사 코드 수정 불필요).
+    local server_deploy_dir="$project_types_dir/$type/server-deploy"
+    if [ -d "$server_deploy_dir" ]; then
+        if [ "$INCLUDE_NEXUS" = true ]; then
+            # 라이브러리(Nexus) 프로젝트 → 서버 배포 워크플로우 폴더째 제외
+            local sd_count=0
+            for f in "$server_deploy_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && sd_count=$((sd_count + 1))
+            done
+            if [ $sd_count -gt 0 ]; then
+                print_info "$type 서버 배포 워크플로우 ${sd_count}개 제외됨 (Nexus 라이브러리 프로젝트라 서버 배포가 불필요)"
+            fi
+        else
+            # 일반 서버 배포 프로젝트 → 루트 워크플로우와 동일하게 기본 포함
+            # 신규/변경/동일 3분류로 루트 복사 루프와 같은 품질을 유지한다.
+            local sd_existing=() sd_unchanged=() sd_new=()
+            for workflow in "$server_deploy_dir"/*.{yaml,yml}; do
+                [ -e "$workflow" ] || continue
+                local filename=$(basename "$workflow")
+                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                    if _wf_is_unchanged "$type" "$workflow" "$WORKFLOWS_DIR/$filename"; then
+                        sd_unchanged+=("$filename")
+                    else
+                        sd_existing+=("$filename")
+                    fi
+                else
+                    sd_new+=("$filename")
+                fi
+            done
+
+            if [ ${#sd_unchanged[@]} -gt 0 ]; then
+                for filename in "${sd_unchanged[@]}"; do
+                    echo "  ⏭ $filename (변경 없음, $type 서버 배포)"
+                    _wf_skipped=$((_wf_skipped + 1))
+                done
+            fi
+
+            if [ ${#sd_new[@]} -gt 0 ]; then
+                print_info "$type 서버 배포 워크플로우를 내려받고 있습니다..."
+                for filename in "${sd_new[@]}"; do
+                    cp "$server_deploy_dir/$filename" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (신규, $type 서버 배포)"
+                    _wf_copied=$((_wf_copied + 1))
+                done
+            fi
+
+            if [ ${#sd_existing[@]} -gt 0 ]; then
+                echo "" >&2
+                print_warning "이미 존재하는 서버 배포 워크플로우($type): ${#sd_existing[@]}개"
+                for f in "${sd_existing[@]}"; do
+                    print_to_user "   • $f"
+                done
+                local sd_choice="skip"
+                if [ "$TTY_AVAILABLE" = true ] && [ "$FORCE_MODE" = false ]; then
+                    local _sd_label
+                    # set -e 안전: ESC 취소 시 choose_menu 비-0 → `|| _sd_label=""`로 흡수(→ 건너뛰기 폴백)
+                    _sd_label=$(choose_menu "기존 서버 배포 워크플로우를 어떻게 할까요?" \
+                        "기존 유지 + 새 버전을 참고용(.template.yaml)으로 추가|" \
+                        "건너뛰기 — 기존 파일만 유지|" \
+                        "덮어쓰기 — 기존 파일을 .bak 백업 후 교체|") || _sd_label=""
+                    case "$_sd_label" in
+                        기존\ 유지*) sd_choice="T" ;;
+                        건너뛰기*)   sd_choice="S" ;;
+                        덮어쓰기*)   sd_choice="O" ;;
+                        *)           sd_choice="S" ;;
+                    esac
+                fi
+                case "$sd_choice" in
+                    T)
+                        print_info "기존 파일은 두고 새 버전을 .template.yaml로 추가합니다 (수동 반영용 참고)..."
+                        for filename in "${sd_existing[@]}"; do
+                            local template_name="${filename%.yaml}.template.yaml"
+                            rm -f "$WORKFLOWS_DIR/$template_name"
+                            cp "$server_deploy_dir/$filename" "$WORKFLOWS_DIR/$template_name"
+                            echo "  ✓ $template_name (참고용 추가)"
+                            _wf_template_added=$((_wf_template_added + 1))
+                        done
+                        ;;
+                    O)
+                        print_info "기존 파일을 .bak으로 백업한 뒤 새 버전으로 교체합니다..."
+                        for filename in "${sd_existing[@]}"; do
+                            mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                            cp "$server_deploy_dir/$filename" "$WORKFLOWS_DIR/"
+                            echo "  ✓ $filename (백업: ${filename}.bak)"
+                            _wf_copied=$((_wf_copied + 1))
+                        done
+                        ;;
+                    *)
+                        print_info "기존 서버 배포 워크플로우를 그대로 유지합니다..."
+                        for filename in "${sd_existing[@]}"; do
+                            echo "  ⏭ $filename (건너뜀)"
+                            _wf_skipped=$((_wf_skipped + 1))
+                        done
+                        ;;
+                esac
+            fi
+        fi
+    fi
+
     # 타입별 Nexus 하위폴더 처리 (opt-in)
-    # 배포 워크플로우는 타입 루트로 올라와 기본 포함됨. nexus/ 만 선택적으로 남는다.
+    # 배포 워크플로우는 server-deploy/로 묶여 기본 포함됨. nexus/ 만 선택적으로 남는다.
     local nexus_dir="$project_types_dir/$type/nexus"
     if [ -d "$nexus_dir" ]; then
         if [ "$INCLUDE_NEXUS" = true ]; then
@@ -3547,7 +3650,7 @@ _copy_workflows_for_type() {
     # 이 타입의 원본 디렉토리(+nexus)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
     # @wizard 마커를 가진 것만 configure. (.template.yaml/.bak은 대상 아님)
     local _src_dir _wf _bn _target
-    for _src_dir in "$type_dir" "$nexus_dir"; do
+    for _src_dir in "$type_dir" "$server_deploy_dir" "$nexus_dir"; do
         [ -d "$_src_dir" ] || continue
         for _wf in "$_src_dir"/*.{yaml,yml}; do
             [ -e "$_wf" ] || continue

@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-06-28T06:28:31Z",
-    "currentVersion": "3.0.181",
+    "lastUpdated": "2026-07-02T11:00:03Z",
+    "currentVersion": "3.0.182",
     "projectType": "basic",
-    "totalReleases": 167,
+    "totalReleases": 168,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.182",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-02",
+      "pr_number": 423,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 라이브러리 배포용 Spring 프로젝트에는 불필요한 서버 배포 워크플로우가 설치되지 않습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "라이브러리 배포용 Spring 프로젝트에는 불필요한 서버 배포 워크플로우가 설치되지 않습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.181",
       "project_type": "basic",

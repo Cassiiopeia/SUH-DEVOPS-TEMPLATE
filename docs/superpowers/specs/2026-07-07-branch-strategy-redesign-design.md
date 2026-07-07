@@ -1,7 +1,7 @@
 # 브랜치 전략 전면 전환 설계 — deploy 폐기, develop/main 표준 구조
 
 - 날짜: 2026-07-07
-- 이슈: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/425
+- 이슈: https://github.com/Cassiiopeia/projectops/issues/425
 - 상태: 설계 확정 (사용자 승인 대기 → writing-plans로 전환 예정)
 
 ## 1. 배경과 목표

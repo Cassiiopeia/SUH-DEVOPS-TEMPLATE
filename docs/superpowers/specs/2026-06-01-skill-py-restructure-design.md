@@ -1,6 +1,6 @@
 # SKILL Python 실행 구조 재설계 (3-layer + skill별 분산)
 
-> **관련 이슈**: [#322](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322)
+> **관련 이슈**: [#322](https://github.com/Cassiiopeia/projectops/issues/322)
 > **작성일**: 2026-06-01
 > **상태**: design (사용자 승인 완료 → spec)
 

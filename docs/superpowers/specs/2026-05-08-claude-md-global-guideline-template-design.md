@@ -1,6 +1,6 @@
 # 신규 프로젝트 init용 표준 CLAUDE.md 글로벌 AI 협업 가이드라인 템플릿 추가
 
-- **이슈**: [#290](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/290)
+- **이슈**: [#290](https://github.com/Cassiiopeia/projectops/issues/290)
 - **작성일**: 2026-05-08
 - **결정**: Q1=B / Q2=A / Q3=A
 

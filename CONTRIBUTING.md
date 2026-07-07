@@ -1,6 +1,6 @@
 # 🤝 기여 가이드라인
 
-SUH-DEVOPS-TEMPLATE 프로젝트에 기여해주셔서 감사합니다! 이 문서는 기여자들이 프로젝트에 효과적으로 참여할 수 있도록 안내합니다.
+projectops(구 SUH-DEVOPS-TEMPLATE) 프로젝트에 기여해주셔서 감사합니다! 이 문서는 기여자들이 프로젝트에 효과적으로 참여할 수 있도록 안내합니다.
 
 ---
 
@@ -1017,6 +1017,6 @@ git push origin develop
 
 ---
 
-**📌 이 문서는 SUH-DEVOPS-TEMPLATE v1.3.0 기준으로 작성되었습니다.**  
+**📌 이 문서는 projectops(구 SUH-DEVOPS-TEMPLATE) v1.3.0 기준으로 작성되었습니다.**  
 **📅 최종 업데이트: 2025년 10월 11일**  
-**✍️ 작성자: SUH-DEVOPS-TEMPLATE 팀**
+**✍️ 작성자: projectops 팀**

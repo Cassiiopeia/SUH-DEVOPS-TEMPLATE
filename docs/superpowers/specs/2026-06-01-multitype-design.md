@@ -405,5 +405,5 @@ changelog_data["metadata"]["projectTypes"] = project_types     # 신규
 
 ## 10. 참고
 
-- 이슈: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/302
+- 이슈: https://github.com/Cassiiopeia/projectops/issues/302
 - 선행 작업 (메뉴 컴포넌트 신설): #326 — `docs/superpowers/specs/2026-06-01-interactive-menu-design.md`

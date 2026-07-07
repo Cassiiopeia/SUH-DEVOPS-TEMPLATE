@@ -1,6 +1,6 @@
 # Flutter 배포 워크플로우 release notes 길이 제한 처리 설계
 
-- 관련 이슈: [#347](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/347)
+- 관련 이슈: [#347](https://github.com/Cassiiopeia/projectops/issues/347)
 - 작성일: 2026-06-09
 - 대상 레포: SUH-DEVOPS-TEMPLATE (템플릿 원천)
 

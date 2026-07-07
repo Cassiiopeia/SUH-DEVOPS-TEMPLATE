@@ -309,5 +309,5 @@ Expected: 없음 (0 matches)
 ```bash
 git add skills/ CLAUDE.md README.md
 git status
-git commit -m "모든 스킬명에 suh- prefix 적용 : feat : cassiiopeia 플러그인 스킬명 충돌 방지를 위해 전체 suh- prefix 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/299"
+git commit -m "모든 스킬명에 suh- prefix 적용 : feat : cassiiopeia 플러그인 스킬명 충돌 방지를 위해 전체 suh- prefix 추가 https://github.com/Cassiiopeia/projectops/issues/299"
 ```

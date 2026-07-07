@@ -1,6 +1,6 @@
 # 확장 가능한 SSH+Docker 배포 엔진 재설계 (Synology 구분 전면 제거)
 
-- **이슈**: [#388](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/388)
+- **이슈**: [#388](https://github.com/Cassiiopeia/projectops/issues/388)
 - **작성일**: 2026-06-16
 - **상태**: 설계 확정 (구현 계획 대기)
 - **적용 범위**: 이번 단계는 **Spring 배포 워크플로우 + template_integrator(.sh/.ps1) + 폴더 구조 + 명명 중립화**. Python/Flutter 배포는 검증된 패턴 확정 후 동일 확산.

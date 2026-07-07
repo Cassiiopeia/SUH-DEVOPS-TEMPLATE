@@ -9,7 +9,7 @@
 **Tech Stack:** Bash, PowerShell 5.1, GitHub raw content, 표준 셸 명령만.
 
 **Spec:** `docs/superpowers/specs/2026-05-08-claude-md-global-guideline-template-design.md`
-**Issue:** [#290](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/290)
+**Issue:** [#290](https://github.com/Cassiiopeia/projectops/issues/290)
 
 ---
 
@@ -812,7 +812,7 @@ git add \
 
 ```
 커밋 메시지:
-신규 프로젝트 init용 표준 CLAUDE.md 글로벌 AI 협업 가이드라인 추가 : feat : .github/templates/CLAUDE.md 신설 (의존성 0 가이드 55줄), template_initializer 신규 init 시 교체 로직, template_integrator/ps1 통합 모드에 merge_claude_md 함수 추가 (덮/별도/skip 분기 + CI 자동) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/290
+신규 프로젝트 init용 표준 CLAUDE.md 글로벌 AI 협업 가이드라인 추가 : feat : .github/templates/CLAUDE.md 신설 (의존성 0 가이드 55줄), template_initializer 신규 init 시 교체 로직, template_integrator/ps1 통합 모드에 merge_claude_md 함수 추가 (덮/별도/skip 분기 + CI 자동) https://github.com/Cassiiopeia/projectops/issues/290
 
 위 메시지로 커밋해도 될까요?
 ```
@@ -820,7 +820,7 @@ git add \
 승인 후:
 
 ```bash
-git commit -m "신규 프로젝트 init용 표준 CLAUDE.md 글로벌 AI 협업 가이드라인 추가 : feat : .github/templates/CLAUDE.md 신설 (의존성 0 가이드 55줄), template_initializer 신규 init 시 교체 로직, template_integrator/ps1 통합 모드에 merge_claude_md 함수 추가 (덮/별도/skip 분기 + CI 자동) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/290"
+git commit -m "신규 프로젝트 init용 표준 CLAUDE.md 글로벌 AI 협업 가이드라인 추가 : feat : .github/templates/CLAUDE.md 신설 (의존성 0 가이드 55줄), template_initializer 신규 init 시 교체 로직, template_integrator/ps1 통합 모드에 merge_claude_md 함수 추가 (덮/별도/skip 분기 + CI 자동) https://github.com/Cassiiopeia/projectops/issues/290"
 ```
 
 > CLAUDE.md 컨벤션: 이모지·태그 없음, 이슈 URL 포함, Co-Authored-By 태그 없음(글로벌 가이드라인 §Hard Rules 준수).
@@ -846,7 +846,7 @@ PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) ||
 "$PYTHON" - <<'PYEOF'
 import urllib.request, urllib.error, json
 pat = "GHP_PLACEHOLDER"
-url = "https://api.github.com/repos/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/290/comments"
+url = "https://api.github.com/repos/Cassiiopeia/projectops/issues/290/comments"
 body = """v3.0.x 패치 완료.
 
 **변경 요약:**

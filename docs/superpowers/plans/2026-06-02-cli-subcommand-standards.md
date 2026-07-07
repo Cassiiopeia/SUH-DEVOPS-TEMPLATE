@@ -14,7 +14,7 @@
 
 **Tech Stack:** Python 3 표준 라이브러리 (`argparse`, `json`, `sys`), pytest, 기존 `scripts/common/emit.py` 재사용.
 
-**Reference issue:** https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+**Reference issue:** https://github.com/Cassiiopeia/projectops/issues/329
 
 ---
 
@@ -250,7 +250,7 @@ argparse 기본 stderr text + SystemExit(2) 대신 stdout JSON으로
 agent가 인자 mismatch 시 즉시 self-correct할 수 있도록 hint와
 available_subcommands 필드를 함께 출력한다.
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -350,7 +350,7 @@ get_next_seq에 strict 모드 추가, skill_dir 미존재 시 명시적 실패 :
 CLI 레이어가 잘못된 skill_id를 침묵 처리하는 대신 FileNotFoundError로
 명시적 실패를 일으킬 수 있게 strict 인자 추가. 기본값은 기존 동작 유지.
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -493,7 +493,7 @@ SKILL.md 4단계는 TMP1 임시번호 직접 사용 절차인데 CLI에 get-next
 재현하던 케이스. CLI 표면에서 제거하여 오추론 표면 자체를 차단.
 JSONArgumentParser로 향후 argparse 실패도 JSON으로 출력하게 통일.
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -569,7 +569,7 @@ commit_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
 argparse 실패도 stdout JSON으로 출력하도록 변경.
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -641,7 +641,7 @@ report_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
 argparse 실패도 stdout JSON으로 출력하도록 변경.
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -700,7 +700,7 @@ git add skills/suh-review/scripts/review_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 review_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -759,7 +759,7 @@ git add skills/suh-troubleshoot/scripts/troubleshoot_cli.py scripts/tests/test_s
 git commit -m "$(cat <<'EOF'
 troubleshoot_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -818,7 +818,7 @@ git add skills/suh-github/scripts/github_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 github_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -877,7 +877,7 @@ git add skills/suh-changelog-deploy/scripts/changelog_cli.py scripts/tests/test_
 git commit -m "$(cat <<'EOF'
 changelog_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1011,7 +1011,7 @@ SKILL.md ↔ CLI 서브커맨드 매칭 회귀 테스트 추가 : test : CLI 표
 현재 누락된 케이스는 EXPECTED_MISSING 화이트리스트로 보호하고,
 후속 이슈로 SKILL.md 호출예 추가 시 셋에서 제거한다.
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1151,7 +1151,7 @@ SKILL.md/references 문서 정정 + JSONArgumentParser 표준 명시 : docs : CL
 - mcp-subcommand-rules.md §8: JSONArgumentParser 사용 규칙 신규
 - test_skill_docs.py: 정합성 회귀 테스트 추가
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1243,7 +1243,7 @@ git add docs/suh-template/issue/20260602_329_skill_cli_서브커맨드_시그니
 git commit -m "$(cat <<'EOF'
 이슈 #329 완료 보고서 추가 : docs : CLI 표준 강화 완료
 
-https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
+https://github.com/Cassiiopeia/projectops/issues/329
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF

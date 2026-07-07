@@ -2,7 +2,7 @@
 
 - 작성일: 2026-06-10
 - 상태: 설계 승인됨 (구현 전)
-- 대상 레포: `Cassiiopeia/SUH-DEVOPS-TEMPLATE` (cassiiopeia-marketplace)
+- 대상 레포: `Cassiiopeia/projectops` (cassiiopeia-marketplace)
 
 ## 1. 배경과 목표
 
@@ -85,8 +85,8 @@ SUH-DEVOPS-TEMPLATE/
   "description": "AI 코딩 하네스 - 5개 전문 페르소나 + SDLC 워크플로우 주입",
   "version": "3.0.104",
   "author": { "name": "Cassiiopeia", "url": "https://github.com/Cassiiopeia" },
-  "homepage": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
-  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
+  "homepage": "https://github.com/Cassiiopeia/projectops",
+  "repository": "https://github.com/Cassiiopeia/projectops",
   "license": "MIT",
   "keywords": ["harness", "persona", "workflow"]
 }
@@ -223,7 +223,7 @@ suh-harness 설명에는 **부작용 고지**(모든 세션 주입 + hypercortex
 포함한다 — 설치 후 "왜 이상한 폴더가 생기지?"를 예방.
 
 **(4) 동작** — 선택 시:
-1. marketplace 미등록이면 `claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE`
+1. marketplace 미등록이면 `claude plugin marketplace add Cassiiopeia/projectops`
    (기존 cassiiopeia 설치 로직과 같은 처리 재사용).
 2. `claude plugin install suh-harness@cassiiopeia-marketplace --scope user` 또는
    `claude plugin update suh-harness@cassiiopeia-marketplace`.
@@ -240,7 +240,7 @@ version.yml에 선택을 저장하지 않으며(synology와 다른 점 — synol
 
 ```bash
 # 최초 1회 (이미 마켓플레이스 등록자는 생략)
-claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin marketplace add Cassiiopeia/projectops
 
 # 설치 (선택적 — 하네스를 원하는 사람만)
 claude plugin install suh-harness@cassiiopeia-marketplace --scope user

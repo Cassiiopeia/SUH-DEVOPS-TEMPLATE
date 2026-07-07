@@ -9,7 +9,7 @@
 **Tech Stack:** Python 3.13 (Windows Git Bash MINGW64 + WSL Linux bash 5.2 호환), argparse, urllib (표준 라이브러리만 — 외부 의존성 0). PyNaCl은 `secrets set` 호출시에만 필요(이미 try-import 패턴).
 
 **Spec:** `docs/superpowers/specs/2026-06-01-skill-py-restructure-design.md`
-**Issue:** Cassiiopeia/SUH-DEVOPS-TEMPLATE#322
+**Issue:** Cassiiopeia/projectops#322
 **Branch suggestion:** `20260601_#322_skill_py_실행_구조_MCP-style_표준화_및_OS_호환성_강건화`
 
 ---
@@ -144,7 +144,7 @@ Expected: 기존 동작 결과 캡처 (예: `D:\...\docs\suh-template\troublesho
 
 ```bash
 git add docs/superpowers/specs/2026-06-01-skill-py-restructure-design.md docs/superpowers/plans/2026-06-01-skill-py-restructure-implementation.md
-git commit -m "docs(specs): 3-layer skill py 재설계 spec + plan 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(specs): 3-layer skill py 재설계 spec + plan 추가 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 Expected: spec + plan 파일 첫 커밋.
@@ -196,7 +196,7 @@ Expected: 리스트 11개 출력.
 
 ```bash
 git add scripts/common/__init__.py
-git commit -m "feat(common): Layer 1 __init__ + SUPPORTED_SKILL_IDS https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): Layer 1 __init__ + SUPPORTED_SKILL_IDS https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -315,7 +315,7 @@ Expected: `4 passed`.
 
 ```bash
 git add scripts/common/emit.py tests/test_emit.py
-git commit -m "feat(common): emit() MCP-style JSON 헬퍼 + tests https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): emit() MCP-style JSON 헬퍼 + tests https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -386,7 +386,7 @@ Expected: scripts 절대경로 출력.
 
 ```bash
 git add scripts/common/bootstrap.py
-git commit -m "feat(common): bootstrap.find_scripts_root 헬퍼 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): bootstrap.find_scripts_root 헬퍼 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -446,7 +446,7 @@ Expected: `OK`.
 
 ```bash
 git add scripts/common/title.py scripts/common/issue_number.py scripts/common/gh_branch.py scripts/common/paths.py
-git commit -m "feat(common): title·issue_number·gh_branch·paths 모듈 이동 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): title·issue_number·gh_branch·paths 모듈 이동 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -483,7 +483,7 @@ Expected: manifest 함수 목록 출력 (None 아니어야 함).
 
 ```bash
 git add scripts/common/manifest.py
-git commit -m "feat(common): manifest 모듈 이동 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): manifest 모듈 이동 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -540,7 +540,7 @@ Expected: 경로 + dict 또는 NoneType 출력. 에러 없어야 함.
 
 ```bash
 git add scripts/common/config.py
-git commit -m "feat(common): config 모듈 이동 + get_pat 통합 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): config 모듈 이동 + get_pat 통합 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -586,7 +586,7 @@ Expected: `OK`.
 
 ```bash
 git add scripts/common/gh_client.py
-git commit -m "feat(common): gh_client 모듈 이동 (559줄, HTTP 코어) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(common): gh_client 모듈 이동 (559줄, HTTP 코어) https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -688,7 +688,7 @@ Expected: 같은 결과. bootstrap이 cwd 상관없이 common import 보장.
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): github_cli 골격 + bootstrap https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): github_cli 골격 + bootstrap https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -823,7 +823,7 @@ Expected: `ok: True / title: 🚀[기능개선][Skills] skill 내부 py 실행 �
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py skills/suh-github/tests/test_github_cli.py
-git commit -m "feat(suh-github): get-issue 서브커맨드 + tests https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): get-issue 서브커맨드 + tests https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -886,7 +886,7 @@ Expected: `count: 3`.
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): get-issues 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): get-issues 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -944,7 +944,7 @@ Expected: `ok: True`.
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): update-issue 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): update-issue 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1034,7 +1034,7 @@ Expected: `ok: True / url: https://...`.
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): add-comment + create-pr 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): add-comment + create-pr 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1149,7 +1149,7 @@ Expected: 두 호출 다 정수 출력.
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): list-prs + update-pr + search-issues 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): list-prs + update-pr + search-issues 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1218,13 +1218,13 @@ def cmd_explore(args) -> int:
 cd "$PROJECT_ROOT/skills/suh-github/scripts" && python github_cli.py explore repo-detail Cassiiopeia SUH-DEVOPS-TEMPLATE 2>&1 | python -c "import sys, json; d = json.loads(sys.stdin.read()); print('ok:', d['ok'], '/ summary:', d.get('summary'))"
 ```
 
-Expected: `ok: True / summary: Cassiiopeia/SUH-DEVOPS-TEMPLATE 상세`.
+Expected: `ok: True / summary: Cassiiopeia/projectops 상세`.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): explore 서브커맨드 (5종 중첩) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): explore 서브커맨드 (5종 중첩) https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1292,7 +1292,7 @@ Expected: `ok: True / count: N`.
 
 ```bash
 git add skills/suh-github/scripts/github_cli.py
-git commit -m "feat(suh-github): secrets 서브커맨드 (list/set) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-github): secrets 서브커맨드 (list/set) https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1479,7 +1479,7 @@ Expected: 5개 모두 정상 출력 (브랜치명·템플릿·count 등).
 
 ```bash
 git add skills/suh-issue/scripts/issue_cli.py
-git commit -m "feat(suh-issue): issue_cli.py 6개 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-issue): issue_cli.py 6개 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1589,7 +1589,7 @@ Expected: 두 호출 모두 정상 JSON.
 
 ```bash
 git add skills/suh-commit/scripts/commit_cli.py
-git commit -m "feat(suh-commit): commit_cli.py 4개 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-commit): commit_cli.py 4개 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1702,7 +1702,7 @@ Expected: `D:\...\docs\suh-template\report\YYYYMMDD_NNN_untitled.md`.
 
 ```bash
 git add skills/suh-report/scripts/report_cli.py
-git commit -m "feat(suh-report): report_cli.py 2개 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-report): report_cli.py 2개 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1746,7 +1746,7 @@ Expected: `D:\...\docs\suh-template\review\YYYYMMDD_NNN_untitled.md`.
 
 ```bash
 git add skills/suh-review/scripts/review_cli.py
-git commit -m "feat(suh-review): review_cli.py get-output-path https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-review): review_cli.py get-output-path https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1793,7 +1793,7 @@ diff <(echo $path_new) /tmp/baseline_get_output_path.txt
 
 ```bash
 git add skills/suh-troubleshoot/scripts/troubleshoot_cli.py
-git commit -m "feat(suh-troubleshoot): troubleshoot_cli.py get-output-path https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-troubleshoot): troubleshoot_cli.py get-output-path https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -1972,7 +1972,7 @@ Expected: PR count + verdict 문자열 출력.
 
 ```bash
 git add skills/suh-changelog-deploy/scripts/changelog_cli.py
-git commit -m "feat(suh-changelog-deploy): changelog_cli.py 5개 서브커맨드 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-changelog-deploy): changelog_cli.py 5개 서브커맨드 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2031,7 +2031,7 @@ Expected: github_cli.py = 8+, suh_template = 0.
 
 ```bash
 git add skills/suh-github/SKILL.md
-git commit -m "docs(suh-github): SKILL.md 표준 5줄 호출 패턴 적용 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-github): SKILL.md 표준 5줄 호출 패턴 적용 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2084,7 +2084,7 @@ cmd_update_issue 함수는 github_cli의 것과 동일 — 복사 후 import 보
 
 ```bash
 git add skills/suh-issue/SKILL.md skills/suh-issue/scripts/issue_cli.py
-git commit -m "docs(suh-issue): SKILL.md 표준 5줄 패턴 + update-issue 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-issue): SKILL.md 표준 5줄 패턴 + update-issue 추가 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2112,7 +2112,7 @@ grep -n "suh_template.suh_command" skills/suh-commit/SKILL.md
 
 ```bash
 git add skills/suh-commit/SKILL.md
-git commit -m "docs(suh-commit): SKILL.md 표준 5줄 패턴 적용 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-commit): SKILL.md 표준 5줄 패턴 적용 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2138,7 +2138,7 @@ Expected: 경로 출력.
 
 ```bash
 git add skills/suh-report/SKILL.md
-git commit -m "docs(suh-report): SKILL.md 표준 5줄 패턴 적용 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-report): SKILL.md 표준 5줄 패턴 적용 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2172,7 +2172,7 @@ Expected: 경로 정상 출력 (이전엔 Exit 127).
 
 ```bash
 git add skills/suh-review/SKILL.md
-git commit -m "docs(suh-review): SKILL.md 깨진 호출 정정 (변수 미정의 → 표준 5줄) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-review): SKILL.md 깨진 호출 정정 (변수 미정의 → 표준 5줄) https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2205,7 +2205,7 @@ Expected: 경로 정상 출력. baseline (/tmp/baseline_get_output_path.txt)와 
 
 ```bash
 git add skills/suh-troubleshoot/SKILL.md
-git commit -m "docs(suh-troubleshoot): SKILL.md 깨진 호출 정정 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-troubleshoot): SKILL.md 깨진 호출 정정 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2239,7 +2239,7 @@ Expected: verdict 문자열 출력.
 
 ```bash
 git add skills/suh-changelog-deploy/SKILL.md
-git commit -m "docs(suh-changelog-deploy): SKILL.md 표준 5줄 패턴 + changelog_cli https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-changelog-deploy): SKILL.md 표준 5줄 패턴 + changelog_cli https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2344,7 +2344,7 @@ Expected: 0건 또는 표준 패턴 일부로만 등장.
 
 ```bash
 git add skills/references/common-rules.md
-git commit -m "docs(references): §3 PYTHONPATH 제거 + 새 표준(self-contained + MCP-style) 명시 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(references): §3 PYTHONPATH 제거 + 새 표준(self-contained + MCP-style) 명시 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2370,7 +2370,7 @@ mcp-subcommand-rules.md 안에 4필드 정의 강조 — 새 표준에 맞게 �
 
 ```bash
 git add skills/references/mcp-subcommand-rules.md
-git commit -m "docs(references): mcp-subcommand-rules.md 새 표준 반영 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(references): mcp-subcommand-rules.md 새 표준 반영 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2469,7 +2469,7 @@ Expected: `{"ok": true, "code": "ok", "summary": "입력: hello world", ..., "in
 
 ```bash
 git add skills/suh-skill-creator/templates/python_cli_script.py
-git commit -m "feat(suh-skill-creator): templates/python_cli_script.py 새 표준 골격 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "feat(suh-skill-creator): templates/python_cli_script.py 새 표준 골격 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2514,7 +2514,7 @@ Expected: 0건. 기존 표준 잔재 없어야 함.
 
 ```bash
 git add skills/suh-skill-creator/SKILL.md
-git commit -m "docs(suh-skill-creator): SKILL.md 새 표준 안내 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "docs(suh-skill-creator): SKILL.md 새 표준 안내 추가 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2547,7 +2547,7 @@ CI 워크플로우에서 직접 호출하면 → `python skills/<x>/scripts/<x>_
 
 ```bash
 git add .
-git commit -m "refactor: suh_template 잔여 import 제거 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "refactor: suh_template 잔여 import 제거 https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2586,7 +2586,7 @@ Expected: 동일 결과. suh_template 삭제 후에도 새 구조가 자급자�
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "refactor: scripts/suh_template/ 완전 제거 (3-layer 마이그레이션 완료) https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322"
+git commit -m "refactor: scripts/suh_template/ 완전 제거 (3-layer 마이그레이션 완료) https://github.com/Cassiiopeia/projectops/issues/322"
 ```
 
 ---
@@ -2707,7 +2707,7 @@ echo "Phase 8 WSL 회귀 검증 완료 — 7개 skill 양 OS 동작 보장" > /t
 
 **Files:**
 - Push: 원격 브랜치
-- Create: PR (Cassiiopeia/SUH-DEVOPS-TEMPLATE)
+- Create: PR (Cassiiopeia/projectops)
 
 - [ ] **Step 1: Push**
 

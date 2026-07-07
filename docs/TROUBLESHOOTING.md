@@ -332,7 +332,7 @@ Actions → 해당 워크플로우 → Run workflow
 
 문제가 해결되지 않으면:
 
-1. [GitHub Issues](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues) 에서 검색
+1. [GitHub Issues](https://github.com/Cassiiopeia/projectops/issues) 에서 검색
 2. 새 이슈 생성 시 다음 정보 포함:
    - 에러 메시지 전문
    - Actions 로그 (민감 정보 제거)

@@ -30,12 +30,12 @@
 
 ### macOS / Linux
 ```bash
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
 ```
 
 ### Windows (PowerShell)
 ```powershell
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")
 ```
 
 ---
@@ -205,11 +205,11 @@ ESC는 "무조건 종료"가 아니라 **현재 화면의 맥락에 맞게** 동
 
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") \
   --mode full --type spring,react,python --version 1.0.0 --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -Type 'spring,react,python' -Version '1.0.0' -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -Type 'spring,react,python' -Version '1.0.0' -Force
 ```
 
 ### 동작 방식
@@ -241,16 +241,16 @@ on:
 ## 사용 예시
 
 > 아래 원격 URL은 가독성을 위해 줄여서 표기합니다.
-> - **Bash**: `https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh`
-> - **PS1**: `https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1`
+> - **Bash**: `https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh`
+> - **PS1**: `https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1`
 
 ### 대화형 모드 (권장)
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")
 ```
 
 ---
@@ -260,57 +260,57 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 #### 전체 통합 (자동 감지)
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode full --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -Force
 ```
 
 #### 전체 통합 + 타입/버전 지정
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") \
   --mode full --type spring --version 1.0.0 --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -Type spring -Version '1.0.0' -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -Type spring -Version '1.0.0' -Force
 ```
 
 #### 전체 통합 + Synology 포함
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --synology --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode full --synology --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -Synology -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -Synology -Force
 ```
 
 #### 전체 통합 + Synology 제외 (명시적)
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --no-synology --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode full --no-synology --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -NoSynology -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -NoSynology -Force
 ```
 
 #### 전체 통합 + 백업 없이
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode full --no-backup --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode full --no-backup --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -NoBackup -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -NoBackup -Force
 ```
 
 #### 전체 통합 + 모든 옵션 조합
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") \
   --mode full --type flutter --version 1.0.0 --synology --no-backup --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode full -Type flutter -Version '1.0.0' -Synology -NoBackup -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode full -Type flutter -Version '1.0.0' -Synology -NoBackup -Force
 ```
 
 ---
@@ -319,10 +319,10 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]
 
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode version --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode version --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode version -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode version -Force
 ```
 
 ---
@@ -332,19 +332,19 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]
 #### 워크플로우만 설치
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode workflows --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode workflows --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode workflows -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode workflows -Force
 ```
 
 #### 워크플로우 + Synology 포함
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode workflows --synology --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode workflows --synology --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode workflows -Synology -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode workflows -Synology -Force
 ```
 
 ---
@@ -353,10 +353,10 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]
 
 ```bash
 # macOS/Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") --mode issues --force
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode issues --force
 
 # Windows
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1"))) -Mode issues -Force
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1"))) -Mode issues -Force
 ```
 
 ---
@@ -367,9 +367,9 @@ TTY가 없는 환경에서는 `--mode`와 `--force`를 반드시 지정해야 �
 
 ```bash
 # macOS/Linux - curl | bash 방식
-curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh" | bash -s -- --mode version --force
+curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh" | bash -s -- --mode version --force
 
-curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh" | bash -s -- --mode full --type spring --force
+curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh" | bash -s -- --mode full --type spring --force
 ```
 
 ---
@@ -390,7 +390,7 @@ curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/ma
 
 ```bash
 # 1. 마켓플레이스 등록
-claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin marketplace add Cassiiopeia/projectops
 
 # 2. 플러그인 설치 (글로벌)
 claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user

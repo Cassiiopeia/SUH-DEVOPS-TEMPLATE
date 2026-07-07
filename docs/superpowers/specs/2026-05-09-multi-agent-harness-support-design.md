@@ -45,7 +45,7 @@ Gemini CLI will be supported through a root `gemini-extension.json` manifest and
 a root `GEMINI.md` context file. Users install it with:
 
 ```bash
-gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE
+gemini extensions install https://github.com/Cassiiopeia/projectops
 ```
 
 Codex CLI will be supported primarily through user-registered plugin marketplace
@@ -53,7 +53,7 @@ sources, not OpenAI official marketplace publication. Users register this
 repository as a marketplace source:
 
 ```bash
-codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+codex plugin marketplace add Cassiiopeia/projectops
 ```
 
 The installer wizard should also prepare the native skill discovery fallback so
@@ -62,7 +62,7 @@ users do not need to manually install through `/plugins`.
 macOS/Linux:
 
 ```bash
-git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia
+git clone https://github.com/Cassiiopeia/projectops.git ~/.codex/cassiiopeia
 mkdir -p ~/.agents/skills
 ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
 ```
@@ -70,7 +70,7 @@ ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
 Windows:
 
 ```powershell
-git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$env:USERPROFILE\.codex\cassiiopeia"
+git clone https://github.com/Cassiiopeia/projectops.git "$env:USERPROFILE\.codex\cassiiopeia"
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.agents\skills"
 cmd /c mklink /J "%USERPROFILE%\.agents\skills\cassiiopeia" "%USERPROFILE%\.codex\cassiiopeia\skills"
 ```
@@ -219,7 +219,7 @@ The scripts should support:
 - Gemini CLI: run `gemini extensions install` or `gemini extensions update`
   when the `gemini` command is available, otherwise print the manual command.
 - Codex CLI: register the repository with `codex plugin marketplace add
-  Cassiiopeia/SUH-DEVOPS-TEMPLATE`, then prepare the native skills fallback
+  Cassiiopeia/projectops`, then prepare the native skills fallback
   automatically so wizard users do not need manual `/plugins` installation. If
   the Codex plugin marketplace command is unavailable, clone or update the
   repository under a stable local directory and create a symlink or junction

@@ -102,7 +102,7 @@ git add .github/scripts/template_initializer.sh .claude-plugin/
 git commit -m "projectops npx CLI 전환 및 npm 배포 자동화 : feat : initializer·플러그인 매니페스트 projectops 갱신 https://github.com/Cassiiopeia/projectops/issues/424"
 ```
 
-> 참고: 플러그인 설치 명령(`claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE`)은 리다이렉트로 계속 동작하나, README의 안내는 Task 3에서 새 이름으로 갱신.
+> 참고: 플러그인 설치 명령(`claude plugin marketplace add Cassiiopeia/projectops`)은 리다이렉트로 계속 동작하나, README의 안내는 Task 3에서 새 이름으로 갱신.
 
 ### Task 3: README·CONTRIBUTING·docs 스윕
 

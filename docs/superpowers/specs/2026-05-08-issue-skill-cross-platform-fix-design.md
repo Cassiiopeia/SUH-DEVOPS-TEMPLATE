@@ -1,6 +1,6 @@
 # issue skill 중복검색 단계 cross-platform 호환 패치
 
-- **이슈**: [#288](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/288)
+- **이슈**: [#288](https://github.com/Cassiiopeia/projectops/issues/288)
 - **작성일**: 2026-05-08
 - **대상 버전**: v3.0.37
 - **결정**: B/B/A/B (범위·공통화·호출형태·ssh)

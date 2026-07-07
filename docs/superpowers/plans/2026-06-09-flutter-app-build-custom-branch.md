@@ -175,7 +175,7 @@ Expected: 마지막 줄에 `ALL PASS`, exit code 0
 
 ```bash
 git add .github/workflows/project-types/flutter/PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml
-git commit -m "Flutter 앱빌드 댓글 트리거에 특정 브랜치명 인자 지원 : feat : 빌드 타입 판별 스텝에서 정규식으로 customBranch 캡처 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/349"
+git commit -m "Flutter 앱빌드 댓글 트리거에 특정 브랜치명 인자 지원 : feat : 빌드 타입 판별 스텝에서 정규식으로 customBranch 캡처 https://github.com/Cassiiopeia/projectops/issues/349"
 ```
 
 ---
@@ -309,7 +309,7 @@ Expected: `YAML OK` (파싱 에러 없음)
 
 ```bash
 git add .github/workflows/project-types/flutter/PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml
-git commit -m "Flutter 앱빌드 댓글 트리거에 특정 브랜치명 인자 지원 : feat : source_info 스텝에서 customBranch를 PR head/이슈 Guide보다 우선 적용 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/349"
+git commit -m "Flutter 앱빌드 댓글 트리거에 특정 브랜치명 인자 지원 : feat : source_info 스텝에서 customBranch를 PR head/이슈 Guide보다 우선 적용 https://github.com/Cassiiopeia/projectops/issues/349"
 ```
 
 ---

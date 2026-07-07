@@ -545,10 +545,10 @@ SSH+Docker 배포 워크플로우(SIMPLE-CICD, NONSTOP-*, PR-PREVIEW)는 해당 
 
 ```bash
 # Linux/macOS
-bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh)
 
 # Windows PowerShell
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")))
+$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")))
 ```
 
 ### 선택 워크플로우 (Nexus / Secret 백업)

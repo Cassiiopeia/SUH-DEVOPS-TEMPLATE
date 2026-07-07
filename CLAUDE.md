@@ -6,10 +6,11 @@
 
 ## ⚠️ 작업 브랜치 규칙 (agent 필독)
 
-**이 프로젝트는 `main` 브랜치에서 직접 작업하는 것을 기본값으로 한다.**
+**이 프로젝트는 `develop` 브랜치에서 직접 작업하는 것을 기본값으로 한다. `main`은 프로덕션(default) — 직접 커밋·push 금지.**
 
-- 별도 지시가 없으면 feature 브랜치를 만들지 말고 `main`에서 작업·커밋·푸시한다.
-- `main` push 전에는 **항상 `git pull --rebase origin main`** 으로 먼저 동기화한다 (버전 자동증가 워크플로우가 main에 커밋을 추가하므로 로컬이 뒤처지기 쉽다).
+- 별도 지시가 없으면 feature 브랜치를 만들지 말고 `develop`에서 작업·커밋·푸시한다.
+- `develop` push 전에는 **항상 `git pull --rebase origin develop`** 으로 먼저 동기화한다 (릴리스 시 버전 확정 커밋이 develop에 추가되므로 로컬이 뒤처지기 쉽다).
+- 릴리스(배포)는 develop→main PR로만 진행한다 (`/cassiiopeia:suh-changelog-deploy`). main 직접 push는 안전망(VERSION-CONTROL 가드)이 버전만 보전할 뿐 지원 경로가 아니다.
 - `git push`는 **사용자가 명시적으로 요청한 경우에만** 실행한다.
 - 사용자가 명시적으로 브랜치 작업을 요청한 경우에만 feature 브랜치를 사용한다.
 
@@ -96,10 +97,10 @@ snake_case.sh / snake_case.py
 | 파일명 | 트리거 | 기능 |
 |--------|--------|------|
 | `PROJECT-TEMPLATE-INITIALIZER` | 저장소 생성 | 템플릿 초기화 (일회성) |
-| `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` | version.yml 변경 | 플러그인 매니페스트 버전 동기화 |
-| `PROJECT-COMMON-VERSION-CONTROL` | main 푸시 | patch 버전 자동 증가 |
-| `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` | deploy PR | AI 체인지로그 생성 |
-| `PROJECT-COMMON-README-VERSION-UPDATE` | deploy 푸시 | README 버전 동기화 |
+| `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` | main 푸시 | 플러그인 매니페스트 버전 동기화 |
+| `PROJECT-COMMON-VERSION-CONTROL` | main 직접 푸시(안전망) | 릴리스 머지 외 push 시 patch 증가 |
+| `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` | main PR (develop→main) | 버전 확정 + AI 체인지로그 + automerge |
+| `PROJECT-COMMON-README-VERSION-UPDATE` | main 푸시 | README 버전 동기화 |
 | `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE` | 이슈 생성 | 브랜치명/커밋 제안 |
 | `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @suh-lab 멘션 | QA 이슈 자동 생성 |
 | `PROJECT-COMMON-SYNC-ISSUE-LABELS` | 라벨 파일 변경 | GitHub 라벨 동기화 |
@@ -364,9 +365,10 @@ EOF
 ### 브랜치 기반
 | 브랜치 | 트리거 | 워크플로우 |
 |--------|--------|-----------|
-| `main` | push | VERSION-CONTROL |
-| `deploy` | PR | CHANGELOG-CONTROL |
-| `deploy` | push | README-UPDATE, CICD |
+| `develop` | push | CI (버전 증가 없음) |
+| `main` | PR (develop→main) | CHANGELOG-CONTROL (버전 확정 + automerge) |
+| `main` | push (릴리스 머지) | README-UPDATE, PLUGIN-SYNC, NPM-PUBLISH, CICD |
+| `main` | push (직접) | VERSION-CONTROL 안전망 (+CICD — 비권장 경로) |
 
 ---
 

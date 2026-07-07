@@ -153,19 +153,19 @@ PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py list-prs {owner} {repo} --state o
 
 ### PR 릴리스 노트 업데이트 (CodeRabbit 폴백)
 
-deploy PR에 CodeRabbit Summary가 없을 때 Claude Code가 직접 커밋을 분석하여 한국어 릴리스 노트를 작성하고 PR 본문에 업데이트한다.
+릴리스 PR(develop→main)에 CodeRabbit Summary가 없을 때 Claude Code가 직접 커밋을 분석하여 한국어 릴리스 노트를 작성하고 PR 본문에 업데이트한다.
 
 "릴리스 노트 업데이트해줘", "changelog 폴백", "PR 본문 업데이트" 등의 요청 시 실행.
 
 **절차**:
 
-1. PR 번호 확인 (사용자 입력 또는 `list-prs`로 최근 deploy PR 조회)
+1. PR 번호 확인 (사용자 입력 또는 `list-prs`로 최근 릴리스 PR 조회)
 
-2. deploy 브랜치 대비 커밋 목록 수집
+2. main(프로덕션) 대비 커밋 목록 수집
 
 ```bash
-git fetch origin deploy 2>/dev/null || true
-git log origin/deploy..HEAD --pretty=format:"%H %s" | grep -v "\[skip ci\]" | head -60
+git fetch origin main 2>/dev/null || true
+git log origin/main..HEAD --pretty=format:"%H %s" | grep -v "\[skip ci\]" | head -60
 ```
 
 3. 커밋 메시지를 분석하여 한국어 릴리스 노트 작성

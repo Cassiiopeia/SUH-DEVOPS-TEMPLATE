@@ -3,7 +3,7 @@
 # 자동 체인지로그 관리 워크플로우
 # ===================================================================
 #
-# 이 워크플로우는 deploy 브랜치로 PR이 생성될 때 CodeRabbit AI의 리뷰를
+# 이 워크플로우는 main 브랜치로 릴리스 PR(develop→main)이 생성될 때 CodeRabbit AI의 리뷰를
 # 자동으로 감지하고 파싱하여 CHANGELOG.json과 CHANGELOG.md를 업데이트합니다.
 #
 # ===================================================================
@@ -13,7 +13,8 @@
 # ===================================================================
 #
 # 작동 방식:
-# 1. deploy 브랜치로 PR 생성 시 트리거
+# 1. main 브랜치로 릴리스 PR(develop→main) 생성 시 트리거
+# 1-1. PR head가 develop이 아니면 전체 파이프라인 스킵 (실수 feature PR 보호)
 # 2. PR 제목을 즉시 🚀 Deploy 형식으로 변경
 # 3. CodeRabbit Summary 요청 후 최대 10분 대기
 # 4. Summary 내용을 파싱하여 CHANGELOG 파일들 업데이트
@@ -30,7 +31,7 @@ name: AUTO UPDATE PROJECT CHANGELOG
 on:
   pull_request_target:
     types: [opened]
-    branches: ["deploy"]
+    branches: ["main"]
 
 permissions:
   contents: write
@@ -40,6 +41,9 @@ jobs:
   # Job 1: CodeRabbit Summary 감지 및 파싱
   detect-and-parse:
     name: CodeRabbit Summary 감지 및 파싱
+    # head 가드: main이 default라 feature PR의 base가 main으로 잘못 열릴 수 있다.
+    # develop발 릴리스 PR만 automerge 파이프라인을 탄다. (후속 job은 needs 조건으로 연쇄 스킵)
+    if: github.event.pull_request.head.ref == 'develop'
     runs-on: ubuntu-latest
     outputs:
       summary_found: ${{ steps.detect_summary.outputs.summary_found }}
@@ -87,7 +91,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          ref: ${{ github.event.repository.default_branch || 'main' }}
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: 버전 스크립트 권한 설정
         run: |
@@ -240,7 +244,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          ref: ${{ github.event.repository.default_branch || 'main' }}
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: 커밋 분석으로 릴리스 노트 생성
         id: generate
@@ -249,9 +253,9 @@ jobs:
 
           echo "🔍 커밋 분석으로 릴리스 노트 생성 중..."
 
-          # deploy 브랜치 대비 커밋 목록 수집 ([skip ci] 제외)
-          git fetch origin deploy 2>/dev/null || true
-          COMMITS=$(git log origin/deploy..HEAD --pretty=format:"%s" 2>/dev/null | grep -v "\[skip ci\]" | head -60)
+          # main(프로덕션) 대비 커밋 목록 수집 ([skip ci] 제외) — HEAD는 develop 체크아웃
+          git fetch origin main 2>/dev/null || true
+          COMMITS=$(git log origin/main..HEAD --pretty=format:"%s" 2>/dev/null | grep -v "\[skip ci\]" | head -60)
 
           if [ -z "$COMMITS" ]; then
             COMMITS=$(git log --pretty=format:"%s" -30 | grep -v "\[skip ci\]")
@@ -347,6 +351,8 @@ jobs:
   update-changelog:
     name: CHANGELOG 업데이트
     runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump_version.outputs.new_version }}
     needs: [detect-and-parse, fallback-summary]
     if: |
       always() &&
@@ -358,24 +364,51 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          ref: ${{ github.event.repository.default_branch || 'main' }}
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Git 설정
         run: |
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git pull origin $DEFAULT_BRANCH
+          git pull origin $HEAD_BRANCH
 
       - name: Summary 파일 다운로드
         uses: actions/download-artifact@v4
         with:
           name: pr-content
 
+      - name: 릴리스 버전 확정 (patch +1)
+        id: bump_version
+        run: |
+          chmod +x .github/scripts/version_manager.sh
+          NEW_VERSION=$(./.github/scripts/version_manager.sh increment | tail -n 1)
+          if [ -z "$NEW_VERSION" ]; then
+            echo "❌ 버전 증가 실패"
+            exit 1
+          fi
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ 릴리스 버전 확정: $NEW_VERSION"
+
+      - name: PR 제목 확정 버전으로 갱신
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          VERSION="${{ steps.bump_version.outputs.new_version }}"
+          TODAY=$(date '+%Y%m%d')
+          NEW_TITLE="🚀 Deploy ${TODAY}-v${VERSION}"
+
+          curl -s -H "Authorization: token ${{ secrets._GITHUB_PAT_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               -X PATCH \
+               -d "{\"title\": \"${NEW_TITLE}\"}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
+
+          echo "✅ PR 제목 확정 버전으로 갱신: $NEW_TITLE"
+
       - name: CHANGELOG 업데이트
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
-          VERSION="${{ needs.detect-and-parse.outputs.version }}"
+          VERSION="${{ steps.bump_version.outputs.new_version }}"
           PROJECT_TYPE="${{ needs.detect-and-parse.outputs.project_type }}"
           PROJECT_TYPES="${{ needs.detect-and-parse.outputs.project_types }}"
           TODAY=$(date '+%Y-%m-%d')
@@ -407,16 +440,17 @@ jobs:
 
       - name: 변경사항 커밋 및 푸시
         run: |
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
-          git add CHANGELOG.json CHANGELOG.md
+          HEAD_BRANCH="${{ github.event.pull_request.head.ref }}"
+          # bump가 version.yml + 프로젝트 버전 파일도 수정하므로 전체 스테이징
+          git add -A
 
           if git diff --staged --quiet; then
             echo "📝 변경사항이 없습니다"
           else
             REPO_NAME=$(basename "${{ github.repository }}")
-            VERSION="${{ needs.detect-and-parse.outputs.version }}"
+            VERSION="${{ steps.bump_version.outputs.new_version }}"
 
-            git commit -m "$REPO_NAME 버전 관리 : docs : v$VERSION 릴리즈 문서 업데이트 (PR #${{ github.event.pull_request.number }})"
+            git commit -m "$REPO_NAME 버전 관리 : chore : v$VERSION 릴리즈 버전 확정 및 릴리즈 문서 업데이트 (PR #${{ github.event.pull_request.number }}) [skip ci]"
 
             # Race Condition 방지: pull-rebase 후 push (최대 3회 재시도)
             MAX_RETRIES=3
@@ -427,13 +461,13 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "🔄 Push 시도 $RETRY_COUNT/$MAX_RETRIES..."
 
-              if git push origin HEAD:$DEFAULT_BRANCH; then
+              if git push origin HEAD:$HEAD_BRANCH; then
                 PUSH_SUCCESS=true
                 echo "✅ 변경사항 커밋 완료"
                 break
               else
                 echo "⚠️ Push 실패, remote 변경사항 동기화 중..."
-                if git pull --rebase origin $DEFAULT_BRANCH; then
+                if git pull --rebase origin $HEAD_BRANCH; then
                   echo "✅ Rebase 성공, 다시 push 시도..."
                 else
                   echo "❌ Rebase 실패, 충돌 해결 필요"
@@ -493,16 +527,16 @@ jobs:
           git fetch origin $PR_HEAD
           git fetch origin $PR_BASE
 
-          # BASE 브랜치(deploy)로 체크아웃
+          # BASE 브랜치(main)로 체크아웃
           echo "📦 $PR_BASE 브랜치로 체크아웃 중..."
           git checkout $PR_BASE
           git pull origin $PR_BASE
 
-          # HEAD 브랜치(main)의 최신 변경사항 다시 가져오기 (race condition 방지)
+          # HEAD 브랜치(develop)의 최신 변경사항 다시 가져오기 (race condition 방지)
           echo "🔄 $PR_HEAD 브랜치의 최신 변경사항 가져오는 중..."
           git fetch origin $PR_HEAD
 
-          # HEAD 브랜치(main)의 변경사항을 BASE(deploy)에 머지
+          # HEAD 브랜치(develop)의 변경사항을 BASE(main)에 머지
           echo "🔀 $PR_HEAD의 변경사항을 $PR_BASE에 머지 중..."
           if git merge --no-edit origin/$PR_HEAD; then
             echo "✅ 머지 성공"
@@ -578,12 +612,12 @@ jobs:
 
           if [ "$PR_MERGEABLE" != "true" ]; then
             echo "⚠️ PR을 GitHub API로 병합할 수 없습니다"
-            echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 deploy 브랜치에 적용되었습니다"
+            echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 main 브랜치에 적용되었습니다"
             echo "📝 PR 상태를 업데이트합니다..."
             
             # PR에 댓글 추가
             export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            gh pr comment $PR_NUMBER --body "✅ 변경사항이 자동으로 deploy 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
+            gh pr comment $PR_NUMBER --body "✅ 변경사항이 자동으로 main 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
             
             echo "✅ PR 상태 업데이트 완료"
             exit 0
@@ -695,12 +729,30 @@ jobs:
           echo ""
           echo "✅ PR 자동 병합 완료"
 
+      - name: 릴리스 태그 생성
+        run: |
+          NEW_VERSION="${{ needs.update-changelog.outputs.new_version }}"
+          TAG_NAME="v$NEW_VERSION"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+
+          git fetch origin $BASE_BRANCH
+          git checkout $BASE_BRANCH
+          git pull origin $BASE_BRANCH
+
+          if git tag -l | grep -q "^$TAG_NAME$"; then
+            echo "⚠️ 태그 $TAG_NAME 이미 존재 — 건너뜀"
+          else
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
+            echo "✅ 릴리스 태그 생성: $TAG_NAME"
+          fi
+
       - name: 배포 완료 알림
         run: |
           echo "🎉 체인지로그 업데이트 및 배포 트리거 완료!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "📋 배포 정보:"
-          echo "  • 버전: ${{ needs.detect-and-parse.outputs.version }}"
+          echo "  • 버전: ${{ needs.update-changelog.outputs.new_version }}"
           echo "  • 프로젝트: ${{ needs.detect-and-parse.outputs.project_type }}"
           echo "  • PR: #${{ github.event.pull_request.number }}"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

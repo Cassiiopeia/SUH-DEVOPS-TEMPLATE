@@ -28,10 +28,10 @@
 # - basic: version.yml만 사용
 # ===================================================================
 
-version: "3.0.185"
-version_code: 377 # app build number
+version: "3.0.186"
+version_code: 378 # app build number
 project_types: ["basic"] # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
 project_type: "basic" # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
-  last_updated: "2026-07-07 05:03:18"
+  last_updated: "2026-07-07 08:21:06"
   last_updated_by: "Cassiiopeia"

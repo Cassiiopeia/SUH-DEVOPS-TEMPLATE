@@ -1,14 +1,47 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-02T11:00:03Z",
-    "currentVersion": "3.0.182",
+    "lastUpdated": "2026-07-07T08:21:07Z",
+    "currentVersion": "3.0.186",
     "projectType": "basic",
-    "totalReleases": 168,
+    "totalReleases": 169,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.186",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-07",
+      "pr_number": 429,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 이슈 본문을 사후에 안전하게 수정할 수 있는 `--body-file` 파라미터 추가\n  * GitHub 연동 도구를 통한 이슈 본문 사후 복구 기능 지원\n\n* **버그 수정**\n  * 이슈 생성 시 템플릿 파일 누락을 감지하고 조용히 빈 본문으로 생성되던 오류 해결\n\n* **문서**\n  * 이슈 본문 예외 검증 및 복구 설계 사양서 및 계획서 추가\n  * 표준 브랜치(develop/main) 전략 전환 완료 보고서 및 인수인계서 추가",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "이슈 본문을 사후에 안전하게 수정할 수 있는 `--body-file` 파라미터 추가",
+            "GitHub 연동 도구를 통한 이슈 본문 사후 복구 기능 지원"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "이슈 생성 시 템플릿 파일 누락을 감지하고 조용히 빈 본문으로 생성되던 오류 해결"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "이슈 본문 예외 검증 및 복구 설계 사양서 및 계획서 추가",
+            "표준 브랜치(develop/main) 전략 전환 완료 보고서 및 인수인계서 추가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.182",
       "project_type": "basic",

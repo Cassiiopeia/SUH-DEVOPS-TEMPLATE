@@ -431,6 +431,12 @@ cleanup_template_files() {
         echo "  ✓ PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml 삭제 (마켓플레이스 전용)"
     fi
 
+    # npm 배포 워크플로우 삭제 (projectops 패키지 게시용, 템플릿 레포 전용)
+    if [ -f ".github/workflows/PROJECT-TEMPLATE-NPM-PUBLISH.yaml" ]; then
+        rm -f .github/workflows/PROJECT-TEMPLATE-NPM-PUBLISH.yaml
+        echo "  ✓ PROJECT-TEMPLATE-NPM-PUBLISH.yaml 삭제 (마켓플레이스 전용)"
+    fi
+
     # docs 폴더 삭제 (템플릿 전용 문서)
     if [ -d "docs" ]; then
         rm -rf docs
@@ -472,6 +478,17 @@ cleanup_template_files() {
     if [ -f "package.json" ]; then
         rm -f package.json
         echo "  ✓ package.json 삭제 (pi 패키지 매니페스트)"
+    fi
+
+    # projectops npm CLI 전용 파일 삭제 (npx 배포용, 마켓플레이스 전용)
+    if [ -d "bin" ]; then
+        rm -rf bin
+        echo "  ✓ bin 폴더 삭제 (projectops CLI)"
+    fi
+
+    if [ -d "src" ]; then
+        rm -rf src
+        echo "  ✓ src 폴더 삭제 (projectops CLI)"
     fi
 
     # pi Persona Harness 삭제 (loader/PERSONA/WORKFLOW, 마켓플레이스 전용)

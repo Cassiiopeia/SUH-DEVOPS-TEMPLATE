@@ -92,10 +92,23 @@ def cmd_update_issue(args) -> int:
         return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
     labels = [l.strip() for l in args.labels.split(",") if l.strip()] if args.labels else None
     assignees = [a.strip() for a in args.assignees.split(",") if a.strip()] if args.assignees else None
+    
+    body = None
+    if args.body_file:
+        body_path = Path(args.body_file)
+        if not body_path.exists():
+            return emit({
+                "ok": False,
+                "code": "body_file_not_found",
+                "error": f"수정용 본문 파일이 존재하지 않습니다: {args.body_file}",
+                "path_attempted": str(body_path.resolve())
+            })
+        body = body_path.read_text(encoding="utf-8")
+        
     try:
         result = update_issue(
             args.owner, args.repo, args.number, pat,
-            title=args.title, state=args.state, labels=labels, assignees=assignees,
+            title=args.title, body=body, state=args.state, labels=labels, assignees=assignees,
         )
         return emit({**result, "summary": f"#{args.number} 수정 완료"})
     except GitHubAPIError as e:
@@ -292,6 +305,7 @@ def build_parser() -> JSONArgumentParser:
     p_ui.add_argument("--state", choices=["open", "closed"])
     p_ui.add_argument("--labels", help="csv")
     p_ui.add_argument("--assignees", help="csv")
+    p_ui.add_argument("--body-file", help="본문 파일 경로")
     p_ui.set_defaults(func=cmd_update_issue)
 
     p_ac = sub.add_parser("add-comment", help="이슈 댓글 추가")

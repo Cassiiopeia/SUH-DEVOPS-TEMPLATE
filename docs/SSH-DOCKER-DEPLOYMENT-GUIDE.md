@@ -129,7 +129,6 @@ APK 파일 경로: `//{SERVER_HOST}/{SMB_SHARE}/{PROJECT_NAME}/android/download/
 
 **트리거**:
 - `main` 브랜치 푸시 (운영 환경)
-- `test` 브랜치 푸시 (테스트 환경)
 - 수동 실행 (workflow_dispatch)
 
 ### 필수 GitHub Secrets
@@ -142,13 +141,6 @@ APK 파일 경로: `//{SERVER_HOST}/{SMB_SHARE}/{PROJECT_NAME}/android/download/
 | `SERVER_HOST` | Synology NAS 호스트 |
 | `SERVER_USER` | SSH 접속 사용자명 |
 | `SERVER_PASSWORD` | SSH 접속 비밀번호 |
-
-### 선택적 Secrets (포트 커스터마이징)
-
-| Secret | 기본값 | 설명 |
-|--------|-------|------|
-| `PROJECT_DEPLOY_PORT` | 8080 | main 브랜치 배포 포트 |
-| `PROJECT_TEST_PORT` | 8081 | test 브랜치 배포 포트 |
 
 ### 환경변수 설정 (워크플로우 파일 내 수정)
 
@@ -164,8 +156,7 @@ env:
 
 | 브랜치 | 포트 | 컨테이너명 |
 |--------|-----|-----------|
-| main | 8080 (기본) | `{PROJECT_NAME}-back-deploy` |
-| test | 8081 (기본) | `{PROJECT_NAME}-back-test` |
+| main | 8080 (기본, `DEPLOY_PORT`) | `{PROJECT_NAME}-back-deploy` |
 
 ### 배포 프로세스
 
@@ -189,7 +180,7 @@ env:
 
 **트리거** (기본 비활성):
 - `workflow_dispatch` (수동 실행)
-- `# push: deploy` 주석 처리됨 — 전환 시 주석 해제 + `SIMPLE-CICD` 의 push 트리거 주석 처리
+- push 트리거는 주석 처리됨 (`# push: / #   branches: / #     - main`) — 전환 시 주석 해제하면 `main` 브랜치 push 시 배포되며, 동시에 `SIMPLE-CICD` 의 push 트리거를 주석 처리해 중복 실행을 막아야 함
 
 ### 사전 요구사항
 
@@ -273,7 +264,7 @@ env:
 
 **트리거** (기본 비활성):
 - `workflow_dispatch` (수동 실행)
-- `# push: deploy` 주석 처리됨 — 전환 시 주석 해제 + `SIMPLE-CICD` 의 push 트리거 주석 처리
+- push 트리거는 주석 처리됨 (`# push: / #   branches: / #     - main`) — 전환 시 주석 해제하면 `main` 브랜치 push 시 배포되며, 동시에 `SIMPLE-CICD` 의 push 트리거를 주석 처리해 중복 실행을 막아야 함
 
 ### 사전 요구사항
 

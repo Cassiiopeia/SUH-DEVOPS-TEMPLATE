@@ -4,7 +4,7 @@
 # GitHub 템플릿 통합 스크립트 v1.0.0
 # ===================================================================
 #
-# 이 스크립트는 기존 프로젝트에 SUH-DEVOPS-TEMPLATE의 기능을
+# 이 스크립트는 기존 프로젝트에 projectops(구 SUH-DEVOPS-TEMPLATE)의 기능을
 # 선택적으로 통합합니다.
 #
 # 주요 기능:
@@ -18,12 +18,12 @@
 # 
 # 방법 1: 로컬 다운로드 후 실행
 # curl -o template_integrator.sh \
-#   https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh
+#   https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh
 # chmod +x template_integrator.sh
 # ./template_integrator.sh [옵션]
 #
 # 방법 2: 원격 실행 - 대화형 (추천)
-# bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh)
+# bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh)
 #
 # 방법 3: 원격 실행 - 자동화 (CI/CD)
 # bash <(curl -fsSL https://raw.../template_integrator.sh) --mode full --force
@@ -109,7 +109,7 @@ MAGENTA=''
 NC=''
 
 # 템플릿 저장소 URL
-TEMPLATE_REPO="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
+TEMPLATE_REPO="https://github.com/Cassiiopeia/projectops.git"
 TEMP_DIR=".template_download_temp"
 
 # 임시 다운로드 폴더 정리 — 정상 종료뿐 아니라 중단(ESC/Ctrl+C)·set -e 에러로
@@ -121,7 +121,7 @@ cleanup_temp_dir() {
 trap cleanup_temp_dir EXIT
 
 # 상수 정의
-readonly TEMPLATE_RAW_URL="https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main"
+readonly TEMPLATE_RAW_URL="https://raw.githubusercontent.com/Cassiiopeia/projectops/main"
 readonly VERSION_FILE="version.yml"
 readonly WORKFLOWS_DIR=".github/workflows"
 readonly SCRIPTS_DIR=".github/scripts"
@@ -195,7 +195,7 @@ print_banner() {
     safe_echo "       🌙 Version : v${version}"
     safe_echo "       🐵 Author  : Cassiiopeia"
     safe_echo "       🪐 Mode    : ${mode}"
-    safe_echo "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    safe_echo "       📦 Repo    : github.com/Cassiiopeia/projectops"
     safe_echo ""
 }
 
@@ -2346,7 +2346,7 @@ metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "template_integrator"
   default_branch: "$branch"
-  integrated_from: "SUH-DEVOPS-TEMPLATE"
+  integrated_from: "projectops"
   integration_date: "$(date -u +"%Y-%m-%d")"
 EOF
 
@@ -2459,7 +2459,7 @@ save_template_options() {
         # 파일 끝에 추가
         cat >> "$version_file" << EOF
   template:
-    source: "SUH-DEVOPS-TEMPLATE"
+    source: "projectops"
     version: "$template_version"
     integrated_date: "$today"
     last_update_date: "$today"
@@ -4099,7 +4099,7 @@ EOF
     # 섹션 헤더 추가
     echo "" >> .gitignore
     echo "# ====================================================================" >> .gitignore
-    echo "# SUH-DEVOPS-TEMPLATE: Auto-added entries" >> .gitignore
+    echo "# projectops: Auto-added entries" >> .gitignore
     echo "# ====================================================================" >> .gitignore
     
     for entry in "${entries_to_add[@]}"; do
@@ -4839,7 +4839,7 @@ _manage_claude_section() {
             fi
         fi
     else
-        echo "  💡 Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "  💡 Claude Code 사용자: claude plugin marketplace add Cassiiopeia/projectops" >&2
         echo "                         claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user" >&2
     fi
 }
@@ -4978,7 +4978,7 @@ _remove_pi_section() {
 _do_claude_plugin_install() {
     local scope="$1"
     print_step "Claude Code 마켓플레이스 등록 중..."
-    if claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+    if claude plugin marketplace add Cassiiopeia/projectops 2>/dev/null; then
         print_success "마켓플레이스 등록 완료"
     else
         print_info "마켓플레이스 이미 등록되어 있거나 등록 생략"
@@ -5034,7 +5034,7 @@ _write_cursor_skills_meta() {
   "name": "cassiiopeia",
   "version": "${version}",
   "scope": "${scope}",
-  "source": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
+  "source": "https://github.com/Cassiiopeia/projectops",
   "installPath": "${dest_dir}",
   "installedAt": "${installed_at}",
   "lastUpdated": "${timestamp}"
@@ -5071,7 +5071,7 @@ _manage_gemini_extension() {
 
     if ! command -v gemini &> /dev/null; then
         print_warning "gemini CLI가 감지되지 않았습니다. 수동 설치 명령:"
-        echo "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "    gemini extensions install https://github.com/Cassiiopeia/projectops" >&2
         return
     fi
 
@@ -5083,12 +5083,12 @@ _manage_gemini_extension() {
     fi
 
     print_step "Gemini CLI extension 설치 중..."
-    if gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+    if gemini extensions install https://github.com/Cassiiopeia/projectops 2>/dev/null; then
         print_success "Gemini CLI extension 설치 완료"
     else
         print_warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
         print_info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
-        echo -e "    ${CYAN}gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE${NC}" >&2
+        echo -e "    ${CYAN}gemini extensions install https://github.com/Cassiiopeia/projectops${NC}" >&2
     fi
 }
 
@@ -5105,13 +5105,13 @@ _manage_codex_skills() {
         return
     else
         print_warning "codex CLI가 감지되지 않았습니다."
-        print_info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        print_info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/projectops"
     fi
 }
 
 _do_codex_marketplace_register() {
     print_step "Codex plugin marketplace 등록 중..."
-    if codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>/dev/null; then
+    if codex plugin marketplace add Cassiiopeia/projectops 2>/dev/null; then
         print_success "Codex marketplace 등록 완료"
     else
         print_info "Codex marketplace가 이미 등록되어 있거나 등록 생략"
@@ -5123,7 +5123,7 @@ _do_codex_marketplace_register() {
     else
         print_warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
         print_info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
-        echo -e "    ${CYAN}codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE${NC}" >&2
+        echo -e "    ${CYAN}codex plugin marketplace add Cassiiopeia/projectops${NC}" >&2
     fi
 }
 
@@ -5147,7 +5147,7 @@ _do_codex_native_skills_fallback() {
 
     if ! command -v git &> /dev/null; then
         print_warning "git이 없어 Codex native skills를 자동 설치할 수 없습니다."
-        echo "    git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ${install_dir}" >&2
+        echo "    git clone https://github.com/Cassiiopeia/projectops.git ${install_dir}" >&2
         echo "    mkdir -p ${target_dir}" >&2
         echo "    ln -s ${skills_dir} ${target}" >&2
         return
@@ -5161,7 +5161,7 @@ _do_codex_native_skills_fallback() {
         return
     else
         print_step "Codex skills 저장소 clone 중..."
-        git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git "$install_dir" 2>/dev/null || {
+        git clone https://github.com/Cassiiopeia/projectops.git "$install_dir" 2>/dev/null || {
             print_warning "Codex skills 저장소 clone에 실패했습니다 — 네트워크를 확인하거나 수동으로 git clone 하세요."
             return
         }
@@ -5189,7 +5189,7 @@ _do_codex_native_skills_fallback() {
 # pi는 native `pi install <git-url>` 사용. raw 다운로드 X.
 # 패키지의 skill은 복사되지 않고, settings의 packages에 등록된 패키지 경로를
 # pi가 startup마다 직접 스캔한다. 따라서 설치 검증은 폴더 존재가 아니라 'pi list' 출력으로 한다.
-PI_PACKAGE_URL="https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+PI_PACKAGE_URL="https://github.com/Cassiiopeia/projectops"
 
 # 실제로 동작하는 python 경로를 찾는다. Windows의 'python3'는 Microsoft Store
 # stub일 수 있어(command -v는 성공하지만 실행 시 Exit 49) 실제 실행으로 걸러낸다.
@@ -5213,14 +5213,21 @@ _pi_is_installed() {
     local out
     out=$(pi list 2>&1 || true)
     case "$out" in
-        *SUH-DEVOPS-TEMPLATE*|*cassiiopeia*) return 0 ;;
+        *SUH-DEVOPS-TEMPLATE*|*projectops*|*cassiiopeia*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
 # pi 클론 경로(harness loader가 사는 곳). pi 표준 클론 위치: ~/.pi/agent/git/<host>/<owner>/<repo>
 _pi_clone_dir() {
-    echo "${HOME}/.pi/agent/git/github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    # 레포명 변경(projectops) 이전에 설치된 pi 클론은 구 경로에 남아 있다
+    local new_dir="${HOME}/.pi/agent/git/github.com/Cassiiopeia/projectops"
+    local old_dir="${HOME}/.pi/agent/git/github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    if [ ! -d "$new_dir" ] && [ -d "$old_dir" ]; then
+        echo "$old_dir"
+    else
+        echo "$new_dir"
+    fi
 }
 _pi_harness_loader_path() {
     echo "$(_pi_clone_dir)/harness/harness-loader.ts"
@@ -5432,7 +5439,7 @@ print_summary() {
     echo "" >&2
     print_separator_line
     echo "" >&2
-    echo "✨ SUH-DEVOPS-TEMPLATE Setup Complete!" >&2
+    echo "✨ projectops Setup Complete!" >&2
     echo "" >&2
     print_separator_line
     echo "" >&2
@@ -5475,7 +5482,7 @@ print_summary() {
     # skills 모드: 파일/워크플로우 추가 없으므로 간결하게 종료
     if [ "$MODE" = "skills" ]; then
         echo "" >&2
-        echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+        echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/projectops" >&2
         echo "" >&2
         print_separator_line
         echo "" >&2
@@ -5590,7 +5597,7 @@ print_summary() {
         echo "" >&2
     fi
     
-    echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" >&2
+    echo "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/projectops" >&2
     echo "  📚 워크플로우 가이드: .github/workflows/project-types/README.md" >&2
     echo "" >&2
     

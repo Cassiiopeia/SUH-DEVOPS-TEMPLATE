@@ -2,7 +2,7 @@
 # GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
 # ===================================================================
 #
-# 이 스크립트는 기존 프로젝트에 SUH-DEVOPS-TEMPLATE의 기능을
+# 이 스크립트는 기존 프로젝트에 projectops(구 SUH-DEVOPS-TEMPLATE)의 기능을
 # 선택적으로 통합합니다. (Windows 환경 전용)
 #
 # 주요 기능:
@@ -111,8 +111,8 @@ $env:REQUESTS_CA_BUNDLE = $null
 # 상수 정의
 # ===================================================================
 
-$TEMPLATE_REPO = "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
-$TEMPLATE_RAW_URL = "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main"
+$TEMPLATE_REPO = "https://github.com/Cassiiopeia/projectops.git"
+$TEMPLATE_RAW_URL = "https://raw.githubusercontent.com/Cassiiopeia/projectops/main"
 $TEMP_DIR = ".template_download_temp"
 $VERSION_FILE = "version.yml"
 $WORKFLOWS_DIR = ".github/workflows"
@@ -136,7 +136,7 @@ $script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "re
 $script:IncludeNexus = $null          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
 $script:IncludeSecretBackup = $null   # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
 $script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
-$script:PiPackageUrl = "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"  # pi install/update/remove 대상
+$script:PiPackageUrl = "https://github.com/Cassiiopeia/projectops"  # pi install/update/remove 대상
 
 # 타입별 프로젝트 경로 (project_paths) — resolve 또는 -Paths로 채워짐
 $script:ProjectPaths = [ordered]@{}
@@ -183,7 +183,7 @@ function Print-Banner {
     Write-Host "       🌙 Version : v$Version"
     Write-Host "       🐵 Author  : Cassiiopeia"
     Write-Host "       🪐 Mode    : $Mode"
-    Write-Host "       📦 Repo    : github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    Write-Host "       📦 Repo    : github.com/Cassiiopeia/projectops"
     Write-Host ""
 }
 
@@ -1963,7 +1963,7 @@ metadata:
   last_updated: "$currentDate"
   last_updated_by: "template_integrator"
   default_branch: "$Branch"
-  integrated_from: "SUH-DEVOPS-TEMPLATE"
+  integrated_from: "projectops"
   integration_date: "$integrationDate"
 "@
 
@@ -2085,7 +2085,7 @@ function Save-TemplateOptions {
         # template 섹션 새로 추가
         $templateSection = @"
   template:
-    source: "SUH-DEVOPS-TEMPLATE"
+    source: "projectops"
     version: "$TemplateVersion"
     integrated_date: "$today"
     last_update_date: "$today"
@@ -3650,7 +3650,7 @@ function Ensure-GitIgnore {
     $appendContent = @"
 
 # ====================================================================
-# SUH-DEVOPS-TEMPLATE: Auto-added entries
+# projectops: Auto-added entries
 # ====================================================================
 "@
     
@@ -4274,7 +4274,7 @@ function Invoke-ClaudeSection {
             }
         }
     } else {
-        Write-Host "  Claude Code 사용자: claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host "  Claude Code 사용자: claude plugin marketplace add Cassiiopeia/projectops"
         Write-Host "                      claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user"
     }
 }
@@ -4411,7 +4411,7 @@ function Invoke-ClaudePluginInstall {
     param([string]$Scope)
 
     Print-Step "Claude Code 마켓플레이스 등록 중..."
-    $null = & claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1  # 이미 등록된 경우 exit code가 0이 아닐 수 있으므로 항상 진행
+    $null = & claude plugin marketplace add Cassiiopeia/projectops 2>&1  # 이미 등록된 경우 exit code가 0이 아닐 수 있으므로 항상 진행
     if ($LASTEXITCODE -eq 0) {
         Print-Success "마켓플레이스 등록 완료"
     } else {
@@ -4514,7 +4514,7 @@ function Write-CursorSkillsMeta {
   "name": "cassiiopeia",
   "version": "$version",
   "scope": "$Scope",
-  "source": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
+  "source": "https://github.com/Cassiiopeia/projectops",
   "installPath": "$escapedDest",
   "installedAt": "$installedAt",
   "lastUpdated": "$timestamp"
@@ -4551,7 +4551,7 @@ function Invoke-GeminiExtensionManage {
     $gemini = Get-Command "gemini" -ErrorAction SilentlyContinue
     if (-not $gemini) {
         Print-Warning "gemini CLI가 감지되지 않았습니다. 수동 설치 명령:"
-        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/projectops"
         return
     }
 
@@ -4570,18 +4570,18 @@ function Invoke-GeminiExtensionManage {
         }
 
         Print-Step "Gemini CLI extension 설치 중..."
-        $null = cmd /c "gemini extensions install `"https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE`" 2>&1"
+        $null = cmd /c "gemini extensions install `"https://github.com/Cassiiopeia/projectops`" 2>&1"
         if ($LASTEXITCODE -eq 0) {
             Print-Success "Gemini CLI extension 설치 완료"
         } else {
             Print-Warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
             Print-Info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
-            Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+            Write-Host "    gemini extensions install https://github.com/Cassiiopeia/projectops" -ForegroundColor Cyan
         }
     } catch {
         Print-Warning "Gemini CLI extension 관리 중 오류가 발생하여 수동 설치가 필요합니다."
         Print-Info "도구 환경을 점검하신 후, 아래 명령어를 입력하여 수동으로 확장을 설치해주세요:"
-        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+        Write-Host "    gemini extensions install https://github.com/Cassiiopeia/projectops" -ForegroundColor Cyan
     } finally {
         $ErrorActionPreference = $oldEAP
     }
@@ -4600,7 +4600,7 @@ function Invoke-CodexSkillsManage {
         return
     } else {
         Print-Warning "codex CLI가 감지되지 않았습니다."
-        Print-Info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Print-Info "설치 후 수동으로 실행하세요: codex plugin marketplace add Cassiiopeia/projectops"
     }
 }
 
@@ -4611,7 +4611,7 @@ function Invoke-CodexMarketplaceRegister {
 
     try {
         Print-Step "Codex plugin marketplace 등록 중..."
-        $null = cmd /c "codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE 2>&1"
+        $null = cmd /c "codex plugin marketplace add Cassiiopeia/projectops 2>&1"
         if ($LASTEXITCODE -eq 0) {
             Print-Success "Codex marketplace 등록 완료"
         } else {
@@ -4625,12 +4625,12 @@ function Invoke-CodexMarketplaceRegister {
         } else {
             Print-Warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
             Print-Info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
-            Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+            Write-Host "    codex plugin marketplace add Cassiiopeia/projectops" -ForegroundColor Cyan
         }
     } catch {
         Print-Warning "Codex plugin marketplace 관리 중 오류가 발생하여 수동 등록이 필요합니다."
         Print-Info "아래 명령어를 입력하여 수동으로 플러그인을 등록해주세요:"
-        Write-Host "    codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE" -ForegroundColor Cyan
+        Write-Host "    codex plugin marketplace add Cassiiopeia/projectops" -ForegroundColor Cyan
     } finally {
         $ErrorActionPreference = $oldEAP
     }
@@ -4659,7 +4659,7 @@ function Invoke-CodexNativeSkillsFallback {
 
     if (-not (Get-Command "git" -ErrorAction SilentlyContinue)) {
         Print-Warning "git이 없어 Codex native skills를 자동 설치할 수 없습니다."
-        Write-Host "    git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git `"$installDir`""
+        Write-Host "    git clone https://github.com/Cassiiopeia/projectops.git `"$installDir`""
         Write-Host "    New-Item -ItemType Directory -Force -Path `"$targetDir`""
         Write-Host "    cmd /c mklink /J `"%USERPROFILE%\.agents\skills\cassiiopeia`" `"%USERPROFILE%\.codex\cassiiopeia\skills`""
         return
@@ -4676,7 +4676,7 @@ function Invoke-CodexNativeSkillsFallback {
         return
     } else {
         Print-Step "Codex skills 저장소 clone 중..."
-        $null = & git clone "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git" $installDir 2>$null
+        $null = & git clone "https://github.com/Cassiiopeia/projectops.git" $installDir 2>$null
         if ($LASTEXITCODE -ne 0) {
             Print-Warning "Codex skills 저장소 clone에 실패했습니다 — 네트워크를 확인하거나 수동으로 git clone 하세요."
             return
@@ -4734,7 +4734,7 @@ function Test-PiInstalled {
     if (-not (Test-PiCli)) { return $false }
     try {
         $output = cmd /c "pi list 2>&1" | Out-String
-        return ($output -match 'SUH-DEVOPS-TEMPLATE' -or $output -match 'cassiiopeia')
+        return ($output -match 'SUH-DEVOPS-TEMPLATE' -or $output -match 'projectops' -or $output -match 'cassiiopeia')
     } catch {
         return $false
     }
@@ -4742,7 +4742,11 @@ function Test-PiInstalled {
 
 # pi 표준 클론 위치: ~/.pi/agent/git/<host>/<owner>/<repo>
 function Get-PiCloneDir {
-    return Join-Path $env:USERPROFILE ".pi\agent\git\github.com\Cassiiopeia\SUH-DEVOPS-TEMPLATE"
+    # 레포명 변경(projectops) 이전에 설치된 pi 클론은 구 경로에 남아 있다
+    $newDir = Join-Path $env:USERPROFILE ".pi\agent\git\github.com\Cassiiopeia\projectops"
+    $oldDir = Join-Path $env:USERPROFILE ".pi\agent\git\github.com\Cassiiopeia\SUH-DEVOPS-TEMPLATE"
+    if ((-not (Test-Path $newDir)) -and (Test-Path $oldDir)) { return $oldDir }
+    return $newDir
 }
 function Get-PiHarnessLoaderPath {
     return Join-Path (Get-PiCloneDir) "harness\harness-loader.ts"
@@ -4941,7 +4945,7 @@ function Show-Summary {
     Write-Host ""
     Print-SeparatorLine
     Write-Host ""
-    Write-Host "✨ SUH-DEVOPS-TEMPLATE Setup Complete!"
+    Write-Host "✨ projectops Setup Complete!"
     Write-Host ""
     Print-SeparatorLine
     Write-Host ""
@@ -4978,7 +4982,7 @@ function Show-Summary {
     # skills 모드: 파일/워크플로우 추가 없으므로 간결하게 종료
     if ($Mode -eq "skills") {
         Write-Host ""
-        Write-Host "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+        Write-Host "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/projectops"
         Write-Host ""
         Print-SeparatorLine
         Write-Host ""
@@ -5034,7 +5038,7 @@ function Show-Summary {
         Write-Host ""
     }
     
-    Write-Host "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+    Write-Host "  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/projectops"
     Write-Host "  📚 워크플로우 가이드: .github/workflows/project-types/README.md"
     Write-Host ""
     

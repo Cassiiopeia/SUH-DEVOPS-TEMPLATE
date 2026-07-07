@@ -113,7 +113,7 @@
 git rev-parse --abbrev-ref HEAD
 ```
 
-현재 브랜치가 **main(프로덕션, 직접 커밋·push 금지)이거나 develop(또는 master 등 default branch)이면 즉시 멈추고** 사용자에게 확인한다. main인 경우 특히 더 강하게 경고한다 — main은 릴리스(develop→main PR)로만 갱신되어야 하는 배포 브랜치다.
+현재 브랜치가 **main(프로덕션, 직접 커밋·push 금지, 레포에 따라 master 등으로 불릴 수 있는 default branch)이거나 develop이면 즉시 멈추고** 사용자에게 확인한다. main인 경우 특히 더 강하게 경고한다 — main은 릴리스(develop→main PR)로만 갱신되어야 하는 배포 브랜치다.
 feature 브랜치이면 이슈 번호 추출로 넘어간다.
 
 ### 2단계: 이슈 번호 확인

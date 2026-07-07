@@ -409,7 +409,7 @@ claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
 | `suh-commit` | 이슈 기반 커밋 자동화 |
 | `suh-github` | GitHub 이슈/PR 조회·관리·Actions Secret 업데이트 |
 | `suh-report` | 구현 보고서 생성 |
-| `suh-changelog-deploy` | main push → deploy PR → automerge / automerge 실패 시 재트리거 |
+| `suh-changelog-deploy` | develop push → main으로 릴리스 PR(deploy PR) → 버전 확정 + automerge / automerge 실패 시 재트리거 |
 | `suh-synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
 | `suh-ssh` | 원격 서버 SSH 접속 및 명령 실행 (AWS EC2, 시놀로지 NAS, Linux 서버 등) |
 | `suh-skill-creator` | skill 생성/리뷰/개선 (CREATE·REVIEW·IMPROVE 3모드) |

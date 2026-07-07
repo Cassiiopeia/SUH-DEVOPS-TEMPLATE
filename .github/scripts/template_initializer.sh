@@ -275,7 +275,7 @@ metadata:
   last_updated_by: "$user"
   default_branch: "$branch"
   template:
-    source: "SUH-DEVOPS-TEMPLATE"
+    source: "projectops"
     version: "$TEMPLATE_VERSION"
     initialized_date: "$(date -u +"%Y-%m-%d")"
 EOF
@@ -561,7 +561,7 @@ EOF
     # 섹션 헤더 추가
     echo "" >> .gitignore
     echo "# ====================================================================" >> .gitignore
-    echo "# SUH-DEVOPS-TEMPLATE: Auto-added entries" >> .gitignore
+    echo "# projectops: Auto-added entries" >> .gitignore
     echo "# ====================================================================" >> .gitignore
     
     for entry in "${entries_to_add[@]}"; do

@@ -96,6 +96,9 @@ flowchart TD
 ````
 
 **규칙:**
+- ⚠️ **[초치명적] subgraph 선언 시 공백/한글/괄호() 혼용 절대 금지**: `subgraph` 자체의 식별자(ID)에 한글, 공백, 괄호`()`가 들어가면 GitHub 렌더러가 `Unable to render rich display` 파싱 오류를 뱉고 렌더링에 실패한다. 화면에 출력할 한글/영문 텍스트는 반드시 대괄호`["..."]`를 사용해 ID와 철저하게 격리 분리해야 한다.
+  * ❌ 나쁜 예: `subgraph 생성 단계 (create-issue)` (ID에 공백, 한글, 괄호가 들어가 파싱 폭사)
+  * ✅ 좋은 예: `subgraph create_phase ["생성 단계 (create-issue)"]` (안전한 영문/스네이크 ID 정의 + 별도 대괄호 명시)
 - **코드 펜스는 반드시 ` ```mermaid `** — `mermaidjs`·`mermaid-js` 등은 GitHub에서 렌더링되지 않는다.
 - `flowchart TD`(위→아래) 또는 `flowchart LR`(좌→우) — 분기가 단순하면 LR이 더 깔끔.
 - 시작/종료: `(["텍스트"])` (둥근 사각형). 처리: `["텍스트"]` (사각형). 조건: `{"텍스트?"}` (다이아몬드).

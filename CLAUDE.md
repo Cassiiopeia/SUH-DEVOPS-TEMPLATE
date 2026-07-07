@@ -1,4 +1,4 @@
-# projectops (구 SUH-DEVOPS-TEMPLATE)
+# Projectops (구 SUH-DEVOPS-TEMPLATE)
 
 완전 자동화된 GitHub 프로젝트 관리 템플릿
 

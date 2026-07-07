@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 projectops
+# 🚀 Projectops
 
 **GitHub Actions 자동화 + Agent AI Skills — 개발 사이클 전체를 자동화하는 DevOps 템플릿 (구 SUH-DEVOPS-TEMPLATE)**
 
@@ -22,7 +22,7 @@
 **① GitHub Actions** — main 푸시 한 번으로 버전 관리, 체인지로그, CI/CD 배포까지 자동 처리  
 **② Agent Skills** — `/issue`, `/commit`, `/report` 등 AI가 이슈 작성부터 커밋 메시지, 구현 보고서까지 대신 생성
 
-| 기존 방식 | projectops |
+| 기존 방식 | Projectops |
 |----------|---------------------|
 | 버전 수동 관리, 태그 직접 생성 | main 푸시 시 patch 버전 자동 증가 + 태그 생성 |
 | 체인지로그 직접 작성 (30분+) | CodeRabbit AI가 PR마다 자동 생성 |

@@ -401,7 +401,7 @@ def build_parser() -> JSONArgumentParser:
     p_ds.add_argument("owner")
     p_ds.add_argument("repo")
     p_ds.add_argument("--pr", type=int)
-    p_ds.add_argument("--base", default="deploy")
+    p_ds.add_argument("--base", default="main")
     p_ds.set_defaults(func=cmd_deploy_status)
 
     p_lp = sub.add_parser("list-prs", help="PR 목록")

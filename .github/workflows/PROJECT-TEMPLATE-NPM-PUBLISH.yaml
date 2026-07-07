@@ -1,0 +1,88 @@
+# ===================================================================
+# PROJECT-TEMPLATE-NPM-PUBLISH.yaml
+# projectops npm 패키지 자동 배포 워크플로우 v1.0
+# ===================================================================
+#
+# 이 워크플로우는 SUH-DEVOPS-TEMPLATE 저장소 전용입니다.
+# template_integrator로 복사되지 않으며, template_initializer가 삭제합니다.
+#
+# 동작:
+# - main 기준으로 version.yml 버전을 읽어 package.json에 주입 후 npm publish
+# - 이미 레지스트리에 있는 버전이면 성공 종료 (멱등)
+#
+# 트리거: deploy 브랜치 push 시 (+ 수동 실행)
+# (VERSION-CONTROL이 GITHUB_TOKEN으로 version.yml을 변경하면
+#  후속 워크플로우가 트리거되지 않으므로 deploy push를 트리거로 사용
+#  — PLUGIN-VERSION-SYNC와 동일 패턴)
+#
+# 필요 Secret: NPM_TOKEN (npm Granular Access Token, 2FA bypass 허용)
+# ===================================================================
+
+name: PROJECT-TEMPLATE-NPM-PUBLISH
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+on:
+  push:
+    branches: ["deploy"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-npm:
+    name: npm 패키지 배포
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃 (main 기준)
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: version.yml에서 버전 추출
+        id: version
+        run: |
+          chmod +x .github/scripts/version_manager.sh
+          VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
+          if [ -z "$VERSION" ]; then
+            echo "❌ version.yml에서 버전을 추출할 수 없습니다"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 배포 대상 버전: $VERSION"
+
+      - name: package.json 버전 주입
+        run: npm pkg set version=${{ steps.version.outputs.version }}
+
+      - name: 이미 배포된 버전인지 확인 (멱등)
+        id: check
+        run: |
+          PKG_NAME=$(npm pkg get name | tr -d '"')
+          VERSION="${{ steps.version.outputs.version }}"
+          if npm view "${PKG_NAME}@${VERSION}" version >/dev/null 2>&1; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "ℹ️ ${PKG_NAME}@${VERSION} 은 이미 배포되어 있습니다. 건너뜁니다."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: npm 배포
+        if: steps.check.outputs.skip == 'false'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 배포 결과 요약
+        if: steps.check.outputs.skip == 'false'
+        run: echo "✅ projectops@${{ steps.version.outputs.version }} npm 배포 완료"

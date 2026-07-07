@@ -19,7 +19,7 @@
 |---|------|------|------|
 | D1 | 전환 전략 | **단계적 전환 (SP1→SP3→SP2)** | 이름 즉시 선점, 단계별 독립 검증, 과도기 사용자 이탈 없음 |
 | D2 | 템플릿 자산 전달 | **npm 패키지에 번들** (`files` 화이트리스트, ~2MB) | npm 버전=템플릿 버전 원자성(기존 PLUGIN-VERSION-SYNC가 이미 동기화), git 불필요, 내부망 npm 미러로도 수신 가능 |
-| D3 | npm publish 케이던스 | **version.yml 변경 시 자동** (매 main push) | 기존 "매 push = 새 버전" 운영 모델과 일치. `npm view` 중복확인으로 멱등 |
+| D3 | npm publish 케이던스 | **deploy 브랜치 push 시 자동** (+ workflow_dispatch) | 실측: VERSION-CONTROL이 GITHUB_TOKEN으로 version.yml을 커밋하면 후속 워크플로우가 트리거되지 않아 main paths 트리거는 동작 안 함. PLUGIN-VERSION-SYNC와 동일 패턴(deploy push → ref: main 체크아웃). `npm view` 중복확인으로 멱등 |
 | D4 | 인증 방식 | **Granular Automation Token** → `NPM_TOKEN` secret | 2FA OTP 우회 가능. 최초 배포 후 Trusted Publishing(OIDC) 전환 검토(선택) |
 | D5 | CLI 플래그 | 기존 `.sh`/`.ps1`과 **100% 동일 플래그** | 문서·사용자 습관 연속성 (`--mode/--type/--version/--paths/--nexus/--secret-backup/--force`) |
 | D6 | 과도기 fallback | `.sh`/`.ps1` **deprecated 배너 부착 후 유지** → SP2 안정화 후 제거 | Node 미설치 사용자(Spring/Flutter 일부) 보호 |
@@ -112,14 +112,14 @@ src/
 
 ```yaml
 on:
-  push: { branches: [main], paths: [version.yml] }
-  workflow_dispatch:        # 최초 선점 배포·재시도용
+  push: { branches: [deploy] }   # ★ main paths 트리거 불가 — VERSION-CONTROL의 GITHUB_TOKEN 커밋은 후속 워크플로우를 트리거하지 않음 (PLUGIN-VERSION-SYNC와 동일 패턴)
+  workflow_dispatch:             # 최초 선점 배포·재시도용
 permissions: { id-token: write, contents: read }
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - checkout (ref: main)
+      - checkout (ref: main)     # deploy push 트리거라도 항상 main 기준으로 게시
       - setup-node (node 20, registry-url: https://registry.npmjs.org)
       - VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
       - npm pkg set version=$VERSION          # PLUGIN-VERSION-SYNC 선행 여부와 무관하게 결정적
@@ -129,6 +129,7 @@ jobs:
 
 - 커밋을 만들지 않으므로 `[skip ci]` 루프 없음. `concurrency` 그룹 지정.
 - `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC`와의 순서 경합은 `npm pkg set version`으로 무력화(레지스트리에 올라가는 버전은 항상 version.yml 기준).
+- 실측 확인(2026-07-07): `npm pack --dry-run`에서 `files`에 명시한 `.github/workflows/`가 정상 포함됨 — D2 번들 전략 실현 가능.
 - 이 워크플로우는 마켓플레이스 전용 → **initializer 삭제 목록에 추가** (PLUGIN-VERSION-SYNC와 동일 취급).
 
 ## 6. 템플릿 이중 정체성 정합표

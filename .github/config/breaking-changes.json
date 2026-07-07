@@ -37,5 +37,11 @@
     "severity": "warning",
     "title": "배포 워크플로우 synology 폴더/옵션 제거 — SSH+Docker 엔진으로 통일",
     "message": "배포 워크플로우의 synology/ 폴더 구분이 완전히 제거되었습니다. Spring 배포(SIMPLE-CICD, NONSTOP-NGINX-CICD, NONSTOP-TRAEFIK-CICD, PR-PREVIEW)와 Python 배포(SIMPLE-CICD, PR-PREVIEW)는 각 타입 루트로 이동해 기본 포함되고, Flutter Synology APK 배포는 PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD로 개명되었습니다. Nexus는 spring/nexus/, Secret 백업은 common/secret-backup/(PROJECT-COMMON-SECRET-FILE-UPLOAD로 개명)으로 분리되어 통합 마법사에서 --nexus / --secret-backup 옵션(.ps1은 -Nexus / -SecretBackup)으로 선택합니다. version.yml의 옵션 키가 options.synology에서 options.nexus / options.secret_backup으로 변경되었습니다 — 기존 synology 키는 더 이상 사용되지 않으니 통합 마법사를 다시 실행해 새 옵션을 설정하세요. 다른 서버(AWS EC2 등) 배포는 SSH_AUTH_METHOD=key + SSH_KEY secret으로 설정하세요. 자세한 내용은 docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md를 참고하세요."
+  },
+
+  "3.0.186": {
+    "severity": "critical",
+    "title": "브랜치 전략 전면 전환 — deploy 폐기, develop(개발)/main(배포) 표준 구조",
+    "message": "브랜치 전략이 전면 개편되었습니다. 기존: main(개발 통합) → deploy(프로덕션). 신규: develop(개발 통합) → main(default=프로덕션). deploy 브랜치는 폐기되었습니다. 배포·README·플러그인/NPM 동기화 워크플로우는 main push 트리거로, CI·시크릿 백업·Util 동기화는 develop 트리거로 변경되었습니다. 버전은 develop→main 릴리스 PR 안에서 AUTO-CHANGELOG-CONTROL이 릴리스당 +1로 확정하며(main 직접 push는 VERSION-CONTROL 안전망이 처리), 일상 develop push는 버전을 올리지 않습니다. 기존 프로젝트 전환 절차: 1) git branch develop main && git push origin develop 2) 템플릿 재통합(업데이트 모드) 3) deploy 브랜치 삭제 4) 이후 개발은 develop에서, 릴리스는 develop→main PR로 진행. 전환 전까지는 이 업데이트를 받지 마세요."
   }
 }

@@ -1,14 +1,52 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-07T08:35:00Z",
-    "currentVersion": "3.0.187",
+    "lastUpdated": "2026-07-07T08:46:21Z",
+    "currentVersion": "3.0.188",
     "projectType": "basic",
-    "totalReleases": 170,
+    "totalReleases": 171,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.188",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-07",
+      "pr_number": 430,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * GitHub 연동 CLI 도구(`github_cli`) 상에 누락되어 있던 Actions 빌드/오류 실시간 조회(`actions`) 서브커맨드 구현 완비\n\n* **버그 수정**\n  * 보고서 결과 댓글 상에서 특수 기호 혼용으로 인해 터지던 Mermaid 그래프 문법 오류 긴급 패치 완료\n\n* **개선**\n  * 뷰포트 크기에 따른 가독성 저하를 예방하기 위해 가로형 흐름도(`flowchart LR`) 금지 및 수직 하강형(`flowchart TD`) 명세 완전 강제화\n  * Mermaid 파싱 실패를 유발하는 `subgraph` 명세 내 특수 문자 및 한글 혼용 전면 제한 및 가이드 문서화 수칙 공인\n\n* **문서**\n  * 이슈 본문 누락 방지 설계 및 완결 결과 정식 보고서 산출물 기록 보관",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "GitHub 연동 CLI 도구(`github_cli`) 상에 누락되어 있던 Actions 빌드/오류 실시간 조회(`actions`) 서브커맨드 구현 완비"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "보고서 결과 댓글 상에서 특수 기호 혼용으로 인해 터지던 Mermaid 그래프 문법 오류 긴급 패치 완료"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "뷰포트 크기에 따른 가독성 저하를 예방하기 위해 가로형 흐름도(`flowchart LR`) 금지 및 수직 하강형(`flowchart TD`) 명세 완전 강제화",
+            "Mermaid 파싱 실패를 유발하는 `subgraph` 명세 내 특수 문자 및 한글 혼용 전면 제한 및 가이드 문서화 수칙 공인"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "이슈 본문 누락 방지 설계 및 완결 결과 정식 보고서 산출물 기록 보관"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.187",
       "project_type": "basic",

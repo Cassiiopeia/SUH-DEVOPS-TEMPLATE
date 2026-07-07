@@ -1,15 +1,21 @@
 <!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+
 ## Summary by CodeRabbit
 
+## 릴리스 노트
+
 * **새 기능**
-  * 이슈 수정 시 본문 파일을 직접 지정해 내용을 업데이트할 수 있게 되었습니다.
-  * 이슈 생성 시 본문 길이 정보가 함께 제공됩니다.
+  * GitHub 연동 CLI 도구(`github_cli`) 상에 누락되어 있던 Actions 빌드/오류 실시간 조회(`actions`) 서브커맨드 구현 완비
 
 * **버그 수정**
-  * 본문 파일이 없을 때 조용히 진행되던 동작을 수정해, 이제 명확한 오류로 안내합니다.
-  * 관련 도구 전반에서 동일한 오류 형식과 경로 정보가 일관되게 표시됩니다.
+  * 보고서 결과 댓글 상에서 특수 기호 혼용으로 인해 터지던 Mermaid 그래프 문법 오류 긴급 패치 완료
+
+* **개선**
+  * 뷰포트 크기에 따른 가독성 저하를 예방하기 위해 가로형 흐름도(`flowchart LR`) 금지 및 수직 하강형(`flowchart TD`) 명세 완전 강제화
+  * Mermaid 파싱 실패를 유발하는 `subgraph` 명세 내 특수 문자 및 한글 혼용 전면 제한 및 가이드 문서화 수칙 공인
 
 * **문서**
-  * 릴리스 노트와 프로젝트 문서를 최신 버전 및 명칭으로 정리했습니다.
+  * 이슈 본문 누락 방지 설계 및 완결 결과 정식 보고서 산출물 기록 보관
+
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 

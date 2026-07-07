@@ -7,34 +7,34 @@
 
 ```mermaid
 flowchart TD
-    subgraph "개발 및 테스트 (Daily Development)"
+    subgraph "개발 및 테스트 - Daily Development"
         A["develop 브랜치 직접 작업"] -->|Push| B["CI 워크플로우 실행"]
-        B -->|결과 검증| C["빌드 & 테스트 통과"]
+        B -->|결과 검증| C["빌드 및 테스트 통과"]
     end
 
-    subgraph "릴리스 준비 및 버전 확정 (Release Gate)"
-        C -->|develop ➔ main PR 생성| D["AUTO-CHANGELOG-CONTROL 트리거"]
+    subgraph "릴리스 준비 및 버전 확정 - Release Gate"
+        C -->|develop에서 main으로 PR 생성| D["AUTO-CHANGELOG-CONTROL 트리거"]
         D -->|head 가드 검증| E{"PR head가 develop인가?"}
-        E -->|아니오| F["파이프라인 스킵 (실수 PR 방지)"]
-        E -->|예| G["릴리스 버전 확정 (patch +1)"]
+        E -->|아니오| F["파이프라인 스킵 - 실수 PR 방지"]
+        E -->|예| G["릴리스 버전 확정 - patch 1 증가"]
         G --> H["PR 제목 업데이트 및 CHANGELOG 빌드"]
         H --> I["머지 직전 버프 커밋 develop에 push"]
     end
 
-    subgraph "배포 및 최종 동기화 (Production Deploy)"
+    subgraph "배포 및 최종 동기화 - Production Deploy"
         I -->|자동 PR 머지| J["main 브랜치에 Push 발생"]
         J --> K["배포 및 버전 동기화 실행"]
-        K --> L["CICD 배포 (Flutter/React/Next 등)"]
+        K --> L["CICD 배포 - Flutter React Next 등"]
         K --> M["README 버전 업데이트"]
-        K --> N["NPM/Plugin 퍼블리시 및 동기화"]
+        K --> N["NPM 및 Plugin 퍼블리시 및 동기화"]
         K --> O["릴리스 태그 생성 및 배포 알림"]
     end
 
-    subgraph "안전 가드 (Safety Guard)"
+    subgraph "안전 가드 - Safety Guard"
         P["main 브랜치 직접 Push 발생"] --> Q["VERSION-CONTROL 안전망 트리거"]
         Q --> R{"version.yml 변경 포함?"}
-        R -->|예 (정상 릴리스 머지)| S["버전 증가 건너뜀 (가드 동작)"]
-        R -->|아니오 (직접 push)| T["안전망 버전 증가 (+1) & 동기화 실행"]
+        R -->|예 - 정상 릴리스 머지| S["버전 증가 건너뜀 - 가드 동작"]
+        R -->|아니오 - 직접 push| T["안전망 버전 증가 1 증가 및 동기화 실행"]
     end
 ```
 

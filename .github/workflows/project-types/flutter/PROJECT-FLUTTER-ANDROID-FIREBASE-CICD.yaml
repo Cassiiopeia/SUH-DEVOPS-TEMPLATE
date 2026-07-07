@@ -2,7 +2,7 @@
 # Flutter Android Firebase App Distribution 배포
 # ===================================================================
 #
-# deploy 브랜치 푸시 시 Android AAB를 빌드하고
+# main 브랜치 푸시 시 Android AAB를 빌드하고
 # Firebase App Distribution에 자동 배포합니다.
 #
 # PlayStore CICD와 동일한 빌드 과정(AAB + 버전 검증)을 거친 후

@@ -2,7 +2,7 @@
 # React CI/CD 배포
 # ===================================================================
 #
-# deploy 브랜치 푸시 시 Docker 이미지를 빌드하고 배포합니다.
+# main 브랜치 푸시 시 Docker 이미지를 빌드하고 배포합니다.
 #
 # ===================================================================
 # 🔑 필수 GitHub Secrets
@@ -169,7 +169,7 @@ jobs:
 
             # 브랜치에 따른 환경별 설정
             if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
-              # 🚀 배포 환경 (deploy 브랜치 또는 main 브랜치)
+              # 🚀 배포 환경 (main 브랜치)
               # GitHub Secrets의 PROJECT_DEPLOY_PORT 환경변수 사용
               # 설정되어 있지 않으면 기본값 3000 사용
               PORT=${{ secrets.PROJECT_DEPLOY_PORT || '3000' }}
@@ -179,7 +179,7 @@ jobs:
             else
               # ⚠️ 기타 브랜치 (예상치 못한 브랜치)
               echo "⚠️ 지원하지 않는 브랜치입니다: $BRANCH"
-              echo "이 워크플로우는 deploy 브랜치만 지원합니다."
+              echo "이 워크플로우는 main 브랜치만 지원합니다."
               echo "on.push.branches에서 지원할 브랜치를 설정하세요."
               exit 1
             fi
@@ -239,15 +239,13 @@ jobs:
             echo "🔗 접속 URL: http://${{ secrets.SERVER_HOST }}:${PORT}"
 
 # ===================================================================
-# 사용 예시 - deploy 브랜치 사용
+# 사용 예시 - main 브랜치 사용
 # ===================================================================
 #
-# 현재 설정: deploy 브랜치에 push할 때 자동 배포
-# main 브랜치는 수동 실행(workflow_dispatch)만 가능
+# 현재 설정: main 브랜치에 push할 때 자동 배포
 #
 # 브랜치별 포트:
-# - deploy: 3000 (PROJECT_DEPLOY_PORT secret으로 변경 가능)
-# - main: 3000 (수동 실행시, PROJECT_DEPLOY_PORT secret으로 변경 가능)
+# - main: 3000 (PROJECT_DEPLOY_PORT secret으로 변경 가능)
 #
 # 필요한 Secrets:
 # - REACT_ENV_FILE, DOCKERHUB_*, SERVER_* (필수)

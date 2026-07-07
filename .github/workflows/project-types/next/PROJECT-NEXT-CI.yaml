@@ -29,7 +29,7 @@ name: PROJECT-NEXT-CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["develop"]
   workflow_dispatch:
 
 env:

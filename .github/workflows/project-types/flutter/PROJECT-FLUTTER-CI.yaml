@@ -45,10 +45,10 @@ name: PROJECT-Flutter-CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [develop]
     types: [opened, synchronize, reopened]
   push:
-    branches: [main]
+    branches: [develop]
   workflow_dispatch:
     inputs:
       analyze_only:

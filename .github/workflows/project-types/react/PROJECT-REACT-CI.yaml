@@ -28,7 +28,7 @@ name: PROJECT-REACT-CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["develop"]
   workflow_dispatch:
 
 env:

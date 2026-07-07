@@ -16,10 +16,10 @@ name: PROJECT-PYTHON-CI
 on:
   push:
     branches:
-      - main  # main 브랜치 push 시 빌드 검증
+      - develop  # develop 브랜치 push 시 빌드 검증
   pull_request:
     branches:
-      - main  # main 브랜치로의 PR 시 빌드 검증
+      - develop  # develop 브랜치로의 PR 시 빌드 검증
   workflow_dispatch:  # 수동 실행 허용
 
 # ===================================================================

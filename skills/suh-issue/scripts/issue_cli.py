@@ -30,7 +30,17 @@ def cmd_create_issue(args) -> int:
     pat = get_github_pat(args.owner, args.repo)
     if not pat:
         return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
-    body = Path(args.body_file).read_text(encoding="utf-8") if Path(args.body_file).exists() else ""
+    
+    body_path = Path(args.body_file)
+    if not body_path.exists():
+        return emit({
+            "ok": False,
+            "code": "body_file_not_found",
+            "error": f"본문 파일이 존재하지 않습니다: {args.body_file}",
+            "path_attempted": str(body_path.resolve())
+        })
+    
+    body = body_path.read_text(encoding="utf-8")
     labels = [l.strip() for l in args.labels.split(",") if l.strip()] if args.labels else []
     # 담당자는 csv로 받는다. agent가 config의 assignee(레포별 → default_assignee 우선순위)를
     # 해석해 넘긴다. 비면 담당자 없이 생성 (기존 동작과 호환).
@@ -41,7 +51,7 @@ def cmd_create_issue(args) -> int:
         # 유효하지 않은 담당자는 GitHub이 조용히 누락시키므로 여기서 비교해 알린다.
         applied = result.get("assignees", [])
         missing = [a for a in assignees if a not in applied]
-        out = {**result, "summary": f"이슈 #{result.get('number')} 생성 완료"}
+        out = {**result, "summary": f"이슈 #{result.get('number')} 생성 완료", "body_length": len(body)}
         if missing:
             out["assignee_warning"] = (
                 f"담당자 지정 일부 실패: {', '.join(missing)} (레포 협업자/권한 확인 필요). 이슈는 정상 생성됨."

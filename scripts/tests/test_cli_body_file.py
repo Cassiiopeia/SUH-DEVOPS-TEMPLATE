@@ -1,0 +1,63 @@
+# scripts/tests/test_cli_body_file.py
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
+if str(ROOT / "skills/suh-issue/scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "skills/suh-issue/scripts"))
+
+from common.cli_parser import run_cli  # noqa: E402
+from issue_cli import build_parser as build_issue_parser  # noqa: E402
+
+
+def test_create_issue_body_file_not_found(capsys):
+    parser = build_issue_parser()
+    # 존재하지 않는 임시 경로를 지정하여 create-issue 실행
+    rc = run_cli(parser, ["create-issue", "Cassiiopeia", "projectops", "테스트 이슈", "nonexistent_body.md", "작업전"])
+    
+    # 리턴코드는 실패(1)여야 함
+    assert rc == 1
+    
+    # 출력된 JSON 파싱 및 구조 검증
+    out = json.loads(capsys.readouterr().out.strip())
+    assert out["ok"] is False
+    assert out["code"] == "body_file_not_found"
+    assert "존재하지 않습니다" in out["error"]
+    assert out["path_attempted"] == str(Path("nonexistent_body.md").resolve())
+
+
+def test_create_issue_success_includes_body_length(capsys, tmp_path, monkeypatch):
+    # 임시 본문 파일 생성
+    body_file = tmp_path / "issue_body.md"
+    body_content = "이것은 테스트용 본문입니다."
+    body_file.write_text(body_content, encoding="utf-8")
+    
+    # issue_cli 모듈 자체에 바인딩된 함수들을 Mocking
+    import issue_cli
+    monkeypatch.setattr(
+        issue_cli, 
+        "create_issue", 
+        lambda owner, repo, title, body, labels, pat, assignees: {
+            "number": 999,
+            "url": "https://github.com/mock/repo/issues/999",
+            "title": title,
+            "assignees": assignees
+        }
+    )
+    
+    # PAT 검증을 통과시키기 위해 get_github_pat Mocking
+    monkeypatch.setattr(issue_cli, "get_github_pat", lambda owner, repo: "mock_pat")
+    
+    parser = build_issue_parser()
+    rc = run_cli(parser, [
+        "create-issue", "Cassiiopeia", "projectops", "성공 테스트", 
+        str(body_file), "작업전", "--assignees", "Cassiiopeia"
+    ])
+    
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out.strip())
+    assert out["number"] == 999
+    assert out["body_length"] == len(body_content)

@@ -291,7 +291,7 @@ EOF
 #
 # 화이트리스트 방식:
 # - main 브랜치를 트리거로 사용하는 워크플로우를 명시적으로 지정
-# - deploy 브랜치 전용 워크플로우는 변경하지 않음
+# - main(프로덕션) push 전용 배포 워크플로우는 변경하지 않음
 # - 새로운 main 트리거 워크플로우 추가 시 MAIN_BRANCH_WORKFLOWS 배열에 추가 필요
 #
 # 참고: 
@@ -310,7 +310,7 @@ update_workflow_triggers() {
     print_step "워크플로우 트리거 브랜치 변경 중: main → $branch"
     
     # main 브랜치를 트리거로 사용하는 워크플로우만 명시적으로 지정
-    # (deploy 브랜치 전용 워크플로우는 포함하지 않음)
+    # (main push 전용 배포 워크플로우는 포함하지 않음)
     local MAIN_BRANCH_WORKFLOWS=(
         "PROJECT-VERSION-CONTROL.yaml"
     )

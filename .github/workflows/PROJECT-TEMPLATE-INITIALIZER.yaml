@@ -212,3 +212,12 @@ jobs:
           fi
           
           echo "✅ 초기화 완료 및 변경사항 푸시 완료"
+
+      - name: develop 브랜치 생성
+        run: |
+          if git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+            echo "✅ develop 브랜치가 이미 존재합니다 — 건너뜀"
+          else
+            git push origin HEAD:develop
+            echo "✅ develop 브랜치 생성 완료 (일상 개발은 develop에서, 릴리스는 develop→main PR)"
+          fi

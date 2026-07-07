@@ -36,10 +36,10 @@ ${CYAN}=========================================================
 ${YELLOW}npx 마법사는 준비 중입니다.${RESET} 지금은 아래 기존 방식으로 통합하세요.
 
 ${GREEN}macOS / Linux:${RESET}
-  bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+  bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
 
 ${GREEN}Windows (PowerShell):${RESET}
-  $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.ps1")
+  $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")
 
-${DIM}문서: https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE${RESET}
+${DIM}문서: https://github.com/Cassiiopeia/projectops${RESET}
 `);

@@ -15,13 +15,13 @@
     "name": "Cassiiopeia",
     "url": "https://github.com/Cassiiopeia"
   },
-  "homepage": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE",
+  "homepage": "https://github.com/Cassiiopeia/projectops",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git"
+    "url": "git+https://github.com/Cassiiopeia/projectops.git"
   },
   "bugs": {
-    "url": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues"
+    "url": "https://github.com/Cassiiopeia/projectops/issues"
   },
   "type": "module",
   "bin": {

@@ -159,3 +159,30 @@ def test_github_cli_update_issue_success_includes_body(capsys, tmp_path, monkeyp
     out = json.loads(capsys.readouterr().out.strip())
     assert out["number"] == 426
     assert out["body"] == body_content
+
+
+def test_github_cli_actions_show_run_success(capsys, monkeypatch):
+    from github_cli import build_parser as build_github_parser
+    import github_cli
+    
+    monkeypatch.setattr(
+        github_cli,
+        "get_run",
+        lambda owner, repo, run_id, pat: {
+            "run_id": run_id,
+            "name": "mock-workflow",
+            "status": "completed",
+            "conclusion": "success",
+            "failed_job_ids": []
+        }
+    )
+    monkeypatch.setattr(github_cli, "get_github_pat", lambda owner, repo: "mock_pat")
+    
+    parser = build_github_parser()
+    rc = run_cli(parser, ["actions", "show-run", "Cassiiopeia", "projectops", "28852073219"])
+    
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out.strip())
+    assert out["run_id"] == 28852073219
+    assert out["conclusion"] == "success"
+    assert out["name"] == "mock-workflow"

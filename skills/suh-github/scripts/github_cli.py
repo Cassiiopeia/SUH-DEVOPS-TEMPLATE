@@ -35,6 +35,7 @@ from common.gh_client import (  # noqa: E402
     search_issues, list_labels,
     get_user_type, list_repos, get_repo_detail, get_readme, get_languages, list_commits,
     list_secrets, set_secret,
+    get_run, get_job_log, list_failed_runs, resolve_pr_runs, resolve_branch_runs,
 )
 
 
@@ -273,6 +274,59 @@ def cmd_secrets(args) -> int:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
 
+def cmd_actions(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        if args.sub == "show-run":
+            if not args.run_id:
+                return emit({"ok": False, "code": "missing_argument", "error": "run_id 필요"})
+            result = get_run(args.owner, args.repo, args.run_id, pat)
+            return emit({
+                **result,
+                "summary": f"Run {args.run_id} 상태: {result.get('status')} / {result.get('conclusion')}",
+                "next": f"actions joblog {args.owner} {args.repo} {result['failed_job_ids'][0]}" if result.get("failed_job_ids") else None
+            })
+        elif args.sub == "joblog":
+            if not args.job_id:
+                return emit({"ok": False, "code": "missing_argument", "error": "job_id 필요"})
+            result = get_job_log(args.owner, args.repo, args.job_id, pat, grep=args.grep, tail=args.tail)
+            return emit({
+                **result,
+                "summary": f"Job {args.job_id} 로그 {result.get('matched_count')}건 검색됨"
+            })
+        elif args.sub == "list-failed":
+            result = list_failed_runs(args.owner, args.repo, pat, limit=args.limit)
+            return emit({
+                "runs": result,
+                "count": len(result),
+                "summary": f"최근 실패한 run {len(result)}개"
+            })
+        elif args.sub == "resolve-pr":
+            if not args.pr_number:
+                return emit({"ok": False, "code": "missing_argument", "error": "pr_number 필요"})
+            result = resolve_pr_runs(args.owner, args.repo, args.pr_number, pat)
+            return emit({
+                **result,
+                "summary": f"PR #{args.pr_number}에 연결된 run {len(result.get('runs', []))}개 조회됨",
+                "next": f"actions show-run {args.owner} {args.repo} {result['runs'][0]['run_id']}" if result.get("runs") else None
+            })
+        elif args.sub == "resolve-branch":
+            if not args.branch:
+                return emit({"ok": False, "code": "missing_argument", "error": "branch 필요"})
+            result = resolve_branch_runs(args.owner, args.repo, args.branch, pat, limit=args.limit)
+            return emit({
+                "runs": result,
+                "count": len(result),
+                "summary": f"브랜치 {args.branch}의 run {len(result)}개",
+                "next": f"actions show-run {args.owner} {args.repo} {result[0]['run_id']}" if result else None
+            })
+        return emit({"ok": False, "code": "unknown_subcommand", "error": f"알 수 없음: {args.sub}"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
 # =========================================================================
 # argparse setup
 # =========================================================================
@@ -359,6 +413,19 @@ def build_parser() -> JSONArgumentParser:
     p_sc.add_argument("repo")
     p_sc.add_argument("name", nargs="?")
     p_sc.set_defaults(func=cmd_secrets)
+
+    p_ac = sub.add_parser("actions", help="GitHub Actions 로그 관리")
+    p_ac.add_argument("sub", choices=["show-run", "joblog", "list-failed", "resolve-pr", "resolve-branch"])
+    p_ac.add_argument("owner")
+    p_ac.add_argument("repo")
+    p_ac.add_argument("run_id", nargs="?", type=int, help="Run ID")
+    p_ac.add_argument("job_id", nargs="?", type=int, help="Job ID")
+    p_ac.add_argument("pr_number", nargs="?", type=int, help="PR Number")
+    p_ac.add_argument("branch", nargs="?", help="Branch Name")
+    p_ac.add_argument("--grep", default="error", help="Filter logs")
+    p_ac.add_argument("--tail", type=int, default=30, help="Log line count")
+    p_ac.add_argument("--limit", type=int, default=10, help="Run count limit")
+    p_ac.set_defaults(func=cmd_actions)
 
     return parser
 

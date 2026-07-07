@@ -99,7 +99,7 @@ name: PROJECT-SYNC-GITHUB-LABELS
 # CodeRabbit 기반 CHANGELOG 자동 생성
 # ===================================================================
 #
-# deploy 브랜치로 PR이 생성될 때 CodeRabbit AI의 리뷰를
+# main 브랜치로 릴리스 PR(develop→main)이 생성될 때 CodeRabbit AI의 리뷰를
 # 자동으로 파싱하여 CHANGELOG를 업데이트합니다.
 #
 # ===================================================================
@@ -109,7 +109,7 @@ name: PROJECT-SYNC-GITHUB-LABELS
 # ===================================================================
 #
 # 작동 방식:
-# 1. deploy 브랜치로 PR 생성 시 트리거
+# 1. main 브랜치로 릴리스 PR(develop→main) 생성 시 트리거
 # 2. CodeRabbit Summary 요청 후 대기
 # 3. CHANGELOG 파일 업데이트
 # 4. PR 자동 머지
@@ -183,7 +183,7 @@ name: PROJECT-Flutter-CI
 # Spring Boot CI/CD 배포 (Synology)
 # ===================================================================
 #
-# deploy 브랜치 푸시 시 Docker 이미지를 빌드하고
+# main 브랜치 푸시 시 Docker 이미지를 빌드하고
 # Synology NAS에 자동 배포합니다.
 #
 # ===================================================================
@@ -268,7 +268,7 @@ name: PROJECT-SPRING-SYNOLOGY-CICD
 # 1. 마법사 실행 (브라우저에서 열기)
 # 2. GitHub Secrets 설정
 # 3. 생성된 파일 커밋
-# 4. deploy 브랜치 푸시
+# 4. main 브랜치 푸시
 # ===================================================================
 
 name: PROJECT-iOS-TestFlight-Deploy

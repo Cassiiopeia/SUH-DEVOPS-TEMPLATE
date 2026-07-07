@@ -185,7 +185,7 @@ base64 release-key.jks               # Linux
 
 ### 본 배포
 - **파일:** `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml`
-- **트리거:** deploy 브랜치 push
+- **트리거:** main 브랜치 push
 - **용도:** Play Store Internal Testing 배포
 
 ### 테스트 빌드
@@ -195,7 +195,7 @@ base64 release-key.jks               # Linux
 
 ### Synology NAS 배포
 - **파일:** `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml`
-- **트리거:** deploy 브랜치 push
+- **트리거:** main 브랜치 push
 - **용도:** 사내 Synology NAS에 APK 배포
 
 ---

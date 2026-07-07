@@ -62,7 +62,7 @@ SUH-DEVOPS-TEMPLATE의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitH
 │                        본 배포 단계                              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  deploy 브랜치 push                                              │
+│  main 브랜치 push                                                │
 │           ↓                                                      │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │ PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml      → TestFlight   │    │
@@ -105,9 +105,9 @@ SUH-DEVOPS-TEMPLATE의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitH
 
 | 워크플로우 | 용도 | 트리거 |
 |-----------|------|--------|
-| `PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml` | iOS TestFlight 배포 | deploy 브랜치 push |
-| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml` | Android Play Store 배포 | deploy 브랜치 push |
-| `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml` | Android Synology NAS 배포 | deploy 브랜치 push |
+| `PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml` | iOS TestFlight 배포 | main 브랜치 push |
+| `PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml` | Android Play Store 배포 | main 브랜치 push |
+| `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml` | Android Synology NAS 배포 | main 브랜치 push |
 
 ### 테스트 빌드 워크플로우
 

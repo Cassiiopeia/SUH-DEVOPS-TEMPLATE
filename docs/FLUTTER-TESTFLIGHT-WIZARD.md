@@ -189,7 +189,7 @@ base64 -i AppDistribution.mobileprovision | pbcopy
 
 ### 본 배포
 - **파일:** `PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml`
-- **트리거:** deploy 브랜치 push
+- **트리거:** main 브랜치 push
 - **용도:** 정식 TestFlight 배포
 
 ### 테스트 빌드

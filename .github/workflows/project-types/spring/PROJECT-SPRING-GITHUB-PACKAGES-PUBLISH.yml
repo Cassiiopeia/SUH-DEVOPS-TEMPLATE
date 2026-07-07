@@ -31,7 +31,7 @@ name: PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH
 
 on:
   push:
-    branches: ["deploy"]
+    branches: ["main"]
     tags:
       - 'v*.*.*'
   workflow_dispatch:

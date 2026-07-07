@@ -55,7 +55,7 @@ name: PROJECT-PYTHON-SIMPLE-CICD
 on:
   push:
     branches:
-      - deploy  # 프로덕션 배포
+      - main  # 프로덕션 배포
     # @wizard paths-anchor (모노레포일 때 integrator가 paths 필터를 여기 주입)
   workflow_dispatch:  # 수동 실행 허용
 

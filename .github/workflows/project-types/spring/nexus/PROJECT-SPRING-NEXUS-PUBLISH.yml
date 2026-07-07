@@ -11,7 +11,7 @@ name: PROJECT-SPRING-NEXUS-PUBLISH
 
 on:
   push:
-    branches: ["deploy"]
+    branches: ["main"]
     tags:
       - 'v*.*.*'
 

@@ -548,7 +548,7 @@ jobs:
             exit 1
           fi
 
-          # deploy 브랜치에 푸시 (다른 워크플로우 트리거)
+          # main 브랜치에 푸시 (다른 워크플로우 트리거)
           # Race Condition 방지: pull-rebase 후 push (최대 3회 재시도)
           echo "🚀 $PR_BASE 브랜치에 푸시 중..."
           MAX_RETRIES=3

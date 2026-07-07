@@ -68,7 +68,7 @@ name: PROJECT-SPRING-NONSTOP-TRAEFIK-CICD
 on:
   # push:
   #   branches:
-  #     - deploy
+  #     - main
   workflow_dispatch:
 
 # ===================================================================

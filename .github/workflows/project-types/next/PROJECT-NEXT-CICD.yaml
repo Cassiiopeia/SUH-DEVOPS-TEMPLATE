@@ -22,7 +22,7 @@ name: PROJECT-NEXT-CICD
 on:
   push:
     branches:
-      - deploy
+      - main
     # @wizard paths-anchor (모노레포일 때 integrator가 paths 필터를 여기 주입)
   workflow_dispatch:
 

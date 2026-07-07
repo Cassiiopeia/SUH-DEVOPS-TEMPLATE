@@ -21,11 +21,7 @@ name: PROJECT-FLUTTER-ANDROID-PLAYSTORE-INTERNAL-CICD
 
 on:
   push:
-    branches: ["deploy"]
-  workflow_run:
-    workflows: ["CHANGELOG 자동 업데이트"]
-    types: [completed]
-    branches: [main]
+    branches: ["main"]
   workflow_dispatch:
     inputs:
       deploy_mode:

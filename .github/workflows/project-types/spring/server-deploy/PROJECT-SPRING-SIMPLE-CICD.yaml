@@ -65,7 +65,7 @@ name: PROJECT-SPRING-SIMPLE-CICD
 on:
   push:
     branches:
-      - deploy  # 배포 환경 (DEPLOY_PORT 사용)
+      - main  # 배포 환경 (DEPLOY_PORT 사용)
     # @wizard paths-anchor (모노레포일 때 integrator가 paths 필터를 여기 주입)
   workflow_dispatch:  # 수동 실행 허용
 

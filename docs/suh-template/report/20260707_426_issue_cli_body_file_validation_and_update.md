@@ -7,7 +7,7 @@
 
 ```mermaid
 flowchart TD
-    subgraph 생성 단계 (create-issue)
+    subgraph create_phase ["생성 단계 (create-issue)"]
         A(["시작"]) --> B["body_file 경로 수신"]
         B --> C{"파일이 존재하는가?"}
         C -->|아니오| D["'body_file_not_found' 에러 리턴 (종료)"]
@@ -15,7 +15,7 @@ flowchart TD
         E --> F["성공: body_length 리턴"]
     end
 
-    subgraph 수정 단계 (update-issue)
+    subgraph update_phase ["수정 단계 (update-issue)"]
         G(["수정 개시"]) --> H{"--body-file 인자 있음?"}
         H -->|예| I{"파일이 존재하는가?"}
         I -->|아니오| J["'body_file_not_found' 에러 리턴 (종료)"]

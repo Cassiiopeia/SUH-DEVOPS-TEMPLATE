@@ -1,7 +1,7 @@
-# deploy 브랜치 폐기 및 develop/main 표준 브랜치 전략 전환
+# [Projectops] deploy 브랜치 폐기 및 develop/main 표준 브랜치 전략 전환
 
 ## 개요
-기존의 `main`(개발) ➔ `deploy`(배포) 브랜치 전략을 업계 표준인 `develop`(개발) ➔ `main`(배포/릴리스, default) 브랜치 구조로 전면 전환하였습니다. 릴리스는 `develop`에서 `main` 브랜치로 향하는 PR(릴리스 PR)을 통해 제어되며, `AUTO-CHANGELOG-CONTROL` 워크플로우가 릴리스 내에서 버전 확정(patch +1) 및 CHANGELOG 업데이트, 자동 PR 머지(automerge) 및 릴리스 태그 생성을 일괄적으로 관리합니다. 또한, 일상적인 `develop` 푸시 시 불필요한 버전 증가를 방지하고, 프로덕션(`main`)에 대한 직접 푸시가 감지될 경우 수동 버전 동기화 안전망(`VERSION-CONTROL` 가드)이 동작하도록 인프라 파이프라인 및 문서 체계를 개편하였습니다.
+Projectops 템플릿/라이브러리의 기존 `main`(개발) ➔ `deploy`(배포) 브랜치 전략을 업계 표준인 `develop`(개발) ➔ `main`(배포/릴리스, default) 브랜치 구조로 전면 전환하였습니다. 릴리스는 `develop`에서 `main` 브랜치로 향하는 PR(릴리스 PR)을 통해 제어되며, `AUTO-CHANGELOG-CONTROL` 워크플로우가 릴리스 내에서 버전 확정(patch +1) 및 CHANGELOG 업데이트, 자동 PR 머지(automerge) 및 릴리스 태그 생성을 일괄적으로 관리합니다. 또한, 일상적인 `develop` 푸시 시 불필요한 버전 증가를 방지하고, 프로덕션(`main`)에 대한 직접 푸시가 감지될 경우 수동 버전 동기화 안전망(`VERSION-CONTROL` 가드)이 동작하도록 인프라 파이프라인 및 문서 체계를 개편하였습니다.
 
 ## 기능 흐름
 

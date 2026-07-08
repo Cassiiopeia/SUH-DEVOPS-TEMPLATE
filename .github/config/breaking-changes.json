@@ -43,5 +43,11 @@
     "severity": "critical",
     "title": "브랜치 전략 전면 전환 — deploy 폐기, develop(개발)/main(배포) 표준 구조",
     "message": "브랜치 전략이 전면 개편되었습니다. 기존: main(개발 통합) → deploy(프로덕션). 신규: develop(개발 통합) → main(default=프로덕션). deploy 브랜치는 폐기되었습니다. 배포·README·플러그인/NPM 동기화 워크플로우는 main push 트리거로, CI·시크릿 백업·Util 동기화는 develop 트리거로 변경되었습니다. 버전은 develop→main 릴리스 PR 안에서 AUTO-CHANGELOG-CONTROL이 릴리스당 +1로 확정하며(main 직접 push는 VERSION-CONTROL 안전망이 처리), 일상 develop push는 버전을 올리지 않습니다. 기존 프로젝트 전환 절차: 1) git branch develop main && git push origin develop 2) 템플릿 재통합(업데이트 모드) 3) deploy 브랜치 삭제 4) 이후 개발은 develop에서, 릴리스는 develop→main PR로 진행. 전환 전까지는 이 업데이트를 받지 마세요."
+  },
+
+  "4.0.0": {
+    "severity": "critical",
+    "title": "통합 마법사 npx projectops 단일 CLI로 전면 전환 — .sh/.ps1 실행 방식 변경",
+    "message": "기존 프로젝트에 템플릿을 통합·업데이트하는 마법사가 'npx projectops' 단일 Node CLI로 전면 전환되었습니다(구 template_integrator.sh 5,660줄 + .ps1 5,127줄을 Node ESM으로 포팅, .sh와 바이트 등가 검증 완료). 이제 macOS·Linux·Windows 어디서든 Node.js 18 이상만 있으면 'npx projectops' 한 줄로 대화형 마법사가 실행됩니다(비대화형: npx projectops --mode full --type spring,react --force). 기존 curl/iex 스크립트 실행 방식은 당분간 병존하지만, 문서·안내가 모두 npx 우선으로 바뀌었으니 npx 방식으로 이관하세요. 이 버전부터 레포 전용 크로스-OS CI(PROJECT-TEMPLATE-CI: ubuntu·windows·macos × Node 18·20)가 추가되었으며, 워크플로우 파일 순회 순서가 .sh glob(.yaml 먼저 → .yml 나중)과 완전히 일치하도록 정밀화되어 version.yml deploy 블록 키 순서까지 등가가 되었습니다. 조치: 1) Node.js 18+ 설치 확인 2) 기존 프로젝트는 'npx projectops'(업데이트 모드)로 재통합 3) CI/CD 스크립트에 template_integrator.sh curl 호출을 박아뒀다면 npx projectops 호출로 교체 권장. Node.js를 설치할 수 없는 폐쇄 환경에서는 기존 스크립트 직접 실행 방식이 여전히 동작합니다."
   }
 }

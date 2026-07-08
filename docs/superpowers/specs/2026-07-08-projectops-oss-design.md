@@ -31,8 +31,13 @@ projectops/ (신규)
 ├── bin/ + src/                  # npx 마법사 (현 npx CLI 코드 선별 복사)
 ├── payload/                     # 마법사가 사용자 프로젝트에 심는 자산 (npm 패키지에 동봉)
 │   ├── workflows/
-│   │   ├── common/              # VERSION-CONTROL, AUTO-CHANGELOG(AI+fallback), README-VERSION-UPDATE
-│   │   └── {spring,flutter,react,next,node,python,react-native,react-native-expo,basic}/
+│   │   ├── common/              # VERSION-CONTROL, AUTO-CHANGELOG(AI+fallback),
+│   │   │   │                    #   RELEASE-PUBLISH(tag+Release), README-VERSION-UPDATE
+│   │   │   └── secret-backup/   # opt-in (--secret-backup)
+│   │   ├── spring/
+│   │   │   ├── server-deploy/   # 기본 포함, Nexus opt-in true면 폴더째 제외
+│   │   │   └── nexus/           # opt-in (--nexus)
+│   │   └── {flutter,react,next,node,python,react-native,react-native-expo,basic}/
 │   ├── scripts/                 # version_manager.sh, changelog_manager.py
 │   └── version.yml.template
 ├── .github/workflows/           # 이 레포 자체용: npm publish + 자체 버전관리(도그푸딩)
@@ -52,7 +57,7 @@ projectops/ (신규)
 
 - **감지**: 마커 파일(`build.gradle`/`pubspec.yaml`/`package.json`/`pyproject.toml` 등)로 타입 자동 감지. 9타입 + 멀티타입(csv) + 모노레포 경로(`project_paths` 맵, 서브폴더 마커 감지).
 - **대화형 계층**: 배너·현재 상태 카드 → 타입/버전/브랜치 확인·수정 → 충돌 3지선 → opt-in 질문들 → 완료 요약.
-- **비대화형**: `--force --type ... --paths ...` 플래그. CI 사용 가능.
+- **비대화형**: `--force --type ... --paths ...` + 신규 `--main-branch <name>` / `--develop-branch <name>` / `--coderabbit` 플래그. CI 사용 가능. 플래그 생략 시 기본값: main-branch = 감지된 default branch, develop-branch = `develop`, coderabbit = false.
 - **모드**: 신규 통합 / 업데이트 / 되돌리기 3모드.
 - **산출**: `.github/workflows` 타입별 배치 + `version.yml` 생성 + 충돌 처리.
 
@@ -62,10 +67,10 @@ projectops/ (신규)
 
 - **릴리스 브랜치**: 기본값 = 감지된 default branch (main/master).
 - **개발 브랜치**: 기본값 `develop`. `git branch -r` 목록에서 선택 또는 직접 입력.
-- **브랜치 자동 생성**: 입력한 개발 브랜치가 원격에 없으면 현 HEAD 기준으로 생성 + push (push 전 확인 질문).
+- **브랜치 자동 생성**: 입력한 개발 브랜치가 원격에 없으면 현 HEAD 기준으로 생성 + push. 대화형은 push 전 확인 질문, `--force` 비대화형은 질문 없이 자동 생성+push.
 - payload 워크플로우에는 `{{DEVELOP_BRANCH}}` / `{{MAIN_BRANCH}}` 플레이스홀더 → 복사 시 치환.
 - 선택값은 `version.yml`의 `metadata.template.branches`에 저장 → 업데이트 모드에서 재질문 없이 동일 치환 재적용.
-- trunk-based(개발=릴리스 동일 브랜치) 선택 시 릴리스 PR 흐름 대신 push 기반 버전 증가로 안내.
+- **trunk-based**(개발=릴리스 동일 브랜치) 선택 시: `AUTO-CHANGELOG-CONTROL`(PR 기반)은 설치 제외, `VERSION-CONTROL`이 main push마다 patch 증가 담당. tag·GitHub Release·CHANGELOG 3종은 `RELEASE-PUBLISH`(main push 트리거)가 동일하게 생성 — PR 흐름과 산출물 동일. 마법사는 완료 요약에서 이 차이를 안내 메시지로 출력.
 
 ### 신규 질문 ② — CodeRabbit opt-in
 
@@ -86,13 +91,14 @@ projectops/ (신규)
 2. 버전 확정 (patch 증가, `version_manager.sh`)
 3. 직전 릴리스 태그 이후 커밋 목록 + PR 제목/diff 수집 → **요약 생성** (아래 엔진 체인)
 4. `changelog_manager.py`가 CHANGELOG.json/md 갱신 → PR에 커밋 → automerge
-5. main 머지 후: **git tag `v{x.y.z}`** 생성·push → **GitHub Release 생성** (`gh release create` 또는 REST API) — body = 생성된 요약 + GitHub 자동 노트(`generate-notes`, Full Changelog 비교 링크·PR 목록) 조합
+5. main 머지 후: **별도 워크플로우 `PROJECT-COMMON-RELEASE-PUBLISH`** (main push 트리거, 릴리스 머지 커밋 감지) — **git tag `v{x.y.z}`** 생성·push → **GitHub Release 생성** (`gh release create --notes-file` + `--generate-notes`, gh CLI로 확정 — GitHub-hosted runner 기본 탑재·GITHUB_TOKEN 자동 인증). Release body = `changelog_manager.py export` 산출 요약 + GitHub 자동 노트(Full Changelog 비교 링크·PR 목록) 조합. trunk-based 레포에서는 이 워크플로우가 요약 생성(엔진 체인)까지 직접 수행.
 
 ### 요약 엔진 체인 (우선순위)
 
 | 순위 | 엔진 | 조건 | 비용 |
 |---|---|---|---|
 | 1 | CodeRabbit PR summary | 마법사 opt-in true | CodeRabbit 요금제 |
+| | └ 대기 정책: PR 코멘트를 30초 간격 폴링, **최대 5분**. 미도착 시 2순위로 전환 (원본 레포의 10분 대기 문제 재현 방지) | | |
 | 2 | 사용자 지정 provider | `AI_API_KEY` secret 존재 | 사용자 부담 |
 | 3 | **GitHub Models** (기본값) | `GITHUB_TOKEN` + `permissions: models: read` | **무료 사용량 (rate limit)** |
 | 4 | 규칙 fallback | 위 전부 실패/부재 | 0원, 항상 동작 |

@@ -1,6 +1,6 @@
 # 버전 관리 시스템
 
-main 브랜치에 푸시하면 patch 버전이 자동으로 증가합니다.
+정상 릴리스는 `develop → main` PR에서 AUTO-CHANGELOG-CONTROL이 버전을 확정합니다. VERSION-CONTROL은 **main 직접 푸시 시 patch 버전을 자동 증가시키는 안전망**입니다.
 
 ---
 
@@ -8,7 +8,8 @@ main 브랜치에 푸시하면 patch 버전이 자동으로 증가합니다.
 
 | 기능 | 설명 |
 |------|------|
-| **자동 증가** | main 푸시 시 patch 버전 +1 (1.0.0 → 1.0.1) |
+| **자동 증가 (안전망)** | main 직접 푸시 시 patch 버전 +1 (1.0.0 → 1.0.1). 릴리스 PR 머지(version.yml 변경 포함)인 경우는 건너뜁니다 |
+| **버전 확정 (정상 릴리스)** | `develop → main` PR에서 AUTO-CHANGELOG-CONTROL이 버전을 확정하고 CHANGELOG를 스탬프합니다 |
 | **멀티 파일 동기화** | version.yml ↔ 프로젝트 파일 양방향 동기화 |
 | **충돌 해결** | 버전 불일치 시 "높은 버전 우선" 정책 |
 | **Git 태그** | 버전 변경 시 자동 태그 생성 |
@@ -96,8 +97,30 @@ project_type: "spring"   # project_types[0] 자동 미러
 
 ## 자동화 흐름
 
+### 정상 릴리스 (develop → main PR)
+
 ```
-main 푸시
+develop → main PR 생성 (release)
+    │
+    ▼
+AUTO-CHANGELOG-CONTROL 워크플로우
+    │
+    ├─ 버전 확정 (PR 안에서 patch/minor/major 결정)
+    ├─ CHANGELOG.json / CHANGELOG.md 스탬프
+    └─ automerge
+         │
+         ▼
+main 푸시 (릴리스 머지)
+    │
+    ├─ README-VERSION-UPDATE
+    ├─ PLUGIN-VERSION-SYNC
+    └─ CICD 배포
+```
+
+### main 직접 푸시 (안전망)
+
+```
+main 직접 푸시 (릴리스 PR이 아닌 경우)
     │
     ▼
 VERSION-CONTROL 워크플로우
@@ -109,13 +132,15 @@ VERSION-CONTROL 워크플로우
     └─ 커밋 & 푸시
 ```
 
+> VERSION-CONTROL은 PR을 생성하지 않습니다. 릴리스 머지로 인한 push(version.yml 변경 포함)는 감지해 건너뛰고, 그 외 main 직접 푸시에만 patch +1로 동작하는 안전망입니다.
+
 ---
 
 ## 버전 증가 규칙
 
 | 버전 | 변경 방법 | 예시 |
 |------|----------|------|
-| **patch** | 자동 (main 푸시) | 1.0.0 → 1.0.1 |
+| **patch** | 자동 (develop → main 릴리스 PR, 또는 main 직접 푸시 안전망) | 1.0.0 → 1.0.1 |
 | **minor** | 수동 (version.yml 직접 수정) | 1.0.1 → 1.1.0 |
 | **major** | 수동 (version.yml 직접 수정) | 1.1.0 → 2.0.0 |
 
@@ -172,7 +197,7 @@ on:
 ```
 
 **트리거 조건**:
-- main 브랜치 푸시
+- main 브랜치 푸시 (**main 직접 푸시 안전망** — 릴리스 PR 머지로 인한 push는 감지해 skip)
 - CHANGELOG, README 변경은 제외
 
 **실행 내용**:
@@ -180,7 +205,8 @@ on:
 2. patch 버전 증가
 3. 프로젝트 파일 동기화
 4. Git 태그 생성
-5. deploy PR 생성
+
+> PR을 생성하지 않습니다. 정상 릴리스 버전 확정은 `develop → main` PR에서 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml`(트리거: `pull_request_target opened, branches: [main]`)이 담당합니다.
 
 ---
 

@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T02:29:21Z",
-    "currentVersion": "3.0.193",
+    "lastUpdated": "2026-07-08T04:30:35Z",
+    "currentVersion": "3.0.194",
     "projectType": "basic",
-    "totalReleases": 176,
+    "totalReleases": 177,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.194",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-08",
+      "pr_number": 441,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * npx 한 줄로 템플릿을 통합할 수 있는 CLI 마법사를 추가했습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "npx 한 줄로 템플릿을 통합할 수 있는 CLI 마법사를 추가했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.193",
       "project_type": "basic",

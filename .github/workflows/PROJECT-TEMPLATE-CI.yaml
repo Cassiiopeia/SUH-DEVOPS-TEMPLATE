@@ -1,0 +1,77 @@
+# ===================================================================
+# PROJECT-TEMPLATE-CI.yaml
+# projectops npx CLI 크로스-OS 테스트 워크플로우 v1.0
+# ===================================================================
+#
+# 이 워크플로우는 projectops(구 SUH-DEVOPS-TEMPLATE) 저장소 전용입니다.
+# template_integrator로 복사되지 않으며, template_initializer가 삭제합니다.
+#
+# 동작:
+# - src/·test/·package.json 변경 시 node --test 를 3-OS × 2 Node 버전으로 실행
+# - ubuntu·windows·macos 전부에서 npx CLI가 도는지 자동 검증
+#   (detect-fs.js의 which/where 분기, ide/runner.js의 win32 .cmd 처리 등
+#    OS 종속 코드가 실제로 mac/linux/windows에서 동작하는지 보장)
+#
+# 트리거: develop·main 브랜치 push / 해당 브랜치 대상 PR (+ 수동 실행)
+# ===================================================================
+
+name: PROJECT-TEMPLATE-CI
+
+concurrency:
+  group: template-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: ["develop", "main"]
+    paths:
+      - "src/**"
+      - "test/**"
+      - "bin/**"
+      - "package.json"
+      - ".github/workflows/PROJECT-TEMPLATE-CI.yaml"
+  pull_request:
+    branches: ["develop", "main"]
+    paths:
+      - "src/**"
+      - "test/**"
+      - "bin/**"
+      - "package.json"
+      - ".github/workflows/PROJECT-TEMPLATE-CI.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node --test (${{ matrix.os }} · Node ${{ matrix.node }})
+    # 릴리스 버전 확정 커밋([skip ci])에서는 실행하지 않음
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [18, 20]
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v5
+
+      - name: Node.js ${{ matrix.node }} 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: 의존성 설치
+        # package-lock.json은 .gitignore 대상(레포에 커밋 안 됨)이라 npm install 사용
+        run: npm install --no-audit --no-fund
+
+      - name: 테스트 실행 (npm test → node --test)
+        # 인자 없는 node --test 는 cwd 기준 test 파일을 자동 탐색한다.
+        # glob 패턴("test/**")은 Node 21+ 전용이라 매트릭스의 Node 18/20에서 깨진다 — 인자 없이 실행.
+        run: npm test
+
+      - name: CLI 스모크 (--help 종료코드 0)
+        run: node bin/projectops.js --help

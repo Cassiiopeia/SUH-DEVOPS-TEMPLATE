@@ -550,6 +550,10 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]
 - **Secret 서버 백업** (`common/secret-backup/`): GitHub Secret 파일을 SSH로 서버에 업로드·이력관리
 
 ```bash
+# 권장 — npx (OS 공통, 옵션 동일)
+npx projectops --nexus --secret-backup
+
+# 대안 — 스크립트 직접 실행
 # Linux/macOS — 둘 다 포함
 bash <(curl -fsSL .../template_integrator.sh) --nexus --secret-backup
 

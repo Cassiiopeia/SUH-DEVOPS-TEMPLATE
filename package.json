@@ -24,6 +24,9 @@
     "url": "https://github.com/Cassiiopeia/projectops/issues"
   },
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "bin": {
     "projectops": "bin/projectops.js"
   },

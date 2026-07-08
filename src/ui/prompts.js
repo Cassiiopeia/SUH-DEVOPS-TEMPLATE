@@ -1,13 +1,13 @@
-// 대화형 프롬프트 래핑 (.sh interactive_menu/choose_menu/ask_* 등가) — @clack/prompts 기반.
+// 대화형 프롬프트 래핑 (.sh interactive_menu/choose_menu/ask_* 등가).
+// node:readline 기반 자체 엔진 사용 (@clack/prompts 는 Windows TTY에서 Enter가 멈추는 버그로 제거).
 // 취소(ESC/Ctrl+C)는 각 함수가 CANCEL 심볼을 반환 → 호출부가 정상 종료(exit 0) 처리.
-import * as clack from "@clack/prompts";
+import * as engine from "./readline-engine.js";
 
-export const CANCEL = Symbol("cancel");
-const wrap = (v) => (clack.isCancel(v) ? CANCEL : v);
+export const CANCEL = engine.CANCEL;
 
 // 모드 선택 — 한국어 라벨, 내부 키 반환. 취소 시 CANCEL.
 export async function selectMode() {
-  const v = await clack.select({
+  return engine.select({
     message: "무엇을 설치할까요?",
     options: [
       { value: "full", label: "전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿 (처음이라면 추천)" },
@@ -17,12 +17,11 @@ export async function selectMode() {
       { value: "skills", label: "AI 스킬만 — Claude·Cursor·Gemini·Codex·PI용 스킬만 설치" },
     ],
   });
-  return wrap(v);
 }
 
 // 프로젝트 확인 화면 메뉴 (계속/수정/취소).
 export async function confirmProjectMenu() {
-  const v = await clack.select({
+  return engine.select({
     message: "이 정보로 진행할까요?",
     options: [
       { value: "continue", label: "예, 계속 진행" },
@@ -30,7 +29,6 @@ export async function confirmProjectMenu() {
       { value: "cancel", label: "아니오, 취소" },
     ],
   });
-  return wrap(v);
 }
 
 // 수정 메뉴 — 어떤 항목을 고칠지. showOptional=full/workflows에서만 nexus/secret 노출.
@@ -45,38 +43,34 @@ export async function editMenu({ showOptional = false } = {}) {
     options.push({ value: "secret", label: "Secret 백업 포함 여부" });
   }
   options.push({ value: "done", label: "모두 맞음, 계속" });
-  const v = await clack.select({ message: "어떤 항목을 수정할까요?", options });
-  return wrap(v);
+  return engine.select({ message: "어떤 항목을 수정할까요?", options });
 }
 
 // 타입 멀티선택.
 export async function selectTypes(current = []) {
   const all = ["spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic"];
-  const v = await clack.multiselect({
+  return engine.multiselect({
     message: "프로젝트 타입을 선택하세요 (Space 토글, Enter 확정)",
     options: all.map((t) => ({ value: t, label: t })),
     initialValues: current.length ? current : ["basic"],
     required: true,
   });
-  return wrap(v);
 }
 
 // 텍스트 입력 (빈 입력=기본값 유지).
 export async function askText(message, defaultValue = "") {
-  const v = await clack.text({ message, placeholder: defaultValue, defaultValue });
-  const w = wrap(v);
-  if (w === CANCEL) return CANCEL;
-  return w === "" || w == null ? defaultValue : w;
+  const v = await engine.text({ message, defaultValue });
+  if (v === CANCEL) return CANCEL;
+  return v === "" || v == null ? defaultValue : v;
 }
 
 // 예/아니오.
 export async function askYesNo(message, initial = true) {
-  const v = await clack.confirm({ message, initialValue: initial });
-  return wrap(v);
+  return engine.confirm({ message, initialValue: initial });
 }
 
 // 배너·안내 출력.
-export function intro(text) { clack.intro(text); }
-export function outro(text) { clack.outro(text); }
-export function note(text, title) { clack.note(text, title); }
-export function cancelMessage(text = "취소했습니다.") { clack.cancel(text); }
+export function intro(text) { engine.intro(text); }
+export function outro(text) { engine.outro(text); }
+export function note(text, title) { engine.note(text, title); }
+export function cancelMessage(text = "취소했습니다.") { engine.cancelMessage(text); }

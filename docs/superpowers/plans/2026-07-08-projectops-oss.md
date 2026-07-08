@@ -312,10 +312,10 @@ class TestFallbackParser(unittest.TestCase):
 **입력 계약 (MCP-style, 해석은 호출측):**
 
 ```
-python3 changelog_manager.py ai-summary --commits-file commits.txt --version 1.2.3 --output summary.md
+python3 changelog_manager.py ai-summary --commits-file commits.txt --version 1.2.3 --output summary.md [--pr-title "..."]
 ```
 
-- 커밋 수집은 워크플로우가 `git log --pretty=%s <range>`로 해 파일로 전달 (py는 git 실행 안 함 — 단독 테스트 가능).
+- 커밋 수집은 워크플로우가 `git log --pretty=%s <range>`로 해 파일로 전달 (py는 git 실행 안 함 — 단독 테스트 가능). `--pr-title`(선택)은 릴리스 PR 제목 — AI 프롬프트 컨텍스트에 포함 (스펙 §5 "커밋 목록 + PR 제목"). diff는 토큰 폭발 위험으로 의도적 제외 — 실행 노트에 스코프 컷 기록.
 - env: `AI_API_KEY`(2순위), `AI_API_BASE_URL`(기본 `https://models.github.ai/inference`), `AI_MODEL`(기본 `openai/gpt-4o-mini`), `GITHUB_TOKEN`(3순위 GitHub Models 인증).
 - 체인: `AI_API_KEY` 있으면 그 키+BASE_URL로 호출 → 없으면 `GITHUB_TOKEN`으로 GitHub Models 호출 → HTTP 오류/타임아웃(30s)/키 전무 시 규칙 fallback. **어떤 경우에도 exit 0 + summary.md 생성.**
 - stdout JSON: `{"ok": true, "engine": "user-api"|"github-models"|"fallback", "output": "summary.md"}`
@@ -351,19 +351,25 @@ python3 changelog_manager.py ai-summary --commits-file commits.txt --version 1.2
 ```javascript
 import { test } from "node:test";
 import assert from "node:assert";
-import { readFileSync, globSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
-const files = globSync("payload/workflows/**/*.y{a,}ml");
+// globSync는 Node 22+ 전용 — engines >=20.12 유지 위해 readdirSync recursive 사용
+const files = readdirSync("payload/workflows", { recursive: true })
+  .filter((f) => /\.ya?ml$/.test(String(f)))
+  .map((f) => join("payload/workflows", String(f)));
 
-test("payload workflows exist", () => assert.ok(files.length >= 20));
+// Task 7 시점엔 2개뿐 — 최종 개수(>=20)는 Task 10에서 상향
+test("payload workflows exist", () => assert.ok(files.length >= 2));
 
-test("no hardcoded develop/main branch outside placeholders", () => {
+test("no hardcoded branch literals outside placeholders", () => {
   for (const f of files) {
     const body = readFileSync(f, "utf8");
-    // on:/if: 트리거 라인에 리터럴 develop 금지 (placeholder만 허용)
     for (const line of body.split("\n")) {
-      if (/branches:.*\bdevelop\b|head\.ref\s*==\s*'develop'/.test(line))
-        assert.fail(`${f}: hardcoded develop → use {{DEVELOP_BRANCH}}: ${line}`);
+      if (line.includes("{{MAIN_BRANCH}}") || line.includes("{{DEVELOP_BRANCH}}")) continue;
+      // 트리거/조건 라인의 리터럴 develop·main 금지 (placeholder만 허용)
+      if (/branches:.*["'\[]\s*(develop|main|master)\b|head\.ref\s*==\s*'(develop|main)'/.test(line))
+        assert.fail(`${f}: hardcoded branch → use placeholder: ${line}`);
     }
   }
 });
@@ -398,7 +404,7 @@ test("no .sh script references in payload", () => {
 Job 1 summary   : 요약 확보
   - version.yml에서 coderabbit 옵션 읽기 (python3 one-liner)
   - coderabbit=true → PR body "Summary by CodeRabbit" 폴링 30s×최대 5분 → 있으면 채택
-  - 미채택 시: git log {{MAIN_BRANCH}}..HEAD 커밋 수집 → ai-summary 실행 (내부에서 2→3→4순위)
+  - 미채택 시: git log {{MAIN_BRANCH}}..HEAD 커밋 수집 → ai-summary 실행 (`--pr-title "${{ github.event.pull_request.title }}"` 전달, 내부에서 2→3→4순위)
 Job 2 version   : version_manager.py increment → 버전 확정 커밋 [skip ci]
 Job 3 changelog : changelog_manager.py update-from-summary + generate-md → PR 커밋 [skip ci]
 Job 4 automerge : gh pr merge --auto --merge
@@ -477,8 +483,10 @@ jobs:
 - Create: `$DST/payload/workflows/common/secret-backup/PROJECT-COMMON-SECRET-FILE-UPLOAD.yaml`
 
 - [ ] **Step 1: 복사** — `cp -r $SRC/.github/workflows/project-types/{spring,flutter,react,next,python}/* $DST/payload/workflows/<type>/` + secret-backup. **제외 확인:** QA-ISSUE-CREATION-BOT, SUH-ISSUE-HELPER-*, SYNC-ISSUE-LABELS, PROJECTS-SYNC-MANAGER, TEMPLATE-UTIL-VERSION-SYNC은 복사 금지 (스펙 §2 제외 목록).
+
+  > 참고: `node`/`react-native`/`react-native-expo`/`basic` 4타입은 `$SRC`에 타입 전용 워크플로우가 없다 (common만 설치). 폴더 없음이 정상 — 찾아 헤매지 말 것.
 - [ ] **Step 2: 일괄 치환** — 각 파일에서 `develop`/`main` 브랜치 리터럴 → 플레이스홀더, `version_manager.sh` → `version_manager.py` 호출. `grep -rn "version_manager.sh" payload/` 결과 0 확인.
-- [ ] **Step 3: 테스트 실행** — Task 7의 payload-yaml.test.js가 전체 파일 커버 (하드코딩 브랜치·sh 잔존 검출). Expected: PASS
+- [ ] **Step 3: 테스트 상향 + 실행** — payload-yaml.test.js의 개수 assert를 `files.length >= 20`으로 상향 (Task 7 시점 임시값 2 교체). 전체 파일 대상 하드코딩 브랜치·sh 잔존 검출. Expected: PASS
 - [ ] **Step 4: Commit** — `feat(payload): port type workflows (spring/flutter/react/next/python) + secret-backup`
 
 ### Task 11: version.yml.template
@@ -523,7 +531,11 @@ metadata:
 
 - [ ] **Step 1: 복사 실행** — 위 제외 빼고 `bin/`, `src/` 복사. `src/index.js`·`src/cli/args.js`·`src/cli/help.js`에서 제외 기능 참조(import·서브커맨드·도움말) 제거.
 - [ ] **Step 2: 실패 테스트 작성** — `assets.test.js`: `resolvePayloadRoot()`가 패키지 루트의 `payload/`를 가리킴, `listCommonWorkflows()`가 RELEASE-PUBLISH 포함 4개+secret-backup 반환, 제거된 모듈 import 잔존 없음(전 src 파일 대상 `grep`식 문자열 검사로 `wizard-labels`/`ide/`/`skills` 참조 0 assert).
-- [ ] **Step 3: assets.js 개조** — 소스 경로를 `.github/workflows/project-types/…`에서 `payload/workflows/…`·`payload/scripts/…`로 전환. exclusions.js의 "템플릿 전용 파일 제외 목록"은 payload 방식에선 불필요 → 삭제하고 참조 제거.
+- [ ] **Step 3: assets.js 개조** — ⚠️ 원본 `$SRC/src/core/assets.js`는 로컬 경로 해석이 아니라 **런타임에 `TEMPLATE_REPO`를 tempDir로 git clone**(`acquireTemplate`)하고 하위 copy 모듈들이 그 tempDir을 소비하는 구조다. 다음 3가지를 명시적으로 수행:
+  1. git clone/`TEMPLATE_REPO`/tempDir 획득 로직 **전부 삭제** — 네트워크 접근 0.
+  2. payload 루트는 `import.meta.url` 기준으로 해석 (`new URL("../../payload/", import.meta.url)`) — npx 글로벌 캐시에서 실행돼도 패키지 내 payload를 정확히 가리킴. 이것이 `resolvePayloadRoot()`.
+  3. `src/core/copy/*.js`의 소스 인자를 tempDir → payload 경로로 재배선. **`payload/scripts/*.py` → 사용자 레포 `.github/scripts/` 복사 배선 포함** (워크플로우가 전부 이 경로를 호출 — 누락 시 설치물 전체가 런타임 사망).
+  exclusions.js의 "템플릿 전용 파일 제외 목록"은 payload 방식에선 불필요 → 삭제하고 참조 제거.
 - [ ] **Step 4: 스모크 확인** — `node bin/projectops.js --help` 정상 출력 + `npm run test:node` PASS
 - [ ] **Step 5: Commit** — `feat(cli): selective port of wizard with payload as single source`
 
@@ -648,9 +660,11 @@ test("throws on unknown placeholder left behind", () => {
 - [ ] **Step 1: 실패 테스트 작성** — fixture별로 tmp 복사 → `node bin/projectops.js --force …` subprocess 실행 → assert:
   - 종료코드 0
   - 타입별 워크플로우 배치 정확 (spring이면 server-deploy 포함, --nexus면 제외)
+  - **`.github/scripts/version_manager.py`·`changelog_manager.py` 설치됨** (워크플로우 전부가 이 경로 호출 — 배선 누락 검출)
   - `version.yml` 생성 + branches/options metadata 기록
   - 설치된 YAML 전체에 `{{` 잔존 0 (치환 무결성)
   - trunk-based 케이스(`--main-branch main --develop-branch main`): RELEASE-PUBLISH만 설치
+  - **되돌리기 모드**: 설치 → revert 실행 → payload 유래 파일(워크플로우·스크립트) 제거 확인 (원본 revert 동작 등가)
 - [ ] **Step 2: 실행 → 실패 확인 → 구현 수정 반복 → 전체 PASS**
 
 Run: `npm test`
@@ -659,6 +673,7 @@ Expected: node + py 전체 PASS
 - [ ] **Step 3: Commit** — `test: E2E install matrix across 11 fixtures`
 
 - [ ] **Step 4: 수동 실기 검증 (커밋 없음, 체크만)** — 실제 GitHub 테스트 레포 1개에 마법사 실행 → develop 커밋 → develop→main PR → AI changelog·automerge·tag·Release 실측. GitHub Models 호출은 로컬 재현 불가 — 이 단계가 유일한 실측 지점. 실패 시 워크플로우 수정 후 재실행.
+- [ ] **Step 5: fallback 실기 검증 (스펙 §7)** — 같은 테스트 레포에서 워크플로우의 `models: read` 권한 제거 커밋 후 릴리스 1회 재실행 → 규칙 fallback 경로로 changelog·Release 완주 확인. 확인 후 권한 복원.
 
 ---
 
@@ -668,3 +683,4 @@ Expected: node + py 전체 PASS
 - **원본 레포는 읽기 전용** — `$SRC` 어떤 파일도 수정하지 않는다.
 - **Windows 주의**: 테스트는 `python` (py launcher), CI는 `python3`. subprocess는 `sys.executable` 사용으로 양쪽 무관.
 - **미결정 잔여** (스펙 §8): npm 패키지명·GitHub Models 기본 모델(`openai/gpt-4o-mini`로 가정, Task 6 env로 교체 가능)·라이선스(MIT 가정) — 게시 직전 확정, 코드 영향 없음.
+- **의도적 스코프 컷**: AI 프롬프트 입력은 커밋 목록 + PR 제목까지 — **diff 본문은 제외** (토큰 폭발·rate limit 리스크 대비 이득 없음. 스펙 §5 "PR 제목/diff" 중 diff는 컷).

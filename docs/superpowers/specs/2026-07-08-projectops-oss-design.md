@@ -167,10 +167,11 @@ permissions:
 | 구간 | 내용 |
 |---|---|
 | 0:00–0:20 | 훅: 빈 레포 + "CI/CD 셋업 몇 시간 걸리세요?" 한 문장 |
-| 0:20–1:10 | **`npx projectops` 라이브 실행** — 멀티타입 모노레포(예: spring+flutter) 자동 감지 → 브랜치 질문 → 완료 요약. 마법사 UI가 주인공 |
-| 1:10–2:20 | **릴리스 자동화** — 커밋 몇 개 → develop→main PR → AI changelog 생성 장면 → automerge → tag + GitHub Release 페이지 (AI 요약 노트) 화면 전환 |
-| 2:20–2:45 | **fallback 시연** — `models: read` 제거하고 재실행 → 규칙 기반 changelog로도 릴리스 완주. "절대 안 막힌다" 증명 |
-| 2:45–3:00 | 아키텍처 슬라이드 1장 + npx 명령어 클로징 |
+| 0:20–1:20 | **`npx projectops` 라이브 실행** — 멀티타입 모노레포(예: spring+flutter) 자동 감지 → 브랜치 질문·자동 생성 → 완료 요약 → 레포에 워크플로우 배치된 모습. 마법사 UI가 주인공 |
+| 1:20–2:40 | **릴리스 자동화 풀사이클** — 커밋 몇 개 → develop→main PR → AI changelog 생성 장면 → automerge → **tag + GitHub Release 페이지(AI 요약 노트) + CHANGELOG.md 3종 동기화** 화면 전환. "API 키 하나도 안 넣었는데 AI가 릴리스 노트 씀" 자막 강조 |
+| 2:40–3:00 | 아키텍처 슬라이드 1장 + npx 명령어 클로징 |
+
+- fallback은 영상에서 시연하지 않는다 — 기본 기능만으로 감동시키는 게 목표. fallback·엔진 체인은 README/발표 자료에서 설계 근거로만 언급.
 
 - 편집 원칙: 대기 시간 전부 점프컷, 터미널 폰트 크게, 자막으로 단계 표시. Actions 실행 대기는 미리 돌린 화면 재사용.
 

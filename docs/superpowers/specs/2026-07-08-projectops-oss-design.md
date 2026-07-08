@@ -16,12 +16,14 @@
 
 1. **npx 마법사 (CLI)** — 멀티프로젝트 초기화 마법사. 주력 데모.
 2. **GitHub Actions 워크플로우** — 버전관리·체인지로그·타입별 CI/CD (payload로 사용자 프로젝트에 설치됨).
-3. **버전/체인지로그 자동화 백엔드** — `version_manager.sh` + `changelog_manager.py`.
+3. **버전/체인지로그 자동화 백엔드** — `version_manager.py` + `changelog_manager.py`. **스크립트는 전부 Python** (sh 금지 — Windows 로컬 테스트 가능, ubuntu 러너 python3 기본 탑재, bash 3.2/BSD 크로스플랫폼 함정 소멸. 속도는 요구사항 아님).
 
 ### 제외 (가져오지 않음)
 
 - Agent Skills 25종 전부 (`skills/`, `scripts/`(플러그인), `.claude-plugin/`, `.codex-plugin/`, `.agents/`, `.cursor/`, `harness/`)
-- 내부 문서(`docs/`), 부가 워크플로우 (issue-helper, QA-bot, projects-sync, labels-sync 등)
+- 내부 문서(`docs/`), 부가 워크플로우 (issue-helper, QA-bot, `PROJECTS-SYNC-MANAGER`, `SYNC-ISSUE-LABELS`, util-version-sync 등)
+- **커스텀 라벨 체계 전부**: `.github/config/issue-labels.yml`(한글 상태 라벨), 라벨 동기화 워크플로우, 라벨→Projects Status 동기화. 새 레포는 **GitHub 기본 라벨**(bug, enhancement, documentation, good first issue, help wanted 등)만 사용 — 상태 추적은 Projects Status 필드/open·closed가 정석. 마법사도 라벨을 건드리지 않는다.
+- shell 스크립트 전부 (`version_manager.sh` 포함) — Python으로 재작성해 대체 (§2 포함 3번 참조)
 - **템플릿 레포 정체성 전부**: "Use this template" 경로, `PROJECT-TEMPLATE-INITIALIZER.yaml`, `template_initializer.sh`, `template_integrator.sh` / `.ps1`. **배포 경로는 npx CLI 유일.**
 
 ## 3. 레포 구조
@@ -38,7 +40,7 @@ projectops/ (신규)
 │   │   │   ├── server-deploy/   # 기본 포함, Nexus opt-in true면 폴더째 제외
 │   │   │   └── nexus/           # opt-in (--nexus)
 │   │   └── {flutter,react,next,node,python,react-native,react-native-expo,basic}/
-│   ├── scripts/                 # version_manager.sh, changelog_manager.py
+│   ├── scripts/                 # version_manager.py, changelog_manager.py (전부 Python)
 │   └── version.yml.template
 ├── .github/workflows/           # 이 레포 자체용: npm publish + 자체 버전관리(도그푸딩)
 ├── version.yml / CHANGELOG.md / CHANGELOG.json
@@ -92,7 +94,7 @@ projectops/ (신규)
 ### 흐름 (develop→main 릴리스 PR)
 
 1. PR 열림 → `AUTO-CHANGELOG-CONTROL` 워크플로우 기동
-2. 버전 확정 (patch 증가, `version_manager.sh`)
+2. 버전 확정 (patch 증가, `version_manager.py`)
 3. 직전 릴리스 태그 이후 커밋 목록 + PR 제목/diff 수집 → **요약 생성** (아래 엔진 체인)
 4. `changelog_manager.py`가 CHANGELOG.json/md 갱신 → PR에 커밋 → automerge
 5. main 머지 후: **별도 워크플로우 `PROJECT-COMMON-RELEASE-PUBLISH`** (main push 트리거. pr-flow 모드: 릴리스 머지 커밋 감지 시만 동작 / trunk-based 모드: `[skip ci]` 아닌 모든 push에서 동작 — §4 브랜치 모드 참조) — **git tag `v{x.y.z}`** 생성·push → **GitHub Release 생성** (`gh release create --notes-file` + `--generate-notes`, gh CLI로 확정 — GitHub-hosted runner 기본 탑재·GITHUB_TOKEN 자동 인증). Release body = `changelog_manager.py export` 산출 요약 + GitHub 자동 노트(Full Changelog 비교 링크·PR 목록) 조합. trunk-based 레포에서는 이 워크플로우가 요약 생성(엔진 체인)까지 직접 수행.
@@ -132,6 +134,12 @@ permissions:
 
 > GitHub Actions 내부에서 별도 외부 API Key 없이 GitHub Models를 기본 AI 엔진으로 사용하고, version bump 시 Git tag·CHANGELOG.md·GitHub Release Notes를 자동 동기화한다. rate limit 또는 호출 실패 시 GitHub 자동 Release Notes 및 규칙 기반 changelog 생성기로 fallback하여 릴리스 자동화가 중단되지 않는다.
 
+### version_manager.py (sh 재작성)
+
+- 기존 `version_manager.sh`와 서브커맨드 등가: `get` / `set` / `increment` / `sync` / `get-code` / `increment-code`
+- 타입별 버전 파일 동기화 로직(`build.gradle`·`pubspec.yaml`·`package.json`·`pyproject.toml`·`Info.plist`·`app.json`) + `project_paths` 모노레포 경로 지원 그대로 이식
+- 표준 라이브러리만 사용 (기존 changelog_manager.py 표준 준수). Windows·mac·ubuntu 러너 동일 동작
+
 ## 6. README (공모전 심사용)
 
 - 히어로: `npx projectops` 한 줄 + 30초 데모 GIF 자리
@@ -145,6 +153,7 @@ permissions:
 - **릴리스 체인**: 테스트 레포에서 develop→main PR 실제 1회 실행 → tag·GitHub Release·CHANGELOG 3종 생성 실측.
 - **fallback**: `models: read` 권한 제거 상태로 실행 → 규칙 파서 경로 동작 확인.
 - **브랜치 생성**: 개발 브랜치 미존재 fixture에서 생성+push 동작 확인.
+- **version_manager.py 등가성**: 기존 sh 버전과 동일 입력→동일 출력 대조 테스트 (get/set/increment/sync, 타입별 동기화 파일). Windows 로컬에서 직접 실행 검증 가능.
 
 ## 8. 미결정 사항
 

@@ -4,8 +4,9 @@
 
 ## 릴리스 노트
 
-* **개선**
-  * 자동 검증 환경을 실제 지원 범위에 맞게 정비해 안정성을 높였습니다
+* **버그 수정**
+  * Windows에서 설치 마법사 메뉴 선택 시 멈추던 문제를 해결했습니다
+  * 버전 확인 명령이 정상적으로 버전을 표시하도록 고쳤습니다
 
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 

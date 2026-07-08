@@ -24,7 +24,7 @@
 
 | 기존 방식 | Projectops |
 |----------|---------------------|
-| 버전 수동 관리, 태그 직접 생성 | main 푸시 시 patch 버전 자동 증가 + 태그 생성 |
+| 버전 수동 관리, 태그 직접 생성 | 릴리스(develop→main PR) 시 patch 버전 자동 증가 + 태그 생성 |
 | 체인지로그 직접 작성 (30분+) | CodeRabbit AI가 PR마다 자동 생성 |
 | CI/CD 처음부터 설정 | 프로젝트 타입별 워크플로우 즉시 구성 |
 | 이슈 매번 형식 맞춰 작성 (5분+) | `/cassiiopeia:suh-issue` 한 번에 표준 템플릿 생성 |
@@ -56,7 +56,7 @@ flowchart TD
     H --> I["/cassiiopeia:suh-commit\n이슈 연동 커밋 자동 완성"]
     I --> J["/cassiiopeia:suh-report\n구현 보고서 + GitHub 댓글"]
     J --> K([PR 등록])
-    K --> L["/cassiiopeia:suh-changelog-deploy\nmain push → deploy PR + automerge"]
+    K --> L["/cassiiopeia:suh-changelog-deploy\ndevelop push → main 릴리스 PR + automerge"]
 ```
 
 > Skills 전체 목록 및 상세 사용법: **[docs/SKILLS.md](docs/SKILLS.md)**
@@ -67,11 +67,11 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A([main 푸시]) --> B[버전 자동 증가\npatch +1 + 태그]
-    B --> C[deploy PR 자동 생성]
-    C --> D[AI 체인지로그\nCodeRabbit 분석]
+    A([develop 푸시]) --> B[개발 통합]
+    B --> C[develop→main 릴리스 PR]
+    C --> D[PR 내 버전 확정\npatch +1 + 태그 + AI 체인지로그]
     D --> E[자동 머지]
-    E --> F[CI/CD 배포\nFlutter / Spring / React 등]
+    E --> F[main push → CI/CD 배포\nFlutter / Spring / React 등]
     F --> G([완료])
 ```
 
@@ -131,7 +131,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 | 기능 | 설명 | 문서 |
 |------|------|------|
 | **Agent Skills** | Claude Code, Cursor, Gemini CLI, Codex CLI에서 쓰는 25종 AI DevOps Skills | [상세](docs/SKILLS.md) |
-| **버전 자동화** | main 푸시 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
+| **버전 자동화** | 릴리스(develop→main PR) 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
 | **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | 댓글 한 줄로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
 | **이슈 자동화** | 브랜치명/커밋 메시지 자동 제안, QA 이슈 생성 | [상세](docs/ISSUE-AUTOMATION.md) |
@@ -151,7 +151,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 | `/cassiiopeia:suh-init-worktree` | Git worktree 생성 + 민감 파일 자동 복사 |
 | `/cassiiopeia:suh-commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 (superpowers 준수) |
 | `/cassiiopeia:suh-report` | git diff 분석 → 구현 보고서 생성 + GitHub 댓글 자동 포스팅 |
-| `/cassiiopeia:suh-changelog-deploy` | main push → deploy PR 생성 + 릴리스 노트 작성 + automerge |
+| `/cassiiopeia:suh-changelog-deploy` | develop push → main 릴리스 PR 생성 + 릴리스 노트 작성 + automerge |
 | `/cassiiopeia:suh-github` | GitHub 이슈/PR/댓글 독립 조회 및 관리 |
 
 ### 📊 분석형 (코드 수정 없음)

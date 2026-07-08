@@ -387,17 +387,17 @@ jobs:
 ### 브랜치 구조
 
 ```
-main (기본 브랜치)
-├── feature/기능명        # 새로운 기능 개발
-├── bugfix/버그명         # 버그 수정
-├── hotfix/긴급수정명     # 긴급 버그 수정
-├── docs/문서명           # 문서 작성/수정
-├── refactor/리팩토링명   # 코드 리팩토링
-└── test/테스트명         # 테스트 추가
-
-deploy (배포 브랜치)
-└── 안정 버전 배포용
+main (기본·프로덕션 브랜치)
+└── develop (개발 통합 브랜치)
+    ├── feature/기능명        # 새로운 기능 개발
+    ├── bugfix/버그명         # 버그 수정
+    ├── hotfix/긴급수정명     # 긴급 버그 수정
+    ├── docs/문서명           # 문서 작성/수정
+    ├── refactor/리팩토링명   # 코드 리팩토링
+    └── test/테스트명         # 테스트 추가
 ```
+
+feature/bugfix 등 작업 브랜치는 `develop`으로 PR을 올려 통합하고, `develop`이 안정화되면 `develop → main` 릴리스 PR로 배포합니다.
 
 ### 브랜치 네이밍 규칙
 
@@ -430,9 +430,9 @@ test/version-manager-unit-tests
 ### 브랜치 생성 및 작업 플로우
 
 ```bash
-# 1. 최신 main 브랜치로 업데이트
-git checkout main
-git pull upstream main
+# 1. 최신 develop 브랜치로 업데이트
+git checkout develop
+git pull upstream develop
 
 # 2. 새 브랜치 생성
 git checkout -b feature/new-feature
@@ -445,7 +445,7 @@ git commit -m "feat: 새로운 기능 추가"
 # 4. 원격 브랜치에 푸시
 git push origin feature/new-feature
 
-# 5. GitHub에서 Pull Request 생성
+# 5. GitHub에서 develop 대상 Pull Request 생성
 
 # 6. 리뷰 및 수정 반영
 # ... 코드 수정 ...
@@ -453,10 +453,12 @@ git commit -m "fix: 리뷰 반영"
 git push origin feature/new-feature
 
 # 7. PR 승인 및 머지 후 브랜치 삭제
-git checkout main
-git pull upstream main
+git checkout develop
+git pull upstream develop
 git branch -d feature/new-feature
 ```
+
+> 릴리스는 `develop → main` Pull Request로만 진행합니다 (`/cassiiopeia:suh-changelog-deploy`). 버전 확정, AI 체인지로그 생성, automerge가 이 PR에서 자동 처리됩니다.
 
 ---
 

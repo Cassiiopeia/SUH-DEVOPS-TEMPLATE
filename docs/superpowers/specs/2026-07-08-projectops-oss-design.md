@@ -70,7 +70,11 @@ projectops/ (신규)
 - **브랜치 자동 생성**: 입력한 개발 브랜치가 원격에 없으면 현 HEAD 기준으로 생성 + push. 대화형은 push 전 확인 질문, `--force` 비대화형은 질문 없이 자동 생성+push.
 - payload 워크플로우에는 `{{DEVELOP_BRANCH}}` / `{{MAIN_BRANCH}}` 플레이스홀더 → 복사 시 치환.
 - 선택값은 `version.yml`의 `metadata.template.branches`에 저장 → 업데이트 모드에서 재질문 없이 동일 치환 재적용.
-- **trunk-based**(개발=릴리스 동일 브랜치) 선택 시: `AUTO-CHANGELOG-CONTROL`(PR 기반)은 설치 제외, `VERSION-CONTROL`이 main push마다 patch 증가 담당. tag·GitHub Release·CHANGELOG 3종은 `RELEASE-PUBLISH`(main push 트리거)가 동일하게 생성 — PR 흐름과 산출물 동일. 마법사는 완료 요약에서 이 차이를 안내 메시지로 출력.
+- **브랜치 모드 저장**: 마법사가 `version.yml`의 `metadata.template.branches.mode`에 `pr-flow` 또는 `trunk-based` 기록. 워크플로우 설치 구성이 모드별로 갈린다:
+  - **pr-flow** (기본): `VERSION-CONTROL`(main 직접 push 안전망) + `AUTO-CHANGELOG-CONTROL`(릴리스 PR) + `RELEASE-PUBLISH`(main push, 릴리스 머지 커밋 감지 시만 동작) 3종 설치.
+  - **trunk-based**: **`RELEASE-PUBLISH` 단독 설치** (`VERSION-CONTROL`·`AUTO-CHANGELOG` 설치 제외 — 역할 흡수). main push마다 RELEASE-PUBLISH 하나가 순서대로 처리: patch 증가 → CHANGELOG 갱신(엔진 체인, PR 컨텍스트 없으므로 1순위 CodeRabbit 자동 스킵) → `[skip ci]` 커밋 → **그 커밋에** tag → GitHub Release. 단일 워크플로우라 순서·경합 문제 없음, tag는 항상 bump 후 커밋을 가리킴.
+  - **루프 가드**: 봇 커밋은 전부 `[skip ci]` — bump/CHANGELOG 커밋이 워크플로우를 재트리거하지 않는다 (원본 레포 방식 유지).
+  - 마법사는 완료 요약에서 선택된 모드와 설치된 워크플로우 구성을 안내.
 
 ### 신규 질문 ② — CodeRabbit opt-in
 
@@ -91,13 +95,13 @@ projectops/ (신규)
 2. 버전 확정 (patch 증가, `version_manager.sh`)
 3. 직전 릴리스 태그 이후 커밋 목록 + PR 제목/diff 수집 → **요약 생성** (아래 엔진 체인)
 4. `changelog_manager.py`가 CHANGELOG.json/md 갱신 → PR에 커밋 → automerge
-5. main 머지 후: **별도 워크플로우 `PROJECT-COMMON-RELEASE-PUBLISH`** (main push 트리거, 릴리스 머지 커밋 감지) — **git tag `v{x.y.z}`** 생성·push → **GitHub Release 생성** (`gh release create --notes-file` + `--generate-notes`, gh CLI로 확정 — GitHub-hosted runner 기본 탑재·GITHUB_TOKEN 자동 인증). Release body = `changelog_manager.py export` 산출 요약 + GitHub 자동 노트(Full Changelog 비교 링크·PR 목록) 조합. trunk-based 레포에서는 이 워크플로우가 요약 생성(엔진 체인)까지 직접 수행.
+5. main 머지 후: **별도 워크플로우 `PROJECT-COMMON-RELEASE-PUBLISH`** (main push 트리거. pr-flow 모드: 릴리스 머지 커밋 감지 시만 동작 / trunk-based 모드: `[skip ci]` 아닌 모든 push에서 동작 — §4 브랜치 모드 참조) — **git tag `v{x.y.z}`** 생성·push → **GitHub Release 생성** (`gh release create --notes-file` + `--generate-notes`, gh CLI로 확정 — GitHub-hosted runner 기본 탑재·GITHUB_TOKEN 자동 인증). Release body = `changelog_manager.py export` 산출 요약 + GitHub 자동 노트(Full Changelog 비교 링크·PR 목록) 조합. trunk-based 레포에서는 이 워크플로우가 요약 생성(엔진 체인)까지 직접 수행.
 
 ### 요약 엔진 체인 (우선순위)
 
 | 순위 | 엔진 | 조건 | 비용 |
 |---|---|---|---|
-| 1 | CodeRabbit PR summary | 마법사 opt-in true | CodeRabbit 요금제 |
+| 1 | CodeRabbit PR summary | 마법사 opt-in true **이고 PR 컨텍스트 존재** (trunk-based push 실행 시 자동 스킵) | CodeRabbit 요금제 |
 | | └ 대기 정책: PR 코멘트를 30초 간격 폴링, **최대 5분**. 미도착 시 2순위로 전환 (원본 레포의 10분 대기 문제 재현 방지) | | |
 | 2 | 사용자 지정 provider | `AI_API_KEY` secret 존재 | 사용자 부담 |
 | 3 | **GitHub Models** (기본값) | `GITHUB_TOKEN` + `permissions: models: read` | **무료 사용량 (rate limit)** |

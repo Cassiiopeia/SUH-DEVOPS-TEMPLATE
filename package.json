@@ -38,5 +38,9 @@
     "skills": [
       "./skills"
     ]
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "picocolors": "^1.1.1"
   }
 }

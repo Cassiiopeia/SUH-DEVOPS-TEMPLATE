@@ -2109,6 +2109,7 @@ download_template() {
         "src"               # projectops npm CLI 소스 (마켓플레이스 전용)
         ".github/workflows/PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml"  # 플러그인 매니페스트 버전 동기화 (위 매니페스트가 제거되므로 동기화 대상 없음)
         ".github/workflows/PROJECT-TEMPLATE-NPM-PUBLISH.yaml"  # npm 배포 워크플로우 (템플릿 레포 전용)
+        ".github/workflows/PROJECT-TEMPLATE-CI.yaml"  # npx CLI 크로스-OS 테스트 워크플로우 (템플릿 레포 전용)
     )
     # 주의: skills/ 폴더는 Cursor IDE 복사용으로 보존 (offer_ide_tools_install에서 사용 후 정리)
 

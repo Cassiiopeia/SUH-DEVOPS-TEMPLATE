@@ -85,6 +85,17 @@ GitHub에서 **"Use this template"** 클릭 → 1분 내 자동 초기화 완료
 
 ### 기존 프로젝트에 통합
 
+**권장 — npx (macOS · Linux · Windows 공통)**
+
+```bash
+npx projectops
+```
+
+> Node.js 18+ 만 있으면 별도 설치 없이 대화형 마법사가 실행됩니다. 비대화형: `npx projectops --mode full --type spring,react --force`
+
+<details>
+<summary>대안 — 스크립트 직접 실행 (Node 없이)</summary>
+
 ```bash
 # macOS / Linux
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
@@ -94,6 +105,8 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 # Windows PowerShell
 $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")
 ```
+
+</details>
 
 ### Agent Skills만 설치
 
@@ -113,14 +126,23 @@ gemini extensions install https://github.com/Cassiiopeia/projectops
 codex plugin marketplace add Cassiiopeia/projectops
 ```
 
-`template_integrator --mode skills` 마법사는 Codex marketplace를 등록한 뒤 native skills fallback도 자동 준비합니다. `/plugins`는 설치 확인/관리용으로만 사용하면 됩니다.
+`--mode skills` 마법사는 Codex marketplace를 등록한 뒤 native skills fallback도 자동 준비합니다. `/plugins`는 설치 확인/관리용으로만 사용하면 됩니다.
 
 Codex plugin marketplace를 사용할 수 없는 환경에서는 [Skills 가이드](docs/SKILLS.md)의 fallback 설치 방식을 사용하세요.
 
 ```bash
-# Cursor / 전체 Agent Skills 설치 메뉴
+# Cursor / 전체 Agent Skills 설치 메뉴 (권장 — npx)
+npx projectops --mode skills
+```
+
+<details>
+<summary>대안 — 스크립트 직접 실행 (Node 없이)</summary>
+
+```bash
 bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode skills
 ```
+
+</details>
 
 > Claude Code는 `/cassiiopeia:` 자동완성, Gemini는 extension, Codex는 plugin marketplace를 우선 사용합니다. 자세한 설치 방식은 [Skills 가이드](docs/SKILLS.md)를 확인하세요.
 

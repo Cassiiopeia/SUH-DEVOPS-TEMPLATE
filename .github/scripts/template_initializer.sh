@@ -437,6 +437,12 @@ cleanup_template_files() {
         echo "  ✓ PROJECT-TEMPLATE-NPM-PUBLISH.yaml 삭제 (마켓플레이스 전용)"
     fi
 
+    # npx CLI 크로스-OS 테스트 워크플로우 삭제 (projectops src/·test/ 검증용, 템플릿 레포 전용)
+    if [ -f ".github/workflows/PROJECT-TEMPLATE-CI.yaml" ]; then
+        rm -f .github/workflows/PROJECT-TEMPLATE-CI.yaml
+        echo "  ✓ PROJECT-TEMPLATE-CI.yaml 삭제 (마켓플레이스 전용)"
+    fi
+
     # docs 폴더 삭제 (템플릿 전용 문서)
     if [ -d "docs" ]; then
         rm -rf docs

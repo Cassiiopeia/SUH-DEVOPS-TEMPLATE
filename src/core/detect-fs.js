@@ -1,6 +1,6 @@
 // 실 파일시스템 프로젝트 감지 (.sh detect_* 실행부 등가).
 // SP2-A detect.js 순수 함수를 fs/git으로 구동한다.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { detectTypesFromMarkers, detectVersionFromFiles } from "./detect.js";
@@ -61,4 +61,46 @@ function hasCommand(cmd) {
     execFileSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore" });
     return true;
   } catch { return false; }
+}
+
+// Spring application*.yml 탐색 (.sh resolve_spring_app_yml_dir/path L2767~2780 등가)
+// find {base} -path "*/src/main/resources/application*.yml" | head -1 의 fs 재귀 구현.
+// 반환: root 기준 상대경로 (예: "server/src/main/resources/application.yml") 또는 "".
+export function findSpringAppYml(root, base = ".") {
+  const startRel = base === "." ? "" : base;
+  const PRUNE = new Set(["node_modules", ".git", "build", ".gradle", "target", ".idea"]);
+  let hit = "";
+  const walk = (rel, depth) => {
+    if (hit || depth > 8) return; // head -1 등가 — 첫 매치에서 중단
+    let entries;
+    try { entries = readdirSync(join(root, rel), { withFileTypes: true }); } catch { return; }
+    // 정렬로 순회 순서 결정화 (find 순서 플랫폼 편차 제거)
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (hit) return;
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (PRUNE.has(e.name)) continue;
+        walk(childRel, depth + 1);
+      } else if (/^application.*\.yml$/.test(e.name) && childRel.includes("src/main/resources/")) {
+        hit = childRel;
+      }
+    }
+  };
+  walk(startRel, 0);
+  return hit;
+}
+
+// 실 resolver 세트 생성 (.sh resolve_token 4종 등가) — index/interactive 공용.
+// paths: Map<type, path> (모노레포 경로).
+export function makeResolvers(root, repoName, paths) {
+  const springBase = (t) => paths.get(t || "spring") || paths.get("spring") || ".";
+  return {
+    repo: () => repoName,
+    "spring-app-yml-dir": (t) => {
+      const f = findSpringAppYml(root, springBase(t));
+      return f ? f.split("/").slice(0, -1).join("/") : "";
+    },
+    "spring-app-yml-path": (t) => findSpringAppYml(root, springBase(t)) || "",
+    "flutter-root": () => paths.get("flutter") || ".",
+  };
 }

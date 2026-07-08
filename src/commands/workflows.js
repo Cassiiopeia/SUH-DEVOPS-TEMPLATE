@@ -8,9 +8,9 @@ import { copyWorkflows } from "../core/copy/workflows.js";
 import { copyScripts, copyConfigFolder, copySetupGuide } from "../core/copy/simple.js";
 import { copyUtilModules } from "../core/copy/util.js";
 
-export function runWorkflows(context, tempDir, targetRoot = ".") {
+export function runWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const { types = [], force = true } = context;
-  const wf = copyWorkflows(context, tempDir, targetRoot);
+  const wf = copyWorkflows(context, tempDir, targetRoot, hooks);
 
   // update_version_yml_deploy: 기존 version.yml이 있고 ask 값이 있을 때만 deploy 블록 갱신
   const vy = join(targetRoot, PATHS.versionFile);

@@ -74,3 +74,29 @@ export function intro(text) { engine.intro(text); }
 export function outro(text) { engine.outro(text); }
 export function note(text, title) { engine.note(text, title); }
 export function cancelMessage(text = "취소했습니다.") { engine.cancelMessage(text); }
+
+// ── #446 첫 화면 UI 5층 + SP2-C 대화형 계층 실물 io ─────────────────
+// runInteractive는 io.<method>?.() 옵셔널 호출 — 테스트 스텁은 이 메서드들을 생략해
+// 시각 층·env 질문을 건너뛴다 (실행 계약은 그대로).
+import { printBanner as _printBanner } from "./banner.js";
+import {
+  printDetectionLog as _detLog, printAnalysisCard as _card,
+  printIdeStatus as _ideStatus, printInstallKind as _installKind, collectIdeStatuses,
+} from "./status-cards.js";
+import { printSummary as _summary } from "./summary.js";
+import { defaultIo } from "../core/ide/runner.js";
+
+export function banner(info) { _printBanner(info); }
+export function detectionLog(info) { _detLog(info); }
+export function analysisCard(info) { _card(info); }
+export function installKind(info) { _installKind(info); }
+export function ideStatus() { _ideStatus(collectIdeStatuses(defaultIo())); }
+export function summary(ctx, targetRoot) { _summary(ctx, targetRoot); }
+
+// env 계획·경로 해석·충돌 메뉴가 쓰는 저수준 엔진 io (env-plan/paths-resolve의 io 계약)
+export const engineIo = {
+  select: engine.select,
+  multiselect: engine.multiselect,
+  text: engine.text,
+  confirm: engine.confirm,
+};

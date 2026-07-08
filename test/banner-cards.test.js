@@ -1,0 +1,100 @@
+// #446 배너·상태 카드 검증 — writer 주입으로 출력 캡처
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { printBanner, printBannerCompact } from "../src/ui/banner.js";
+import {
+  printDetectionLog, printAnalysisCard, printIdeStatus, printInstallKind, collectIdeStatuses,
+} from "../src/ui/status-cards.js";
+
+const capture = () => {
+  const buf = [];
+  const out = (s) => buf.push(s);
+  out.text = () => buf.join("");
+  return out;
+};
+const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
+
+test("printBanner: 박스 타이틀 + 메타 4줄 (시안 A)", () => {
+  const out = capture();
+  printBanner({ version: "4.0.3", modeLabel: "대화형 통합 마법사" }, out);
+  const t = strip(out.text());
+  assert.match(t, /P R O J E C T O P S/);
+  assert.match(t, /╔═+╗/);
+  assert.match(t, /Version : v4\.0\.3/);
+  assert.match(t, /Author {2}: Cassiiopeia/);
+  assert.match(t, /Mode {4}: 대화형 통합 마법사/);
+  assert.match(t, /github\.com\/Cassiiopeia\/projectops/);
+  // 박스 정렬: ║로 시작하는 줄은 모두 ║로 끝나야 함
+  for (const line of t.split("\n")) {
+    if (line.startsWith("║")) assert.ok(line.endsWith("║"), `박스 줄 정렬 깨짐: "${line}"`);
+  }
+});
+
+test("printBannerCompact: 비대화형 1줄", () => {
+  const out = capture();
+  printBannerCompact({ version: "4.0.3", mode: "full" }, out);
+  const t = strip(out.text());
+  assert.equal(t.trim().split("\n").length, 1);
+  assert.match(t, /projectops v4\.0\.3 — full 모드 \(--force\)/);
+});
+
+test("printDetectionLog: 타입별 마커 + 버전/브랜치, basic 폴백", () => {
+  const out = capture();
+  printDetectionLog({ types: ["spring", "react"], version: "1.2.3", branch: "main" }, out);
+  const t = strip(out.text());
+  assert.match(t, /build\.gradle 발견 → spring 감지/);
+  assert.match(t, /package\.json 발견 → react 감지/);
+  assert.match(t, /버전: v1\.2\.3 · 브랜치: main/);
+
+  const out2 = capture();
+  printDetectionLog({ types: ["basic"], version: "0.0.1", branch: "main" }, out2);
+  assert.match(strip(out2.text()), /마커 파일 없음 → basic/);
+});
+
+test("printAnalysisCard: 멀티타입·옵션·모노레포 경로 표시", () => {
+  const out = capture();
+  printAnalysisCard({
+    mode: "full", modeLabel: "전체 설치", types: ["spring", "react"], version: "1.2.3", branch: "main",
+    includeNexus: true, includeSecretBackup: false, showOptional: true,
+    paths: new Map([["spring", "server"], ["react", "client"]]),
+  }, out);
+  const t = strip(out.text());
+  assert.match(t, /타입\(멀티\).*spring, react/);
+  assert.match(t, /Nexus.*포함/);
+  assert.match(t, /Secret백업.*제외/);
+  assert.match(t, /spring→server, react→client/);
+});
+
+test("printIdeStatus: 설치/미설치/CLI없음 3상태", () => {
+  const out = capture();
+  printIdeStatus([
+    { id: "claude", label: "Claude Code", installed: true, version: "4.0.2", scope: "user", cliMissing: false },
+    { id: "cursor", label: "Cursor", installed: false, cliMissing: false },
+    { id: "gemini", label: "Gemini CLI", installed: false, cliMissing: true, note: "CLI 없음" },
+  ], out);
+  const t = strip(out.text());
+  assert.match(t, /Claude Code.*설치됨 v4\.0\.2 \(user\)/);
+  assert.match(t, /Cursor.*미설치/);
+  assert.match(t, /Gemini CLI.*CLI 없음/);
+});
+
+test("printInstallKind: 신규 vs 업데이트", () => {
+  const out = capture();
+  printInstallKind({ currentTemplateVersion: "", templateVersion: "4.0.3" }, out);
+  assert.match(strip(out.text()), /신규 통합/);
+
+  const out2 = capture();
+  printInstallKind({ currentTemplateVersion: "3.0.188", templateVersion: "4.0.3" }, out2);
+  assert.match(strip(out2.text()), /업데이트 — 템플릿 v3\.0\.188 → v4\.0\.3/);
+});
+
+test("collectIdeStatuses: 어댑터 전체 순회 (예외 없음)", () => {
+  // 아무것도 설치 안 된 io 스텁 — which 전부 null
+  const io = { which: () => null, run: () => ({ ok: false, stdout: "" }), home: () => "/nonexistent-home", log: () => {} };
+  const statuses = collectIdeStatuses(io);
+  assert.ok(statuses.length >= 5, "어댑터 5개 이상");
+  for (const s of statuses) {
+    assert.ok(typeof s.label === "string" && s.label.length > 0);
+    assert.ok(typeof s.installed === "boolean");
+  }
+});

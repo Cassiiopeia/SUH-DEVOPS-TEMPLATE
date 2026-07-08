@@ -113,11 +113,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: deploy
+          ref: main
           fetch-depth: 0
 
       - name: Pull latest changes
-        run: git pull origin deploy
+        run: git pull origin main
 
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
@@ -240,11 +240,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: deploy
+          ref: main
           fetch-depth: 0
 
       - name: Pull latest changes
-        run: git pull origin deploy
+        run: git pull origin main
 
       - name: Select Xcode version
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
@@ -384,7 +384,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: deploy
+          ref: main
           fetch-depth: 0
 
       - name: Setup App Store Connect API Key

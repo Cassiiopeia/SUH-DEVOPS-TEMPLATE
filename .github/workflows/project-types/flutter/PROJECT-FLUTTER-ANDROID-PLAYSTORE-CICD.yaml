@@ -69,11 +69,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: deploy
+          ref: main
           fetch-depth: 0
 
       - name: Pull latest changes
-        run: git pull origin deploy
+        run: git pull origin main
 
       - name: Create .env file
         env:
@@ -198,11 +198,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: deploy
+          ref: main
           fetch-depth: 0
 
       - name: Pull latest changes
-        run: git pull origin deploy
+        run: git pull origin main
 
       # 프로젝트 파일들 다운로드
       - name: Download project files
@@ -524,7 +524,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: deploy
+          ref: main
           fetch-depth: 0
 
       # Service Account JSON 설정

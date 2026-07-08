@@ -5611,8 +5611,8 @@ print_summary() {
     echo "     → Secret Name: _GITHUB_PAT_TOKEN" >&2
     echo "     → Scopes: repo, workflow" >&2
     echo "" >&2
-    echo "  2️⃣  deploy 브랜치 생성" >&2
-    echo "     → git checkout -b deploy && git push -u origin deploy" >&2
+    echo "  2️⃣  develop 브랜치 생성" >&2
+    echo "     → git checkout -b develop && git push -u origin develop" >&2
     echo "" >&2
     echo "  3️⃣  CodeRabbit 활성화" >&2
     echo "     → https://coderabbit.ai 방문하여 저장소 활성화" >&2

@@ -85,11 +85,13 @@ export function parseExisting(content) {
   return { version, versionCode, types, paths, templateVersion };
 }
 
-// version.yml 전체 생성 (.sh create_version_yml heredoc 등가).
-// opts: { version, types:[], primaryType?, paths:Map, branch, versionCode, now, today }
+// version.yml 전체 생성 (.sh create_version_yml + save_template_options 신규 케이스 등가).
+// opts: { version, types:[], primaryType?, paths:Map, pathMarkers?:Map, branch, versionCode, now, today, templateOptions? }
 //   now   = "YYYY-MM-DD HH:MM:SS" (UTC) — 결정성 위해 주입
 //   today = "YYYY-MM-DD" (UTC)
-export function buildVersionYml({ version, types = [], primaryType, paths = new Map(), branch = "main", versionCode = 1, now, today }) {
+//   pathMarkers = Map<type, markerFilename> (project_paths 주석용)
+//   templateOptions = { templateVersion, includeNexus, includeSecretBackup, optionsDate } (template 블록)
+export function buildVersionYml({ version, types = [], primaryType, paths = new Map(), pathMarkers = new Map(), branch = "main", versionCode = 1, now, today, templateOptions = null, deployValues = new Map() }) {
   const typesJson = types.length ? `[${types.map((t) => `"${t}"`).join(",")}]` : `["basic"]`;
   const primary = primaryType || types[0] || "basic";
 
@@ -99,9 +101,14 @@ export function buildVersionYml({ version, types = [], primaryType, paths = new 
   out += `project_types: ${typesJson}   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능\n`;
   out += `project_type: "${primary}"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)\n`;
 
+  // project_paths 블록. pathMarkers: Map<type, markerFilename> (있으면 "  type: "path"   # path/marker" 주석).
   if (paths.size) {
     out += `project_paths:                # 타입별 프로젝트 폴더 (레포 루트 기준 상대경로)\n`;
-    for (const [t, p] of paths) out += `  ${t}: "${p}"\n`;
+    for (const [t, p] of paths) {
+      const marker = pathMarkers.get(t) || "";
+      const pf = p === "." ? marker : (marker ? `${p}/${marker}` : p);
+      out += marker ? `  ${t}: "${p}"   # ${pf}\n` : `  ${t}: "${p}"\n`;
+    }
   }
 
   out += `metadata:\n`;
@@ -110,5 +117,30 @@ export function buildVersionYml({ version, types = [], primaryType, paths = new 
   out += `  default_branch: "${branch}"\n`;
   out += `  integrated_from: "projectops"\n`;
   out += `  integration_date: "${today}"\n`;
+
+  // deploy 블록 (.sh update_version_yml_deploy). deployValues: Map<type, Map<key,value>>.
+  // WF ask 값이 있는 타입만. metadata 뒤, template 앞. (앞에 빈 줄 1개)
+  const deployTypes = [...deployValues.keys()].filter((t) => deployValues.get(t) && deployValues.get(t).size > 0);
+  if (deployTypes.length) {
+    out += `\n`;
+    out += `deploy:                          # 마법사가 기억하는 배포 설정 (비민감 / 직접 수정 가능)\n`;
+    for (const t of deployTypes) {
+      out += `  ${t}:\n`;
+      for (const [k, v] of deployValues.get(t)) out += `    ${k}: "${v}"\n`;
+    }
+  }
+
+  // template 옵션 블록 (.sh save_template_options 신규 추가 케이스). templateOptions 지정 시.
+  if (templateOptions) {
+    const { templateVersion = "unknown", includeNexus = false, includeSecretBackup = false, optionsDate = today } = templateOptions;
+    out += `  template:\n`;
+    out += `    source: "projectops"\n`;
+    out += `    version: "${templateVersion}"\n`;
+    out += `    integrated_date: "${optionsDate}"\n`;
+    out += `    last_update_date: "${optionsDate}"\n`;
+    out += `    options:\n`;
+    out += `      nexus: ${includeNexus}\n`;
+    out += `      secret_backup: ${includeSecretBackup}\n`;
+  }
   return out;
 }

@@ -8,10 +8,10 @@ import { exists, copyFileSync, listYamlFiles } from "../fsutil.js";
 import { isUnchanged, substituteEnv } from "../wizard-env.js";
 
 // 한 파일에 env 치환(기본값)을 적용해 대상 파일을 갱신 (.sh configure_workflow_env 등가).
-function configureEnv(targetPath, { type, projectPath = ".", repoName = "", resolvers = {} }) {
+function configureEnv(targetPath, { type, projectPath = ".", repoName = "", resolvers = {}, collectAsks = null }) {
   const content = readFileSync(targetPath, "utf8");
   if (!content.includes("@wizard")) return;
-  const out = substituteEnv(content, { type, useDefaults: true, projectPath, repoName, resolvers });
+  const out = substituteEnv(content, { type, useDefaults: true, projectPath, repoName, resolvers, collectAsks });
   writeFileSync(targetPath, out);
 }
 
@@ -44,6 +44,8 @@ export function copyWorkflows(context, tempDir, targetRoot = ".") {
   if (!exists(projectTypesDir)) throw new Error("템플릿 저장소 구조 오류 — project-types 폴더를 찾지 못했습니다.");
 
   const counters = { copied: 0, skipped: 0, templateAdded: 0, optionalCopied: 0 };
+  const deployValues = new Map(); // Map<type, Map<key,value>> — deploy 블록용 ask 값
+  counters.deployValues = deployValues;
   const envOptsFor = (type) => ({ type, projectPath: paths.get(type) || ".", repoName, resolvers });
 
   // (1) common — unchanged면 스킵, 아니면 무조건 덮어쓰기
@@ -63,7 +65,9 @@ export function copyWorkflows(context, tempDir, targetRoot = ".") {
 
   // (2~4) 타입별
   for (const type of types) {
-    copyWorkflowsForType(type, projectTypesDir, workflowsDir, { includeNexus, ...context, envOptsFor }, counters);
+    const asks = new Map();
+    copyWorkflowsForType(type, projectTypesDir, workflowsDir, { includeNexus, ...context, envOptsFor, collectAsks: asks }, counters);
+    if (asks.size) deployValues.set(type, asks);
   }
 
   // (5) common/secret-backup — 있으면 무조건 스킵/신규만 복사
@@ -82,7 +86,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".") {
 }
 
 function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters) {
-  const { includeNexus, force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor } = ctx;
+  const { includeNexus, force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null } = ctx;
   const typeDir = join(projectTypesDir, type);
   const envOpts = envOptsFor(type);
   let unchangedNames = [];
@@ -135,7 +139,7 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
       const target = join(workflowsDir, filename);
       if (!existsSync(target)) continue;            // 건너뛴 파일 제외
       if (unchangedNames.includes(filename)) continue; // unchanged 제외
-      configureEnv(target, { type, projectPath: paths.get(type) || ".", repoName, resolvers });
+      configureEnv(target, { type, projectPath: paths.get(type) || ".", repoName, resolvers, collectAsks });
     }
   }
 }

@@ -213,6 +213,12 @@ git clone은 `child_process.execFileSync("git", ["clone","--depth","1","--quiet"
 
 - [ ] **Step 5: 4개 타입 전부 통과 확인 후 커밋**
 
+## 검증 결과 (2026-07-08)
+
+- **react full: 파일트리 완전 IDENTICAL (diff 0)** — 워크플로우 env 치환, version.yml(project_paths·deploy·template 블록), 모든 복사 파일 바이트 동일.
+- **spring full: 워크플로우·복사물 전부 동일, version.yml deploy 블록의 키 순서만 차이** (값·개수는 정렬 시 IDENTICAL). 원인: `.sh` `wf_collect_asks`가 type_dir을 먼저 스캔해 타입별 기본값 저장 순서를 잡는데, spring은 type_dir이 비어(모든 워크플로우가 server-deploy 하위) 순서가 `_kv_set` 해시 순서에 의존. **알려진 차이 — deploy 블록은 재통합 힌트용 메타데이터라 기능 무영향.** SP2-C에서 `.sh` CSV 누적 순서 정밀 재현.
+- 단위테스트 54개 pass. CRLF 안전성 수정 반영(substituteEnv가 `split(/\r?\n/)`로 EOL 정규화).
+
 ## Self-Review 기록
 
 1. **커버리지**: 동작명세 §4 복사 규칙 전부 태스크 매핑. update_version_yml_deploy(deploy 블록)는 wizard env ask 값이 있을 때만이라 Task 5~6에서 처리, 값 없으면 no-op.

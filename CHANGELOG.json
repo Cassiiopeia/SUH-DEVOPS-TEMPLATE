@@ -1,14 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T00:43:13Z",
-    "currentVersion": "3.0.189",
+    "lastUpdated": "2026-07-08T01:20:01Z",
+    "currentVersion": "3.0.190",
     "projectType": "basic",
-    "totalReleases": 172,
+    "totalReleases": 173,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.190",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-08",
+      "pr_number": 432,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 템플릿 통합 마법사의 npx 전환을 위한 기반 작업을 시작했습니다\n  * 브랜치 운영 방식을 develop/main 표준 구조로 정리했습니다\n\n* **문서**\n  * 브랜치 전략 전환 작업 내역을 문서로 정리했습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "템플릿 통합 마법사의 npx 전환을 위한 기반 작업을 시작했습니다",
+            "브랜치 운영 방식을 develop/main 표준 구조로 정리했습니다"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "브랜치 전략 전환 작업 내역을 문서로 정리했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.189",
       "project_type": "basic",

@@ -2,29 +2,29 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `npx projectops` 한 줄로 9타입+멀티+모노레포 프로젝트에 GitHub-native AI Release Automation(버전·체인지로그·tag·Release)을 설치하는 공모전 제출용 신규 레포를 만든다.
+**Goal:** `npx project-auto-wizard` 한 줄로 9타입+멀티+모노레포 프로젝트에 GitHub-native AI Release Automation(버전·체인지로그·tag·Release)을 설치하는 공모전 제출용 신규 레포를 만든다.
 
-**Architecture:** 신규 레포(가칭 `projectops-oss`, 위치 `E:\github\projectops-oss`)는 3축 — ① npx 마법사(Node, 기존 `src/` 선별 복사 후 개조) ② `payload/`(마법사가 사용자 레포에 심는 워크플로우+Python 스크립트, 단일 진실) ③ Python 자동화 백엔드(`version_manager.py` 신규 재작성 + `changelog_manager.py` 이식·확장). 릴리스 요약은 4단 엔진 체인(CodeRabbit opt-in → AI_API_KEY → GitHub Models → 규칙 fallback)으로 절대 안 막힌다.
+**Architecture:** 신규 레포(**확정: `project-auto-wizard`**, GitHub `Twin-Fang/project-auto-wizard`, 위치 `E:\github\project-auto-wizard`, npm 패키지명 `project-auto-wizard` — 404 확인됨, `npx project-auto-wizard`로 실행)는 3축 — ① npx 마법사(Node, 기존 `src/` 선별 복사 후 개조) ② `payload/`(마법사가 사용자 레포에 심는 워크플로우+Python 스크립트, 단일 진실) ③ Python 자동화 백엔드(`version_manager.py` 신규 재작성 + `changelog_manager.py` 이식·확장). 릴리스 요약은 4단 엔진 체인(CodeRabbit opt-in → AI_API_KEY → GitHub Models → 규칙 fallback)으로 절대 안 막힌다.
 
 **Tech Stack:** Node ≥20 (ESM, `node --test`, 의존성 0) / Python 3 표준 라이브러리만 (`unittest`) / GitHub Actions / gh CLI / GitHub Models (`models.github.ai`)
 
 **Spec:** `E:\github\SUH-DEVOPS-TEMPLATE\docs\superpowers\specs\2026-07-08-projectops-oss-design.md` (승인됨)
 
-**Source repo (복사 원본):** `E:\github\SUH-DEVOPS-TEMPLATE` — 아래에서 `$SRC`로 표기. 신규 레포는 `$DST` = `E:\github\projectops-oss`.
+**Source repo (복사 원본):** `E:\github\SUH-DEVOPS-TEMPLATE` — 아래에서 `$SRC`로 표기. 신규 레포는 `$DST` = `E:\github\project-auto-wizard`.
 
 ---
 
 ## 전체 파일 구조 (최종 목표)
 
 ```
-projectops-oss/
-├── package.json                  # name: projectops-oss(가칭), bin: projectops, deps 0
+project-auto-wizard/
+├── package.json                  # name: project-auto-wizard(확정), bin: project-auto-wizard, deps 0
 ├── LICENSE                       # MIT
 ├── README.md                     # 공모전 심사용 (Task 19)
 ├── version.yml                   # 자기 자신 버전 (0.1.0 시작)
 ├── CHANGELOG.md / CHANGELOG.json
 ├── .gitignore
-├── bin/projectops.js             # $SRC/bin/projectops.js 복사
+├── bin/project-auto-wizard.js             # $SRC/bin/project-auto-wizard.js 복사
 ├── src/                          # $SRC/src 선별 복사 + 개조 (Task 12~17)
 │   ├── cli/args.js, help.js
 │   ├── commands/interactive.js, full.js, version.js, workflows.js
@@ -72,8 +72,8 @@ projectops-oss/
 - [ ] **Step 1: 디렉토리 + git init**
 
 ```bash
-mkdir -p /e/github/projectops-oss && cd /e/github/projectops-oss
-git init -b main
+# 레포는 이미 clone돼 있음 (Twin-Fang/project-auto-wizard, main, LICENSE+README 존재) — git init 불필요
+cd /e/github/project-auto-wizard
 mkdir -p bin src payload/workflows/common payload/scripts tests/node tests/py tests/fixtures .github/workflows
 ```
 
@@ -81,12 +81,12 @@ mkdir -p bin src payload/workflows/common payload/scripts tests/node tests/py te
 
 ```json
 {
-  "name": "projectops-oss",
+  "name": "project-auto-wizard",
   "version": "0.1.0",
   "description": "One command DevOps: npx wizard that installs GitHub-native AI Release Automation into any project",
   "license": "MIT",
   "type": "module",
-  "bin": { "projectops": "bin/projectops.js" },
+  "bin": { "project-auto-wizard": "bin/project-auto-wizard.js" },
   "engines": { "node": ">=20.12" },
   "files": ["bin/", "src/", "payload/"],
   "scripts": {
@@ -98,7 +98,7 @@ mkdir -p bin src payload/workflows/common payload/scripts tests/node tests/py te
 ```
 
 > `files`에 `payload/` 포함 필수 — npm 패키지에 동봉돼야 마법사가 오프라인 복사 가능.
-> 패키지명은 스펙 §8 미결정 — 게시 전 확정. 코드는 `bin` 이름(`projectops`)만 의존.
+> 패키지명 확정: `project-auto-wizard` (npm 404 확인, 2026-07-08). CLI UI 문자열의 "ProjectOps" 브랜딩도 "Project Auto Wizard"로 rebrand (Task 12에서 일괄).
 
 - [ ] **Step 3: LICENSE(MIT, author Cassiiopeia), .gitignore(node_modules, __pycache__, .DS_Store), version.yml 작성**
 
@@ -119,7 +119,7 @@ metadata:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "chore: scaffold projectops-oss repo skeleton"
+git add -A && git commit -m "chore: scaffold project-auto-wizard repo skeleton"
 ```
 
 ---
@@ -520,7 +520,7 @@ metadata:
 ### Task 12: src 선별 복사 + 프루닝 + payload 경로 전환
 
 **Files:**
-- Create: `$DST/bin/projectops.js`, `$DST/src/**` (선별)
+- Create: `$DST/bin/project-auto-wizard.js`, `$DST/src/**` (선별)
 - Modify: `$DST/src/core/assets.js`
 - Test: `$DST/tests/node/assets.test.js`
 
@@ -536,7 +536,7 @@ metadata:
   2. payload 루트는 `import.meta.url` 기준으로 해석 (`new URL("../../payload/", import.meta.url)`) — npx 글로벌 캐시에서 실행돼도 패키지 내 payload를 정확히 가리킴. 이것이 `resolvePayloadRoot()`.
   3. `src/core/copy/*.js`의 소스 인자를 tempDir → payload 경로로 재배선. **`payload/scripts/*.py` → 사용자 레포 `.github/scripts/` 복사 배선 포함** (워크플로우가 전부 이 경로를 호출 — 누락 시 설치물 전체가 런타임 사망).
   exclusions.js의 "템플릿 전용 파일 제외 목록"은 payload 방식에선 불필요 → 삭제하고 참조 제거.
-- [ ] **Step 4: 스모크 확인** — `node bin/projectops.js --help` 정상 출력 + `npm run test:node` PASS
+- [ ] **Step 4: 스모크 확인** — `node bin/project-auto-wizard.js --help` 정상 출력 + `npm run test:node` PASS
 - [ ] **Step 5: Commit** — `feat(cli): selective port of wizard with payload as single source`
 
 ### Task 13: 브랜치 질문 + 플래그 + 자동 생성·push
@@ -626,7 +626,7 @@ test("throws on unknown placeholder left behind", () => {
 - Modify: `$DST/src/ui/summary.js`, `$DST/src/cli/help.js`
 
 - [ ] **Step 1: summary.js에 브랜치 모드·설치 워크플로우 목록·요약 엔진(coderabbit/GitHub Models) 안내 라인 추가. help.js에 신규 플래그 3종 문서화. 제거된 기능(skills 등) 언급 잔존 0 확인 (`grep -rn "suh-\|skills" src/ | wc -l` → 0).**
-- [ ] **Step 2: `node bin/projectops.js --help` 육안 확인 + `npm test` 전체 PASS → Commit** — `feat(cli): completion summary with mode/engine info`
+- [ ] **Step 2: `node bin/project-auto-wizard.js --help` 육안 확인 + `npm test` 전체 PASS → Commit** — `feat(cli): completion summary with mode/engine info`
 
 ---
 
@@ -639,7 +639,7 @@ test("throws on unknown placeholder left behind", () => {
 - Create: `$DST/.github/workflows/RELEASE-PUBLISH.yaml` 등 (자기 자신에 payload 설치)
 - Create: `$DST/.github/scripts/` (payload 스크립트 자기 설치본)
 
-- [ ] **Step 1: 도그푸딩 설치** — `node bin/projectops.js --force --type node --main-branch main --develop-branch develop` 을 `$DST` 자신에 실행 → payload가 자기 레포에 설치되는 것 자체가 E2E 1차 검증. 설치 결과 커밋.
+- [ ] **Step 1: 도그푸딩 설치** — `node bin/project-auto-wizard.js --force --type node --main-branch main --develop-branch develop` 을 `$DST` 자신에 실행 → payload가 자기 레포에 설치되는 것 자체가 E2E 1차 검증. 설치 결과 커밋.
 - [ ] **Step 2: NPM-PUBLISH.yaml 작성** — main push(릴리스 머지) 시 `npm publish` (`NPM_TOKEN` secret, `[skip ci]` 가드, version.yml 버전과 package.json 동기 확인 step). `$SRC`의 npm 배포 워크플로우 참조.
 - [ ] **Step 3: Commit** — `chore: dogfood payload install + npm publish workflow`
 
@@ -648,7 +648,7 @@ test("throws on unknown placeholder left behind", () => {
 **Files:**
 - Create: `$DST/README.md`
 
-- [ ] **Step 1: 스펙 §6 구성대로 작성** — 히어로(`npx projectops` + GIF 자리표시) / 문제 정의 훅 / 3축 / 어필 포인트 6종 표 / 아키텍처 mermaid + 엔진 체인 다이어그램 / 배지. 데모 GIF·유튜브 링크는 자리표시자(TODO 마커).
+- [ ] **Step 1: 스펙 §6 구성대로 작성** — 히어로(`npx project-auto-wizard` + GIF 자리표시) / 문제 정의 훅 / 3축 / 어필 포인트 6종 표 / 아키텍처 mermaid + 엔진 체인 다이어그램 / 배지. 데모 GIF·유튜브 링크는 자리표시자(TODO 마커).
 - [ ] **Step 2: Commit** — `docs: competition README`
 
 ### Task 20: E2E fixture 매트릭스 검증
@@ -657,7 +657,7 @@ test("throws on unknown placeholder left behind", () => {
 - Test: `$DST/tests/node/e2e-matrix.test.js`
 - Create: `$DST/tests/fixtures/e2e/{spring,flutter,react,next,node,python,react-native,react-native-expo,basic,multi,monorepo}/…` (마커 파일만 있는 최소 fixture)
 
-- [ ] **Step 1: 실패 테스트 작성** — fixture별로 tmp 복사 → `node bin/projectops.js --force …` subprocess 실행 → assert:
+- [ ] **Step 1: 실패 테스트 작성** — fixture별로 tmp 복사 → `node bin/project-auto-wizard.js --force …` subprocess 실행 → assert:
   - 종료코드 0
   - 타입별 워크플로우 배치 정확 (spring이면 server-deploy 포함, --nexus면 제외)
   - **`.github/scripts/version_manager.py`·`changelog_manager.py` 설치됨** (워크플로우 전부가 이 경로 호출 — 배선 누락 검출)

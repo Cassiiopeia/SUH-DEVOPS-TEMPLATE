@@ -12,6 +12,7 @@ import { runFull } from "./commands/full.js";
 import { runVersion } from "./commands/version.js";
 import { runWorkflows } from "./commands/workflows.js";
 import { runIssues } from "./commands/issues.js";
+import { runInteractive } from "./commands/interactive.js";
 
 // 결정적 UTC 타임스탬프 (주입 가능 — 테스트/골든용)
 function utcNow(date = new Date()) {
@@ -39,9 +40,17 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     console.error("skills 모드는 아직 지원되지 않습니다 (SP2-D 예정). 기존 template_integrator를 사용하세요.");
     return 1;
   }
-  // 비대화형 전제 — interactive/대화형은 SP2-C 후반
-  if (opts.mode === "interactive" || !opts.force) {
-    console.error("현재 npx CLI는 비대화형 경로만 지원합니다. --mode <full|version|workflows|issues> 와 --force 를 지정하세요.");
+  // 대화형 모드 — 인자 없이 실행 or --mode interactive
+  if (opts.mode === "interactive") {
+    if (!process.stdout.isTTY) {
+      console.error("대화형 입력이 불가능한 환경입니다. --mode <full|version|workflows|issues> 와 --force 를 지정하세요.");
+      return 1;
+    }
+    return await runInteractive({}, { cwd, source, clock });
+  }
+  // 명시 모드인데 --force 없으면 (비대화형 CLI는 --force 필요)
+  if (!opts.force && !process.stdout.isTTY) {
+    console.error("비대화형 환경에서는 --force 옵션이 필요합니다.");
     return 1;
   }
 

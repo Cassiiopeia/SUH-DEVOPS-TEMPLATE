@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const nodeMajor = Number(process.versions.node.split(".")[0]);
-if (nodeMajor < 18) {
-  console.error(`Node.js 18 이상이 필요합니다 (현재: ${process.versions.node})`);
+const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
+if (nodeMajor < 20 || (nodeMajor === 20 && nodeMinor < 12)) {
+  console.error(`Node.js 20.12 이상이 필요합니다 (현재: ${process.versions.node})`);
   process.exit(1);
 }
 

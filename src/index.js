@@ -1,6 +1,8 @@
 // projectops CLI 진입 파이프라인 (.sh main + execute_integration 등가).
 // 감지 → 다운로드 → 모드 라우팅 → 통합 실행 → 정리. 비대화형(--force) 우선.
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { parseArgs, parsePathsCsv, CliError } from "./cli/args.js";
 import { HELP_TEXT } from "./cli/help.js";
 import { createContext } from "./context.js";
@@ -14,6 +16,17 @@ import { runWorkflows } from "./commands/workflows.js";
 import { runIssues } from "./commands/issues.js";
 import { runInteractive } from "./commands/interactive.js";
 import { runSkills } from "./commands/skills.js";
+
+// projectops 패키지 버전 읽기 (-v/--version 출력용). src/../package.json.
+function readPkgVersion() {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
+    return pkg.version || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
 
 // 결정적 UTC 타임스탬프 (주입 가능 — 테스트/골든용)
 function utcNow(date = new Date()) {
@@ -34,6 +47,7 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     if (e instanceof CliError) { console.error(e.message); return 1; }
     throw e;
   }
+  if (opts.showVersion) { console.log(readPkgVersion()); return 0; }
   if (opts.help) { console.log(HELP_TEXT); return 0; }
 
   // skills 모드 — IDE 스킬 설치/업데이트/제거 (템플릿 통합 없음).

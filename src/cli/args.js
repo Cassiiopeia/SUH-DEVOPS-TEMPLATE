@@ -5,7 +5,7 @@ import { VALID_TYPES } from "../context.js";
 export function parseArgs(argv) {
   const result = {
     mode: "interactive",
-    version: "",
+    version: "",             // 통합 대상 프로젝트의 초기 버전 (--project-version)
     types: [],
     primaryType: "",
     includeNexus: null,      // null=미설정
@@ -13,6 +13,7 @@ export function parseArgs(argv) {
     pathsCsv: "",            // "flutter=app,react=client" 원문 (정규화는 resolve 단계)
     force: false,
     help: false,
+    showVersion: false,      // -v/--version → projectops 패키지 버전 출력 (npm 관례)
   };
   const args = [...argv];
   while (args.length > 0) {
@@ -21,6 +22,9 @@ export function parseArgs(argv) {
       case "-m": case "--mode":
         result.mode = args.shift() ?? ""; break;
       case "-v": case "--version":
+        // npm 관례: -v/--version 은 패키지 버전 출력. (초기 버전 지정은 --project-version)
+        result.showVersion = true; break;
+      case "--project-version":
         result.version = args.shift() ?? ""; break;
       case "-t": case "--type": {
         const csv = args.shift() ?? "";

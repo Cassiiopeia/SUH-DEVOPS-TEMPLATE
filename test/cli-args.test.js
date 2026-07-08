@@ -10,13 +10,22 @@ test("기본값", () => {
   assert.deepEqual(r.types, []);
 });
 
-test("mode/version/force/type csv dedup", () => {
-  const r = parseArgs(["--mode", "full", "--version", "1.2.3", "--force", "--type", "spring,react,spring"]);
+test("mode/project-version/force/type csv dedup", () => {
+  const r = parseArgs(["--mode", "full", "--project-version", "1.2.3", "--force", "--type", "spring,react,spring"]);
   assert.equal(r.mode, "full");
   assert.equal(r.version, "1.2.3");
   assert.equal(r.force, true);
   assert.deepEqual(r.types, ["spring", "react"]); // dedup
   assert.equal(r.primaryType, "spring");
+});
+
+test("-v/--version 은 패키지 버전 출력 플래그 (초기버전 아님)", () => {
+  assert.equal(parseArgs(["-v"]).showVersion, true);
+  assert.equal(parseArgs(["--version"]).showVersion, true);
+  // 초기 버전으로 오염되지 않아야 함
+  assert.equal(parseArgs(["-v"]).version, "");
+  // 기본값은 false
+  assert.equal(parseArgs([]).showVersion, false);
 });
 
 test("무효 타입 throw", () => {

@@ -91,7 +91,7 @@ GitHub에서 **"Use this template"** 클릭 → 1분 내 자동 초기화 완료
 npx projectops
 ```
 
-> Node.js 18+ 만 있으면 별도 설치 없이 대화형 마법사가 실행됩니다. 비대화형: `npx projectops --mode full --type spring,react --force`
+> Node.js 20.12+ 만 있으면 별도 설치 없이 대화형 마법사가 실행됩니다. 비대화형: `npx projectops --mode full --type spring,react --force`
 
 <details>
 <summary>대안 — 스크립트 직접 실행 (Node 없이)</summary>

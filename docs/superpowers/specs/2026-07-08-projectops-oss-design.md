@@ -140,12 +140,39 @@ permissions:
 - 타입별 버전 파일 동기화 로직(`build.gradle`·`pubspec.yaml`·`package.json`·`pyproject.toml`·`Info.plist`·`app.json`) + `project_paths` 모노레포 경로 지원 그대로 이식
 - 표준 라이브러리만 사용 (기존 changelog_manager.py 표준 준수). Windows·mac·ubuntu 러너 동일 동작
 
-## 6. README (공모전 심사용)
+## 6. README + 심사위원 어필 전략 (수상 목표)
 
-- 히어로: `npx projectops` 한 줄 + 30초 데모 GIF 자리
-- 3축 구조 소개: ① 마법사(9타입+멀티+모노레포) ② GitHub-native AI Release Automation ③ 타입별 CI/CD
-- "설정 0개로 AI changelog" 차별점 섹션
-- 아키텍처 mermaid 1개, 배지(버전·라이선스·npm)
+**목표: 심사위원이 "개발 좀 치는 사람들이네" 느끼게.** 기능 나열이 아니라 엔지니어링 판단력을 보여주는 구성.
+
+### README 구성
+
+- **히어로**: `npx projectops` 한 줄 + 30초 데모 GIF + 배지(npm·버전·라이선스·CI status)
+- **문제 정의 훅**: "새 프로젝트마다 CI/CD·버전관리·체인지로그 셋업에 반나절" → "npx 한 줄, 3분"
+- 3축 구조: ① 마법사(9타입+멀티+모노레포) ② GitHub-native AI Release Automation ③ 타입별 CI/CD
+- 아키텍처 mermaid + 엔진 체인 다이어그램
+
+### 심사위원 어필 포인트 (README·발표 공통 강조)
+
+| 포인트 | 왜 "치는 사람들"로 보이나 |
+|---|---|
+| **API 키 0개 AI** | GitHub Models + `GITHUB_TOKEN`으로 AI changelog — "AI 붙였어요"가 아니라 플랫폼 네이티브 통합의 이해도 증명 |
+| **4단 엔진 체인 + graceful degradation** | "AI 실패해도 릴리스는 절대 안 막힘" — 장애 설계 사고방식. 데모에서 일부러 실패시켜 fallback 시연 |
+| **9타입+멀티타입+모노레포 자동 감지** | 마커 파일 기반 감지 → 질문 최소화. 제품 감각 |
+| **크로스플랫폼 무결점** | Node CLI + Python 스크립트만 — bash/PowerShell 이중 유지·bash 3.2 함정을 설계로 제거했다는 스토리 |
+| **payload 단일 진실** | 배포물 관리 아키텍처 자체가 설계 결정의 근거 문서화 |
+| **표준 존중** | GitHub 기본 라벨·Projects·Releases·Conventional Commits — 커스텀 발명 대신 생태계 표준 위에 구축 |
+
+### 3분 데모 영상 (YouTube 업로드)
+
+| 구간 | 내용 |
+|---|---|
+| 0:00–0:20 | 훅: 빈 레포 + "CI/CD 셋업 몇 시간 걸리세요?" 한 문장 |
+| 0:20–1:10 | **`npx projectops` 라이브 실행** — 멀티타입 모노레포(예: spring+flutter) 자동 감지 → 브랜치 질문 → 완료 요약. 마법사 UI가 주인공 |
+| 1:10–2:20 | **릴리스 자동화** — 커밋 몇 개 → develop→main PR → AI changelog 생성 장면 → automerge → tag + GitHub Release 페이지 (AI 요약 노트) 화면 전환 |
+| 2:20–2:45 | **fallback 시연** — `models: read` 제거하고 재실행 → 규칙 기반 changelog로도 릴리스 완주. "절대 안 막힌다" 증명 |
+| 2:45–3:00 | 아키텍처 슬라이드 1장 + npx 명령어 클로징 |
+
+- 편집 원칙: 대기 시간 전부 점프컷, 터미널 폰트 크게, 자막으로 단계 표시. Actions 실행 대기는 미리 돌린 화면 재사용.
 
 ## 7. 검증 전략
 

@@ -450,7 +450,12 @@ jobs:
             REPO_NAME=$(basename "${{ github.repository }}")
             VERSION="${{ steps.bump_version.outputs.new_version }}"
 
-            git commit -m "$REPO_NAME 버전 관리 : chore : v$VERSION 릴리즈 버전 확정 및 릴리즈 문서 업데이트 (PR #${{ github.event.pull_request.number }}) [skip ci]"
+            # [skip ci] 미포함 의도: 이 커밋이 develop→main 머지로 main HEAD가 되어야
+            # 배포/동기화 워크플로우(CICD·NPM-PUBLISH·README-UPDATE·PLUGIN-SYNC)가 main push로 트리거된다.
+            # VERSION-CONTROL 안전망은 paths-ignore(version.yml) + release_guard(version.yml 변경 감지)로
+            # 이 커밋을 릴리스로 인식해 재bump를 건너뛰므로 무한 루프가 없다.
+            # develop을 트리거로 쓰는 워크플로우는 없어 develop push에서 중복 CI도 발생하지 않는다.
+            git commit -m "$REPO_NAME 버전 관리 : chore : v$VERSION 릴리즈 버전 확정 및 릴리즈 문서 업데이트 (PR #${{ github.event.pull_request.number }})"
 
             # Race Condition 방지: pull-rebase 후 push (최대 3회 재시도)
             MAX_RETRIES=3

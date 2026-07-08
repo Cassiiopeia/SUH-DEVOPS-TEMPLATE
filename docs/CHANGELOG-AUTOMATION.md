@@ -253,6 +253,26 @@ git push
 
 ---
 
+## 릴리스 버전 확정 커밋과 후속 워크플로우 트리거
+
+`AUTO-CHANGELOG-CONTROL`이 develop→main 릴리스 PR을 automerge하며 만드는 **버전 확정 커밋**은
+`[skip ci]`를 **포함하지 않는다**. 이 커밋이 main HEAD가 되므로, main push 트리거 워크플로우
+(`NPM-PUBLISH`·`README-VERSION-UPDATE`·`PLUGIN-VERSION-SYNC` 및 각 프로젝트 배포 CICD)가
+**릴리스 시 자동으로 트리거**되어야 하기 때문이다. (default 브랜치 push = 배포 트리거)
+
+무한 루프가 없는 이유:
+
+- `VERSION-CONTROL` 안전망은 `paths-ignore(version.yml)` + `release_guard`(커밋에 version.yml
+  변경이 포함됐는지 감지)로 이 릴리스 커밋을 인식해 **재bump를 건너뛴다**.
+- `README-VERSION-UPDATE`·`PLUGIN-VERSION-SYNC`는 자신이 만드는 후속 커밋에 `[skip ci]`를
+  유지하므로 서로 재트리거하지 않는다.
+- develop을 push 트리거로 쓰는 워크플로우가 없어, 릴리스 커밋이 develop에 있을 때 중복 CI가
+  발생하지 않는다.
+
+> 버전 확정 커밋에 `[skip ci]`를 다시 붙이면 릴리스마다 배포·동기화가 전부 멈춘다. 붙이지 않는다.
+
+---
+
 ## 관련 문서
 
 - [버전 관리](VERSION-CONTROL.md)

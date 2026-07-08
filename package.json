@@ -31,7 +31,7 @@
     "projectops": "bin/projectops.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.12"
   },
   "files": [
     "bin/",

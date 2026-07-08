@@ -164,7 +164,7 @@ jobs:
             PORT=3000
             CONTAINER_NAME="${PROJECT_NAME}-nextjs"
 
-            if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
+            if [ "$BRANCH" == "main" ]; then
               PORT=${{ secrets.PROJECT_DEPLOY_PORT || '3000' }}
               CONTAINER_NAME="${PROJECT_NAME}-nextjs-deploy"
               echo "🚀 배포 환경으로 배포합니다 (브랜치: $BRANCH)"

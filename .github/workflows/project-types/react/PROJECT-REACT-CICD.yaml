@@ -168,7 +168,7 @@ jobs:
             CONTAINER_NAME="${PROJECT_NAME}-front"
 
             # 브랜치에 따른 환경별 설정
-            if [ "$BRANCH" == "deploy" ] || [ "$BRANCH" == "main" ]; then
+            if [ "$BRANCH" == "main" ]; then
               # 🚀 배포 환경 (main 브랜치)
               # GitHub Secrets의 PROJECT_DEPLOY_PORT 환경변수 사용
               # 설정되어 있지 않으면 기본값 3000 사용

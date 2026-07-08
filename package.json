@@ -31,7 +31,8 @@
     "node": ">=18"
   },
   "files": [
-    "bin/"
+    "bin/",
+    "src/"
   ],
   "pi": {
     "skills": [

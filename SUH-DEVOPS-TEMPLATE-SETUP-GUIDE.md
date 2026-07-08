@@ -29,18 +29,18 @@
 
 ---
 
-### 2️⃣ deploy 브랜치 생성
+### 2️⃣ develop 브랜치 생성
 
 ```bash
-# deploy 브랜치 생성 및 푸시
-git checkout -b deploy
-git push -u origin deploy
+# develop 브랜치 생성 및 푸시
+git checkout -b develop
+git push -u origin develop
 
 # main 브랜치로 돌아가기
 git checkout main
 ```
 
-**설명**: `deploy` 브랜치는 체인지로그 자동 생성 및 배포 워크플로우가 실행되는 브랜치입니다.
+**설명**: `develop`은 개발 통합 브랜치입니다. feature 브랜치는 `develop`으로 PR을 보내고, 릴리스 준비가 되면 `develop → main` PR(체인지로그 자동 생성 및 배포 워크플로우가 실행되는 릴리스 PR)을 생성합니다.
 
 ---
 
@@ -156,7 +156,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
   - React Native: `package.json`, `ios/Info.plist`, `android/build.gradle`
   - Python: `pyproject.toml`
 
-#### deploy 브랜치로 PR 생성/머지 시
+#### develop → main 릴리스 PR 생성 시
 - ✅ CodeRabbit AI 자동 코드 리뷰
 - ✅ 체인지로그 자동 생성 (`CHANGELOG.json`, `CHANGELOG.md`)
 - ✅ PR 자동 머지 (리뷰 통과 시)
@@ -221,7 +221,8 @@ git add TEST2.md
 git commit -m "feat: 체인지로그 테스트 기능"
 git push origin feature/test-changelog
 
-# GitHub에서 deploy 브랜치로 PR 생성
+# GitHub에서 develop 브랜치로 PR 생성 (feature → develop)
+# 이후 develop → main 릴리스 PR 생성 시 체인지로그가 자동 생성됩니다
 ```
 
 **예상 결과**:
@@ -235,18 +236,18 @@ git push origin feature/test-changelog
 
 ### Q1: 워크플로우가 실행되지 않아요
 
-**원인**: `deploy` 브랜치에 워크플로우 파일이 없을 수 있습니다.
+**원인**: `develop` 브랜치에 워크플로우 파일이 없을 수 있습니다.
 
 **해결**:
 ```bash
-git checkout deploy
+git checkout develop
 ls .github/workflows/
 
 # 파일이 없다면 main에서 복사
 git checkout main
-git checkout deploy
+git checkout develop
 git merge main
-git push origin deploy
+git push origin develop
 ```
 
 ---

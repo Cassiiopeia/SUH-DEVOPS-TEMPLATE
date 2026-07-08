@@ -7,7 +7,7 @@
 # template_integrator로 복사되지 않으며, template_initializer가 삭제합니다.
 #
 # 동작:
-# - src/·test/·package.json 변경 시 node --test 를 3-OS × 2 Node 버전으로 실행
+# - src/·test/·package.json 변경 시 node --test 를 3-OS × 2 Node 버전(20·22)으로 실행
 # - ubuntu·windows·macos 전부에서 npx CLI가 도는지 자동 검증
 #   (detect-fs.js의 which/where 분기, ide/runner.js의 win32 .cmd 처리 등
 #    OS 종속 코드가 실제로 mac/linux/windows에서 동작하는지 보장)
@@ -53,7 +53,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [18, 20]
+        # 의존성 @clack/core가 node:util styleText(Node 20.12+ 전용)를 쓰므로 20 이상만 지원.
+        # (package.json engines: >=20.12 와 일치)
+        node: [20, 22]
 
     steps:
       - name: 저장소 체크아웃
@@ -69,8 +71,8 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: 테스트 실행 (npm test → node --test)
-        # 인자 없는 node --test 는 cwd 기준 test 파일을 자동 탐색한다.
-        # glob 패턴("test/**")은 Node 21+ 전용이라 매트릭스의 Node 18/20에서 깨진다 — 인자 없이 실행.
+        # 인자 없는 node --test 는 cwd 기준 test 파일을 자동 탐색한다(Node 20+ 안정).
+        # glob 패턴("test/**")은 Node 21+ 전용이라 매트릭스 Node 20에서 깨지므로 인자 없이 실행.
         run: npm test
 
       - name: CLI 스모크 (--help 종료코드 0)

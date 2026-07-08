@@ -50,12 +50,15 @@ export function resolveToken(name, type, resolvers = {}) {
 //   repoName      - __PROJECT_NAME__/__APP_ARTIFACT_NAME__ 치환값
 //   projectPath   - paths-anchor 치환용 ('.'이면 anchor 미변경)
 export function substituteEnv(content, opts = {}) {
-  const { type = "", values = new Map(), useDefaults = true, resolvers = {}, repoName = "", projectPath = "." } = opts;
+  const { type = "", values = new Map(), useDefaults = true, resolvers = {}, repoName = "", projectPath = ".", collectAsks = null } = opts;
   if (!content.includes("@wizard")) return content;
 
-  const lines = content.split("\n");
+  // CRLF 안전: EOL을 분리해 LF 기준으로 파싱·치환하고, 원래 EOL 스타일을 복원한다.
+  // (JS 정규식의 `.`은 \r을 매칭하지 않아 `(.*)$` 마커 파싱이 CRLF에서 실패하기 때문.)
+  const usesCRLF = content.includes("\r\n");
+  const lines = content.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
-    const p = parseWizardLine(lines[i]);
+    const p = parseWizardLine(lines[i]); // 이미 \r 제거된 라인
     if (!p) continue;
     let val = "";
     if (p.action === "auto") {
@@ -65,10 +68,12 @@ export function substituteEnv(content, opts = {}) {
       const chosen = values.get(p.key);
       if (chosen != null && chosen !== "" && !useDefaults) val = chosen;
       else val = def;
+      // ask 키만 수집 (.sh wf_deploy_set — auto는 저장 안 함). deploy 블록용.
+      if (collectAsks) collectAsks.set(p.key, val);
     }
     lines[i] = setEnvLine(lines[i], p.key, val);
   }
-  let out = lines.join("\n");
+  let out = lines.join(usesCRLF ? "\r\n" : "\n");
 
   // 잔여 전역 토큰 (.sh 3347~3351)
   if (out.includes("__PROJECT_NAME__") || out.includes("__APP_ARTIFACT_NAME__")) {
@@ -77,13 +82,14 @@ export function substituteEnv(content, opts = {}) {
 
   // paths-anchor (.sh 3353~3360): 경로가 '.'이 아니면 주석 라인 전체를 paths 라인으로 교체
   if (PATHS_ANCHOR_RE.test(out) && projectPath && projectPath !== ".") {
-    out = out.split("\n").map((line) => {
+    const eol = out.includes("\r\n") ? "\r\n" : "\n";
+    out = out.split(/\r?\n/).map((line) => {
       if (PATHS_ANCHOR_RE.test(line)) {
         const indent = (line.match(/^(\s*)/) || ["", ""])[1];
         return `${indent}paths: ['${projectPath}/**']`;
       }
       return line;
-    }).join("\n");
+    }).join(eol);
   }
   return out;
 }

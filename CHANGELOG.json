@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T01:45:48Z",
-    "currentVersion": "3.0.192",
+    "lastUpdated": "2026-07-08T02:29:21Z",
+    "currentVersion": "3.0.193",
     "projectType": "basic",
-    "totalReleases": 175,
+    "totalReleases": 176,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.193",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-08",
+      "pr_number": 440,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 템플릿 통합 마법사의 npx 전환 작업을 계속 진행했습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "템플릿 통합 마법사의 npx 전환 작업을 계속 진행했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.192",
       "project_type": "basic",

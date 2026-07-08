@@ -4,8 +4,8 @@
 
 ## 릴리스 노트
 
-* **버그 수정**
-  * 릴리스 후 배포와 버전 정보 동기화가 자동으로 실행되지 않던 문제를 해결했습니다
+* **문서**
+  * 릴리스 자동 배포 동작 방식에 대한 설명을 추가했습니다
 
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 

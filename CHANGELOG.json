@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T01:41:35Z",
-    "currentVersion": "3.0.191",
+    "lastUpdated": "2026-07-08T01:45:48Z",
+    "currentVersion": "3.0.192",
     "projectType": "basic",
-    "totalReleases": 174,
+    "totalReleases": 175,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.192",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-08",
+      "pr_number": 435,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **문서**\n  * 릴리스 자동 배포 동작 방식에 대한 설명을 추가했습니다",
+      "parsed_changes": {
+        "문서": {
+          "title": "문서",
+          "items": [
+            "릴리스 자동 배포 동작 방식에 대한 설명을 추가했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.191",
       "project_type": "basic",

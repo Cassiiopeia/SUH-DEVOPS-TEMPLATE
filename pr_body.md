@@ -5,7 +5,7 @@
 ## 릴리스 노트
 
 * **개선**
-  * 템플릿 통합 마법사의 npx 전환 작업을 계속 진행했습니다
+  * npx 한 줄로 템플릿을 통합할 수 있는 CLI 마법사를 추가했습니다
 
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 

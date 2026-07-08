@@ -40,6 +40,43 @@ const HEADER = `# ==============================================================
 # ===================================================================
 `;
 
+// metadata.template.options 상태머신 파싱 (.sh read_template_options L2361~2416 등가).
+// 반환: { nexus: bool|null, secretBackup: bool|null } — null=미기재.
+// 구 synology 키 등 다른 키는 어느 분기에도 안 걸려 자연히 무시된다.
+// (options-ask.js가 이 함수를 import한다 — 순환 방지 위해 여기(version-yml)에 정의.)
+export function parseTemplateOptions(content) {
+  const out = { nexus: null, secretBackup: null };
+  // 값 정규화: 따옴표 제거 + 트림 (.sh tr -d '"' | tr -d "'" | xargs 등가)
+  const strip = (s) => String(s).replace(/["']/g, "").trim();
+  let inTemplate = false;
+  let inOptions = false;
+  for (const line of String(content || "").split("\n")) {
+    if (/^\s*template:/.test(line)) { inTemplate = true; continue; }
+    if (inTemplate && /^\s+options:/.test(line)) { inOptions = true; continue; }
+    if (inTemplate && inOptions) {
+      let m = line.match(/^\s+nexus:\s*(.+)/);
+      if (m) {
+        const v = strip(m[1]);
+        if (v === "true") out.nexus = true;
+        if (v === "false") out.nexus = false;
+        continue;
+      }
+      m = line.match(/^\s+secret_backup:\s*(.+)/);
+      if (m) {
+        const v = strip(m[1]);
+        if (v === "true") out.secretBackup = true;
+        if (v === "false") out.secretBackup = false;
+        continue;
+      }
+      // 들여쓰기 0~4칸의 다른 키 → options 섹션 종료 (.sh L2404~2408)
+      if (/^\s{0,4}[a-z_]+:/.test(line)) { inOptions = false; inTemplate = false; }
+    }
+    // 최상위 키 → template 섹션 종료 (.sh L2411~2415)
+    if (inTemplate && /^[a-z_]+:/.test(line)) { inTemplate = false; inOptions = false; }
+  }
+  return out;
+}
+
 // 기존 version.yml에서 값 추출 (.sh grep/sed 등가, 주석 라인 오탐 방지).
 export function parseExisting(content) {
   const text = String(content || "");
@@ -82,7 +119,9 @@ export function parseExisting(content) {
       if (/^\S/.test(l)) break;
     }
   }
-  return { version, versionCode, types, paths, templateVersion };
+  // 선택 워크플로우 옵션 (metadata.template.options — nexus/secret_backup)
+  const options = parseTemplateOptions(text);
+  return { version, versionCode, types, paths, templateVersion, options };
 }
 
 // version.yml 전체 생성 (.sh create_version_yml + save_template_options 신규 케이스 등가).

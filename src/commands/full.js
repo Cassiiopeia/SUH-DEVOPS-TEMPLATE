@@ -19,7 +19,7 @@ import { ensureGitignore } from "../core/copy/gitignore.js";
 // context: { version, types, paths:Map, branch, versionCode, includeNexus, includeSecretBackup,
 //            force, repoName, resolvers, now, today }
 // tempDir: 획득된 템플릿. targetRoot: 통합 대상.
-export function runFull(context, tempDir, targetRoot = ".") {
+export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
   const { version, types = [], paths = new Map(), branch = "main", versionCode = 1,
     force = true, now, today, templateVersion = "unknown",
     includeNexus = false, includeSecretBackup = false } = context;
@@ -29,8 +29,8 @@ export function runFull(context, tempDir, targetRoot = ".") {
   for (const [t] of paths) pathMarkers.set(t, markerForType(t));
 
   // 3. 워크플로우 복사 (+ env 치환) — deploy 블록에 쓸 ask 값을 수집한다.
-  //    (.sh는 copy_workflows 후 update_version_yml_deploy로 deploy 블록을 붙인다.)
-  const wfCounters = copyWorkflows(context, tempDir, targetRoot);
+  //    hooks.decisions: 대화형 충돌 3지선 결정 Map (미지정=skip — 현행 force 동작)
+  const wfCounters = copyWorkflows(context, tempDir, targetRoot, hooks);
   const deployValues = wfCounters.deployValues || new Map(); // Map<type, Map<key,value>>
 
   // 1. version.yml 생성 (전체 재생성 — metadata → deploy → template 순, .sh 최종형과 동일)

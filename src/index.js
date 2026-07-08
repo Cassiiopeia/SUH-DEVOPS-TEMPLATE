@@ -2,14 +2,19 @@
 // 감지 → 다운로드 → 모드 라우팅 → 통합 실행 → 정리. 비대화형(--force) 우선.
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { parseArgs, parsePathsCsv, CliError } from "./cli/args.js";
 import { HELP_TEXT } from "./cli/help.js";
 import { createContext } from "./context.js";
 import { PATHS } from "./core/paths.js";
 import { remove } from "./core/fsutil.js";
 import { acquireTemplate, readTemplateVersion } from "./core/assets.js";
-import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName } from "./core/detect-fs.js";
+import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName, makeResolvers } from "./core/detect-fs.js";
+import { parseExisting } from "./core/version-yml.js";
+import { runBreakingCheck } from "./core/breaking-check.js";
+import { resolveProjectPaths } from "./core/paths-resolve.js";
+import { printBannerCompact } from "./ui/banner.js";
+import { printSummary } from "./ui/summary.js";
 import { runFull } from "./commands/full.js";
 import { runVersion } from "./commands/version.js";
 import { runWorkflows } from "./commands/workflows.js";
@@ -77,40 +82,55 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     return 1;
   }
 
+  // 기존 version.yml 로드 — version/version_code/project_paths 보존의 단일 진실 (.sh L2208~2239 SSoT)
+  const vyPath = join(cwd, "version.yml");
+  const existing = existsSync(vyPath) ? parseExisting(readFileSync(vyPath, "utf8")) : null;
+
   // 감지 (CLI 인자 우선, 없으면 자동 감지 — version.yml 우선 규칙은 detectTypes/detectVersion 내부)
   const types = opts.types.length ? opts.types : detectTypes(cwd);
-  const version = opts.version || detectVersion(cwd);
+  // version: 기존 version.yml 최우선(SSoT — 재실행 시 덮어쓰기 방지) → CLI 지정 → 파일 감지
+  const version = (existing?.version) || opts.version || detectVersion(cwd);
+  const versionCode = existing?.versionCode ?? 1; // 기존 빌드번호 보존 (.sh L2208~2221)
   const branch = detectDefaultBranch(cwd);
   const repoName = detectRepoName(cwd);
-  const paths = parsePathsCsv(opts.pathsCsv);
-  // paths 미지정 타입은 루트(".") — basic 제외
-  for (const t of types) if (t !== "basic" && !paths.has(t)) paths.set(t, ".");
+  // 경로 확정 (.sh resolve_project_paths 비대화형 경로 — --paths 우선 → 저장값 → 후보 1개 자동 → 루트 폴백)
+  const paths = await resolveProjectPaths({
+    root: cwd, types, paths: parsePathsCsv(opts.pathsCsv),
+    existingPaths: existing?.paths ?? new Map(), force: true, tty: false, io: {},
+  });
 
   const { now, today } = clock || utcNow();
   const tempDir = join(cwd, PATHS.tempDir);
 
   const context = createContext({
-    mode: opts.mode, force: true, types, version, branch,
-    paths, includeNexus: opts.includeNexus === true, includeSecretBackup: opts.includeSecretBackup === true,
+    mode: opts.mode, force: true, types, version, versionCode, branch,
+    paths,
+    // 옵션 워크플로우: CLI 플래그 최우선 → version.yml 저장 옵션(.sh read_template_options 등가) → false
+    includeNexus: opts.includeNexus ?? existing?.options?.nexus ?? false,
+    includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
     repoName,
-    resolvers: {
-      repo: () => repoName,
-      "spring-app-yml-dir": () => "",
-      "spring-app-yml-path": () => "",
-      "flutter-root": () => paths.get("flutter") || ".",
-    },
+    // 실 resolver 4종 (.sh resolve_token 등가 — spring-app-yml 스텁 제거)
+    resolvers: makeResolvers(cwd, repoName, paths),
     now, today,
   });
 
+  let result = null;
   try {
     acquireTemplate({ tempDir, source });
     context.templateVersion = readTemplateVersion(tempDir);
 
+    // 비대화형 축약 배너 (#446 확정 — 1줄, 로그 오염 최소)
+    printBannerCompact({ version: context.templateVersion, mode: opts.mode });
+
+    // Breaking Changes 게이트 (.sh execute_integration L4415~4420 등가 — 비대화형은 경고 후 진행)
+    const proceed = await runBreakingCheck({ cwd, tempDir, templateVersion: context.templateVersion });
+    if (!proceed) return 0;
+
     switch (opts.mode) {
-      case "full": runFull(context, tempDir, cwd); break;
-      case "version": runVersion(context, tempDir, cwd); break;
-      case "workflows": runWorkflows(context, tempDir, cwd); break;
-      case "issues": runIssues(context, tempDir, cwd); break;
+      case "full": result = runFull(context, tempDir, cwd); break;
+      case "version": result = runVersion(context, tempDir, cwd); break;
+      case "workflows": result = runWorkflows(context, tempDir, cwd); break;
+      case "issues": result = runIssues(context, tempDir, cwd); break;
       default:
         // 알 수 없는 모드 → .sh와 동일하게 복사 0건, 에러 아님
         break;
@@ -118,5 +138,11 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   } finally {
     remove(tempDir);
   }
+
+  // 완료 요약 (.sh print_summary — CLI 모드에서도 출력)
+  printSummary({
+    mode: opts.mode, types, version,
+    counters: { workflows: result?.workflows?.copied ?? 0, utilModules: 0 },
+  }, cwd);
   return 0;
 }

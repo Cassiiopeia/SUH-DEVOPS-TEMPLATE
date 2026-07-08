@@ -13,6 +13,7 @@ import { runVersion } from "./commands/version.js";
 import { runWorkflows } from "./commands/workflows.js";
 import { runIssues } from "./commands/issues.js";
 import { runInteractive } from "./commands/interactive.js";
+import { runSkills } from "./commands/skills.js";
 
 // 결정적 UTC 타임스탬프 (주입 가능 — 테스트/골든용)
 function utcNow(date = new Date()) {
@@ -35,10 +36,18 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   }
   if (opts.help) { console.log(HELP_TEXT); return 0; }
 
-  // skills 모드는 IDE 설치 전용 (SP2-D)
+  // skills 모드 — IDE 스킬 설치/업데이트/제거 (템플릿 통합 없음).
+  // Cursor 복사용 skills/ 소스가 필요하므로 템플릿을 획득한 뒤 실행한다.
   if (opts.mode === "skills") {
-    console.error("skills 모드는 아직 지원되지 않습니다 (SP2-D 예정). 기존 template_integrator를 사용하세요.");
-    return 1;
+    const tempDir = join(cwd, PATHS.tempDir);
+    const interactive = !opts.force && process.stdout.isTTY;
+    try {
+      acquireTemplate({ tempDir, source });
+      const templateVersion = readTemplateVersion(tempDir);
+      return await runSkills({ templateVersion, tempDir, interactive });
+    } finally {
+      remove(tempDir);
+    }
   }
   // 대화형 모드 — 인자 없이 실행 or --mode interactive
   if (opts.mode === "interactive") {

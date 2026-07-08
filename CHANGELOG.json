@@ -1,14 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T05:24:49Z",
-    "currentVersion": "3.0.195",
+    "lastUpdated": "2026-07-08T06:03:30Z",
+    "currentVersion": "4.0.1",
     "projectType": "basic",
-    "totalReleases": 178,
+    "totalReleases": 179,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.0.1",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-08",
+      "pr_number": 443,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 템플릿 통합·설치를 명령어 한 줄로 실행할 수 있게 되었습니다\n  * Windows·macOS·Linux 어디서든 동일하게 동작합니다\n\n* **개선**\n  * 세 운영체제에서 자동으로 동작을 검증하도록 안정성을 강화했습니다\n  * 설치 안내 문서를 더 쉬운 방식 중심으로 정리했습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "템플릿 통합·설치를 명령어 한 줄로 실행할 수 있게 되었습니다",
+            "Windows·macOS·Linux 어디서든 동일하게 동작합니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "세 운영체제에서 자동으로 동작을 검증하도록 안정성을 강화했습니다",
+            "설치 안내 문서를 더 쉬운 방식 중심으로 정리했습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.195",
       "project_type": "basic",

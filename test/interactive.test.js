@@ -81,12 +81,24 @@ test("대화형: issues 모드 → 템플릿만", async () => {
   } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
 });
 
-test("대화형: skills 모드 → 안내 후 exit 1 (SP2-D 예정)", async () => {
+test("대화형: skills 모드 → IDE 스킬 설치 흐름 실행 후 exit 0", async () => {
+  const src = mkdtempSync(join(tmpdir(), "iasrc4-"));
   const cwd = mkdtempSync(join(tmpdir(), "iacwd4-"));
   try {
+    makeSource(src);
+    // skills 모드는 템플릿을 획득하고 runSkills를 부른다.
+    // 실제 IDE CLI를 안 건드리도록 skills를 스텁으로 주입 — 호출 여부만 검증.
+    let skillsCalled = false;
     const code = await runInteractive({}, {
-      cwd, source: { type: "local", path: cwd }, io: stubIo({ mode: "skills" }),
+      cwd, source: { type: "local", path: src }, clock: { now: "n", today: "t" },
+      io: stubIo({ mode: "skills" }),
+      skills: async (o) => { skillsCalled = true; assert.equal(o.interactive, true); return 0; },
     });
-    assert.equal(code, 1);
-  } finally { rmSync(cwd, { recursive: true, force: true }); }
+    assert.equal(skillsCalled, true);
+    assert.equal(code, 0);
+    // skills는 통합이 아니므로 version.yml을 만들지 않는다
+    assert.equal(exists(join(cwd, "version.yml")), false);
+    // TEMP 정리됨
+    assert.equal(exists(join(cwd, ".template_download_temp")), false);
+  } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
 });

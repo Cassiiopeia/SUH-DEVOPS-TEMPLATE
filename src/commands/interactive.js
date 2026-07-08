@@ -10,28 +10,31 @@ import { runFull } from "./full.js";
 import { runVersion } from "./version.js";
 import { runWorkflows } from "./workflows.js";
 import { runIssues } from "./issues.js";
+import { runSkills } from "./skills.js";
 import * as prompts from "../ui/prompts.js";
 
 const CANCEL = prompts.CANCEL;
 
 // io 기본값 = 실제 prompts. 테스트는 스텁 io 주입.
-export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { type: "git" }, clock, io = prompts } = {}) {
+// skills = runSkills 주입 지점(테스트가 실제 IDE CLI를 안 건드리게). 기본은 실제 runSkills.
+export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { type: "git" }, clock, io = prompts, skills = runSkills } = {}) {
   io.intro?.("projectops — 대화형 통합 마법사");
 
   // 1) 모드 선택
   const mode = await io.selectMode();
   if (mode === CANCEL || mode == null) { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
 
-  // skills는 SP2-D 예정
-  if (mode === "skills") {
-    io.note?.("AI 스킬 설치는 아직 준비 중입니다 (곧 제공). 기존 template_integrator를 사용하세요.", "안내");
-    return 1;
-  }
-
   const tempDir = join(cwd, PATHS.tempDir);
   try {
     acquireTemplate({ tempDir, source });
     const templateVersion = readTemplateVersion(tempDir);
+
+    // skills 모드 — IDE 스킬 설치 (템플릿 통합 없음). 대화형으로 실행.
+    if (mode === "skills") {
+      await skills({ templateVersion, tempDir, interactive: true });
+      io.outro?.("AI 스킬 설치를 마쳤습니다.");
+      return 0;
+    }
 
     // issues 모드는 정보 수집 없이 바로 실행
     if (mode === "issues") {

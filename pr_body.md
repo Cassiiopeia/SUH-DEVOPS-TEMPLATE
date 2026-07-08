@@ -5,7 +5,7 @@
 ## 릴리스 노트
 
 * **개선**
-  * npx 한 줄로 템플릿을 통합할 수 있는 CLI 마법사를 추가했습니다
+  * AI 스킬(Claude·Cursor·Gemini·Codex 등)을 npx 한 줄로 설치·업데이트·제거할 수 있게 되었습니다
 
 <!-- end of auto-generated comment: release notes by coderabbit.ai -->
 

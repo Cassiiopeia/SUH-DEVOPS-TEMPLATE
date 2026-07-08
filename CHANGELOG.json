@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T04:30:35Z",
-    "currentVersion": "3.0.194",
+    "lastUpdated": "2026-07-08T05:24:49Z",
+    "currentVersion": "3.0.195",
     "projectType": "basic",
-    "totalReleases": 177,
+    "totalReleases": 178,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "3.0.195",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-08",
+      "pr_number": 442,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * AI 스킬(Claude·Cursor·Gemini·Codex 등)을 npx 한 줄로 설치·업데이트·제거할 수 있게 되었습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "AI 스킬(Claude·Cursor·Gemini·Codex 등)을 npx 한 줄로 설치·업데이트·제거할 수 있게 되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "3.0.194",
       "project_type": "basic",

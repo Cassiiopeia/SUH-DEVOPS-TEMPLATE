@@ -3,9 +3,12 @@
 import { join } from "node:path";
 import { exists, copyFileSync } from "../fsutil.js";
 
-// 반환: 'skip-no-src' | 'copied-new' | 'overwritten-backup' | 'skip-non-tty'
-// opts: { force, tty }  — SP2-B 검증은 force:true 경로.
-export function copyCoderabbit(tempDir, { force = false, tty = false } = {}, targetRoot = ".") {
+// 반환: 'skip-disabled' | 'skip-no-src' | 'copied-new' | 'overwritten-backup' | 'skip-non-tty'
+// opts: { force, tty, enabled }  — SP2-B 검증은 force:true 경로.
+// enabled=false면(#457 CodeRabbit 미사용 선택) 파일을 아예 복사하지 않는다.
+// enabled 미지정(undefined)이면 기존 동작(복사) 유지 — 구 호출부 하위호환.
+export function copyCoderabbit(tempDir, { force = false, tty = false, enabled } = {}, targetRoot = ".") {
+  if (enabled === false) return "skip-disabled";
   const src = join(tempDir, ".coderabbit.yaml");
   if (!exists(src)) return "skip-no-src";
   const dst = join(targetRoot, ".coderabbit.yaml");

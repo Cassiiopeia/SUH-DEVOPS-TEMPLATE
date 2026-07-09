@@ -36,6 +36,33 @@ test("copyCoderabbit 소스 없으면 스킵", () => {
   } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
 });
 
+// #457 — CodeRabbit 미사용(enabled:false) 레포엔 .coderabbit.yaml을 아예 복사하지 않는다.
+test("copyCoderabbit enabled:false면 복사 스킵", () => {
+  const tmp = fresh("cr4t-"); const tgt = fresh("cr4g-");
+  try {
+    writeText(join(tmp, ".coderabbit.yaml"), "language: ko-KR\n");
+    assert.equal(copyCoderabbit(tmp, { force: true, enabled: false }, tgt), "skip-disabled");
+    assert.equal(exists(join(tgt, ".coderabbit.yaml")), false);
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});
+
+// #457 — enabled 미지정(기존 호출부 하위호환)이면 기본 복사 동작 유지.
+test("copyCoderabbit enabled 미지정이면 기본 복사(하위호환)", () => {
+  const tmp = fresh("cr5t-"); const tgt = fresh("cr5g-");
+  try {
+    writeText(join(tmp, ".coderabbit.yaml"), "language: ko-KR\n");
+    assert.equal(copyCoderabbit(tmp, { force: true }, tgt), "copied-new");
+    assert.ok(exists(join(tgt, ".coderabbit.yaml")));
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});
+
+// #457 회귀 방지 — full.js 호출부가 codeReviewCoderabbit을 enabled로 실제 전달하는지.
+// (유닛 분기만 맞고 호출부가 값을 안 넘기면 조건부 복사가 무력화되므로 소스 계약을 고정한다.)
+test("full.js가 copyCoderabbit에 enabled: codeReviewCoderabbit 전달", () => {
+  const src = readText(join(process.cwd(), "src/commands/full.js"));
+  assert.match(src, /copyCoderabbit\([^)]*enabled:\s*codeReviewCoderabbit/);
+});
+
 test("copyUtilModules force로 모듈 복사 + 카운트", () => {
   const tmp = fresh("ut-t-"); const tgt = fresh("ut-g-");
   try {

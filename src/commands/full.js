@@ -58,7 +58,8 @@ export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
   copyDiscussionTemplates(tempDir, targetRoot);
 
   // 8. coderabbit / gitignore / setup guide
-  copyCoderabbit(tempDir, { force }, targetRoot);
+  //    CodeRabbit 코드리뷰 미사용 선택(#457)이면 .coderabbit.yaml을 복사하지 않는다.
+  copyCoderabbit(tempDir, { force, enabled: codeReviewCoderabbit }, targetRoot);
   ensureGitignore(targetRoot);
   copySetupGuide(tempDir, targetRoot);
 

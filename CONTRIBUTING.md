@@ -376,9 +376,8 @@ jobs:
 
 `version.yml`에 `project_types` 배열 키가 도입되어 단일 레포에 여러 타입이 공존할 수 있습니다. 워크플로우/스크립트를 추가·수정할 때 다음을 지킵니다.
 
-- **배열 우선 읽기**: 타입에 따라 분기하는 새 코드는 단수 `project_type`이 아닌 `project_types` 배열을 우선 읽고 순회합니다.
-- **자동 미러 유지**: 단수 `project_type` 키는 항상 `project_types[0]`으로 자동 미러되므로 직접 수정하지 않습니다.
-- **하위 호환 보장**: 단수 키만 읽던 기존 코드도 그대로 동작해야 합니다 (`project_types`가 없으면 단수 키로 폴백).
+- **배열이 유일한 소스(SSOT)**: 타입에 따라 분기하는 코드는 `project_types` 배열을 읽고 순회합니다. primary 타입이 필요하면 `project_types[0]`을 사용합니다.
+- **단수 키 금지**: 단수 `project_type` 키는 v4.1.0에서 완전히 제거되었습니다. 새 코드에서 읽지도 쓰지도 않습니다 (legacy 단수-only 파일은 version_manager.sh가 명시적으로 실패하며 전환 절차를 안내).
 
 ---
 
@@ -569,7 +568,7 @@ assert_equals() {
 test_increment_version() {
     # Setup
     echo 'version: "1.0.0"' > version.yml
-    echo 'project_type: "basic"' >> version.yml
+    echo 'project_types: ["basic"]' >> version.yml
     
     # Execute
     result=$(./version_manager.sh increment)

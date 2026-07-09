@@ -892,13 +892,8 @@ function Detect-ProjectTypes {
                 break
             }
         }
-        # 배열이 없으면 단수 project_type 폴백
-        if (-not $existingTypes) {
-            foreach ($line in $lines) {
-                if ($line -match '^\s*#') { continue }
-                if ($line -match '^project_type:\s*"?([a-z\-]+)"?') { $existingTypes = $matches[1]; break }
-            }
-        }
+        # v4.1.0: 단수 project_type 키는 더 이상 읽지 않는다 (SSOT: project_types 배열).
+        # legacy 파일(단수 키만)은 아래 마커 스캔으로 재감지되고, 통합 시 배열 형식으로 재작성된다.
         # version.yml에 타입이 명시돼 있으면(basic 포함) source of truth → 그대로 사용
         if ($existingTypes) {
             Print-Info "✓ 기존 설정 적용: $existingTypes (version.yml에서 불러옴)"
@@ -1893,10 +1888,8 @@ function Create-VersionYml {
     # (배열이 비었으면 $Type 단수로 fallback — 하위 호환)
     if ($script:ProjectTypes.Count -gt 0) {
         $typesJson = '[' + (($script:ProjectTypes | ForEach-Object { '"' + $_ + '"' }) -join ',') + ']'
-        $primaryType = $script:ProjectTypes[0]
     } else {
         $typesJson = "[`"$Type`"]"
-        $primaryType = $Type
     }
 
     # project_paths 블록 (Resolve-ProjectPaths가 확정한 값 — 비어있으면 생략)
@@ -1925,7 +1918,7 @@ function Create-VersionYml {
 # 사용법:
 # 1. version: "1.0.0" - 사용자에게 표시되는 버전
 # 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
-# 3. project_type: 프로젝트 타입 지정
+# 3. project_types: 프로젝트 타입 배열 — 첫 항목이 primary
 # 4. project_paths: 타입별 프로젝트 폴더 (레포 루트 기준 상대경로, 모노레포용)
 #
 # 자동 버전 업데이트:
@@ -1948,14 +1941,13 @@ function Create-VersionYml {
 # - .github/workflows/PROJECT-AUTO-CHANGELOG-CONTROL.yaml
 #
 # 주의사항:
-# - project_type은 최초 설정 후 변경하지 마세요
+# - project_types는 최초 설정 후 변경하지 마세요
 # - 버전은 항상 높은 버전으로 자동 동기화됩니다
 # ===================================================================
 
 version: "$Version"
 version_code: $existingVersionCode  # app build number
 project_types: $typesJson   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
-project_type: "$primaryType"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 
 "@
 

@@ -245,7 +245,7 @@ create_version_yml() {
 # 사용법:
 # 1. version: "1.0.0" - 사용자에게 표시되는 버전
 # 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
-# 3. project_type: 프로젝트 타입 지정
+# 3. project_types: 프로젝트 타입 배열 — 첫 항목이 primary
 #
 # 자동 버전 업데이트:
 # - patch: 자동으로 세 번째 자리 증가 (x.x.x -> x.x.x+1)
@@ -262,14 +262,13 @@ create_version_yml() {
 # - basic/기타: version.yml 파일만 사용
 #
 # 주의사항:
-# - project_type은 최초 설정 후 변경하지 마세요
+# - project_types는 최초 설정 후 변경하지 마세요
 # - 버전은 항상 높은 버전으로 자동 동기화됩니다
 # ===================================================================
 
 version: "$version"
 version_code: 1  # app build number
 project_types: ["$type"]   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
-project_type: "$type" # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
   last_updated: "$(date -u +"%Y-%m-%d %H:%M:%S")"
   last_updated_by: "$user"
@@ -665,7 +664,7 @@ print_summary() {
     echo ""
     echo -e "${YELLOW}다음 단계:${NC}"
     echo "  1. 프로젝트에 맞게 README.md를 수정하세요"
-    echo "  2. 필요한 경우 version.yml의 project_type을 확인하세요"
+    echo "  2. 필요한 경우 version.yml의 project_types를 확인하세요"
     echo "  3. 첫 번째 커밋을 푸시하여 자동화 시스템을 테스트하세요"
     echo ""
     echo -e "${CYAN}유용한 명령어:${NC}"

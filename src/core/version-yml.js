@@ -12,7 +12,7 @@ const HEADER = `# ==============================================================
 # 사용법:
 # 1. version: "1.0.0" - 사용자에게 표시되는 버전
 # 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
-# 3. project_type: 프로젝트 타입 지정
+# 3. project_types: 프로젝트 타입 배열 — 첫 항목이 primary
 # 4. project_paths: 타입별 프로젝트 폴더 (레포 루트 기준 상대경로, 모노레포용)
 #
 # 자동 버전 업데이트:
@@ -35,7 +35,7 @@ const HEADER = `# ==============================================================
 # - .github/workflows/PROJECT-AUTO-CHANGELOG-CONTROL.yaml
 #
 # 주의사항:
-# - project_type은 최초 설정 후 변경하지 마세요
+# - project_types는 최초 설정 후 변경하지 마세요
 # - 버전은 항상 높은 버전으로 자동 동기화됩니다
 # ===================================================================
 `;
@@ -125,20 +125,19 @@ export function parseExisting(content) {
 }
 
 // version.yml 전체 생성 (.sh create_version_yml + save_template_options 신규 케이스 등가).
-// opts: { version, types:[], primaryType?, paths:Map, pathMarkers?:Map, branch, versionCode, now, today, templateOptions? }
+// opts: { version, types:[], paths:Map, pathMarkers?:Map, branch, versionCode, now, today, templateOptions? }
+// primary 타입은 별도 키 없이 project_types[0]이다 (v4.1.0 SSOT — 단수 project_type 키 제거).
 //   now   = "YYYY-MM-DD HH:MM:SS" (UTC) — 결정성 위해 주입
 //   today = "YYYY-MM-DD" (UTC)
 //   pathMarkers = Map<type, markerFilename> (project_paths 주석용)
 //   templateOptions = { templateVersion, includeNexus, includeSecretBackup, optionsDate } (template 블록)
-export function buildVersionYml({ version, types = [], primaryType, paths = new Map(), pathMarkers = new Map(), branch = "main", versionCode = 1, now, today, templateOptions = null, deployValues = new Map() }) {
+export function buildVersionYml({ version, types = [], paths = new Map(), pathMarkers = new Map(), branch = "main", versionCode = 1, now, today, templateOptions = null, deployValues = new Map() }) {
   const typesJson = types.length ? `[${types.map((t) => `"${t}"`).join(",")}]` : `["basic"]`;
-  const primary = primaryType || types[0] || "basic";
 
   let out = HEADER + "\n";
   out += `version: "${version}"\n`;
   out += `version_code: ${versionCode}  # app build number\n`;
   out += `project_types: ${typesJson}   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능\n`;
-  out += `project_type: "${primary}"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)\n`;
 
   // project_paths 블록. pathMarkers: Map<type, markerFilename> (있으면 "  type: "path"   # path/marker" 주석).
   if (paths.size) {

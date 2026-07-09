@@ -39,5 +39,11 @@ test("buildVersionYml emits integrated_from projectops and template_integrator",
   const yml = buildVersionYml({ version: "1.0.0", types: ["basic"], now: "n", today: "t" });
   assert.ok(yml.includes('integrated_from: "projectops"'));
   assert.ok(yml.includes('last_updated_by: "template_integrator"'));
-  assert.ok(yml.includes('project_type: "basic"'));
+  assert.ok(yml.includes('project_types: ["basic"]'));
+});
+
+test("buildVersionYml: 단수 project_type 키를 쓰지 않는다 (v4.1.0 SSOT)", () => {
+  const yml = buildVersionYml({ version: "1.0.0", types: ["spring", "react"], now: "n", today: "t" });
+  assert.ok(!/^project_type:/m.test(yml), "단수 project_type 라인이 생성되면 안 됨");
+  assert.ok(yml.includes('project_types: ["spring","react"]'));
 });

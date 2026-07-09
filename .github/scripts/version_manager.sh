@@ -117,23 +117,6 @@ get_type_path() {
     echo "$p"
 }
 
-# project_type 단수 키를 project_types[0]으로 강제 동기화 (사용자 수동 편집 실수 자동 복구)
-sync_project_type_field() {
-    local types_csv=$1
-    [ -z "$types_csv" ] && return 0
-
-    local first
-    first=$(echo "$types_csv" | cut -d',' -f1)
-
-    local current_single
-    current_single=$(yq -r '.project_type // ""' version.yml)
-
-    if [ "$current_single" != "$first" ]; then
-        log_info "project_type 정합화: '$current_single' → '$first' (project_types[0])"
-        yq -i ".project_type = \"$first\"" version.yml
-    fi
-}
-
 read_version_config() {
     if [ ! -f "version.yml" ]; then
         log_error "version.yml 파일을 찾을 수 없습니다!"
@@ -142,16 +125,31 @@ read_version_config() {
 
     log_debug "version.yml 파싱 시작 (yq 사용)"
 
-    # 1. project_types 배열 파싱 (멀티타입)
+    # 1. project_types 배열 파싱 (SSOT — v4.1.0부터 유일한 소스)
     PROJECT_TYPES_CSV=$(parse_project_types)
 
-    # 2. 정합화 — 배열 있으면 project_type 단수 키를 첫 항목으로 강제
+    # 2. 단수 project_type 키는 v4.1.0에서 제거됨 — legacy 파일 감지
+    local _legacy_single
+    _legacy_single=$(yq -r '.project_type // ""' version.yml 2>/dev/null) || _legacy_single=""
+    [ "$_legacy_single" = "null" ] && _legacy_single=""
+
     if [ -n "$PROJECT_TYPES_CSV" ]; then
-        sync_project_type_field "$PROJECT_TYPES_CSV"
+        # 배열이 소스 — 잔존 단수 키는 무시하되 제거 안내
+        if [ -n "$_legacy_single" ]; then
+            log_warning "project_type 단수 키는 v4.1.0부터 무시됩니다 — version.yml에서 해당 라인을 제거하세요 (project_types 배열이 유일한 소스)"
+        fi
+        PROJECT_TYPE=$(echo "$PROJECT_TYPES_CSV" | cut -d',' -f1)
+    elif [ -n "$_legacy_single" ]; then
+        # legacy: 단수 키만 있는 v4 이전 형식 — 조용한 오작동 대신 명시적 실패
+        log_error "version.yml이 v4.1.0 이전 형식입니다 (project_type 단수 키만 존재)."
+        log_error "전환 절차: project_type 라인을 삭제하고 project_types 배열로 교체하세요."
+        log_error "  예) project_type: \"$_legacy_single\"  →  project_types: [\"$_legacy_single\"]"
+        exit 1
+    else
+        # 둘 다 없음 — bare 파일은 basic으로 동작 (기존 기본값 유지)
+        PROJECT_TYPE="basic"
     fi
 
-    # 3. 단수 키 + 현재 버전 읽기 (정합화 이후)
-    PROJECT_TYPE=$(yq -r '.project_type // "basic"' version.yml)
     CURRENT_VERSION=$(yq -r '.version // "0.0.0"' version.yml)
 
     # 4. 필수 도구 확인 — 배열이면 모든 타입 검사, 아니면 단수

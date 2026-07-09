@@ -1044,10 +1044,6 @@ detect_project_types() {
         if command -v yq >/dev/null 2>&1; then
             _existing_types=$(yq -r '.project_types // [] | join(",")' version.yml 2>/dev/null)
             [ "$_existing_types" = "null" ] && _existing_types=""
-            if [ -z "$_existing_types" ]; then
-                _existing_types=$(yq -r '.project_type // ""' version.yml 2>/dev/null)
-                [ "$_existing_types" = "null" ] && _existing_types=""
-            fi
         else
             # yq 없음: project_types 라인에서 ["a","b"] 안의 토큰 추출
             local _line
@@ -1055,10 +1051,9 @@ detect_project_types() {
             if [ -n "$_line" ]; then
                 _existing_types=$(echo "$_line" | grep -oE '"[a-z-]+"' | tr -d '"' | paste -sd, -)
             fi
-            if [ -z "$_existing_types" ]; then
-                _existing_types=$(grep -E '^project_type:' version.yml 2>/dev/null | head -1 | sed 's/.*"\([a-z-]*\)".*/\1/')
-            fi
         fi
+        # v4.1.0: 단수 project_type 키는 더 이상 읽지 않는다 (SSOT: project_types 배열).
+        # legacy 파일(단수 키만)은 아래 마커 스캔으로 재감지되고, 통합 시 배열 형식으로 재작성된다.
         # version.yml에 타입이 명시돼 있으면(basic 포함) 그것이 source of truth → 그대로 사용.
         # 값이 아예 없을 때만 아래 파일 스캔으로 새로 감지한다.
         if [ -n "$_existing_types" ]; then
@@ -2190,17 +2185,15 @@ create_version_yml() {
 
     # 멀티타입 — PROJECT_TYPES 배열을 ["a","b"] json 형태로, primary는 첫 항목
     # (배열이 비었으면 $type 단수로 fallback — 하위 호환)
-    local _types_json _primary_type
+    local _types_json
     if [ ${#PROJECT_TYPES[@]} -gt 0 ]; then
         local _t _parts=()
         for _t in "${PROJECT_TYPES[@]}"; do _parts+=("\"$_t\""); done
         local IFS=','
         _types_json="[${_parts[*]}]"
         unset IFS
-        _primary_type="${PROJECT_TYPES[0]}"
     else
         _types_json="[\"$type\"]"
-        _primary_type="$type"
     fi
 
     print_step "version.yml 생성 중..."
@@ -2305,7 +2298,7 @@ create_version_yml() {
 # 사용법:
 # 1. version: "1.0.0" - 사용자에게 표시되는 버전
 # 2. version_code: 1 - Play Store/App Store 빌드 번호 (1부터 자동 증가)
-# 3. project_type: 프로젝트 타입 지정
+# 3. project_types: 프로젝트 타입 배열 — 첫 항목이 primary
 # 4. project_paths: 타입별 프로젝트 폴더 (레포 루트 기준 상대경로, 모노레포용)
 #
 # 자동 버전 업데이트:
@@ -2328,14 +2321,13 @@ create_version_yml() {
 # - .github/workflows/PROJECT-AUTO-CHANGELOG-CONTROL.yaml
 #
 # 주의사항:
-# - project_type은 최초 설정 후 변경하지 마세요
+# - project_types는 최초 설정 후 변경하지 마세요
 # - 버전은 항상 높은 버전으로 자동 동기화됩니다
 # ===================================================================
 
 version: "$version"
 version_code: $existing_version_code  # app build number
 project_types: $_types_json   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
-project_type: "$_primary_type"  # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 EOF
 
     if [ -n "$_paths_block" ]; then

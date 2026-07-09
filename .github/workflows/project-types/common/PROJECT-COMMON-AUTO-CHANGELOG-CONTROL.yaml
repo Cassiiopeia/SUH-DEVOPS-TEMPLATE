@@ -126,12 +126,12 @@ jobs:
             PROJECT_TYPE="python"
           fi
 
-          # version.yml에서 프로젝트 타입 확인
-          if [ -f "version.yml" ] && [ "$PROJECT_TYPE" = "unknown" ]; then
-            PROJECT_TYPE=$(grep "^project_type:" version.yml | sed 's/project_type: *"\([^"]*\)".*/\1/' || echo "unknown")
-          fi
-          # 멀티타입 — project_types 배열을 csv로 추출, 없으면 단수 키 fallback
+          # 멀티타입 — project_types 배열을 csv로 추출 (v4.1.0 SSOT: 단수 project_type 키는 읽지 않음)
           PROJECT_TYPES=$(grep "^project_types:" version.yml 2>/dev/null | sed -E 's/.*\[([^]]*)\].*/\1/' | tr -d '" ' || echo "")
+          # primary 타입 = 배열 첫 항목 (배열이 없으면 위 폴백에서 감지한 값 유지)
+          if [ -n "$PROJECT_TYPES" ]; then
+            PROJECT_TYPE=$(echo "$PROJECT_TYPES" | cut -d',' -f1)
+          fi
           [ -z "$PROJECT_TYPES" ] && PROJECT_TYPES="$PROJECT_TYPE"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT

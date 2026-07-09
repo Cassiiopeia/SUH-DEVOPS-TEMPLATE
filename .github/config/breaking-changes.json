@@ -45,6 +45,13 @@
     "message": "브랜치 전략이 전면 개편되었습니다. 기존: main(개발 통합) → deploy(프로덕션). 신규: develop(개발 통합) → main(default=프로덕션). deploy 브랜치는 폐기되었습니다. 배포·README·플러그인/NPM 동기화 워크플로우는 main push 트리거로, CI·시크릿 백업·Util 동기화는 develop 트리거로 변경되었습니다. 버전은 develop→main 릴리스 PR 안에서 AUTO-CHANGELOG-CONTROL이 릴리스당 +1로 확정하며(main 직접 push는 VERSION-CONTROL 안전망이 처리), 일상 develop push는 버전을 올리지 않습니다. 기존 프로젝트 전환 절차: 1) git branch develop main && git push origin develop 2) 템플릿 재통합(업데이트 모드) 3) deploy 브랜치 삭제 4) 이후 개발은 develop에서, 릴리스는 develop→main PR로 진행. 전환 전까지는 이 업데이트를 받지 마세요."
   },
 
+  "4.1.0": {
+    "severity": "critical",
+    "title": "version.yml 단수 project_type 키 제거 — project_types 배열이 유일한 소스(SSOT)",
+    "message": "version.yml의 단수 project_type 키가 완전히 제거되었습니다. 이제 project_types 배열이 유일한 소스이며 첫 항목이 primary 타입입니다. 배열과 단수 키가 같이 있으면 단수 키는 무시되고(경고 출력), 단수 키만 있는 v4.0 이전 형식은 version_manager.sh가 명시적으로 실패합니다(조용한 오작동 방지). 전환 절차: version.yml에서 project_type 라인을 삭제하고 project_types: [\"타입\"] 배열만 남기세요. 예) project_type: \"spring\" → project_types: [\"spring\"]. 템플릿 재통합(npx projectops 업데이트 모드)을 실행하면 version.yml이 새 형식으로 자동 재작성됩니다.",
+    "_comment_placeholder_437": "next 타입 제거 내용은 #437 작업에서 이 메시지에 병합 예정"
+  },
+
   "4.0.0": {
     "severity": "critical",
     "title": "통합 마법사 npx projectops 단일 CLI로 전면 전환 — .sh/.ps1 실행 방식 변경",

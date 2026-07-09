@@ -3411,9 +3411,13 @@ function Copy-Scripts {
         New-Item -Path $SCRIPTS_DIR -ItemType Directory -Force | Out-Null
     }
     
+    # version_manager는 .sh(위임 shim) + .py(실 로직) 한 쌍 — 둘 다 복사해야 동작 (#448)
     $scripts = @(
         "version_manager.sh",
-        "changelog_manager.py"
+        "version_manager.py",
+        "changelog_manager.py",
+        "truncate_release_notes.sh",
+        "truncate_release_notes.py"
     )
     
     $copied = 0
@@ -5068,7 +5072,8 @@ function Show-Summary {
     Write-Host "  📦 새로 설치됨 ($($script:WorkflowsCopied)개)"
     Write-Host ""
     Write-Host "  🔧 .github/scripts/"
-    Write-Host "     ├─ version_manager.sh"
+    Write-Host "     ├─ version_manager.sh (+ .py)"
+    Write-Host "     ├─ truncate_release_notes.sh (+ .py)"
     Write-Host "     └─ changelog_manager.py"
     Write-Host ""
 

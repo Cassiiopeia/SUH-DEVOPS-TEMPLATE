@@ -5,9 +5,14 @@ import { chmodSync } from "node:fs";
 import { PATHS } from "../paths.js";
 import { exists, copyFileSync, copyDirSync } from "../fsutil.js";
 
-// version_manager.sh, changelog_manager.py 2개만 무조건 덮어쓰기 + chmod +x.
+// 버전관리/릴리스노트 스크립트만 무조건 덮어쓰기 + chmod +x.
+// version_manager는 .sh(위임 shim) + .py(실 로직) 한 쌍 — 둘 다 복사해야 동작 (#448).
 export function copyScripts(tempDir, targetRoot = ".") {
-  const scripts = ["version_manager.sh", "changelog_manager.py"];
+  const scripts = [
+    "version_manager.sh", "version_manager.py",
+    "changelog_manager.py",
+    "truncate_release_notes.sh", "truncate_release_notes.py",
+  ];
   let copied = 0;
   for (const s of scripts) {
     const src = join(tempDir, PATHS.scriptsDir, s);

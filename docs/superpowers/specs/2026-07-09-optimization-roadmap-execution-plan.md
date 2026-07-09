@@ -102,15 +102,25 @@ Phase 6  전체 회귀 + 통합검증                       ← npm test 전량 
 
 ### Phase 4 — #456: changelog-deploy 스킬 브랜치·mode config화
 
-**작업**: SKILL.md의 `develop`/`main` 하드코딩 → version.yml `default_branch`(+deploy 브랜치 개념 검토)에서 읽기. A의 `changelog.provider`를 스킬이 읽어 `commit` 모드면 노트 정책 분기. 필요 시 `changelog_cli.py`에 브랜치/mode 조회 서브커맨드 추가.
+**작업**:
+- **`deploy_branch` 신규 도입 (게이트 4 확정)**: `default_branch`와 **별개 개념**. 마법사가 "릴리스 배포 브랜치(릴리스 PR의 head)는 무엇인가요?"를 **별도 질문**하고 version.yml에 저장. `buildVersionYml`/`parseTemplateOptions`(npx `src/core/version-yml.js`) + `options-ask.js`에 배선 + 테스트.
+- SKILL.md의 `develop`/`main` 하드코딩 → version.yml에서 읽기: **head 브랜치 = `deploy_branch`(없으면 `develop` 폴백)**, base 브랜치 = `default_branch`(없으면 `main` 폴백).
+- A의 `changelog.provider`를 스킬이 읽어 `commit` 모드면 노트 정책 분기.
+- `changelog_cli.py`에 브랜치/mode 조회 서브커맨드 추가.
 
-**TDD**: `changelog_cli.py` 신규 서브커맨드는 `mcp-subcommand-rules.md` 기준(JSON `ok`/`next`) + `scripts/test/` 단위 테스트. 브랜치 읽기 실패 시 `develop→main` 폴백 테스트. 워크플로우 리네임(Phase 3) 반영이 스킬 문서에도 되어야 하므로 Phase 3 후 진행.
+**TDD**:
+- npx: `deploy_branch` 질문·저장·파싱 라운드트립 테스트(`test/version-yml.test.js`·`test/options-ask.test.js` 패턴). deploy_branch 미지정 시 `develop` 폴백 테스트.
+- 스킬: `changelog_cli.py` 신규 서브커맨드는 `mcp-subcommand-rules.md` 기준(JSON `ok`/`next`) + `scripts/test/` 단위 테스트. 브랜치 읽기 실패 시 `develop→main` 폴백 테스트.
+- 워크플로우 리네임(Phase 3) 반영이 스킬 문서에도 되어야 하므로 Phase 3 후 진행.
 
-### Phase 5 — #458: integrator.sh/.ps1 EOF
+### Phase 5 — #458: integrator.sh/.ps1 EOF (게이트 3 확정 = 삭제 아님, 라우팅 유도)
 
-**작업**: 폐기 방식 확정(§6) 후 실행. deprecation shim(1버전 안내 후 삭제) 권장. CLAUDE.md의 integrator 검증 가이드(bash 3.2·Docker PowerShell)를 **npx 기준으로 대체**, README·docs 참조 교체, 제외 목록에서 integrator 항목 정리.
+**작업 (게이트 3 확정)**: **두 스크립트의 본문 로직은 삭제하지 않는다.** 진입부(`main` 호출 직전 또는 최상단)에 **"이제 `npx projectops`를 쓰세요"라는 안내를 출력하고 npx 경로로 유도**하는 라우팅 메시지만 추가한다. `.sh`·`.ps1` 양쪽 동일. CLAUDE.md의 integrator 검증 가이드(bash 3.2·Docker PowerShell)를 **npx 기준으로 대체**, README·docs 사용법을 npx로 교체.
 
-**TDD**: shim 방식이면 "두 스크립트 실행 시 npx 안내 출력 후 종료" 스모크. **npx 통합이 A·C·E를 전부 반영했는지** 통합 스모크(`--force --mode full --type spring,flutter,react,python`)가 종료코드 0으로 완주하는지 — 이게 D의 안전 전제.
+**TDD**:
+- `.sh`: `expect`(또는 stdin 주입)로 실행 시 npx 안내 문구가 뜨는지 스모크. 본문 로직 보존 확인(diff로 진입부만 변경).
+- `.ps1`: Docker PowerShell 파서로 `PS1_PARSE_OK` + 안내 출력 확인.
+- **npx 통합이 A·C·E를 전부 반영했는지** 통합 스모크(`--force --mode full --type spring,flutter,react,python`)가 종료코드 0으로 완주 — 이게 D의 안전 전제.
 
 ### Phase 6 — 전체 회귀 + 통합 검증
 
@@ -144,13 +154,20 @@ Phase 6  전체 회귀 + 통합검증                       ← npm test 전량 
 
 ---
 
-## 6. 구현 전 확정 필요 (결정 게이트)
+## 6. 결정 게이트 — 확정됨 (2026-07-09 사용자 확정)
 
-writing-plans로 넘어가기 전 확정:
-1. **E 네임스페이스**: `projectops:issue`(무접두) vs `projectops:suh-issue`? **구 커맨드 alias 1버전 유지 여부?**
-2. **#457 브랜치 질문**: 마법사에 브랜치 전략 질문을 추가할지(default_branch 이미 있음) — 안 하면 범위 밖 명시.
-3. **#458 폐기 방식**: 즉시 삭제 vs deprecation shim 1버전.
-4. **B deploy 브랜치**: `default_branch` 외에 별도 deploy 브랜치 개념을 version.yml에 추가할지.
+| # | 결정 | 확정 내용 |
+|---|------|----------|
+| 1 | **E 네임스페이스** | **`projectops:issue` 무접두사**. `suh-` 완전 제거. **구 커맨드 alias는 두지 않음**(즉시 전환). |
+| 2 | **#457 브랜치 질문** | **추가 안 함 (범위 밖)**. `default_branch`가 이미 version.yml에 있고 감지되므로 마법사 질문을 늘리지 않는다. changelog/coderabbit 질문만 유지. |
+| 3 | **#458 integrator 폐기** | **코드 로직은 삭제하지 않는다.** 두 스크립트가 실행되면 **"이제 `npx projectops`를 쓰세요"라는 라우팅 안내로 연결되도록 내부 진입부만 수정**(얇은 라우팅 메시지). 본문 로직은 보존하되 실행 경로가 npx로 유도되게 한다. README·docs·CLAUDE.md의 사용법은 npx 기준으로 갱신. |
+| 4 | **B deploy 브랜치** | **`deploy_branch`를 별개 개념으로 추가한다.** `default_branch`(레포가 이미 아는 기본 브랜치)와 **배포 브랜치(릴리스 PR의 head)는 다른 개념** — 마법사가 **별도로 물어보고** version.yml에 저장한다. |
+
+> 게이트 확정에 따른 스펙 반영:
+> - **Phase 1**: 브랜치 질문 없음 확정 → `.coderabbit.yaml` 조건부 복사만.
+> - **Phase 2**: alias 없이 `projectops:issue`로 즉시 리네임. 리네임 후 구 이름 잔재 0건이 정합성 테스트 통과 조건.
+> - **Phase 4**: version.yml 스키마에 `metadata.template.deploy_branch`(또는 `metadata.template.options.deploy_branch`) 추가 + 마법사 질문 + `buildVersionYml`/`parseTemplateOptions` 배선 + 테스트. 스킬은 이 값을 읽어 릴리스 PR head를 결정(없으면 `develop` 폴백).
+> - **Phase 5**: integrator를 **삭제하지 않고** 진입부 라우팅 메시지로 npx 유도. shim 스모크 = "실행 시 npx 안내 출력".
 
 ---
 

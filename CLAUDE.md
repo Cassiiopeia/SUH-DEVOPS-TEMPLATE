@@ -23,15 +23,14 @@
 |------|------|-----------------|
 | `spring` | Spring Boot | `build.gradle` |
 | `flutter` | Flutter | `pubspec.yaml` |
-| `react` | React.js | `package.json` |
-| `next` | Next.js | `package.json` |
+| `react` | React.js / Next.js | `package.json` |
 | `node` | Node.js | `package.json` |
 | `python` | FastAPI/Django | `pyproject.toml` |
 | `react-native` | React Native CLI | `Info.plist` + `build.gradle` |
 | `react-native-expo` | Expo | `app.json` |
 | `basic` | 범용 | `version.yml`만 |
 
-> **멀티타입**: 단일 레포에 여러 타입 공존 시 `--type spring,react,python` csv로 지정. `version.yml`의 `project_types` 배열에 저장되며, 단수 `project_type` 키는 배열 첫 항목으로 자동 미러된다.
+> **멀티타입**: 단일 레포에 여러 타입 공존 시 `--type spring,react,python` csv로 지정. `version.yml`의 `project_types` 배열에 저장되며, 첫 항목이 primary 타입이다 (단수 `project_type` 키는 v4.1.0에서 제거됨 — SSOT).
 >
 > **모노레포 경로**: 타입별 프로젝트가 서브폴더에 있으면(예: `app/`, `client/`, `ai/`) `version.yml`의 `project_paths` 맵(타입 → 레포 루트 기준 상대경로)으로 지정한다. integrator가 통합 시 마커 파일(`pubspec.yaml`·`package.json`·`pyproject.toml`·`build.gradle` 등)을 자동 감지·확인하며, 키가 없으면 루트 기준(기존 동작 100% 유지). 비대화형은 `--paths "flutter=app,react=client"`(`.ps1`은 `-Paths`). `version_manager.sh`가 이 경로를 따라 서브폴더 버전 파일을 동기화하므로, `PROJECT-COMMON-VERSION-CONTROL` 워크플로우는 무수정으로 모노레포를 커버한다.
 
@@ -49,8 +48,7 @@ suh-github-template/
 │   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in)
 │   │       ├── flutter/         # Flutter 전용 (배포 워크플로우 루트 포함)
 │   │       ├── spring/          # Spring 전용 (server-deploy/ 기본포함·Nexus면제외 + nexus/ opt-in)
-│   │       ├── react/
-│   │       └── next/
+│   │       └── react/           # React/Next.js 공용 (next 타입은 v4.1.0에서 흡수됨)
 │   ├── scripts/
 │   │   ├── version_manager.sh
 │   │   ├── changelog_manager.py
@@ -80,7 +78,7 @@ suh-github-template/
 ```
 PROJECT-[TYPE]-[FEATURE]-[DETAIL].yaml
 
-TYPE: TEMPLATE | COMMON | FLUTTER | SPRING | REACT | NEXT
+TYPE: TEMPLATE | COMMON | FLUTTER | SPRING | REACT
 ```
 
 ### 스크립트 파일
@@ -143,11 +141,13 @@ snake_case.sh / snake_case.py
 
 > `--secret-backup` 옵션으로 포함합니다.
 
-#### React / Next
+#### React (Next.js 포함)
 | 파일명 | 용도 |
 |--------|------|
-| `PROJECT-REACT-CI` / `PROJECT-NEXT-CI` | 빌드 검증 |
-| `PROJECT-REACT-CICD` / `PROJECT-NEXT-CICD` | Docker 빌드 및 배포 |
+| `PROJECT-REACT-CI` | 빌드 검증 (.next/cache 캐싱 포함) |
+| `PROJECT-REACT-CICD` | Docker 빌드 및 배포 (Next.js SSR 옵션 포함) |
+
+> `next` 타입은 v4.1.0에서 `react`로 흡수되었습니다 (PROJECT-NEXT-* 워크플로우 삭제).
 
 ---
 

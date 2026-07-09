@@ -1,14 +1,48 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-08T09:58:58Z",
-    "currentVersion": "4.0.4",
-    "projectType": "basic",
-    "totalReleases": 182,
+    "lastUpdated": "2026-07-09T02:50:55Z",
+    "currentVersion": "4.1.1",
+    "projectType": "",
+    "totalReleases": 183,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.1.1",
+      "project_type": "",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-09",
+      "pr_number": 449,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * React 배포 시 Next.js SSR 실행 옵션과 컨테이너 자동 재시작을 기본 지원합니다\n\n* **개선**\n  * 프로젝트 타입 설정이 하나의 목록으로 통일되어 중복 관리가 사라졌습니다\n  * next 타입이 react로 통합되어 Next.js 프로젝트도 react 하나로 관리됩니다\n  * 이전 형식 설정 파일은 명확한 전환 안내와 함께 감지됩니다\n\n* **문서**\n  * 마법사 첫 화면 개편 설계와 신규 CLI 계획 문서가 추가되었습니다\n  * 지원 타입·버전 관리 문서가 새 기준으로 정리되었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "React 배포 시 Next.js SSR 실행 옵션과 컨테이너 자동 재시작을 기본 지원합니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "프로젝트 타입 설정이 하나의 목록으로 통일되어 중복 관리가 사라졌습니다",
+            "next 타입이 react로 통합되어 Next.js 프로젝트도 react 하나로 관리됩니다",
+            "이전 형식 설정 파일은 명확한 전환 안내와 함께 감지됩니다"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "마법사 첫 화면 개편 설계와 신규 CLI 계획 문서가 추가되었습니다",
+            "지원 타입·버전 관리 문서가 새 기준으로 정리되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.0.4",
       "project_type": "basic",

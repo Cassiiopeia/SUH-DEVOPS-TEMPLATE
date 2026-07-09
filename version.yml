@@ -11,27 +11,28 @@
 #       → 사용자가 이 파일에서 직접 수정해야 합니다
 #       → 예: 1.0.5 → 1.1.0 또는 2.0.0 으로 올리고 싶으면 직접 수정
 #
-# 지원 타입: spring, flutter, next, react, react-native,
+# 지원 타입: spring, flutter, react, react-native,
 #           react-native-expo, node, python, basic
+#           (next는 v4.1.0에서 react로 흡수됨)
 #
 # [멀티타입] 한 레포에 여러 타입 공존 시 project_types 배열에 나열:
 #           project_types: ["spring", "react", "python"]
-#           → project_type(단수)은 항상 배열 첫 항목으로 자동 미러링됨 (직접 수정 금지)
+#           → 첫 항목이 primary 타입 (버전 파일 결정 기준)
+#           → 단수 project_type 키는 v4.1.0에서 제거됨 — 사용하지 마세요
 #
 # 타입별 동기화 파일:
 # - spring: build.gradle
 # - flutter: pubspec.yaml
-# - next/react/node: package.json
+# - react/node: package.json
 # - react-native: Info.plist, build.gradle
 # - react-native-expo: app.json
 # - python: pyproject.toml
 # - basic: version.yml만 사용
 # ===================================================================
 
-version: "4.0.4"
-version_code: 391 # app build number
+version: "4.1.1"
+version_code: 392 # app build number
 project_types: ["basic"] # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
-project_type: "basic" # project_types[0] 자동 미러 — 직접 수정 금지 (spring, flutter, next, react, react-native, react-native-expo, node, python, basic)
 metadata:
-  last_updated: "2026-07-08 09:58:57"
+  last_updated: "2026-07-09 02:50:54"
   last_updated_by: "Cassiiopeia"

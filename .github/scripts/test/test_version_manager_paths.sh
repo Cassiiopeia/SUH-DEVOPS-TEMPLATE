@@ -24,7 +24,7 @@ new_workdir() {
   cd "$WORK" || exit 1
 }
 
-echo "=== (1) legacy 회귀: project_paths 없음 + 루트 flutter ==="
+echo "=== (1) v4.1.0 breaking: legacy 단수 키만 있으면 명시적 실패 ==="
 new_workdir
 cat > version.yml << 'EOF'
 version: "0.0.2"
@@ -32,8 +32,36 @@ version_code: 5
 project_type: "flutter"
 EOF
 printf 'name: demo\nversion: 0.0.1+1\n' > pubspec.yaml
+OUT=$(bash "$SCRIPT" sync 2>&1)
+RC=$?
+chk "legacy 형식 → exit 1" "$RC" "1"
+echo "$OUT" | grep -q "project_types" && chk "전환 안내 출력" "1" "1" || chk "전환 안내 출력" "0" "1"
+chk "pubspec 미변경 (조용한 오작동 방지)" "$(yq -r '.version' pubspec.yaml)" "0.0.1+1"
+
+echo "=== (1-2) 배열 단독 + 루트 flutter sync (SSOT 정상 경로) ==="
+new_workdir
+cat > version.yml << 'EOF'
+version: "0.0.2"
+version_code: 5
+project_types: ["flutter"]
+EOF
+printf 'name: demo\nversion: 0.0.1+1\n' > pubspec.yaml
 bash "$SCRIPT" sync >/dev/null 2>&1
 chk "루트 pubspec 동기화" "$(yq -r '.version' pubspec.yaml)" "0.0.2+5"
+
+echo "=== (1-3) 배열 + 잔존 단수 키: 단수 무시(경고)하고 정상 동작 ==="
+new_workdir
+cat > version.yml << 'EOF'
+version: "0.0.2"
+version_code: 5
+project_types: ["flutter"]
+project_type: "spring"
+EOF
+printf 'name: demo\nversion: 0.0.1+1\n' > pubspec.yaml
+OUT=$(bash "$SCRIPT" sync 2>&1)
+chk "exit 0" "$?" "0"
+chk "배열 기준으로 pubspec 동기화 (단수 spring 무시)" "$(yq -r '.version' pubspec.yaml)" "0.0.2+5"
+echo "$OUT" | grep -q "무시" && chk "단수 키 무시 경고 출력" "1" "1" || chk "단수 키 무시 경고 출력" "0" "1"
 
 echo "=== (2) 모노레포: project_paths 있는 멀티타입 sync ==="
 new_workdir
@@ -41,7 +69,6 @@ cat > version.yml << 'EOF'
 version: "0.0.9"
 version_code: 5
 project_types: ["flutter", "react", "python"]
-project_type: "flutter"
 project_paths:
   flutter: "app"
   react: "client"
@@ -62,7 +89,6 @@ cat > version.yml << 'EOF'
 version: "0.0.9"
 version_code: 5
 project_types: ["flutter", "react"]
-project_type: "flutter"
 EOF
 mkdir -p app client
 printf 'name: demo\nversion: 0.0.1+1\n' > app/pubspec.yaml
@@ -78,7 +104,6 @@ cat > version.yml << 'EOF'
 version: "0.0.9"
 version_code: 5
 project_types: ["flutter"]
-project_type: "flutter"
 project_paths:
   flutter: "nope"
 EOF
@@ -92,7 +117,6 @@ cat > version.yml << 'EOF'
 version: "0.0.9"
 version_code: 5
 project_types: ["flutter", "react"]
-project_type: "flutter"
 project_paths:
   flutter: "app"
   react: "client"
@@ -111,7 +135,6 @@ cat > version.yml << 'EOF'
 version: "0.0.9"
 version_code: 5
 project_types: ["spring"]
-project_type: "spring"
 project_paths:
   spring: "nope"
 EOF

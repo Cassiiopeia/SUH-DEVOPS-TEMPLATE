@@ -24,7 +24,7 @@ function makeTemplateFixture({ nexus = true, secretBackup = true } = {}) {
 }
 
 const VY_WITH_OPTIONS = (nexus, secret) => `version: "1.0.0"
-project_type: "spring"
+project_types: ["spring"]
 metadata:
   last_updated: "2026-07-08"
   template:
@@ -50,7 +50,7 @@ test("parseTemplateOptions: true/false/미존재", () => {
     { nexus: true, secretBackup: false });
   assert.deepEqual(parseTemplateOptions(VY_WITH_OPTIONS('"false"', '"true"')),
     { nexus: false, secretBackup: true }); // 따옴표 제거 (.sh tr -d 등가)
-  assert.deepEqual(parseTemplateOptions('version: "1.0.0"\nproject_type: "spring"\n'),
+  assert.deepEqual(parseTemplateOptions('version: "1.0.0"\nproject_types: ["spring"]\n'),
     { nexus: null, secretBackup: null }); // options 블록 없음 → null
 });
 

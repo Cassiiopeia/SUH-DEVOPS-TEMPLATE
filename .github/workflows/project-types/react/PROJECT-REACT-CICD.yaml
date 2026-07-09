@@ -217,11 +217,14 @@ jobs:
             # ============================================================
             echo "🚀 새로운 컨테이너 $CONTAINER_NAME 실행 중..."
 
+            # Next.js SSR 컨테이너도 커버 (next 타입 흡수 — NODE_ENV/restart 정책 포함)
             echo $PW | sudo -S docker run -d \
               -p ${PORT}:3000 \
               --name $CONTAINER_NAME \
               -e TZ=Asia/Seoul \
+              -e NODE_ENV=production \
               -v /etc/localtime:/etc/localtime:ro \
+              --restart unless-stopped \
               ${{ secrets.DOCKERHUB_USERNAME }}/${PROJECT_NAME}-${{ env.DOCKER_IMAGE_PREFIX }}:${BRANCH}
 
             # ============================================================

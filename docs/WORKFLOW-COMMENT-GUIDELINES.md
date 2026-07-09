@@ -169,7 +169,7 @@ name: PROJECT-Flutter-CI
 **적용 파일:**
 - FLUTTER-CI
 - REACT-CI
-- NEXT-CI
+
 - PYTHON-CI
 
 ---
@@ -225,7 +225,7 @@ name: PROJECT-SPRING-SYNOLOGY-CICD
 - SPRING-SYNOLOGY-CICD
 - PYTHON-SYNOLOGY-CICD
 - REACT-CICD
-- NEXT-CICD
+
 - FLUTTER-SYNOLOGY-CICD
 
 ---
@@ -376,14 +376,12 @@ name: PROJECT-iOS-TestFlight-Deploy
 | NEXUS-CI | B | ✅ |
 | NEXUS-PUBLISH | B | ✅ |
 
-### project-types/react/ & next/
+### project-types/react/ (Next.js 포함 — next 타입은 v4.1.0에서 흡수)
 
 | 파일 | 타입 | 상태 |
 |------|------|------|
 | REACT-CI | C | ✅ |
 | REACT-CICD | D | ✅ |
-| NEXT-CI | C | ✅ |
-| NEXT-CICD | D | ✅ |
 
 ---
 

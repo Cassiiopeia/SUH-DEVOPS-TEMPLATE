@@ -217,10 +217,9 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]
 - **자동 감지 시 다중 선택**: `--type`을 생략하면 일치하는 모든 타입을 감지해 다중 선택 메뉴로 표시합니다. `Space`로 토글, `Enter`로 csv 확정합니다.
 - **version.yml 저장 형식**: 선택한 타입은 `version.yml`의 `project_types` 배열에 저장됩니다.
   ```yaml
-  project_types: ["spring", "react", "python"]
-  project_type: "spring"   # project_types[0] 자동 미러 (직접 수정 금지)
+  project_types: ["spring", "react", "python"]   # 첫 항목이 primary
   ```
-- **하위 호환**: 단일 타입도 `project_types: ["react"]` 형태로 통일되며, 단수 `project_type` 키만 있는 기존 version.yml도 100% 그대로 동작합니다.
+- **단수 키 제거(v4.1.0)**: 단일 타입도 `project_types: ["react"]` 형태로 통일됩니다. 단수 `project_type` 키는 더 이상 쓰지도 읽지도 않으며, 단수 키만 있는 기존 version.yml은 통합(업데이트) 실행 시 마커 재감지를 거쳐 배열 형식으로 재작성됩니다.
 
 ### CI 트리거 주의
 

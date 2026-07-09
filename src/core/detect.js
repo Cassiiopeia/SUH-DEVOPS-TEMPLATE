@@ -6,8 +6,8 @@ export function classifyPackageText(raw) {
   if (s.includes("@react-native") || s.includes("react-native")) {
     return s.includes("expo") ? "react-native-expo" : "react-native";
   }
-  if (s.includes('"next"')) return "next";
-  if (s.includes('"react"')) return "react";
+  // next 타입은 v4.1.0에서 react로 흡수 — "next" 의존성이 있어도 react로 판정
+  if (s.includes('"react"') || s.includes('"next"')) return "react";
   return "node";
 }
 

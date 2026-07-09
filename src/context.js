@@ -19,6 +19,10 @@ export function createContext(overrides = {}) {
     deployTarget: null,      // 'docker-ssh'(기본) | 'vercel' | 'none'
     publishTargets: null,    // ['nexus','npm','github-packages'] 부분집합
     includeSecretBackup: null,
+    // changelog provider 축 (#455 — null=미설정)
+    changelogProvider: null, // 'github-ai'(기본) | 'coderabbit' | 'openai' | 'gemini' | 'claude' | 'ollama' | 'commit'
+    changelogBaseUrl: null,  // ollama일 때만 값
+    codeReviewCoderabbit: null,
     templateVersion: "",
     tempDir: "",
     deployValues: new Map(), // "type.KEY" -> value

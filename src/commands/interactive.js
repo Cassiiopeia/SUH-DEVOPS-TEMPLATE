@@ -83,6 +83,9 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     let deployTarget = existing?.options?.deploy ?? "docker-ssh";
     let publishTargets = existing?.options?.publish ?? [];
     let includeSecretBackup = existing?.options?.secretBackup ?? false;
+    let codeReviewCoderabbit = existing?.options?.codeReviewCoderabbit ?? true;
+    let changelogProvider = existing?.options?.changelogProvider ?? "github-ai";
+    let changelogBaseUrl = existing?.options?.changelogBaseUrl ?? "";
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
 
@@ -93,17 +96,26 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     if (showOptional) {
       const r = await askAllOptionalWorkflows({
         tempDir, types, targetRoot: cwd,
-        current: { deploy: existing?.options?.deploy ?? null, publish: existing?.options?.publish ?? null, secretBackup: existing?.options?.secretBackup ?? null },
+        current: {
+          deploy: existing?.options?.deploy ?? null, publish: existing?.options?.publish ?? null, secretBackup: existing?.options?.secretBackup ?? null,
+          codeReviewCoderabbit: existing?.options?.codeReviewCoderabbit ?? null,
+          changelogProvider: existing?.options?.changelogProvider ?? null,
+          changelogBaseUrl: existing?.options?.changelogBaseUrl ?? null,
+        },
         force: false, tty: realTty,
         io: {
           confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue),
           select: io.engineIo?.select,
           multiselect: io.engineIo?.multiselect,
+          text: io.engineIo?.text ?? (({ message }) => io.askText?.(message, "")),
         },
       });
       deployTarget = r.deploy;
       publishTargets = r.publish;
       includeSecretBackup = r.secretBackup;
+      codeReviewCoderabbit = r.codeReviewCoderabbit;
+      changelogProvider = r.changelogProvider;
+      changelogBaseUrl = r.changelogBaseUrl;
     }
 
     // 확인/수정 루프 — ESC는 '머무르기' (.sh L1877~1881: 명시적 '아니오'만 종료)
@@ -114,7 +126,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       if (io.analysisCard) {
         io.analysisCard({ mode, modeLabel: modeLabel(mode), types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional, paths });
       } else {
-        io.note?.(summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional }), "프로젝트 분석 결과");
+        io.note?.(summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional, changelogProvider, codeReviewCoderabbit }), "프로젝트 분석 결과");
       }
       const choice = await io.confirmProjectMenu();
       if (choice === "cancel") { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
@@ -147,17 +159,24 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           // 배포/publish 축 재질문 (#439 — forceAsk)
           const r = await askAllOptionalWorkflows({
             tempDir, types, targetRoot: cwd,
-            current: { deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup },
+            current: {
+              deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup,
+              codeReviewCoderabbit, changelogProvider, changelogBaseUrl,
+            },
             force: false, tty: realTty, forceAsk: true,
             io: {
               confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue),
               select: io.engineIo?.select,
               multiselect: io.engineIo?.multiselect,
+              text: io.engineIo?.text ?? (({ message }) => io.askText?.(message, "")),
             },
           });
           deployTarget = r.deploy;
           publishTargets = r.publish;
           includeSecretBackup = r.secretBackup;
+          codeReviewCoderabbit = r.codeReviewCoderabbit;
+          changelogProvider = r.changelogProvider;
+          changelogBaseUrl = r.changelogBaseUrl;
         } else if (what === "secret") {
           const y = await io.askYesNo("Secret 백업 워크플로우를 포함할까요?", includeSecretBackup);
           if (!isCancel(y)) includeSecretBackup = y === true;
@@ -190,6 +209,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     const { now, today } = clock || utcNow();
     const ctx = createContext({
       mode, force: true, types, version, versionCode, branch, paths, deployTarget, publishTargets, includeSecretBackup,
+      codeReviewCoderabbit, changelogProvider, changelogBaseUrl,
       repoName, templateVersion, resolvers, envValues, envUseDefaults, now, today,
     });
     ctx.templateVersion = templateVersion;
@@ -240,7 +260,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
   }
 }
 
-function summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional }) {
+function summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional, changelogProvider, codeReviewCoderabbit }) {
   const lines = [
     `통합 모드 : ${modeLabel(mode)}`,
     `프로젝트 타입 : ${types.join(", ")}${types.length > 1 ? " (멀티)" : ""}`,
@@ -251,6 +271,8 @@ function summarize({ mode, types, version, branch, deployTarget, publishTargets,
     lines.push(`배포 방식 : ${deployTarget || "docker-ssh"}`);
     lines.push(`Publish : ${(publishTargets ?? []).join(",") || "없음"}`);
     lines.push(`Secret 백업 : ${includeSecretBackup ? "포함" : "제외"}`);
+    lines.push(`Changelog : ${changelogProvider || "github-ai"}`);
+    lines.push(`CodeRabbit 리뷰 : ${codeReviewCoderabbit ? "사용" : "미사용"}`);
   }
   return lines.join("\n");
 }

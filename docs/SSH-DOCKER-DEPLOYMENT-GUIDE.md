@@ -6,7 +6,7 @@ SSH로 접속 가능한 모든 서버(Synology NAS·AWS EC2·GCP·일반 VPS 등
 
 ## 개요
 
-SUH-DEVOPS-TEMPLATE은 "SSH 접속 → Docker 이미지 pull → 컨테이너 교체" 패턴의 배포 워크플로우를 제공합니다. 배포처가 Synology든 AWS EC2든 동일한 워크플로우 하나로 커버하며, 차이는 `SSH_AUTH_METHOD`(password/key)와 경로 설정뿐입니다.
+projectops은 "SSH 접속 → Docker 이미지 pull → 컨테이너 교체" 패턴의 배포 워크플로우를 제공합니다. 배포처가 Synology든 AWS EC2든 동일한 워크플로우 하나로 커버하며, 차이는 `SSH_AUTH_METHOD`(password/key)와 경로 설정뿐입니다.
 
 | 워크플로우 | 프로젝트 타입 | 용도 |
 |-----------|-------------|------|

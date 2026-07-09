@@ -1,6 +1,6 @@
 # 🤝 기여 가이드라인
 
-projectops(구 SUH-DEVOPS-TEMPLATE) 프로젝트에 기여해주셔서 감사합니다! 이 문서는 기여자들이 프로젝트에 효과적으로 참여할 수 있도록 안내합니다.
+projectops 프로젝트에 기여해주셔서 감사합니다! 이 문서는 기여자들이 프로젝트에 효과적으로 참여할 수 있도록 안내합니다.
 
 ---
 
@@ -22,7 +22,7 @@ projectops(구 SUH-DEVOPS-TEMPLATE) 프로젝트에 기여해주셔서 감사합
 ## 시작하기 전에
 
 ### 기여하기 전 체크리스트
-- [ ] [이슈 목록](https://github.com/Cassiiopeia/suh-github-template/issues)을 확인하여 중복된 이슈가 없는지 확인
+- [ ] [이슈 목록](https://github.com/Cassiiopeia/projectops/issues)을 확인하여 중복된 이슈가 없는지 확인
 - [ ] 새로운 기능을 제안하려면 먼저 이슈를 생성하여 논의
 - [ ] 프로젝트 구조와 워크플로우를 이해
 - [ ] 개발 환경 설정 완료
@@ -100,18 +100,18 @@ gh --version
 # GitHub에서 Fork 버튼 클릭
 
 # 2. 포크한 리포지토리 클론
-git clone https://github.com/YOUR-USERNAME/suh-github-template.git
-cd suh-github-template
+git clone https://github.com/YOUR-USERNAME/projectops.git
+cd projectops
 
 # 3. 원본 리포지토리를 upstream으로 추가
-git remote add upstream https://github.com/Cassiiopeia/suh-github-template.git
+git remote add upstream https://github.com/Cassiiopeia/projectops.git
 
 # 4. 리모트 확인
 git remote -v
-# origin    https://github.com/YOUR-USERNAME/suh-github-template.git (fetch)
-# origin    https://github.com/YOUR-USERNAME/suh-github-template.git (push)
-# upstream  https://github.com/Cassiiopeia/suh-github-template.git (fetch)
-# upstream  https://github.com/Cassiiopeia/suh-github-template.git (push)
+# origin    https://github.com/YOUR-USERNAME/projectops.git (fetch)
+# origin    https://github.com/YOUR-USERNAME/projectops.git (push)
+# upstream  https://github.com/Cassiiopeia/projectops.git (fetch)
+# upstream  https://github.com/Cassiiopeia/projectops.git (push)
 
 # 5. 스크립트 실행 권한 부여
 chmod +x .github/scripts/*.sh
@@ -140,8 +140,8 @@ git init
 git remote add origin https://github.com/YOUR-USERNAME/test-suh-template.git
 
 # 4. 개발 중인 스크립트 복사
-cp -r ~/suh-github-template/.github ./
-cp ~/suh-github-template/template_initializer.sh ./
+cp -r ~/projectops/.github ./
+cp ~/projectops/template_initializer.sh ./
 
 # 5. 테스트 실행
 ./template_initializer.sh -v 1.0.0 -t basic
@@ -992,8 +992,8 @@ git push origin develop
 ### 지원 채널
 
 - 📧 **이메일**: chan4760@naver.com
-- 🎫 **GitHub Issues**: [이슈 생성](https://github.com/Cassiiopeia/suh-github-template/issues)
-- 💬 **Discussions**: [토론 참여](https://github.com/Cassiiopeia/suh-github-template/discussions)
+- 🎫 **GitHub Issues**: [이슈 생성](https://github.com/Cassiiopeia/projectops/issues)
+- 💬 **Discussions**: [토론 참여](https://github.com/Cassiiopeia/projectops/discussions)
 
 ### 응답 시간
 평균 24시간 이내 응답을 목표로 합니다.
@@ -1018,6 +1018,6 @@ git push origin develop
 
 ---
 
-**📌 이 문서는 projectops(구 SUH-DEVOPS-TEMPLATE) v1.3.0 기준으로 작성되었습니다.**  
+**📌 이 문서는 projectops v1.3.0 기준으로 작성되었습니다.**  
 **📅 최종 업데이트: 2025년 10월 11일**  
 **✍️ 작성자: projectops 팀**

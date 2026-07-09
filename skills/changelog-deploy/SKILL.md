@@ -7,7 +7,7 @@ description: "develop 브랜치를 push하고 main으로 릴리스 PR(deploy PR)
 
 > **⚠️ 모델 권고**: 이 스킬은 릴리스 노트 작성이 주 작업이다. **lite(haiku) 모델로 실행을 권장**한다. 커밋 분석과 자연어 재작성만 하면 되므로 강력한 모델이 불필요하다.
 
-SUH-DEVOPS-TEMPLATE 전용 스킬. `PROJECT-COMMON-RELEASE-CHANGELOG` (develop→main 릴리스 PR 감지 → CodeRabbit 대기 → 버전 확정 → CHANGELOG 업데이트 → automerge) 워크플로우와 연동.
+projectops 전용 스킬. `PROJECT-COMMON-RELEASE-CHANGELOG` (develop→main 릴리스 PR 감지 → CodeRabbit 대기 → 버전 확정 → CHANGELOG 업데이트 → automerge) 워크플로우와 연동.
 
 develop 브랜치 push → main으로 릴리스 PR 생성 → 릴리스 노트 즉시 작성 → automerge 자동 진행.
 automerge 실패 시 기존 PR 닫고 새 PR 재생성 → 릴리스 노트 재작성.
@@ -94,8 +94,8 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 
 > **이후 모든 Bash 블록의 사용 규칙**: PAT/OWNER/REPO/PYTHON/PROJECT_ROOT가 등장하는 블록은 **그 블록 맨 앞에 실제 값을 인라인 prefix**로 붙인다. 예:
 > ```bash
-> GITHUB_PAT="{PAT}" OWNER="Cassiiopeia" REPO="SUH-DEVOPS-TEMPLATE" \
-> PYTHON="/c/Users/USER/.../python" PROJECT_ROOT="/d/0-suh/.../suh-github-template" \
+> GITHUB_PAT="{PAT}" OWNER="Cassiiopeia" REPO="projectops" \
+> PYTHON="/c/Users/USER/.../python" PROJECT_ROOT="/d/0-suh/.../projectops" \
 >   bash -c '...아래 블록 내용...'
 > ```
 > 또는 더 간단히, 블록 첫 줄에서 `GITHUB_PAT="..."; OWNER="..."; REPO="..."; PYTHON="..."; PROJECT_ROOT="..."` 로 재선언한 뒤 나머지를 실행한다. **핵심은 "이전 Bash 호출의 변수가 살아있다"고 가정하지 않는 것.**

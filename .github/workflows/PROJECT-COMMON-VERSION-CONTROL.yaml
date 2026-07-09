@@ -28,7 +28,7 @@
 
 name: PROJECT-VERSION-CONTROL
 
-# 동시 실행 방지 (https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/63)
+# 동시 실행 방지 (https://github.com/Cassiiopeia/projectops/issues/63)
 concurrency:
   group: version-increment
   cancel-in-progress: false

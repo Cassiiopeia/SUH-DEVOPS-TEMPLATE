@@ -3,7 +3,7 @@
 # projectops npm 패키지 자동 배포 워크플로우 v1.0
 # ===================================================================
 #
-# 이 워크플로우는 SUH-DEVOPS-TEMPLATE 저장소 전용입니다.
+# 이 워크플로우는 projectops 저장소 전용입니다.
 # template_integrator로 복사되지 않으며, template_initializer가 삭제합니다.
 #
 # 동작:

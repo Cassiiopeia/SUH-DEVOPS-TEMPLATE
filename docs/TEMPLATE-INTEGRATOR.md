@@ -1,6 +1,6 @@
 # Template Integrator 상세 가이드
 
-> 기존 프로젝트에 SUH-DEVOPS-TEMPLATE을 통합하는 스크립트 사용법
+> 기존 프로젝트에 projectops을 통합하는 스크립트 사용법
 
 ---
 
@@ -18,7 +18,7 @@
 
 ## 개요
 
-`template_integrator`는 기존 프로젝트에 SUH-DEVOPS-TEMPLATE의 기능을 선택적으로 통합할 수 있는 스크립트입니다.
+`template_integrator`는 기존 프로젝트에 projectops의 기능을 선택적으로 통합할 수 있는 스크립트입니다.
 
 **지원 환경:**
 - **macOS/Linux**: `template_integrator.sh` (Bash)

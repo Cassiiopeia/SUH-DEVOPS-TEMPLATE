@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""<scope>_cli — <skill name> 전용 CLI (suh-github-template 3-layer 표준 골격).
+"""<scope>_cli — <skill name> 전용 CLI (projectops 3-layer 표준 골격).
 
 이 파일은 신규 skill 생성 시 복사하는 표준 골격이다.
 3-layer 아키텍처 Layer 2 (`skills/<skill>/scripts/<scope>_cli.py`).

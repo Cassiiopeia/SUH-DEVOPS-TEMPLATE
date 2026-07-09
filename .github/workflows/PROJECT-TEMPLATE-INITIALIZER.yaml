@@ -183,7 +183,7 @@ jobs:
           fi
           
           # 커밋 메시지 생성
-          commit_message="SUH-DEVOPS-TEMPLATE : init : ${{ needs.check-initialization-needed.outputs.project_name }} 기본 Template 초기화 완료
+          commit_message="projectops : init : ${{ needs.check-initialization-needed.outputs.project_name }} 기본 Template 초기화 완료
 
           자동으로 수행된 초기화 작업:
           - version.yml → 0.0.0, basic 타입으로 초기화

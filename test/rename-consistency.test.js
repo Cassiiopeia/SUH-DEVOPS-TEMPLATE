@@ -30,6 +30,9 @@ function ripgrepCount(pattern, globs) {
 const EXCLUDE = [
   ":!docs/superpowers/**", ":!docs/projectops/**",
   ":!CHANGELOG.md", ":!CHANGELOG.json",
+  // breaking-changes.json은 "구 이름 → 신 이름" 마이그레이션을 설명하는 파일이라
+  // 구 이름(@suh-lab, cassiiopeia:suh-* 등) 언급이 의도된 것 — 잔재 검사에서 제외한다.
+  ":!.github/config/breaking-changes.json",
 ];
 
 test("skills/ 아래 suh- 폴더가 0개다", () => {

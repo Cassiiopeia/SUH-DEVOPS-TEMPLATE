@@ -16,7 +16,7 @@
 
 ## 개요
 
-SUH-DEVOPS-TEMPLATE의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitHub Actions 워크플로우**의 조합으로 구성됩니다.
+projectops의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitHub Actions 워크플로우**의 조합으로 구성됩니다.
 
 **핵심 특징:**
 - 웹 UI 마법사로 복잡한 배포 설정 자동 생성

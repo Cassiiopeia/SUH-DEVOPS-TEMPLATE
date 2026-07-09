@@ -1,4 +1,4 @@
-# 🚀 SUH-DEVOPS-TEMPLATE 빠른 시작 가이드
+# 🚀 projectops 빠른 시작 가이드
 
 > **3가지만 하면 끝!** 나머지는 모두 자동화됩니다.
 

@@ -2,7 +2,7 @@
 
 # 🚀 Projectops
 
-**GitHub Actions 자동화 + Agent AI Skills — 개발 사이클 전체를 자동화하는 DevOps 템플릿 (구 SUH-DEVOPS-TEMPLATE)**
+**GitHub Actions 자동화 + Agent AI Skills — 개발 사이클 전체를 자동화하는 DevOps 템플릿**
 
 > 이슈 등록부터 커밋, 보고서, 배포까지. 개발자는 코드만 작성하세요.
 

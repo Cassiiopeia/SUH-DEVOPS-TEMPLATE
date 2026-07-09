@@ -1,6 +1,6 @@
 # GitHub Actions 워크플로우 주석 표준 가이드라인
 
-> SUH-DEVOPS-TEMPLATE의 모든 워크플로우 파일에 적용되는 주석 작성 규칙
+> projectops의 모든 워크플로우 파일에 적용되는 주석 작성 규칙
 
 ---
 

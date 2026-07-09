@@ -1,11 +1,11 @@
 {
-  "name": "cassiiopeia",
+  "name": "projectops",
   "interface": {
     "displayName": "Cassiiopeia"
   },
   "plugins": [
     {
-      "name": "cassiiopeia",
+      "name": "projectops",
       "source": {
         "source": "local",
         "path": "."

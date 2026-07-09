@@ -71,7 +71,7 @@ template_integrator로 통합 시 자동 안내되지만, 수동으로도 설치
 ```bash
 # 마켓플레이스 등록 + 플러그인 설치
 claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
-claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+claude plugin install projectops@projectops-marketplace --scope user
 ```
 
 ### Cursor

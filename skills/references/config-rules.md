@@ -9,7 +9,7 @@
 config 파일은 **글로벌 단일 파일**로만 관리한다. 스킬이 추가되어도 파일을 새로 만들지 않는다.
 
 ```
-{HOME}/.suh-template/config/config.json
+{HOME}/.projectops/config/config.json
 ```
 
 `{HOME}`은 OS별로 다르다. 아래 §2에서 확인하는 방법을 따른다.
@@ -41,11 +41,11 @@ echo "$HOME"
 
 ## 3. Config 읽기
 
-> ⚠️ **config.json은 절대 탐색하지 않는다.** 경로는 `{HOME}/.suh-template/config/config.json` **한 곳으로 고정**이다. Read tool로 이 경로를 **바로** 읽는다. `ls`·`find`·glob으로 찾지 마라.
+> ⚠️ **config.json은 절대 탐색하지 않는다.** 경로는 `{HOME}/.projectops/config/config.json` **한 곳으로 고정**이다. Read tool로 이 경로를 **바로** 읽는다. `ls`·`find`·glob으로 찾지 마라.
 >
 > **특히 플러그인 캐시(`~/.claude/plugins/cache/...`)를 뒤지지 마라.** 각 스킬의 SKILL.md는 *스크립트*(`*_cli.py`) 위치를 찾을 때 `ls ~/.claude/plugins/cache/*/projectops/*/skills/.../scripts` 패턴을 쓴다 — 이건 **스크립트 전용**이며 config.json은 그 캐시 안에 **없다.** 그 `ls` 패턴을 config 찾기에 전이시키면 엉뚱한 파일을 잡거나 "config 없음"으로 오판해 이미 등록된 PAT를 사용자에게 다시 묻게 된다 (실제 발생한 사고). **스크립트는 캐시에서 ls로, config는 홈의 고정 경로에서 Read로 — 두 경로를 절대 섞지 않는다.**
 
-agent는 Read tool로 `{HOME}/.suh-template/config/config.json`을 읽는다.
+agent는 Read tool로 `{HOME}/.projectops/config/config.json`을 읽는다.
 (Search·find로 탐색하지 않는다 — 경로가 고정이므로 탐색이 필요 없고, 탐색하면 플러그인 캐시 등 엉뚱한 파일을 잡을 수 있다)
 
 파일이 없으면 → §5 대화형 수집으로 진행한다.
@@ -105,7 +105,7 @@ PAT 추출은 매번 즉흥 코드로 짜지 말고 아래 두 경로 중 하나
 
 ## 4. Config 저장 (쓰기)
 
-agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다.
+agent가 Write tool로 `{HOME}/.projectops/config/config.json`에 저장한다.
 
 **반드시 전체 파일을 Read로 읽은 뒤 수정**하여 덮어쓴다. 기존 다른 섹션을 날리지 않도록 주의한다.
 

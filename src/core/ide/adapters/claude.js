@@ -1,12 +1,12 @@
 // Claude Code 어댑터 (.sh _manage_claude_section / _do_claude_plugin_install /
 // _remove_claude_section / _remove_claude_plugin_data 등가).
-// 마켓플레이스 Cassiiopeia/projectops, 플러그인 cassiiopeia@cassiiopeia-marketplace.
+// 마켓플레이스 Cassiiopeia/projectops, 플러그인 projectops@projectops-marketplace.
 import { join } from "node:path";
 import { existsSync, readdirSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { compareCacheName } from "../util.js";
 
 const MARKETPLACE = "Cassiiopeia/projectops";
-const PLUGIN = "cassiiopeia@cassiiopeia-marketplace";
+const PLUGIN = "projectops@projectops-marketplace";
 
 function detect(io) {
   if (!io.which("claude")) return { installed: false, version: null, cliMissing: true, note: "CLI 없음" };
@@ -17,7 +17,7 @@ function detect(io) {
     const list = Array.isArray(arr) ? arr : (arr.plugins || []);
     for (const p of list) {
       const name = String(p.name || p.id || "");
-      if (name.includes("cassiiopeia@") || name === "cassiiopeia") { scope = p.scope || ""; version = p.version || null; break; }
+      if (name.includes("projectops@") || name === "projectops") { scope = p.scope || ""; version = p.version || null; break; }
     }
   } catch { /* 파싱 실패 → 미설치 취급 */ }
   return { installed: !!scope, version, cliMissing: false, scope };
@@ -42,7 +42,7 @@ function install(io, scope = "user") {
 }
 
 function update(io, scope) {
-  const cacheRoot = join(io.home(), ".claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia");
+  const cacheRoot = join(io.home(), ".claude/plugins/cache/projectops-marketplace/projectops");
   const oldCache = latestCacheDir(cacheRoot);
   io.log("플러그인 업데이트 중...");
   const up = io.run("claude", ["plugin", "update", PLUGIN, "--scope", scope]);

@@ -40,15 +40,15 @@ Common routing:
 codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
 ```
 
-After registering, open `/plugins` in Codex and verify the `cassiiopeia` entry.
+After registering, open `/plugins` in Codex and verify the `projectops` entry.
 
 **Method 2 (fallback):** Direct clone + symlink for immediate activation without
 marketplace:
 
 ```bash
-git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/cassiiopeia
+git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/projectops
 mkdir -p ~/.agents/skills
-ln -s ~/.codex/cassiiopeia/skills ~/.agents/skills/cassiiopeia
+ln -s ~/.codex/projectops/skills ~/.agents/skills/projectops
 ```
 
 Codex reads `.agents/plugins/marketplace.json` to discover the marketplace entry

@@ -355,7 +355,7 @@ EOF
 
 1. **GitHub 실행 이력을 먼저 본다 (가장 강력한 증거).** 같은 파일/패턴이 실제 `success`한 run이 있으면 → **멀쩡한 코드 확정.** 절대 손대지 마라.
    ```bash
-   PAT=$(python3 -c "import json;print(json.load(open('$HOME/.suh-template/config/config.json'))['github']['global_pat'])")
+   PAT=$(python3 -c "import json;print(json.load(open('$HOME/.projectops/config/config.json'))['github']['global_pat'])")
    curl -s -H "Authorization: token $PAT" \
      "https://api.github.com/repos/<owner>/<repo>/actions/workflows/<file>.yaml/runs?per_page=20" \
      | python3 -c "import json,sys;from collections import Counter;d=json.load(sys.stdin);print(Counter(r['conclusion'] for r in d.get('workflow_runs',[])))"
@@ -408,11 +408,11 @@ EOF
 
 ## Skills (Claude Code 플러그인)
 
-**플러그인명**: `cassiiopeia`
+**플러그인명**: `projectops`
 
 ```bash
 claude plugin marketplace add Cassiiopeia/projectops
-claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+claude plugin install projectops@projectops-marketplace --scope user
 ```
 
 | 명령어 | 용도 |
@@ -543,7 +543,7 @@ opener = urllib.request.build_opener(StripAuthRedirect)
 
 ### config 구조
 
-모든 스킬의 config는 **단일 파일** `~/.suh-template/config/config.json` 하나로 관리한다.
+모든 스킬의 config는 **단일 파일** `~/.projectops/config/config.json` 하나로 관리한다.
 skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 
 | 스킬 | config 섹션 키 | 비고 |

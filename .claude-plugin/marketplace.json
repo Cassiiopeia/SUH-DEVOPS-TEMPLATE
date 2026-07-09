@@ -1,8 +1,8 @@
 {
-  "name": "cassiiopeia-marketplace",
+  "name": "projectops-marketplace",
   "owner": {
     "name": "Cassiiopeia",
-    "email": "cassiiopeia@github.com"
+    "email": "projectops@github.com"
   },
   "metadata": {
     "description": "Cassiiopeia DevOps 자동화 스킬 마켓플레이스",
@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "cassiiopeia",
+      "name": "projectops",
       "source": {
         "source": "url",
         "url": "https://github.com/Cassiiopeia/projectops.git"

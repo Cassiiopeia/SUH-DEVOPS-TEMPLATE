@@ -1,13 +1,13 @@
 // Codex CLI 어댑터 (.sh _manage_codex_skills / _do_codex_marketplace_register /
 // _remove_codex_section 등가).
-// marketplace 등록/업그레이드가 주 경로. native ~/.agents/skills/cassiiopeia 심링크는 감지·제거에 사용.
+// marketplace 등록/업그레이드가 주 경로. native ~/.agents/skills/projectops 심링크는 감지·제거에 사용.
 import { join } from "node:path";
 import { existsSync, lstatSync, rmSync } from "node:fs";
 
 const MARKETPLACE = "Cassiiopeia/projectops";
-const PLUGIN = "cassiiopeia";
+const PLUGIN = "projectops";
 
-function nativeTarget(io) { return join(io.home(), ".agents/skills/cassiiopeia"); }
+function nativeTarget(io) { return join(io.home(), ".agents/skills/projectops"); }
 
 function detect(io) {
   const tgt = nativeTarget(io);

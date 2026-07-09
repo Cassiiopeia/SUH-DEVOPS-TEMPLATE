@@ -113,7 +113,7 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.Download
 ```bash
 # Claude Code
 claude plugin marketplace add Cassiiopeia/projectops
-claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+claude plugin install projectops@projectops-marketplace --scope user
 ```
 
 ```bash
@@ -144,7 +144,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 
 </details>
 
-> Claude Code는 `/cassiiopeia:` 자동완성, Gemini는 extension, Codex는 plugin marketplace를 우선 사용합니다. 자세한 설치 방식은 [Skills 가이드](docs/SKILLS.md)를 확인하세요.
+> Claude Code는 `/projectops:` 자동완성, Gemini는 extension, Codex는 plugin marketplace를 우선 사용합니다. 자세한 설치 방식은 [Skills 가이드](docs/SKILLS.md)를 확인하세요.
 
 ---
 

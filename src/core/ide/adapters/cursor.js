@@ -62,7 +62,7 @@ function writeMeta(io, destDir, templateVersion) {
   let installedAt = now;
   if (existsSync(file)) { try { installedAt = JSON.parse(readFileSync(file, "utf8")).installedAt || now; } catch { /* 무해 */ } }
   const meta = {
-    name: "cassiiopeia", version, scope: "user",
+    name: "projectops", version, scope: "user",
     source: "https://github.com/Cassiiopeia/projectops",
     installPath: destDir, installedAt, lastUpdated: now,
   };

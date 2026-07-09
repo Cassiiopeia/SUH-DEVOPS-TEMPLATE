@@ -392,7 +392,7 @@ curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/templa
 claude plugin marketplace add Cassiiopeia/projectops
 
 # 2. 플러그인 설치 (글로벌)
-claude plugin install cassiiopeia@cassiiopeia-marketplace --scope user
+claude plugin install projectops@projectops-marketplace --scope user
 ```
 
 설치 후 `/projectops:analyze`, `/projectops:review` 등으로 사용합니다.

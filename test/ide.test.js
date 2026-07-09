@@ -52,13 +52,13 @@ test("claude: 미설치 감지 → apply가 install 경로", () => {
   const io = stubIo({ present: { claude: 1 } });
   adapterById("claude").apply(io);
   assert.ok(io.calls.some((c) => c.includes("marketplace add Cassiiopeia/projectops")));
-  assert.ok(io.calls.some((c) => c.includes("plugin install cassiiopeia@cassiiopeia-marketplace")));
+  assert.ok(io.calls.some((c) => c.includes("plugin install projectops@projectops-marketplace")));
 });
 
 test("claude: 설치 감지 → apply가 update 경로", () => {
   const io = stubIo({
     present: { claude: 1 },
-    runs: { "plugin list": { code: 0, stdout: JSON.stringify([{ name: "cassiiopeia@cassiiopeia-marketplace", scope: "user", version: "3.0.1" }]), stderr: "" } },
+    runs: { "plugin list": { code: 0, stdout: JSON.stringify([{ name: "projectops@projectops-marketplace", scope: "user", version: "3.0.1" }]), stderr: "" } },
   });
   adapterById("claude").apply(io);
   assert.ok(io.calls.some((c) => c.includes("plugin update")));
@@ -102,7 +102,7 @@ test("codex: CLI 없고 native도 없으면 cliMissing", () => {
 test("codex: native symlink 존재 시 installed", () => {
   const home = mkdtempSync(join(tmpdir(), "co2-"));
   try {
-    mkdirSync(join(home, ".agents/skills/cassiiopeia"), { recursive: true });
+    mkdirSync(join(home, ".agents/skills/projectops"), { recursive: true });
     assert.equal(adapterById("codex").detect(stubIo({ home })).installed, true);
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
@@ -160,7 +160,7 @@ test("runSkills 대화형: action=apply + targets 선택 → 해당 어댑터만
   };
   await runSkills({ io, interactive: true, ui });
   assert.ok(io.calls.some((c) => c.includes("gemini")));
-  assert.ok(!io.calls.some((c) => c.includes("plugin install cassiiopeia"))); // claude 미실행
+  assert.ok(!io.calls.some((c) => c.includes("plugin install projectops"))); // claude 미실행
 });
 
 test("runSkills 대화형: action=skip → 변경 동작(install/update/uninstall) 없음", async () => {

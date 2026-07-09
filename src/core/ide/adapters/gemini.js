@@ -1,6 +1,6 @@
 // Gemini CLI 어댑터 (.sh _manage_gemini_extension / _remove_gemini_section 등가).
 // extension install/update/uninstall. 마켓플레이스 대신 git URL 확장.
-const EXT = "cassiiopeia";
+const EXT = "projectops";
 const URL = "https://github.com/Cassiiopeia/projectops";
 
 function detect(io) {

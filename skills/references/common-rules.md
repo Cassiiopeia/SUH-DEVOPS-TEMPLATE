@@ -227,11 +227,11 @@ PYTHONIOENCODING=utf-8 "$PYTHON" <scope>_cli.py <subcommand> [args]
 ```
 
 > **⚠️ 스크립트는 플러그인 캐시에 설치된다 — 작업 중인 프로젝트 루트에 있지 않다.**
-> 플러그인으로 설치된 skill의 `_cli.py`는 `~/.claude/plugins/cache/<marketplace>/cassiiopeia/<version>/skills/<skill>/scripts/`에 있다.
+> 플러그인으로 설치된 skill의 `_cli.py`는 `~/.claude/plugins/cache/<marketplace>/projectops/<version>/skills/<skill>/scripts/`에 있다.
 > 사용자 프로젝트(템플릿으로 생성·통합된 레포 포함)에는 `skills/` 폴더 자체가 없다(통합 시 제외됨). 따라서 `cd "$PROJECT_ROOT/skills/..."` 고정 경로는 **이 템플릿 레포 안에서만** 동작하고 다른 레포에선 실패한다.
 > 위 `SCRIPTS=...` 라인은 **캐시(설치 위치, 최신 버전) 우선 → 프로젝트 루트 폴백** 순으로 스크립트를 찾으므로 어느 레포에서든 동작한다.
 > `_cli.py`는 `Path(__file__).parents[3]` 기준으로 `scripts/common`을 import하므로(cwd 무관), 스크립트 파일 위치만 맞으면 `cd` 위치와 무관하게 import가 풀린다.
-> config(`~/.suh-template/config/config.json`)는 항상 user 홈 기준이라 프로젝트 위치와 무관하다.
+> config(`~/.projectops/config/config.json`)는 항상 user 홈 기준이라 프로젝트 위치와 무관하다.
 
 ### OS 호환성 (실측 검증 완료)
 

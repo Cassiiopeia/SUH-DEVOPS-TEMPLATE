@@ -16,11 +16,11 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 ```
 
 > **⚠️ 스크립트는 플러그인 캐시에 설치된다 — 작업 중인 프로젝트 루트에 없다.**
-> `github_cli.py`는 `~/.claude/plugins/cache/<marketplace>/cassiiopeia/<version>/skills/github/scripts/`에 있다. 사용자 프로젝트(템플릿으로 생성·통합된 레포 포함)에는 `skills/` 폴더 자체가 없으므로(통합 시 제외) `$PROJECT_ROOT/skills/...` 고정 경로는 다른 레포에서 실패한다. 아래 모든 Bash 블록의 `SCRIPTS=$(ls -d ~/.claude/plugins/cache/...)` 라인이 **캐시 우선 → 프로젝트 루트 폴백**으로 스크립트를 찾으므로 어느 레포에서든 동작한다. config(`~/.suh-template/config/config.json`)는 항상 user 홈 기준이라 프로젝트 위치와 무관하다.
+> `github_cli.py`는 `~/.claude/plugins/cache/<marketplace>/projectops/<version>/skills/github/scripts/`에 있다. 사용자 프로젝트(템플릿으로 생성·통합된 레포 포함)에는 `skills/` 폴더 자체가 없으므로(통합 시 제외) `$PROJECT_ROOT/skills/...` 고정 경로는 다른 레포에서 실패한다. 아래 모든 Bash 블록의 `SCRIPTS=$(ls -d ~/.claude/plugins/cache/...)` 라인이 **캐시 우선 → 프로젝트 루트 폴백**으로 스크립트를 찾으므로 어느 레포에서든 동작한다. config(`~/.projectops/config/config.json`)는 항상 user 홈 기준이라 프로젝트 위치와 무관하다.
 
 **Config / PAT 확인** — `references/config-rules.md` §2~3 절차를 따른다.
 
-> ⚠️ **config는 탐색 금지.** config.json은 고정 경로 `{HOME}/.suh-template/config/config.json` 한 곳뿐이다 — Read tool로 바로 읽는다. 위 ⚠️ 블록의 `ls ~/.claude/plugins/cache/...` 패턴은 **스크립트(`github_cli.py`) 전용**이며 config는 그 캐시 안에 없다. 캐시를 뒤지면 "config 없음"으로 오판해 등록된 PAT를 다시 묻게 된다.
+> ⚠️ **config는 탐색 금지.** config.json은 고정 경로 `{HOME}/.projectops/config/config.json` 한 곳뿐이다 — Read tool로 바로 읽는다. 위 ⚠️ 블록의 `ls ~/.claude/plugins/cache/...` 패턴은 **스크립트(`github_cli.py`) 전용**이며 config는 그 캐시 안에 없다. 캐시를 뒤지면 "config 없음"으로 오판해 등록된 PAT를 다시 묻게 된다.
 
 **MCP-style 서브커맨드 표준** — `references/mcp-subcommand-rules.md`를 따른다.
 

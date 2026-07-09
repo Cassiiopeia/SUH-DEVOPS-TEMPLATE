@@ -219,7 +219,8 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
 
   // template 옵션 블록 (.sh save_template_options 신규 추가 케이스). templateOptions 지정 시.
   if (templateOptions) {
-    const { templateVersion = "unknown", deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, optionsDate = today } = templateOptions;
+    const { templateVersion = "unknown", deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, optionsDate = today,
+            changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true } = templateOptions;
     const publishJson = `[${publishTargets.map((t) => `"${t}"`).join(",")}]`;
     out += `  template:\n`;
     out += `    source: "projectops"\n`;
@@ -230,6 +231,11 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
     out += `      deploy: "${deployTarget}"\n`;
     out += `      publish: ${publishJson}\n`;
     out += `      secret_backup: ${includeSecretBackup}\n`;
+    out += `      code_review:\n`;
+    out += `        coderabbit: ${codeReviewCoderabbit}\n`;
+    out += `      changelog:\n`;
+    out += `        provider: "${changelogProvider}"\n`;
+    out += `        base_url: "${changelogBaseUrl}"\n`;
   }
   return out;
 }

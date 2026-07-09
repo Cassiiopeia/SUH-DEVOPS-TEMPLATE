@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { parseTemplateOptions, askAllOptionalWorkflows } from "../src/core/options-ask.js";
-import { parseExisting } from "../src/core/version-yml.js";
+import { parseExisting, buildVersionYml } from "../src/core/version-yml.js";
 
 function touch(root, rel, content = "") {
   const p = join(root, rel);
@@ -123,6 +123,40 @@ test("parseTemplateOptions: changelog/code_review 파싱 (#455)", () => {
   assert.equal(r3.changelogProvider, null);
   assert.equal(r3.changelogBaseUrl, null);
   assert.equal(r3.codeReviewCoderabbit, null);
+});
+
+test("buildVersionYml: changelog/code_review 블록 생성 + round-trip (#455)", () => {
+  const yml = buildVersionYml({
+    version: "1.0.0", types: ["basic"], branch: "main", versionCode: 1,
+    now: "2026-07-09 00:00:00", today: "2026-07-09",
+    templateOptions: {
+      templateVersion: "4.3.0", deployTarget: "none", publishTargets: [], includeSecretBackup: false,
+      changelogProvider: "github-ai", changelogBaseUrl: "", codeReviewCoderabbit: true,
+    },
+  });
+  assert.match(yml, /changelog:/);
+  assert.match(yml, /provider: "github-ai"/);
+  assert.match(yml, /coderabbit: true/);
+  // round-trip: 생성 → 파싱 동일
+  const parsed = parseTemplateOptions(yml);
+  assert.equal(parsed.changelogProvider, "github-ai");
+  assert.equal(parsed.codeReviewCoderabbit, true);
+  assert.equal(parsed.changelogBaseUrl, "");
+});
+
+test("buildVersionYml: ollama base_url round-trip (#455)", () => {
+  const yml = buildVersionYml({
+    version: "1.0.0", types: ["basic"], branch: "main", versionCode: 1,
+    now: "2026-07-09 00:00:00", today: "2026-07-09",
+    templateOptions: {
+      templateVersion: "4.3.0", deployTarget: "none", publishTargets: [], includeSecretBackup: false,
+      changelogProvider: "ollama", changelogBaseUrl: "https://ai.suhsaechan.kr/v1", codeReviewCoderabbit: false,
+    },
+  });
+  const parsed = parseTemplateOptions(yml);
+  assert.equal(parsed.changelogProvider, "ollama");
+  assert.equal(parsed.changelogBaseUrl, "https://ai.suhsaechan.kr/v1");
+  assert.equal(parsed.codeReviewCoderabbit, false);
 });
 
 test("parseTemplateOptions: template 섹션 밖의 nexus 키는 무시", () => {

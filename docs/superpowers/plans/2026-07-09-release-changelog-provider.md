@@ -4,6 +4,11 @@
 
 **Goal:** CodeRabbit 하드 커플링을 제거하고, GitHub AI를 기본으로 하는 changelog provider 폴백 사다리를 구현한다 (이슈 #455).
 
+> **진행 상태 (2026-07-09):**
+> - ✅ **Task 1~7 완료·develop push됨** — 마법사 JS(파싱·생성·질문·연결) + provider 스크립트 3개(commit/coderabbit/openai_compatible). 전부 테스트 통과.
+> - ⏸ **Task 8~9 보류** — 763줄 운영 중 워크플로우(`AUTO-CHANGELOG-CONTROL.yaml`) 대규모 개편이라, 로컬 검증 불가 + 프로덕션 릴리스 파이프라인 리스크. CLAUDE.md "운영 중 워크플로우 함부로 안 건드림" 원칙에 따라 **별도 feature 브랜치 + 실제 PR 검증 후 병합** 필요. 사용자 판단 대기.
+> - 현재 마법사는 provider를 version.yml에 저장하지만, 워크플로우가 아직 그 값을 읽어 사다리를 돌리지 않음(구 워크플로우 유지 중). Task 8이 그 연결을 완성함.
+
 **Architecture:** 릴리스 노트 생성기를 교체 가능한 provider로 추상화한다. 모든 provider는 `Summary by CodeRabbit` 고정 형식의 `pr_body.md`를 산출하고, 기존 `changelog_manager.py` 파싱은 무수정 재사용한다. 마법사(JS)는 provider 선택값을 version.yml에 저장하고, 워크플로우(yaml+bash)는 그 값으로 폴백 사다리를 실행한다.
 
 **Tech Stack:** GitHub Actions YAML, bash (러너), Node.js ESM (마법사 `src/core/`), `node:test` (테스트), `actions/ai-inference@v1` (GitHub Models).

@@ -15,8 +15,9 @@ export function createContext(overrides = {}) {
     version: "",
     branch: "",
     paths: new Map(),        // type -> path
-    includeNexus: null,      // null=미설정, true/false=명시
-    includeNpmPublish: null, // null=미설정, true/false=명시 (node/npm-publish/)
+    // 배포/publish 축 (#439 — 타입 비종속. null=미설정)
+    deployTarget: null,      // 'docker-ssh'(기본) | 'vercel' | 'none'
+    publishTargets: null,    // ['nexus','npm','github-packages'] 부분집합
     includeSecretBackup: null,
     templateVersion: "",
     tempDir: "",

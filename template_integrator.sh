@@ -753,12 +753,11 @@ ${BLUE}옵션:${NC}
   -t, --type TYPE          프로젝트 타입 (미지정 시 자동 감지)
   --no-backup              백업 생성 안 함
   --force                  확인 없이 즉시 실행
-  --nexus                  Nexus 라이브러리 publish 워크플로우 포함 (기본: 제외)
-  --no-nexus               Nexus publish 워크플로우 제외
+  --deploy TARGET          배포 방식 택1: docker-ssh(기본) | vercel | none
+  --publish CSV            publish 타겟 csv: nexus,npm,github-packages (기본: 없음)
   --secret-backup          GitHub Secret 서버 백업 워크플로우 포함 (기본: 제외)
   --no-secret-backup       Secret 백업 워크플로우 제외
-  --npm-publish            npm 패키지 publish 워크플로우 포함 (기본: 제외)
-  --no-npm-publish         npm publish 워크플로우 제외
+  --nexus / --npm-publish  (deprecated — --publish nexus / --publish npm 사용)
   --paths "T=P,..."        타입별 프로젝트 경로 (모노레포용, 예: --paths "flutter=app,react=client")
   -h, --help               이 도움말 표시
 
@@ -832,10 +831,14 @@ PROJECT_TYPE=""
 PROJECT_TYPES=()   # 멀티타입 배열 — PROJECT_TYPE은 PROJECT_TYPES[0] 미러
 FORCE_MODE=false
 IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
-# 선택적(opt-in) 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
-INCLUDE_NEXUS=""          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
-INCLUDE_SECRET_BACKUP=""  # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
-INCLUDE_NPM_PUBLISH=""    # npm 패키지 publish 워크플로우 (node/npm-publish/)
+# ── 배포/publish 타겟 축 (#439 — 타입 비종속, 빈 값=미설정) ──
+# deploy(택1): docker-ssh(기본) | vercel | none — 서버/호스팅 배포 방식
+# publish(0..n 공존): nexus / npm / github-packages — 내부 불리언 3종으로 관리
+DEPLOY_TARGET=""          # 빈 값=미설정 (확정 시 기본 docker-ssh)
+INCLUDE_NEXUS=""          # publish: nexus (spring/publish/nexus/)
+INCLUDE_NPM_PUBLISH=""    # publish: npm (node/publish/npm/)
+INCLUDE_GH_PACKAGES=""    # publish: github-packages (spring/publish/github-packages/)
+INCLUDE_SECRET_BACKUP=""  # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/ — 배포축 아님)
 PROJECT_PATHS_CSV=""  # 타입별 경로 "flutter=app,react=client" — 빈 값이면 미확정 (bash 3.2 호환: 연관배열 금지)
 
 # 지원하는 프로젝트 타입 (next는 v4.1.0에서 react로 흡수 — sh/ps1 일관성)
@@ -887,8 +890,35 @@ while [[ $# -gt 0 ]]; do
             FORCE_MODE=true
             shift
             ;;
+        --deploy)
+            # 배포 방식 (택1): docker-ssh | vercel | none
+            case "$2" in
+                docker-ssh|vercel|none) DEPLOY_TARGET="$2" ;;
+                *) echo "❌ --deploy 값은 docker-ssh | vercel | none 중 하나여야 합니다: '$2'" >&2; exit 1 ;;
+            esac
+            shift 2
+            ;;
+        --publish)
+            # publish 타겟 csv (다중): nexus,npm,github-packages
+            INCLUDE_NEXUS=false; INCLUDE_NPM_PUBLISH=false; INCLUDE_GH_PACKAGES=false
+            IFS=',' read -ra _pub_arr <<< "$2"
+            for _pt in "${_pub_arr[@]}"; do
+                _pt=$(echo "$_pt" | tr -d ' ')
+                case "$_pt" in
+                    nexus)           INCLUDE_NEXUS=true ;;
+                    npm)             INCLUDE_NPM_PUBLISH=true ;;
+                    github-packages) INCLUDE_GH_PACKAGES=true ;;
+                    "") ;;
+                    *) echo "❌ --publish 값은 nexus | npm | github-packages csv여야 합니다: '$_pt'" >&2; exit 1 ;;
+                esac
+            done
+            shift 2
+            ;;
         --nexus)
+            # deprecated alias (1 minor 유지, #439) — 라이브러리 프로젝트는 서버 배포 없음이 기존 동작
+            echo "⚠️  --nexus는 deprecated입니다. --publish nexus --deploy none 을 사용하세요." >&2
             INCLUDE_NEXUS=true
+            [ -z "$DEPLOY_TARGET" ] && DEPLOY_TARGET="none"
             shift
             ;;
         --no-nexus)
@@ -904,6 +934,8 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --npm-publish)
+            # deprecated alias (1 minor 유지, #439)
+            echo "⚠️  --npm-publish는 deprecated입니다. --publish npm 을 사용하세요." >&2
             INCLUDE_NPM_PUBLISH=true
             shift
             ;;
@@ -1817,21 +1849,19 @@ print_project_analysis() {
     print_to_user "       🌿 Default Branch   : $DETECTED_BRANCH"
     # 모드  : 무엇을 설치하는지 (확인 화면에서 한눈에)
     [ -n "$MODE" ] && print_to_user "       💫 통합 모드        : $(_mode_display_label "$MODE")"
-    # 선택 워크플로우 : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
-    if [ "$INCLUDE_NEXUS" = true ]; then
-        print_to_user "       📦 Nexus publish    : 포함"
-    elif [ "$INCLUDE_NEXUS" = false ]; then
-        print_to_user "       📦 Nexus publish    : 제외"
+    # 배포/publish 축 (#439) : full/workflows에서 수집된 경우만 표시 (값이 있을 때만)
+    if [ -n "$DEPLOY_TARGET" ]; then
+        print_to_user "       🚀 배포 방식        : $DEPLOY_TARGET"
+    fi
+    if [ "$INCLUDE_NEXUS" = true ] || [ "$INCLUDE_NPM_PUBLISH" = true ] || [ "$INCLUDE_GH_PACKAGES" = true ]; then
+        print_to_user "       📦 Publish          : $(publish_targets_csv)"
+    elif [ "$INCLUDE_NEXUS" = false ] || [ "$INCLUDE_NPM_PUBLISH" = false ] || [ "$INCLUDE_GH_PACKAGES" = false ]; then
+        print_to_user "       📦 Publish          : 없음"
     fi
     if [ "$INCLUDE_SECRET_BACKUP" = true ]; then
         print_to_user "       🔐 Secret 백업      : 포함"
     elif [ "$INCLUDE_SECRET_BACKUP" = false ]; then
         print_to_user "       🔐 Secret 백업      : 제외"
-    fi
-    if [ "$INCLUDE_NPM_PUBLISH" = true ]; then
-        print_to_user "       📦 npm publish      : 포함"
-    elif [ "$INCLUDE_NPM_PUBLISH" = false ]; then
-        print_to_user "       📦 npm publish      : 제외"
     fi
     # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
     if [ -n "$PROJECT_PATHS_CSV" ]; then
@@ -1935,12 +1965,10 @@ handle_project_edit_menu() {
         # (version 모드는 워크플로우를 안 깔아 무관.)
         local _edit_opts=("프로젝트 타입|" "버전|" "기본 브랜치|")
         if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-            local _nx_state="제외"; [ "$INCLUDE_NEXUS" = "true" ] && _nx_state="포함"
+            local _dp_state="${DEPLOY_TARGET:-docker-ssh}"
             local _sb_state="제외"; [ "$INCLUDE_SECRET_BACKUP" = "true" ] && _sb_state="포함"
-            local _np_state="제외"; [ "$INCLUDE_NPM_PUBLISH" = "true" ] && _np_state="포함"
-            _edit_opts+=("Nexus publish 포함 여부 (현재: ${_nx_state})|")
+            _edit_opts+=("배포/Publish 방식 (현재: ${_dp_state} / $(publish_targets_csv))|")
             _edit_opts+=("Secret 백업 포함 여부 (현재: ${_sb_state})|")
-            _edit_opts+=("npm publish 포함 여부 (현재: ${_np_state})|")
         fi
         _edit_opts+=("모두 맞음, 계속|" "뒤로 (변경 없이 확인 화면으로)|")
 
@@ -1957,9 +1985,8 @@ handle_project_edit_menu() {
                 프로젝트\ 타입*) edit_choice="type" ;;
                 버전*)           edit_choice="version" ;;
                 기본\ 브랜치*)   edit_choice="branch" ;;
-                Nexus*)          edit_choice="optional" ;;
+                배포/Publish*)   edit_choice="optional" ;;
                 Secret*)         edit_choice="optional" ;;
-                npm\ publish*)   edit_choice="optional" ;;
                 모두\ 맞음*)     edit_choice="done" ;;
                 뒤로*)           edit_choice="back" ;;
                 *)               edit_choice="back" ;;
@@ -2384,14 +2411,30 @@ read_template_options() {
             continue
         fi
 
-        # options 섹션 내부에서 nexus / secret_backup 값 확인
-        # (한 키만 읽고 끝내면 안 되므로 continue로 둘 다 스캔. 구 synology 키는 어느 분기에도
-        #  안 걸려 자연히 무시된다.)
+        # options 섹션 내부 — 신 축(deploy/publish) 우선, 구 키(nexus/npm_publish)는 마이그레이션 폴백
         if [ "$in_template" = true ] && [ "$in_options" = true ]; then
+            if [[ "$line" =~ ^[[:space:]]+deploy:[[:space:]]*(.+) ]]; then
+                local _v=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | xargs)
+                case "$_v" in
+                    docker-ssh|vercel|none) [ -z "$DEPLOY_TARGET" ] && DEPLOY_TARGET="$_v" ;;
+                esac
+                continue
+            fi
+            if [[ "$line" =~ ^[[:space:]]+publish:[[:space:]]*\[([^]]*)\] ]]; then
+                # publish: ["nexus","npm"] — CLI 미지정 항목만 저장값으로 채움
+                local _pl=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | tr -d ' ')
+                [ -z "$INCLUDE_NEXUS" ] && { [[ ",$_pl," == *",nexus,"* ]] && INCLUDE_NEXUS=true || INCLUDE_NEXUS=false; }
+                [ -z "$INCLUDE_NPM_PUBLISH" ] && { [[ ",$_pl," == *",npm,"* ]] && INCLUDE_NPM_PUBLISH=true || INCLUDE_NPM_PUBLISH=false; }
+                [ -z "$INCLUDE_GH_PACKAGES" ] && { [[ ",$_pl," == *",github-packages,"* ]] && INCLUDE_GH_PACKAGES=true || INCLUDE_GH_PACKAGES=false; }
+                continue
+            fi
+            # ── 구 키 마이그레이션 (v4.2.0 이전 파일) — 신 키가 이미 값을 채웠으면 무시 ──
             if [[ "$line" =~ ^[[:space:]]+nexus:[[:space:]]*(.+) ]]; then
                 local _v=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | xargs)
-                [ "$_v" = "true" ] && INCLUDE_NEXUS=true
-                [ "$_v" = "false" ] && INCLUDE_NEXUS=false
+                if [ -z "$INCLUDE_NEXUS" ]; then
+                    [ "$_v" = "true" ] && { INCLUDE_NEXUS=true; [ -z "$DEPLOY_TARGET" ] && DEPLOY_TARGET="none"; }
+                    [ "$_v" = "false" ] && INCLUDE_NEXUS=false
+                fi
                 continue
             fi
             if [[ "$line" =~ ^[[:space:]]+secret_backup:[[:space:]]*(.+) ]]; then
@@ -2402,8 +2445,10 @@ read_template_options() {
             fi
             if [[ "$line" =~ ^[[:space:]]+npm_publish:[[:space:]]*(.+) ]]; then
                 local _v=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | xargs)
-                [ "$_v" = "true" ] && INCLUDE_NPM_PUBLISH=true
-                [ "$_v" = "false" ] && INCLUDE_NPM_PUBLISH=false
+                if [ -z "$INCLUDE_NPM_PUBLISH" ]; then
+                    [ "$_v" = "true" ] && INCLUDE_NPM_PUBLISH=true
+                    [ "$_v" = "false" ] && INCLUDE_NPM_PUBLISH=false
+                fi
                 continue
             fi
 
@@ -2422,16 +2467,45 @@ read_template_options() {
     done < "$version_file"
 }
 
+# 현재 publish 불리언 3종을 ["a","b"] json 배열 문자열로 (version.yml 기록용)
+publish_targets_json() {
+    local _parts=()
+    [ "$INCLUDE_NEXUS" = true ] && _parts+=('"nexus"')
+    [ "$INCLUDE_NPM_PUBLISH" = true ] && _parts+=('"npm"')
+    [ "$INCLUDE_GH_PACKAGES" = true ] && _parts+=('"github-packages"')
+    local IFS=','
+    echo "[${_parts[*]:-}]"
+}
+
+# 현재 publish 타겟을 사람이 읽는 csv로 (분석 카드/메뉴 표시용) — 없으면 "없음"
+publish_targets_csv() {
+    local _parts=()
+    [ "$INCLUDE_NEXUS" = true ] && _parts+=("nexus")
+    [ "$INCLUDE_NPM_PUBLISH" = true ] && _parts+=("npm")
+    [ "$INCLUDE_GH_PACKAGES" = true ] && _parts+=("github-packages")
+    if [ ${#_parts[@]} -eq 0 ]; then
+        echo "없음"
+    else
+        local IFS=','
+        echo "${_parts[*]}"
+    fi
+}
+
 # version.yml에 템플릿 옵션 저장
 save_template_options() {
     local version_file="version.yml"
     local template_version="${1:-unknown}"
     local today=$(date -u +"%Y-%m-%d")
 
-    # 미설정(빈 값)이면 false로 보정 — 항상 명시적 true/false를 기록한다.
+    # 미설정(빈 값)이면 기본값으로 보정 — 항상 명시적 값을 기록한다.
+    : "${DEPLOY_TARGET:=docker-ssh}"
     : "${INCLUDE_NEXUS:=false}"
-    : "${INCLUDE_SECRET_BACKUP:=false}"
     : "${INCLUDE_NPM_PUBLISH:=false}"
+    : "${INCLUDE_GH_PACKAGES:=false}"
+    : "${INCLUDE_SECRET_BACKUP:=false}"
+
+    local _publish_json
+    _publish_json=$(publish_targets_json)
 
     if [ ! -f "$version_file" ]; then
         return
@@ -2439,15 +2513,24 @@ save_template_options() {
 
     # 기존에 template 섹션이 있는지 확인
     if grep -q "^[[:space:]]*template:" "$version_file"; then
-        # 기존 template 섹션 업데이트
-        # macOS/Linux 호환을 위해 임시 파일 방식 사용
+        # 기존 template 섹션 업데이트 (macOS/Linux 호환 임시 파일 방식)
+        # ── 구 키(nexus/npm_publish) 라인은 제거 — 신 축으로 마이그레이션 완료 (SSOT) ──
+        sed "/^      nexus:/d; /^      npm_publish:/d" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
 
-        # options.nexus 값 업데이트 또는 추가
-        if grep -q "nexus:" "$version_file"; then
-            sed "s/nexus:.*$/nexus: $INCLUDE_NEXUS/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        # options.deploy 값 업데이트 또는 추가
+        if grep -q "^      deploy:" "$version_file"; then
+            sed "s/^      deploy:.*$/      deploy: \"$DEPLOY_TARGET\"/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
         elif grep -q "options:" "$version_file"; then
             sed "/options:/a\\
-      nexus: $INCLUDE_NEXUS" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+      deploy: \"$DEPLOY_TARGET\"" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        fi
+
+        # options.publish 값 업데이트 또는 추가
+        if grep -q "^      publish:" "$version_file"; then
+            sed "s/^      publish:.*$/      publish: $_publish_json/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        elif grep -q "options:" "$version_file"; then
+            sed "/options:/a\\
+      publish: $_publish_json" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
         fi
 
         # options.secret_backup 값 업데이트 또는 추가
@@ -2458,21 +2541,12 @@ save_template_options() {
       secret_backup: $INCLUDE_SECRET_BACKUP" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
         fi
 
-        # options.npm_publish 값 업데이트 또는 추가
-        if grep -q "npm_publish:" "$version_file"; then
-            sed "s/npm_publish:.*$/npm_publish: $INCLUDE_NPM_PUBLISH/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
-        elif grep -q "options:" "$version_file"; then
-            sed "/options:/a\\
-      npm_publish: $INCLUDE_NPM_PUBLISH" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
-        fi
-
         # last_update_date 업데이트
         if grep -q "last_update_date:" "$version_file"; then
             sed "s/last_update_date:.*$/last_update_date: \"$today\"/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
         fi
     else
         # template 섹션 새로 추가 (metadata 섹션 끝에)
-        # 파일 끝에 추가
         cat >> "$version_file" << EOF
   template:
     source: "projectops"
@@ -2480,9 +2554,9 @@ save_template_options() {
     integrated_date: "$today"
     last_update_date: "$today"
     options:
-      nexus: $INCLUDE_NEXUS
+      deploy: "$DEPLOY_TARGET"
+      publish: $_publish_json
       secret_backup: $INCLUDE_SECRET_BACKUP
-      npm_publish: $INCLUDE_NPM_PUBLISH
 EOF
         print_info "version.yml에 템플릿 설정 저장됨"
     fi
@@ -2717,10 +2791,75 @@ ask_optional_workflow() {
     return 0
 }
 
+# 배포/publish 축 질문 (#439 — 타입 비종속)
+# force-ask가 아니고 값이 이미 있으면(CLI/version.yml) 재질문하지 않는다.
+ask_deploy_publish() {
+    local _force_ask=false
+    if [ "${1:-}" = "--force-ask" ]; then _force_ask=true; fi
+
+    # 비대화형 → 기본값 확정 (deploy=docker-ssh, publish 미설정=false)
+    if [ "$TTY_AVAILABLE" = false ] || [ "$FORCE_MODE" = true ]; then
+        [ -z "$DEPLOY_TARGET" ] && DEPLOY_TARGET="docker-ssh"
+        return 0
+    fi
+
+    # ── 배포 방식 (택1) ──
+    if [ "$_force_ask" = true ] || [ -z "$DEPLOY_TARGET" ]; then
+        print_separator_line
+        print_to_user ""
+        print_to_user "🚀 이 프로젝트를 어디에 배포하나요?"
+        print_to_user ""
+        local _dp_label _dp_rc=0
+        _dp_label=$(choose_menu --cancel-label="기본값(docker-ssh)" "배포 방식을 선택하세요" \
+            "Docker + SSH 서버 배포 (기본)|" \
+            "Vercel|" \
+            "배포하지 않음 (라이브러리/CI 전용)|") || _dp_rc=$?
+        if [ "$_dp_rc" -ne 0 ] || [ -z "$_dp_label" ]; then
+            DEPLOY_TARGET="${DEPLOY_TARGET:-docker-ssh}"
+        else
+            case "$_dp_label" in
+                Docker*)  DEPLOY_TARGET="docker-ssh" ;;
+                Vercel*)  DEPLOY_TARGET="vercel" ;;
+                배포하지*) DEPLOY_TARGET="none" ;;
+                *)        DEPLOY_TARGET="${DEPLOY_TARGET:-docker-ssh}" ;;
+            esac
+        fi
+        print_info "배포 방식: $DEPLOY_TARGET"
+    fi
+
+    # ── publish 타겟 (다중 선택) ──
+    if [ "$_force_ask" = true ] || [ -z "$INCLUDE_NEXUS" ] || [ -z "$INCLUDE_NPM_PUBLISH" ] || [ -z "$INCLUDE_GH_PACKAGES" ]; then
+        print_to_user ""
+        print_to_user "📦 라이브러리/패키지 publish 레지스트리가 있나요? (없으면 그냥 Enter)"
+        print_to_user ""
+        local _preselect=""
+        [ "$INCLUDE_NEXUS" = true ] && _preselect="${_preselect:+$_preselect,}nexus"
+        [ "$INCLUDE_NPM_PUBLISH" = true ] && _preselect="${_preselect:+$_preselect,}npm"
+        [ "$INCLUDE_GH_PACKAGES" = true ] && _preselect="${_preselect:+$_preselect,}github-packages"
+        local _pub_sel="" _pub_rc=0
+        _pub_sel=$(choose_menu --multi --cancel-label="없음" --preselect="$_preselect" "publish 타겟을 선택하세요 (Space 토글, Enter 확정)" \
+            "nexus|사내 Maven(Nexus) 라이브러리 배포" \
+            "npm|공개 npmjs 패키지 배포 (NPM_TOKEN)" \
+            "github-packages|GitHub Packages 라이브러리 배포") || _pub_rc=$?
+        if [ "$_pub_rc" -eq 0 ]; then
+            [[ ",$_pub_sel," == *",nexus,"* ]] && INCLUDE_NEXUS=true || INCLUDE_NEXUS=false
+            [[ ",$_pub_sel," == *",npm,"* ]] && INCLUDE_NPM_PUBLISH=true || INCLUDE_NPM_PUBLISH=false
+            [[ ",$_pub_sel," == *",github-packages,"* ]] && INCLUDE_GH_PACKAGES=true || INCLUDE_GH_PACKAGES=false
+        else
+            # ESC → 미설정 항목만 false 확정
+            [ -z "$INCLUDE_NEXUS" ] && INCLUDE_NEXUS=false
+            [ -z "$INCLUDE_NPM_PUBLISH" ] && INCLUDE_NPM_PUBLISH=false
+            [ -z "$INCLUDE_GH_PACKAGES" ] && INCLUDE_GH_PACKAGES=false
+        fi
+        print_info "Publish 타겟: $(publish_targets_csv)"
+    fi
+    return 0
+}
+
 # 모든 opt-in 워크플로우를 순서대로 묻는다.
 # 인자: [--force-ask] type_dirs... (project_types_dir 하위 타입 폴더 목록)
-# - Nexus: 각 타입의 nexus/ 폴더 (현재 spring만 존재)
-# - Secret 백업: 공통 secret-backup/ 폴더
+# - 배포/publish 축 (#439): ask_deploy_publish (타입 비종속 질문)
+# - Secret 백업: 공통 secret-backup/ 폴더 (배포축 아님 — 기존 폴더 질문 유지)
 ask_all_optional_workflows() {
     local _fa=""
     if [ "$1" = "--force-ask" ]; then _fa="--force-ask"; shift; fi
@@ -2729,22 +2868,11 @@ ask_all_optional_workflows() {
     local _common_root; _common_root="$(dirname "${type_dirs[0]}")/common"
 
     # --force-ask가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
-    # (ask_optional_workflow가 변수값으로 판단하므로 여기서 한 번만 읽는다.)
     [ "$_fa" = "" ] && read_template_options
 
-    # Nexus: 각 타입의 nexus/ 폴더
-    local _td
-    for _td in "${type_dirs[@]}"; do
-        ask_optional_workflow $_fa "$_td/nexus" "📦" "Nexus 라이브러리 publish" \
-            "라이브러리/모듈을 Maven 저장소(Nexus)에 배포하는 워크플로우입니다. 일반 서버 배포가 아니라 라이브러리 프로젝트에만 필요합니다." \
-            INCLUDE_NEXUS
-    done
-    # npm publish: 각 타입의 npm-publish/ 폴더 (현재 node만 존재)
-    for _td in "${type_dirs[@]}"; do
-        ask_optional_workflow $_fa "$_td/npm-publish" "📦" "npm 패키지 publish" \
-            "패키지를 공개 npmjs 레지스트리에 자동 배포하는 워크플로우입니다. npm 라이브러리/CLI 프로젝트에만 필요합니다 (NPM_TOKEN secret 필요)." \
-            INCLUDE_NPM_PUBLISH
-    done
+    # 배포/publish 축 질문 (타입 비종속)
+    ask_deploy_publish $_fa
+
     # Secret 백업: 공통 폴더
     ask_optional_workflow $_fa "$_common_root/secret-backup" "🔐" "Secret 서버 백업" \
         "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다." \
@@ -3533,21 +3661,21 @@ _copy_workflows_for_type() {
         print_info "$type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     fi
 
-    # 타입별 server-deploy 하위폴더 처리 (기본 포함, 단 Nexus 프로젝트면 폴더째 제외)
+    # 타입별 server-deploy 하위폴더 처리 (deploy=docker-ssh일 때만 포함 — #439)
     # SSH+Docker 서버 배포(SIMPLE-CICD·NONSTOP-*·PR-PREVIEW)는 이 폴더로 묶여 있다.
-    # Nexus(라이브러리 publish) 프로젝트는 서버에 배포하지 않으므로 이 폴더 전체를 건너뛴다.
-    # → "서버 배포 워크플로우"를 새로 추가할 땐 이 server-deploy/ 폴더에 파일만 넣으면
-    #   INCLUDE_NEXUS=true일 때 자동으로 제외된다(마법사 코드 수정 불필요).
+    # deploy=vercel/none 프로젝트는 서버에 배포하지 않으므로 이 폴더 전체를 건너뛴다.
+    # → "서버 배포 워크플로우"를 새로 추가할 땐 이 server-deploy/ 폴더에 파일만 넣으면 된다.
     local server_deploy_dir="$project_types_dir/$type/server-deploy"
     if [ -d "$server_deploy_dir" ]; then
-        if [ "$INCLUDE_NEXUS" = true ]; then
-            # 라이브러리(Nexus) 프로젝트 → 서버 배포 워크플로우 폴더째 제외
+        local _dp="${DEPLOY_TARGET:-docker-ssh}"
+        if [ "$_dp" != "docker-ssh" ]; then
+            # vercel/none 프로젝트 → 서버 배포 워크플로우 폴더째 제외
             local sd_count=0
             for f in "$server_deploy_dir"/*.{yaml,yml}; do
                 [ -e "$f" ] && sd_count=$((sd_count + 1))
             done
             if [ $sd_count -gt 0 ]; then
-                print_info "$type 서버 배포 워크플로우 ${sd_count}개 제외됨 (Nexus 라이브러리 프로젝트라 서버 배포가 불필요)"
+                print_info "$type 서버 배포 워크플로우 ${sd_count}개 제외됨 (배포 방식: $_dp)"
             fi
         else
             # 일반 서버 배포 프로젝트 → 루트 워크플로우와 동일하게 기본 포함
@@ -3636,83 +3764,54 @@ _copy_workflows_for_type() {
         fi
     fi
 
-    # 타입별 Nexus 하위폴더 처리 (opt-in)
-    # 배포 워크플로우는 server-deploy/로 묶여 기본 포함됨. nexus/ 만 선택적으로 남는다.
-    local nexus_dir="$project_types_dir/$type/nexus"
-    if [ -d "$nexus_dir" ]; then
-        if [ "$INCLUDE_NEXUS" = true ]; then
-            print_info "$type Nexus 워크플로우 다운로드 중..."
-            for workflow in "$nexus_dir"/*.{yaml,yml}; do
+    # 타입별 publish/<target> 하위폴더 처리 (opt-in — #439 publish 축)
+    # 선택된 publish 타겟 집합으로 복사를 결정한다. 타입은 파일 위치일 뿐 게이트가 아니다.
+    local _pub_target _pub_dir _pub_on
+    for _pub_target in nexus npm github-packages; do
+        _pub_dir="$project_types_dir/$type/publish/$_pub_target"
+        [ -d "$_pub_dir" ] || continue
+        case "$_pub_target" in
+            nexus)           _pub_on="$INCLUDE_NEXUS" ;;
+            npm)             _pub_on="$INCLUDE_NPM_PUBLISH" ;;
+            github-packages) _pub_on="$INCLUDE_GH_PACKAGES" ;;
+        esac
+        if [ "$_pub_on" = true ]; then
+            print_info "$type publish($_pub_target) 워크플로우 다운로드 중..."
+            for workflow in "$_pub_dir"/*.{yaml,yml}; do
                 [ -e "$workflow" ] || continue
                 local filename=$(basename "$workflow")
                 if [ -f "$WORKFLOWS_DIR/$filename" ] && _wf_is_unchanged "$type" "$workflow" "$WORKFLOWS_DIR/$filename"; then
-                    echo "  ⏭ $filename (Nexus $type, 변경 없음)"
+                    echo "  ⏭ $filename (publish:$_pub_target $type, 변경 없음)"
                     _wf_skipped=$((_wf_skipped + 1))
                     continue
                 fi
                 if [ -f "$WORKFLOWS_DIR/$filename" ]; then
                     mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
                     cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Nexus $type, 백업: ${filename}.bak)"
+                    echo "  ✓ $filename (publish:$_pub_target $type, 백업: ${filename}.bak)"
                 else
                     cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (Nexus $type)"
+                    echo "  ✓ $filename (publish:$_pub_target $type)"
                 fi
                 _wf_optional_copied=$((_wf_optional_copied + 1))
                 _wf_copied=$((_wf_copied + 1))
             done
         else
-            local nexus_count=0
-            for f in "$nexus_dir"/*.{yaml,yml}; do
-                [ -e "$f" ] && nexus_count=$((nexus_count + 1))
+            local _pub_count=0
+            for f in "$_pub_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && _pub_count=$((_pub_count + 1))
             done
-            if [ $nexus_count -gt 0 ]; then
-                print_info "$type Nexus 워크플로우 $nexus_count개 제외됨 (--nexus 옵션으로 포함 가능)"
+            if [ $_pub_count -gt 0 ]; then
+                print_info "$type publish($_pub_target) 워크플로우 $_pub_count개 제외됨 (--publish $_pub_target 옵션으로 포함 가능)"
             fi
         fi
-    fi
-
-    # 타입별 npm-publish 하위폴더 처리 (opt-in — 현재 node/npm-publish/만 존재)
-    # npm 라이브러리를 공개 npmjs에 배포하는 프로젝트만 --npm-publish로 포함한다.
-    local npm_publish_dir="$project_types_dir/$type/npm-publish"
-    if [ -d "$npm_publish_dir" ]; then
-        if [ "$INCLUDE_NPM_PUBLISH" = true ]; then
-            print_info "$type npm publish 워크플로우 다운로드 중..."
-            for workflow in "$npm_publish_dir"/*.{yaml,yml}; do
-                [ -e "$workflow" ] || continue
-                local filename=$(basename "$workflow")
-                if [ -f "$WORKFLOWS_DIR/$filename" ] && _wf_is_unchanged "$type" "$workflow" "$WORKFLOWS_DIR/$filename"; then
-                    echo "  ⏭ $filename (npm publish $type, 변경 없음)"
-                    _wf_skipped=$((_wf_skipped + 1))
-                    continue
-                fi
-                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
-                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (npm publish $type, 백업: ${filename}.bak)"
-                else
-                    cp "$workflow" "$WORKFLOWS_DIR/"
-                    echo "  ✓ $filename (npm publish $type)"
-                fi
-                _wf_optional_copied=$((_wf_optional_copied + 1))
-                _wf_copied=$((_wf_copied + 1))
-            done
-        else
-            local npm_publish_count=0
-            for f in "$npm_publish_dir"/*.{yaml,yml}; do
-                [ -e "$f" ] && npm_publish_count=$((npm_publish_count + 1))
-            done
-            if [ $npm_publish_count -gt 0 ]; then
-                print_info "$type npm publish 워크플로우 $npm_publish_count개 제외됨 (--npm-publish 옵션으로 포함 가능)"
-            fi
-        fi
-    fi
+    done
 
     # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
-    # 이 타입의 원본 디렉토리(+nexus+npm-publish)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
+    # 이 타입의 원본 디렉토리(+publish/*)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
     # @wizard 마커를 가진 것만 configure. (.template.yaml/.bak은 대상 아님)
     local _src_dir _wf _bn _target
-    for _src_dir in "$type_dir" "$server_deploy_dir" "$nexus_dir" "$npm_publish_dir"; do
+    for _src_dir in "$type_dir" "$server_deploy_dir" "$project_types_dir/$type/publish/nexus" "$project_types_dir/$type/publish/npm" "$project_types_dir/$type/publish/github-packages"; do
         [ -d "$_src_dir" ] || continue
         for _wf in "$_src_dir"/*.{yaml,yml}; do
             [ -e "$_wf" ] || continue
@@ -3800,6 +3899,26 @@ copy_workflows() {
         _copy_workflows_for_type "$_t" "$project_types_dir"
     done
 
+    # 3.5 Common 배포 타겟 워크플로우 처리 (deploy=vercel 등 타입 비종속 — #439)
+    local common_deploy_dir="$project_types_dir/common/deploy/${DEPLOY_TARGET:-docker-ssh}"
+    if [ -d "$common_deploy_dir" ]; then
+        print_info "공통 배포(${DEPLOY_TARGET}) 워크플로우 다운로드 중..."
+        for workflow in "$common_deploy_dir"/*.{yaml,yml}; do
+            [ -e "$workflow" ] || continue
+            local filename=$(basename "$workflow")
+            if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                cp "$workflow" "$WORKFLOWS_DIR/"
+                echo "  ✓ $filename (deploy:${DEPLOY_TARGET}, 백업: ${filename}.bak)"
+            else
+                cp "$workflow" "$WORKFLOWS_DIR/"
+                echo "  ✓ $filename (deploy:${DEPLOY_TARGET})"
+            fi
+            _wf_optional_copied=$((_wf_optional_copied + 1))
+            _wf_copied=$((_wf_copied + 1))
+        done
+    fi
+
     # 4. Common Secret 백업 워크플로우 처리 (opt-in)
     local common_secret_dir="$project_types_dir/common/secret-backup"
     if [ -d "$common_secret_dir" ]; then
@@ -3879,9 +3998,13 @@ copy_scripts() {
     
     mkdir -p "$SCRIPTS_DIR"
     
+    # version_manager는 .sh(위임 shim) + .py(실 로직) 한 쌍 — 둘 다 복사해야 동작 (#448)
     local scripts=(
         "version_manager.sh"
+        "version_manager.py"
         "changelog_manager.py"
+        "truncate_release_notes.sh"
+        "truncate_release_notes.py"
     )
     
     local copied=0
@@ -4603,13 +4726,14 @@ execute_integration() {
             ;;
     esac
 
-    # 2.1 템플릿 옵션 저장 (Nexus / Secret 백업 등 선택 워크플로우 설정)
+    # 2.1 템플릿 옵션 저장 (배포/publish 축 + Secret 백업)
     if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
-        # 설정되지 않은 경우 기본값 false 사용
-        # (해당 opt-in 폴더가 없는 타입을 위한 처리)
+        # 설정되지 않은 경우 기본값 사용
+        [ -z "$DEPLOY_TARGET" ] && DEPLOY_TARGET="docker-ssh"
         [ -z "$INCLUDE_NEXUS" ] && INCLUDE_NEXUS=false
         [ -z "$INCLUDE_SECRET_BACKUP" ] && INCLUDE_SECRET_BACKUP=false
         [ -z "$INCLUDE_NPM_PUBLISH" ] && INCLUDE_NPM_PUBLISH=false
+        [ -z "$INCLUDE_GH_PACKAGES" ] && INCLUDE_GH_PACKAGES=false
         # 다운로드한 템플릿의 실제 버전 전달 (TEMPLATE_VERSION 사용)
         save_template_options "$TEMPLATE_VERSION"
     fi

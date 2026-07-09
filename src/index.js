@@ -105,10 +105,10 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   const context = createContext({
     mode: opts.mode, force: true, types, version, versionCode, branch,
     paths,
-    // 옵션 워크플로우: CLI 플래그 최우선 → version.yml 저장 옵션(.sh read_template_options 등가) → false
-    includeNexus: opts.includeNexus ?? existing?.options?.nexus ?? false,
+    // 배포/publish 축(#439): CLI 플래그 최우선 → version.yml 저장 옵션(구 키 자동 마이그레이션) → 기본값
+    deployTarget: opts.deployTarget ?? existing?.options?.deploy ?? "docker-ssh",
+    publishTargets: opts.publishTargets ?? existing?.options?.publish ?? [],
     includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
-    includeNpmPublish: opts.includeNpmPublish ?? existing?.options?.npmPublish ?? false,
     repoName,
     // 실 resolver 4종 (.sh resolve_token 등가 — spring-app-yml 스텁 제거)
     resolvers: makeResolvers(cwd, repoName, paths),

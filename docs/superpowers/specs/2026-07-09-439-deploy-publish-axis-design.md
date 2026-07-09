@@ -1,8 +1,28 @@
 # 배포/publish 타겟 축 재설계 (타입 비종속) — 설계 스펙
 
 > **관련 이슈**: [#439](https://github.com/Cassiiopeia/projectops/issues/439)
-> **성격**: 설계 이슈 — 이 문서가 산출물. 구현은 이 스펙 승인 후 별도 이슈로 분할.
+> **성격**: 설계 + **구현 완료** (v4.2.0). 미확정 3건은 아래 §9로 확정.
 > **선행 완료**: #436(project_types SSOT), #437(next 제거), #438(npm publish opt-in)
+
+## 9. 확정 사항 (구현 시 결정)
+
+- **github-packages**: publish 축 값으로 승격 — `--publish github-packages` opt-in (기존 spring 기본 포함 → opt-in으로 breaking, breaking-changes.json 4.2.0에 등록)
+- **Vercel 원본**: passQL-Lab/passQL의 `PROJECT-COMMON-VERCEL-DEPLOY.yml`을 편입 — 입력 계약 `VERCEL_TOKEN`·`VERCEL_ORG_ID`·`VERCEL_PROJECT_ID`, `PROJECT_PATH` env로 모노레포 서브폴더 지원
+- **alias 유지 기간**: 1 minor — `--nexus`/`--npm-publish`(.ps1 `-Nexus`/`-NpmPublish`)는 경고 후 신 축 해석, 다음 major에서 제거
+
+## 구현 내역 (v4.2.0)
+
+| 레이어 | 변경 |
+|--------|------|
+| 폴더 | `spring/nexus`→`spring/publish/nexus`, `node/npm-publish`→`node/publish/npm`, `spring/PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH`→`spring/publish/github-packages/`, 신규 `common/deploy/vercel/PROJECT-COMMON-VERCEL-DEPLOY.yaml` |
+| `.sh` | `DEPLOY_TARGET`+`INCLUDE_{NEXUS,NPM_PUBLISH,GH_PACKAGES}`, `--deploy`/`--publish` 파싱, deprecated `--nexus`/`--npm-publish` alias, `ask_deploy_publish`(택1+다중선택), server-deploy는 docker-ssh만·common/deploy/<target> 복사·publish/<target> 복사, read/save_template_options 신 축+구 키 마이그레이션·제거, 분석카드·수정메뉴 |
+| `.ps1` | `-Deploy`/`-Publish` 파라미터, `$DeployTarget`+3 publish 불리언, `Ask-DeployPublish`, `Get-PublishTargets{Json,Csv}`, 동일 복사·마이그레이션 |
+| Node CLI | `args.js`(--deploy/--publish + alias), `context.js`, `index.js`, `options-ask.js`(deploy/publish 질문+구 키 마이그레이션), `version-yml.js`(parse/serialize 신 축+마이그레이션), `copy/workflows.js`(server-deploy 게이트·common/deploy·publish/<target>), `env-plan.js`(스캔 범위), `interactive.js`·`prompts.js`·`status-cards.js` UI |
+| 문서/설정 | CLAUDE.md(배포/publish 축 표·폴더·옵션), breaking-changes.json 4.2.0(warning), version.yml 4.2.0 |
+| 테스트 | cli-args(deploy/publish+alias), copy-workflows(vercel·publish 이동), options-ask(신 축+구 키 마이그레이션 재작성), env-plan·banner-cards 갱신 — **158/158 green** |
+
+---
+## (원 설계 — 참고용)
 
 ---
 

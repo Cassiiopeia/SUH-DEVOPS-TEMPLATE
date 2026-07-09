@@ -45,6 +45,12 @@
     "message": "브랜치 전략이 전면 개편되었습니다. 기존: main(개발 통합) → deploy(프로덕션). 신규: develop(개발 통합) → main(default=프로덕션). deploy 브랜치는 폐기되었습니다. 배포·README·플러그인/NPM 동기화 워크플로우는 main push 트리거로, CI·시크릿 백업·Util 동기화는 develop 트리거로 변경되었습니다. 버전은 develop→main 릴리스 PR 안에서 AUTO-CHANGELOG-CONTROL이 릴리스당 +1로 확정하며(main 직접 push는 VERSION-CONTROL 안전망이 처리), 일상 develop push는 버전을 올리지 않습니다. 기존 프로젝트 전환 절차: 1) git branch develop main && git push origin develop 2) 템플릿 재통합(업데이트 모드) 3) deploy 브랜치 삭제 4) 이후 개발은 develop에서, 릴리스는 develop→main PR로 진행. 전환 전까지는 이 업데이트를 받지 마세요."
   },
 
+  "4.2.0": {
+    "severity": "warning",
+    "title": "배포/publish 타겟 축 재설계 — deploy(택1)/publish(다중) 분리, 구 옵션 deprecated",
+    "message": "version.yml의 template.options 스키마가 배포/publish 두 축으로 재설계되었습니다. 신 키: deploy(택1 — docker-ssh(기본)·vercel·none) + publish(배열 — nexus·npm·github-packages). 구 키(nexus·npm_publish)는 통합/업데이트 시 자동으로 신 축으로 변환·기록되며, 구 플래그 --nexus/--npm-publish(.ps1은 -Nexus/-NpmPublish)는 1 minor 동안 경고와 함께 동작합니다(다음 major에서 제거 예정). 새 사용법: --deploy vercel(Vercel 배포), --publish nexus,npm(다중 publish). 폴더 구조도 이동했습니다 — spring/nexus→spring/publish/nexus, node/npm-publish→node/publish/npm, spring/PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH→spring/publish/github-packages, 신규 common/deploy/vercel(Vercel 배포 워크플로우). 조치: 대부분 자동 마이그레이션되어 별도 조치가 필요 없습니다. Vercel 배포를 쓰려면 --deploy vercel로 재통합하고 VERCEL_TOKEN·VERCEL_ORG_ID·VERCEL_PROJECT_ID secret을 등록하세요. github-packages publish는 이제 --publish github-packages opt-in입니다(기존 spring 프로젝트에 자동 포함되던 것에서 변경)."
+  },
+
   "4.1.0": {
     "severity": "critical",
     "title": "version.yml 단수 project_type 키 제거(SSOT) + next 타입 제거(react로 흡수)",

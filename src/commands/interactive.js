@@ -79,27 +79,31 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     let branch = detectDefaultBranch(cwd);
     const repoName = detectRepoName(cwd);
     const versionCode = existing?.versionCode ?? 1; // 기존 빌드번호 보존
-    // 선택 워크플로우 초기값: version.yml 저장 옵션 (.sh read_template_options L2361 등가)
-    let includeNexus = existing?.options?.nexus ?? false;
+    // 배포/publish 축 초기값(#439): version.yml 저장 옵션 (구 키 자동 마이그레이션 포함)
+    let deployTarget = existing?.options?.deploy ?? "docker-ssh";
+    let publishTargets = existing?.options?.publish ?? [];
     let includeSecretBackup = existing?.options?.secretBackup ?? false;
-    let includeNpmPublish = existing?.options?.npmPublish ?? false;
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
 
     // 층2 — 감지 로그 (#446)
     io.detectionLog?.({ types, version, branch });
 
-    // 선택 워크플로우(Nexus/Secret) 질문 (.sh ask_all_optional_workflows L2707 — full/workflows만)
+    // 배포/publish 축 + Secret 백업 질문 (#439 — full/workflows만)
     if (showOptional) {
       const r = await askAllOptionalWorkflows({
         tempDir, types, targetRoot: cwd,
-        current: { nexus: existing?.options?.nexus ?? null, secretBackup: existing?.options?.secretBackup ?? null, npmPublish: existing?.options?.npmPublish ?? null },
+        current: { deploy: existing?.options?.deploy ?? null, publish: existing?.options?.publish ?? null, secretBackup: existing?.options?.secretBackup ?? null },
         force: false, tty: realTty,
-        io: { confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue) },
+        io: {
+          confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue),
+          select: io.engineIo?.select,
+          multiselect: io.engineIo?.multiselect,
+        },
       });
-      includeNexus = r.nexus;
+      deployTarget = r.deploy;
+      publishTargets = r.publish;
       includeSecretBackup = r.secretBackup;
-      includeNpmPublish = r.npmPublish;
     }
 
     // 확인/수정 루프 — ESC는 '머무르기' (.sh L1877~1881: 명시적 '아니오'만 종료)
@@ -108,9 +112,9 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     while (!confirmed) {
       // 층3 — 프로젝트 분석 개요 카드 (#446). 스텁엔 없음 → note 폴백.
       if (io.analysisCard) {
-        io.analysisCard({ mode, modeLabel: modeLabel(mode), types, version, branch, includeNexus, includeSecretBackup, includeNpmPublish, showOptional, paths });
+        io.analysisCard({ mode, modeLabel: modeLabel(mode), types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional, paths });
       } else {
-        io.note?.(summarize({ mode, types, version, branch, includeNexus, includeSecretBackup, includeNpmPublish, showOptional }), "프로젝트 분석 결과");
+        io.note?.(summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional }), "프로젝트 분석 결과");
       }
       const choice = await io.confirmProjectMenu();
       if (choice === "cancel") { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
@@ -139,15 +143,24 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         } else if (what === "branch") {
           const b = await io.askText("기본 브랜치", branch);
           if (!isCancel(b) && b) branch = b;
-        } else if (what === "nexus") {
-          const y = await io.askYesNo("Nexus publish 워크플로우를 포함할까요?", includeNexus);
-          if (!isCancel(y)) includeNexus = y === true;
+        } else if (what === "deploy-publish") {
+          // 배포/publish 축 재질문 (#439 — forceAsk)
+          const r = await askAllOptionalWorkflows({
+            tempDir, types, targetRoot: cwd,
+            current: { deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup },
+            force: false, tty: realTty, forceAsk: true,
+            io: {
+              confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue),
+              select: io.engineIo?.select,
+              multiselect: io.engineIo?.multiselect,
+            },
+          });
+          deployTarget = r.deploy;
+          publishTargets = r.publish;
+          includeSecretBackup = r.secretBackup;
         } else if (what === "secret") {
           const y = await io.askYesNo("Secret 백업 워크플로우를 포함할까요?", includeSecretBackup);
           if (!isCancel(y)) includeSecretBackup = y === true;
-        } else if (what === "npm-publish") {
-          const y = await io.askYesNo("npm publish 워크플로우를 포함할까요?", includeNpmPublish);
-          if (!isCancel(y)) includeNpmPublish = y === true;
         }
       }
     }
@@ -168,7 +181,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     if (showOptional) {
       const plan = await promptEnvPlan({
         tempDir, types, io: io.engineIo ?? null, force: false,
-        resolvers, includeNexus, targetRoot: cwd, repoName,
+        resolvers, deployTarget, publishTargets, targetRoot: cwd, repoName,
       });
       envValues = plan.values;
       envUseDefaults = plan.useDefaults;
@@ -176,7 +189,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
 
     const { now, today } = clock || utcNow();
     const ctx = createContext({
-      mode, force: true, types, version, versionCode, branch, paths, includeNexus, includeSecretBackup, includeNpmPublish,
+      mode, force: true, types, version, versionCode, branch, paths, deployTarget, publishTargets, includeSecretBackup,
       repoName, templateVersion, resolvers, envValues, envUseDefaults, now, today,
     });
     ctx.templateVersion = templateVersion;
@@ -227,7 +240,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
   }
 }
 
-function summarize({ mode, types, version, branch, includeNexus, includeSecretBackup, includeNpmPublish, showOptional }) {
+function summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional }) {
   const lines = [
     `통합 모드 : ${modeLabel(mode)}`,
     `프로젝트 타입 : ${types.join(", ")}${types.length > 1 ? " (멀티)" : ""}`,
@@ -235,9 +248,9 @@ function summarize({ mode, types, version, branch, includeNexus, includeSecretBa
     `기본 브랜치 : ${branch}`,
   ];
   if (showOptional) {
-    lines.push(`Nexus publish : ${includeNexus ? "포함" : "제외"}`);
+    lines.push(`배포 방식 : ${deployTarget || "docker-ssh"}`);
+    lines.push(`Publish : ${(publishTargets ?? []).join(",") || "없음"}`);
     lines.push(`Secret 백업 : ${includeSecretBackup ? "포함" : "제외"}`);
-    lines.push(`npm publish : ${includeNpmPublish ? "포함" : "제외"}`);
   }
   return lines.join("\n");
 }

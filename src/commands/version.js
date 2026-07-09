@@ -12,7 +12,7 @@ import { ensureGitignore } from "../core/copy/gitignore.js";
 
 export function runVersion(context, tempDir, targetRoot = ".") {
   const { version, types = [], paths = new Map(), branch = "main", versionCode = 1,
-    now, today, templateVersion = "unknown", includeNexus = false, includeSecretBackup = false, includeNpmPublish = false } = context;
+    now, today, templateVersion = "unknown", deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false } = context;
 
   const pathMarkers = new Map();
   for (const [t] of paths) pathMarkers.set(t, markerForType(t));
@@ -20,7 +20,7 @@ export function runVersion(context, tempDir, targetRoot = ".") {
   writeText(join(targetRoot, PATHS.versionFile),
     buildVersionYml({
       version, types, paths, pathMarkers, branch, versionCode, now, today,
-      templateOptions: { templateVersion, includeNexus, includeSecretBackup, includeNpmPublish, optionsDate: today },
+      templateOptions: { templateVersion, deployTarget, publishTargets, includeSecretBackup, optionsDate: today },
     }));
   addVersionSectionToReadme(version, targetRoot);
   copyScripts(tempDir, targetRoot);

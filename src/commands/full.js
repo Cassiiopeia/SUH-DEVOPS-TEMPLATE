@@ -16,13 +16,13 @@ import { copyUtilModules } from "../core/copy/util.js";
 import { copyCoderabbit } from "../core/copy/coderabbit.js";
 import { ensureGitignore } from "../core/copy/gitignore.js";
 
-// context: { version, types, paths:Map, branch, versionCode, includeNexus, includeSecretBackup,
+// context: { version, types, paths:Map, branch, versionCode, deployTarget, publishTargets, includeSecretBackup,
 //            force, repoName, resolvers, now, today }
 // tempDir: 획득된 템플릿. targetRoot: 통합 대상.
 export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
   const { version, types = [], paths = new Map(), branch = "main", versionCode = 1,
     force = true, now, today, templateVersion = "unknown",
-    includeNexus = false, includeSecretBackup = false, includeNpmPublish = false } = context;
+    deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false } = context;
 
   // project_paths 마커 계산 (.sh existing_marker_in_dir 등가 — 대표 마커명)
   const pathMarkers = new Map();
@@ -38,7 +38,7 @@ export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
     buildVersionYml({
       version, types, paths, pathMarkers, branch, versionCode, now, today,
       deployValues,
-      templateOptions: { templateVersion, includeNexus, includeSecretBackup, includeNpmPublish, optionsDate: today },
+      templateOptions: { templateVersion, deployTarget, publishTargets, includeSecretBackup, optionsDate: today },
     }));
 
   // 2. README 버전 섹션

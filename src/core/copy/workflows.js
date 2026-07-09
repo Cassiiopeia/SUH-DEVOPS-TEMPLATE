@@ -36,13 +36,14 @@ function classify(srcDir, workflowsDir, envOpts) {
 }
 
 // copy_workflows 본체 (동기 — 기존 호출부 무변경).
-// context: { types:[], paths:Map, includeNexus, includeSecretBackup, force, repoName, resolvers,
+// context: { types:[], paths:Map, deployTarget, publishTargets:[], includeSecretBackup, force, repoName, resolvers,
 //            envValues?:Map<key,value>, envUseDefaults?:boolean }  ← env 계획(promptEnvPlan) 결과 주입점
+//   deployTarget(#439 택1): 'docker-ssh'(기본) | 'vercel' | 'none' — server-deploy는 docker-ssh일 때만,
+//   common/deploy/<target>/은 해당 타겟일 때 복사. publishTargets(#439 다중): 'nexus'|'npm'|'github-packages'.
 // hooks: { decisions?: Map<filename, 'skip'|'backup'|'template'> } — 기존 파일(changed) 충돌 결정.
-//        미지정 파일은 'skip'(현행 force 동작 100% 유지). 대화형 수집은 copyWorkflowsInteractive 참조.
 // 반환: {copied, skipped, templateAdded, optionalCopied}
 export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
-  const { types = [], paths = new Map(), includeNexus = false, includeSecretBackup = false, repoName = "", resolvers = {}, envValues = new Map(), envUseDefaults = true } = context;
+  const { types = [], paths = new Map(), deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, repoName = "", resolvers = {}, envValues = new Map(), envUseDefaults = true } = context;
   const decisions = hooks.decisions instanceof Map ? hooks.decisions : new Map();
   const workflowsDir = join(targetRoot, PATHS.workflowsDir);
   const projectTypesDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
@@ -72,8 +73,25 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   // (2~4) 타입별
   for (const type of types) {
     const asks = new Map();
-    copyWorkflowsForType(type, projectTypesDir, workflowsDir, { includeNexus, ...context, envOptsFor, collectAsks: asks, decisions }, counters);
+    copyWorkflowsForType(type, projectTypesDir, workflowsDir, { deployTarget, publishTargets, ...context, envOptsFor, collectAsks: asks, decisions }, counters);
     if (asks.size) deployValues.set(type, asks);
+  }
+
+  // (4.5) common/deploy/<target> — 타입 비종속 배포 타겟 (vercel 등, #439)
+  const commonDeployDir = join(commonDir, "deploy", deployTarget || "docker-ssh");
+  if (exists(commonDeployDir)) {
+    for (const filename of listYamlFiles(commonDeployDir)) {
+      const src = join(commonDeployDir, filename);
+      const dst = join(workflowsDir, filename);
+      if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOptsFor("common"))) {
+        counters.skipped++;
+        continue;
+      }
+      if (existsSync(dst)) renameSync(dst, dst + ".bak");
+      copyFileSync(src, dst);
+      counters.optionalCopied++;
+      counters.copied++;
+    }
   }
 
   // (5) common/secret-backup — 있으면 무조건 스킵/신규만 복사
@@ -116,7 +134,7 @@ function applyDecision(decision, srcDir, workflowsDir, filename, counters) {
 // 대상 워크플로우 디렉토리에서 changed(충돌) 파일 목록만 뽑는다 — copyWorkflowsInteractive의 사전 조사용.
 // copyWorkflows 본체와 동일한 classify 기준을 써야 결정 Map이 실제 처리 대상과 1:1로 맞는다.
 export function listWorkflowConflicts(context, tempDir, targetRoot = ".") {
-  const { types = [], paths = new Map(), includeNexus = false, repoName = "", resolvers = {} } = context;
+  const { types = [], paths = new Map(), deployTarget = "docker-ssh", repoName = "", resolvers = {} } = context;
   const workflowsDir = join(targetRoot, PATHS.workflowsDir);
   const projectTypesDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   const conflicts = []; // [{ filename, type }] — 엔진 처리 순서와 동일 (타입 순회 → 직하위 → server-deploy)
@@ -127,7 +145,7 @@ export function listWorkflowConflicts(context, tempDir, targetRoot = ".") {
       for (const f of classify(typeDir, workflowsDir, envOpts).changed) conflicts.push({ filename: f, type });
     }
     const serverDeployDir = join(typeDir, "server-deploy");
-    if (exists(serverDeployDir) && !includeNexus) {
+    if (exists(serverDeployDir) && (deployTarget || "docker-ssh") === "docker-ssh") {
       for (const f of classify(serverDeployDir, workflowsDir, envOpts).changed) conflicts.push({ filename: f, type });
     }
   }
@@ -149,8 +167,10 @@ export async function copyWorkflowsInteractive(context, tempDir, targetRoot = ".
   return copyWorkflows(context, tempDir, targetRoot, { decisions });
 }
 
+const PUBLISH_TARGETS = ["nexus", "npm", "github-packages"];
+
 function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters) {
-  const { includeNexus, includeNpmPublish = false, force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null, decisions = new Map() } = ctx;
+  const { deployTarget = "docker-ssh", publishTargets = [], force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null, decisions = new Map() } = ctx;
   const typeDir = join(projectTypesDir, type);
   const envOpts = envOptsFor(type);
   let unchangedNames = [];
@@ -165,41 +185,23 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
     for (const f of changed) applyDecision(decisions.get(f), typeDir, workflowsDir, f, counters);
   }
 
-  // server-deploy
+  // server-deploy — deploy=docker-ssh일 때만 포함 (#439)
   const serverDeployDir = join(typeDir, "server-deploy");
-  if (exists(serverDeployDir)) {
-    if (includeNexus) {
-      // Nexus 프로젝트 → 폴더째 제외 (복사 안 함)
-    } else {
-      const { newFiles, unchanged, changed } = classify(serverDeployDir, workflowsDir, envOpts);
-      for (const f of unchanged) counters.skipped++;
-      for (const f of newFiles) { copyFileSync(join(serverDeployDir, f), join(workflowsDir, f)); counters.copied++; }
-      for (const f of changed) applyDecision(decisions.get(f), serverDeployDir, workflowsDir, f, counters);
-    }
+  if (exists(serverDeployDir) && (deployTarget || "docker-ssh") === "docker-ssh") {
+    const { newFiles, unchanged, changed } = classify(serverDeployDir, workflowsDir, envOpts);
+    for (const f of unchanged) counters.skipped++;
+    for (const f of newFiles) { copyFileSync(join(serverDeployDir, f), join(workflowsDir, f)); counters.copied++; }
+    for (const f of changed) applyDecision(decisions.get(f), serverDeployDir, workflowsDir, f, counters);
   }
 
-  // nexus (opt-in)
-  const nexusDir = join(typeDir, "nexus");
-  if (exists(nexusDir) && includeNexus) {
-    for (const filename of listYamlFiles(nexusDir)) {
-      const src = join(nexusDir, filename);
-      const dst = join(workflowsDir, filename);
-      if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOpts)) {
-        counters.skipped++;
-        continue;
-      }
-      if (existsSync(dst)) renameSync(dst, dst + ".bak");
-      copyFileSync(src, dst);
-      counters.optionalCopied++;
-      counters.copied++;
-    }
-  }
-
-  // npm-publish (opt-in — 현재 node/npm-publish/만 존재)
-  const npmPublishDir = join(typeDir, "npm-publish");
-  if (exists(npmPublishDir) && includeNpmPublish) {
-    for (const filename of listYamlFiles(npmPublishDir)) {
-      const src = join(npmPublishDir, filename);
+  // publish/<target> (opt-in — #439 publish 축. 타입은 파일 위치일 뿐 게이트가 아니다)
+  const pubDirs = [];
+  for (const target of PUBLISH_TARGETS) {
+    const pubDir = join(typeDir, "publish", target);
+    pubDirs.push(pubDir);
+    if (!exists(pubDir) || !publishTargets.includes(target)) continue;
+    for (const filename of listYamlFiles(pubDir)) {
+      const src = join(pubDir, filename);
       const dst = join(workflowsDir, filename);
       if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOpts)) {
         counters.skipped++;
@@ -213,7 +215,7 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
   }
 
   // env 치환 — 이 타입의 원본 디렉토리들에서 복사돼 존재하고 unchanged 아닌 파일만
-  for (const srcDir of [typeDir, serverDeployDir, nexusDir, npmPublishDir]) {
+  for (const srcDir of [typeDir, serverDeployDir, ...pubDirs]) {
     if (!exists(srcDir)) continue;
     for (const filename of listYamlFiles(srcDir)) {
       const target = join(workflowsDir, filename);

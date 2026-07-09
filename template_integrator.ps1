@@ -91,6 +91,12 @@ param(
     [switch]$NoNpmPublish,
 
     [Parameter(Mandatory=$false)]
+    [string]$Deploy = "",
+
+    [Parameter(Mandatory=$false)]
+    [string]$Publish = "",
+
+    [Parameter(Mandatory=$false)]
     [string]$Paths = "",
 
     [Parameter(Mandatory=$false)]
@@ -139,10 +145,13 @@ $script:WorkflowsCopied = 0
 $script:UtilModulesCopied = 0
 # next는 v4.1.0에서 react로 흡수됨 (breaking)
 $script:ValidTypes = @("spring", "flutter", "react", "react-native", "react-native-expo", "node", "python", "basic")
-# 선택적(opt-in) 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
-$script:IncludeNexus = $null          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
-$script:IncludeSecretBackup = $null   # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
-$script:IncludeNpmPublish = $null     # npm 패키지 publish 워크플로우 (node/npm-publish/)
+# ── 배포/publish 타겟 축 (#439 — 타입 비종속, $null: 미설정) ──
+# deploy(택1): docker-ssh(기본) | vercel | none / publish(0..n): nexus·npm·github-packages
+$script:DeployTarget = $null          # 서버/호스팅 배포 방식
+$script:IncludeNexus = $null          # publish: nexus (spring/publish/nexus/)
+$script:IncludeNpmPublish = $null     # publish: npm (node/publish/npm/)
+$script:IncludeGhPackages = $null     # publish: github-packages (spring/publish/github-packages/)
+$script:IncludeSecretBackup = $null   # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/ — 배포축 아님)
 $script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
 $script:PiPackageUrl = "https://github.com/Cassiiopeia/projectops"  # pi install/update/remove 대상
 
@@ -718,12 +727,11 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Type <TYPE>          프로젝트 타입 (미지정 시 자동 감지)
   -NoBackup             백업 생성 안 함
   -Force                확인 없이 즉시 실행
-  -Nexus                Nexus 라이브러리 publish 워크플로우 포함 (기본: 제외)
-  -NoNexus              Nexus publish 워크플로우 제외
+  -Deploy <TARGET>      배포 방식 택1: docker-ssh(기본) | vercel | none
+  -Publish <CSV>        publish 타겟 csv: nexus,npm,github-packages (기본: 없음)
   -SecretBackup         GitHub Secret 서버 백업 워크플로우 포함 (기본: 제외)
   -NoSecretBackup       Secret 백업 워크플로우 제외
-  -NpmPublish           npm 패키지 publish 워크플로우 포함 (기본: 제외)
-  -NoNpmPublish         npm publish 워크플로우 제외
+  -Nexus / -NpmPublish  (deprecated — -Publish nexus / -Publish npm 사용)
   -Paths "T=P,..."      타입별 프로젝트 경로 (모노레포용, 예: -Paths "flutter=app,react=client")
   -Help                 이 도움말 표시
 
@@ -1501,12 +1509,13 @@ function Print-ProjectAnalysis {
     Write-Host "       🌿 Default Branch   : $($script:DetectedBranch)"
     # 모드 / 선택 워크플로우 / 멀티경로 (값이 있을 때만 — sh와 동일)
     if ($script:Mode) { Write-Host "       💫 통합 모드        : $(Get-ModeDisplayLabel $script:Mode)" }
-    if ($script:IncludeNexus -eq $true)  { Write-Host "       📦 Nexus publish    : 포함" }
-    elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
+    # 배포/publish 축 (#439)
+    if ($null -ne $script:DeployTarget) { Write-Host "       🚀 배포 방식        : $($script:DeployTarget)" }
+    if (($null -ne $script:IncludeNexus) -or ($null -ne $script:IncludeNpmPublish) -or ($null -ne $script:IncludeGhPackages)) {
+        Write-Host "       📦 Publish          : $(Get-PublishTargetsCsv)"
+    }
     if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
     elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
-    if ($script:IncludeNpmPublish -eq $true)  { Write-Host "       📦 npm publish      : 포함" }
-    elseif ($script:IncludeNpmPublish -eq $false) { Write-Host "       📦 npm publish      : 제외" }
     if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
         $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
         Write-Host "       📁 프로젝트 경로    : $pathPairs"
@@ -1534,12 +1543,10 @@ function Edit-ProjectInfo {
             @{Value='branch';  Label='기본 브랜치'}
         )
         if ($_optEditable) {
-            $_nxState = if ($script:IncludeNexus -eq $true) { '포함' } else { '제외' }
+            $_dpState = if ($script:DeployTarget) { $script:DeployTarget } else { 'docker-ssh' }
             $_sbState = if ($script:IncludeSecretBackup -eq $true) { '포함' } else { '제외' }
-            $_npState = if ($script:IncludeNpmPublish -eq $true) { '포함' } else { '제외' }
-            $_editOptions += @{Value='optional'; Label="Nexus publish 포함 여부 (현재: $_nxState)"}
+            $_editOptions += @{Value='optional'; Label="배포/Publish 방식 (현재: $_dpState / $(Get-PublishTargetsCsv))"}
             $_editOptions += @{Value='optional'; Label="Secret 백업 포함 여부 (현재: $_sbState)"}
-            $_editOptions += @{Value='optional'; Label="npm publish 포함 여부 (현재: $_npState)"}
         }
         $_editOptions += @{Value='done';    Label='모두 맞음, 계속'}
         $_editOptions += @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
@@ -2001,14 +2008,32 @@ function Read-TemplateOptions {
             continue
         }
 
-        # options 섹션 내부에서 nexus / secret_backup 값 확인
-        # (한 키만 읽고 끝내면 안 되므로 continue로 둘 다 스캔. 구 synology 키는 어느 분기에도
-        #  안 걸려 자연히 무시된다.)
+        # options 섹션 내부 — 신 축(deploy/publish) 우선, 구 키(nexus/npm_publish)는 마이그레이션 폴백
         if ($inTemplate -and $inOptions) {
+            if ($line -match "^\s+deploy:\s*(.+)") {
+                $v = $matches[1].Trim().Trim('"').Trim("'")
+                if (($v -in @("docker-ssh","vercel","none")) -and ($null -eq $script:DeployTarget)) { $script:DeployTarget = $v }
+                continue
+            }
+            if ($line -match "^\s+publish:\s*\[([^\]]*)\]") {
+                # publish: ["nexus","npm"] — CLI 미지정 항목만 저장값으로 채움
+                $pl = ($matches[1] -replace '["'' ]', '')
+                $plList = @($pl -split ',' | Where-Object { $_ })
+                if ($null -eq $script:IncludeNexus)      { $script:IncludeNexus = ($plList -contains 'nexus') }
+                if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = ($plList -contains 'npm') }
+                if ($null -eq $script:IncludeGhPackages) { $script:IncludeGhPackages = ($plList -contains 'github-packages') }
+                continue
+            }
+            # ── 구 키 마이그레이션 (v4.2.0 이전 파일) — 신 키가 이미 값을 채웠으면 무시 ──
             if ($line -match "^\s+nexus:\s*(.+)") {
                 $v = $matches[1].Trim().Trim('"').Trim("'")
-                if ($v -eq "true" -or $v -eq "True") { $script:IncludeNexus = $true }
-                elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeNexus = $false }
+                if ($null -eq $script:IncludeNexus) {
+                    if ($v -eq "true" -or $v -eq "True") {
+                        $script:IncludeNexus = $true
+                        if ($null -eq $script:DeployTarget) { $script:DeployTarget = "none" }
+                    }
+                    elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeNexus = $false }
+                }
                 continue
             }
             if ($line -match "^\s+secret_backup:\s*(.+)") {
@@ -2019,8 +2044,10 @@ function Read-TemplateOptions {
             }
             if ($line -match "^\s+npm_publish:\s*(.+)") {
                 $v = $matches[1].Trim().Trim('"').Trim("'")
-                if ($v -eq "true" -or $v -eq "True") { $script:IncludeNpmPublish = $true }
-                elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeNpmPublish = $false }
+                if ($null -eq $script:IncludeNpmPublish) {
+                    if ($v -eq "true" -or $v -eq "True") { $script:IncludeNpmPublish = $true }
+                    elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeNpmPublish = $false }
+                }
                 continue
             }
 
@@ -2045,13 +2072,15 @@ function Save-TemplateOptions {
     $versionFile = "version.yml"
     $today = (Get-Date).ToString("yyyy-MM-dd")
 
-    # 미설정($null)이면 false로 보정 — 항상 명시적 true/false를 기록한다.
+    # 미설정($null)이면 기본값으로 보정 — 항상 명시적 값을 기록한다.
+    if ($null -eq $script:DeployTarget) { $script:DeployTarget = "docker-ssh" }
     if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
     if ($null -eq $script:IncludeSecretBackup) { $script:IncludeSecretBackup = $false }
     if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = $false }
-    $nexusVal = $script:IncludeNexus.ToString().ToLower()
+    if ($null -eq $script:IncludeGhPackages) { $script:IncludeGhPackages = $false }
+    $dpVal = $script:DeployTarget
+    $pubVal = Get-PublishTargetsJson
     $sbVal = $script:IncludeSecretBackup.ToString().ToLower()
-    $npVal = $script:IncludeNpmPublish.ToString().ToLower()
 
     if (-not (Test-Path $versionFile)) {
         return
@@ -2061,12 +2090,24 @@ function Save-TemplateOptions {
 
     # 기존에 template 섹션이 있는지 확인
     if ($content -match "template:") {
-        # nexus 값 업데이트 또는 추가
-        if ($content -match "nexus:") {
-            $content = $content -replace "(?m)nexus:.*$", "nexus: $nexusVal"
+        # ── 구 키(nexus/npm_publish) 라인은 제거 — 신 축으로 마이그레이션 완료 (SSOT) ──
+        $content = $content -replace "(?m)^      nexus:.*\r?\n", ""
+        $content = $content -replace "(?m)^      npm_publish:.*\r?\n", ""
+
+        # deploy 값 업데이트 또는 추가
+        if ($content -match "(?m)^      deploy:") {
+            $content = $content -replace "(?m)^      deploy:.*$", "      deploy: `"$dpVal`""
         }
         elseif ($content -match "options:") {
-            $content = $content -replace "(options:)", "`$1`n      nexus: $nexusVal"
+            $content = $content -replace "(options:)", "`$1`n      deploy: `"$dpVal`""
+        }
+
+        # publish 값 업데이트 또는 추가
+        if ($content -match "(?m)^      publish:") {
+            $content = $content -replace "(?m)^      publish:.*$", "      publish: $pubVal"
+        }
+        elseif ($content -match "options:") {
+            $content = $content -replace "(options:)", "`$1`n      publish: $pubVal"
         }
 
         # secret_backup 값 업데이트 또는 추가
@@ -2075,14 +2116,6 @@ function Save-TemplateOptions {
         }
         elseif ($content -match "options:") {
             $content = $content -replace "(options:)", "`$1`n      secret_backup: $sbVal"
-        }
-
-        # npm_publish 값 업데이트 또는 추가
-        if ($content -match "npm_publish:") {
-            $content = $content -replace "(?m)npm_publish:.*$", "npm_publish: $npVal"
-        }
-        elseif ($content -match "options:") {
-            $content = $content -replace "(options:)", "`$1`n      npm_publish: $npVal"
         }
 
         # last_update_date 업데이트
@@ -2101,13 +2134,32 @@ function Save-TemplateOptions {
     integrated_date: "$today"
     last_update_date: "$today"
     options:
-      nexus: $nexusVal
+      deploy: "$dpVal"
+      publish: $pubVal
       secret_backup: $sbVal
-      npm_publish: $npVal
 "@
         Add-Content -Path $versionFile -Value $templateSection -Encoding UTF8
         Print-Info "version.yml에 템플릿 설정 저장됨"
     }
+}
+
+# 현재 publish 불리언 3종을 ["a","b"] json 배열 문자열로 (version.yml 기록용)
+function Get-PublishTargetsJson {
+    $parts = @()
+    if ($script:IncludeNexus -eq $true) { $parts += '"nexus"' }
+    if ($script:IncludeNpmPublish -eq $true) { $parts += '"npm"' }
+    if ($script:IncludeGhPackages -eq $true) { $parts += '"github-packages"' }
+    return '[' + ($parts -join ',') + ']'
+}
+
+# 현재 publish 타겟을 사람이 읽는 csv로 (분석 카드/메뉴 표시용) — 없으면 "없음"
+function Get-PublishTargetsCsv {
+    $parts = @()
+    if ($script:IncludeNexus -eq $true) { $parts += 'nexus' }
+    if ($script:IncludeNpmPublish -eq $true) { $parts += 'npm' }
+    if ($script:IncludeGhPackages -eq $true) { $parts += 'github-packages' }
+    if ($parts.Count -eq 0) { return '없음' }
+    return ($parts -join ',')
 }
 
 # 버전 비교 함수 (v1 > v2 이면 1, v1 < v2 이면 -1, 같으면 0)
@@ -2339,33 +2391,98 @@ function Ask-AllOptionalWorkflows {
     $commonRoot = Join-Path (Split-Path $TypeDirs[0] -Parent) "common"
 
     # CLI 파라미터로 이미 지정된 경우 우선 반영
-    if ($Nexus)          { $script:IncludeNexus = $true }
+    # CLI 파라미터 우선 반영 — 신 축(-Deploy/-Publish) + deprecated alias
+    if ($Deploy) {
+        if ($Deploy -in @("docker-ssh","vercel","none")) { $script:DeployTarget = $Deploy }
+        else { Print-Error "-Deploy 값은 docker-ssh | vercel | none 중 하나여야 합니다: '$Deploy'"; exit 1 }
+    }
+    if ($Publish) {
+        $pubList = @(($Publish -replace ' ','') -split ',' | Where-Object { $_ })
+        foreach ($p in $pubList) {
+            if ($p -notin @("nexus","npm","github-packages")) { Print-Error "-Publish 값은 nexus | npm | github-packages csv여야 합니다: '$p'"; exit 1 }
+        }
+        $script:IncludeNexus = ($pubList -contains 'nexus')
+        $script:IncludeNpmPublish = ($pubList -contains 'npm')
+        $script:IncludeGhPackages = ($pubList -contains 'github-packages')
+    }
+    if ($Nexus) {
+        Print-Warning "-Nexus는 deprecated입니다. -Publish nexus -Deploy none 을 사용하세요."
+        $script:IncludeNexus = $true
+        if ($null -eq $script:DeployTarget) { $script:DeployTarget = "none" }
+    }
     if ($NoNexus)        { $script:IncludeNexus = $false }
     if ($SecretBackup)   { $script:IncludeSecretBackup = $true }
     if ($NoSecretBackup) { $script:IncludeSecretBackup = $false }
-    if ($NpmPublish)     { $script:IncludeNpmPublish = $true }
+    if ($NpmPublish) {
+        Print-Warning "-NpmPublish는 deprecated입니다. -Publish npm 을 사용하세요."
+        $script:IncludeNpmPublish = $true
+    }
     if ($NoNpmPublish)   { $script:IncludeNpmPublish = $false }
 
     # -ForceAsk가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
-    # (Ask-OptionalWorkflow가 변수값으로 판단하므로 여기서 한 번만 읽는다.)
     if (-not $ForceAsk) { Read-TemplateOptions }
 
-    # Nexus: 각 타입의 nexus/ 폴더
-    foreach ($td in $TypeDirs) {
-        Ask-OptionalWorkflow -Dir (Join-Path $td "nexus") -Icon "📦" -Short "Nexus 라이브러리 publish" `
-            -Desc "라이브러리/모듈을 Maven 저장소(Nexus)에 배포하는 워크플로우입니다. 일반 서버 배포가 아니라 라이브러리 프로젝트에만 필요합니다." `
-            -VarName "IncludeNexus" -ForceAsk:$ForceAsk
-    }
-    # npm publish: 각 타입의 npm-publish/ 폴더 (현재 node만 존재)
-    foreach ($td in $TypeDirs) {
-        Ask-OptionalWorkflow -Dir (Join-Path $td "npm-publish") -Icon "📦" -Short "npm 패키지 publish" `
-            -Desc "패키지를 공개 npmjs 레지스트리에 자동 배포하는 워크플로우입니다. npm 라이브러리/CLI 프로젝트에만 필요합니다 (NPM_TOKEN secret 필요)." `
-            -VarName "IncludeNpmPublish" -ForceAsk:$ForceAsk
-    }
-    # Secret 백업: 공통 폴더
+    # 배포/publish 축 질문 (#439 — 타입 비종속)
+    Ask-DeployPublish -ForceAsk:$ForceAsk
+
+    # Secret 백업: 공통 폴더 (배포축 아님 — 기존 폴더 질문 유지)
     Ask-OptionalWorkflow -Dir (Join-Path $commonRoot "secret-backup") -Icon "🔐" -Short "Secret 서버 백업" `
         -Desc "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다." `
         -VarName "IncludeSecretBackup" -ForceAsk:$ForceAsk
+}
+
+# 배포/publish 축 질문 (#439) — force-ask가 아니고 값이 이미 있으면 재질문하지 않는다.
+function Ask-DeployPublish {
+    param([switch]$ForceAsk)
+
+    # 비대화형(-Force) → 기본값 확정
+    if ($Force) {
+        if ($null -eq $script:DeployTarget) { $script:DeployTarget = "docker-ssh" }
+        return
+    }
+
+    # ── 배포 방식 (택1) ──
+    if ($ForceAsk -or ($null -eq $script:DeployTarget)) {
+        Print-SeparatorLine
+        Write-Host ""
+        Write-Host "🚀 이 프로젝트를 어디에 배포하나요?"
+        Write-Host ""
+        $dpChoice = Invoke-ChooseMenu -CancelLabel "기본값(docker-ssh)" -Prompt "배포 방식을 선택하세요" -Options @(
+            @{Value='docker-ssh'; Label='Docker + SSH 서버 배포 (기본)'},
+            @{Value='vercel';     Label='Vercel'},
+            @{Value='none';       Label='배포하지 않음 (라이브러리/CI 전용)'}
+        )
+        if ($dpChoice) { $script:DeployTarget = $dpChoice }
+        elseif ($null -eq $script:DeployTarget) { $script:DeployTarget = "docker-ssh" }
+        Print-Info "배포 방식: $($script:DeployTarget)"
+    }
+
+    # ── publish 타겟 (다중 선택) ──
+    if ($ForceAsk -or ($null -eq $script:IncludeNexus) -or ($null -eq $script:IncludeNpmPublish) -or ($null -eq $script:IncludeGhPackages)) {
+        Write-Host ""
+        Write-Host "📦 라이브러리/패키지 publish 레지스트리가 있나요? (없으면 그냥 Enter)"
+        Write-Host ""
+        $preselect = @()
+        if ($script:IncludeNexus -eq $true) { $preselect += 'nexus' }
+        if ($script:IncludeNpmPublish -eq $true) { $preselect += 'npm' }
+        if ($script:IncludeGhPackages -eq $true) { $preselect += 'github-packages' }
+        $pubSel = Invoke-ChooseMenu -Multi -CancelLabel "없음" -Preselect ($preselect -join ',') -Prompt "publish 타겟을 선택하세요 (Space 토글, Enter 확정)" -Options @(
+            @{Value='nexus';           Label='사내 Maven(Nexus) 라이브러리 배포'},
+            @{Value='npm';             Label='공개 npmjs 패키지 배포 (NPM_TOKEN)'},
+            @{Value='github-packages'; Label='GitHub Packages 라이브러리 배포'}
+        )
+        if ($null -ne $pubSel) {
+            $selList = @("$pubSel" -split ',' | Where-Object { $_ })
+            $script:IncludeNexus = ($selList -contains 'nexus')
+            $script:IncludeNpmPublish = ($selList -contains 'npm')
+            $script:IncludeGhPackages = ($selList -contains 'github-packages')
+        } else {
+            if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
+            if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = $false }
+            if ($null -eq $script:IncludeGhPackages) { $script:IncludeGhPackages = $false }
+        }
+        Print-Info "Publish 타겟: $(Get-PublishTargetsCsv)"
+    }
 }
 
 # ===================================================================
@@ -3013,23 +3130,22 @@ function Copy-Workflows-ForType {
         Print-Info "$Type 타입의 전용 워크플로우가 없습니다. (공통 워크플로우만 사용)"
     }
 
-    # 2.5 타입별 server-deploy 하위폴더 처리 (기본 포함, 단 Nexus 프로젝트면 폴더째 제외)
+    # 2.5 타입별 server-deploy 하위폴더 처리 (deploy=docker-ssh일 때만 포함 — #439)
     # SSH+Docker 서버 배포(SIMPLE-CICD·NONSTOP-*·PR-PREVIEW)는 이 폴더로 묶여 있다.
-    # Nexus(라이브러리 publish) 프로젝트는 서버에 배포하지 않으므로 이 폴더 전체를 건너뛴다.
-    # → "서버 배포 워크플로우"를 새로 추가할 땐 이 server-deploy 폴더에 파일만 넣으면
-    #   IncludeNexus=true일 때 자동으로 제외된다(마법사 코드 수정 불필요).
+    # deploy=vercel/none 프로젝트는 서버에 배포하지 않으므로 이 폴더 전체를 건너뛴다.
     $serverDeployDir = Join-Path $ProjectTypesDir "$Type\server-deploy"
 
     if (Test-Path $serverDeployDir) {
-        if ($script:IncludeNexus -eq $true) {
-            # 라이브러리(Nexus) 프로젝트 → 서버 배포 워크플로우 폴더째 제외
+        $dpNow = if ($script:DeployTarget) { $script:DeployTarget } else { 'docker-ssh' }
+        if ($dpNow -ne 'docker-ssh') {
+            # vercel/none 프로젝트 → 서버 배포 워크플로우 폴더째 제외
             $sdFiles = @()
             $yamlFiles = Get-ChildItem -Path $serverDeployDir -Filter "*.yaml" -ErrorAction SilentlyContinue
             $ymlFiles = Get-ChildItem -Path $serverDeployDir -Filter "*.yml" -ErrorAction SilentlyContinue
             if ($yamlFiles) { $sdFiles += $yamlFiles }
             if ($ymlFiles) { $sdFiles += $ymlFiles }
             if ($sdFiles.Count -gt 0) {
-                Print-Info "$Type 서버 배포 워크플로우 $($sdFiles.Count)개 제외됨 (Nexus 라이브러리 프로젝트라 서버 배포가 불필요)"
+                Print-Info "$Type 서버 배포 워크플로우 $($sdFiles.Count)개 제외됨 (배포 방식: $dpNow)"
             }
         } else {
             # 일반 서버 배포 프로젝트 → 루트 워크플로우와 동일하게 기본 포함 (신규/변경/동일 3분류)
@@ -3124,78 +3240,30 @@ function Copy-Workflows-ForType {
         }
     }
 
-    # 3. 타입별 Nexus 하위폴더 처리 (opt-in)
-    # 배포 워크플로우는 server-deploy로 묶여 기본 포함됨. nexus/ 만 선택적으로 남는다.
-    $nexusDir = Join-Path $ProjectTypesDir "$Type\nexus"
-
-    if (Test-Path $nexusDir) {
-        if ($script:IncludeNexus -eq $true) {
-            Print-Info "$Type Nexus 워크플로우 다운로드 중..."
-
-            $nexusWorkflows = @()
-            $yamlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $nexusWorkflows += $yamlFiles }
-            if ($ymlFiles) { $nexusWorkflows += $ymlFiles }
-
-            foreach ($workflow in $nexusWorkflows) {
-                $filename = $workflow.Name
-                $destPath = Join-Path $WORKFLOWS_DIR $filename
-
-                # 내용이 이미 동일하면 복사 생략 (변경점 0인 파일 덮어쓰기 방지)
-                if ((Test-Path $destPath) -and (Test-WorkflowUnchanged -Type $Type -SrcPath $workflow.FullName -ExistingPath $destPath)) {
-                    Write-Host "  ⏭ $filename (Nexus $Type, 변경 없음)"
-                    $Counters.skipped++
-                    continue
-                }
-
-                # 이미 존재하는 경우 처리
-                if (Test-Path $destPath) {
-                    # 기존 파일 백업 후 덮어쓰기
-                    $backupPath = [string]$destPath + ".bak"
-                    Move-Item -Path $destPath -Destination $backupPath -Force
-                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (Nexus $Type, 백업: ${filename}.bak)"
-                } else {
-                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (Nexus $Type)"
-                }
-                $Counters.optionalCopied++
-                $Counters.copied++
-            }
-        } else {
-            # Nexus 제외됨 - 사용자에게 알림
-            $nexusFiles = @()
-            $yamlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $nexusDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $nexusFiles += $yamlFiles }
-            if ($ymlFiles) { $nexusFiles += $ymlFiles }
-
-            if ($nexusFiles.Count -gt 0) {
-                Print-Info "$Type Nexus 워크플로우 $($nexusFiles.Count)개 제외됨 (-Nexus 옵션으로 포함 가능)"
-            }
+    # 3. 타입별 publish/<target> 하위폴더 처리 (opt-in — #439 publish 축)
+    # 선택된 publish 타겟 집합으로 복사를 결정한다. 타입은 파일 위치일 뿐 게이트가 아니다.
+    foreach ($pubTarget in @('nexus','npm','github-packages')) {
+        $pubDir = Join-Path $ProjectTypesDir "$Type\publish\$pubTarget"
+        if (-not (Test-Path $pubDir)) { continue }
+        $pubOn = switch ($pubTarget) {
+            'nexus'           { $script:IncludeNexus }
+            'npm'             { $script:IncludeNpmPublish }
+            'github-packages' { $script:IncludeGhPackages }
         }
-    }
+        $pubWorkflows = @()
+        $yamlFiles = Get-ChildItem -Path $pubDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $pubDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $pubWorkflows += $yamlFiles }
+        if ($ymlFiles) { $pubWorkflows += $ymlFiles }
 
-    # 3.5 타입별 npm-publish 하위폴더 처리 (opt-in — 현재 node/npm-publish/만 존재)
-    $npmPublishDir = Join-Path $ProjectTypesDir "$Type\npm-publish"
-
-    if (Test-Path $npmPublishDir) {
-        if ($script:IncludeNpmPublish -eq $true) {
-            Print-Info "$Type npm publish 워크플로우 다운로드 중..."
-
-            $npmWorkflows = @()
-            $yamlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $npmWorkflows += $yamlFiles }
-            if ($ymlFiles) { $npmWorkflows += $ymlFiles }
-
-            foreach ($workflow in $npmWorkflows) {
+        if ($pubOn -eq $true) {
+            Print-Info "$Type publish($pubTarget) 워크플로우 다운로드 중..."
+            foreach ($workflow in $pubWorkflows) {
                 $filename = $workflow.Name
                 $destPath = Join-Path $WORKFLOWS_DIR $filename
 
                 if ((Test-Path $destPath) -and (Test-WorkflowUnchanged -Type $Type -SrcPath $workflow.FullName -ExistingPath $destPath)) {
-                    Write-Host "  ⏭ $filename (npm publish $Type, 변경 없음)"
+                    Write-Host "  ⏭ $filename (publish:$pubTarget $Type, 변경 없음)"
                     $Counters.skipped++
                     continue
                 }
@@ -3204,24 +3272,16 @@ function Copy-Workflows-ForType {
                     $backupPath = [string]$destPath + ".bak"
                     Move-Item -Path $destPath -Destination $backupPath -Force
                     Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (npm publish $Type, 백업: ${filename}.bak)"
+                    Write-Host "  ✓ $filename (publish:$pubTarget $Type, 백업: ${filename}.bak)"
                 } else {
                     Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
-                    Write-Host "  ✓ $filename (npm publish $Type)"
+                    Write-Host "  ✓ $filename (publish:$pubTarget $Type)"
                 }
                 $Counters.optionalCopied++
                 $Counters.copied++
             }
-        } else {
-            $npmFiles = @()
-            $yamlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yaml" -ErrorAction SilentlyContinue
-            $ymlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yml" -ErrorAction SilentlyContinue
-            if ($yamlFiles) { $npmFiles += $yamlFiles }
-            if ($ymlFiles) { $npmFiles += $ymlFiles }
-
-            if ($npmFiles.Count -gt 0) {
-                Print-Info "$Type npm publish 워크플로우 $($npmFiles.Count)개 제외됨 (-NpmPublish 옵션으로 포함 가능)"
-            }
+        } elseif ($pubWorkflows.Count -gt 0) {
+            Print-Info "$Type publish($pubTarget) 워크플로우 $($pubWorkflows.Count)개 제외됨 (-Publish $pubTarget 옵션으로 포함 가능)"
         }
     }
 
@@ -3230,7 +3290,8 @@ function Copy-Workflows-ForType {
     #    조용히 0개를 반환한다(알려진 함정). 그러면 Configure-WorkflowEnv 가 한 번도
     #    호출되지 않아 __PROJECT_NAME__ 등 @wizard 토큰 치환이 통째로 스킵된다.
     #    → -Filter 를 yaml/yml 각각 누적하는 방식으로 처리(Windows PS 5.1 + macOS PS Core 공통 동작).
-    foreach ($srcDir in @($typeDir, $serverDeployDir, $nexusDir, $npmPublishDir)) {
+    $pubSrcDirs = @('nexus','npm','github-packages') | ForEach-Object { Join-Path $ProjectTypesDir "$Type\publish\$_" }
+    foreach ($srcDir in (@($typeDir, $serverDeployDir) + $pubSrcDirs)) {
         if (-not (Test-Path $srcDir)) { continue }
         $wfFiles = @()
         $wfFiles += Get-ChildItem -Path $srcDir -Filter '*.yaml' -File -ErrorAction SilentlyContinue
@@ -3320,6 +3381,33 @@ function Copy-Workflows {
     $skipped = $counters.skipped
     $templateAdded = $counters.templateAdded
     $optionalCopied = $counters.optionalCopied
+
+    # 3.5 Common 배포 타겟 워크플로우 처리 (deploy=vercel 등 타입 비종속 — #439)
+    $dpNowCommon = if ($script:DeployTarget) { $script:DeployTarget } else { 'docker-ssh' }
+    $commonDeployDir = Join-Path $projectTypesDir "common\deploy\$dpNowCommon"
+    if (Test-Path $commonDeployDir) {
+        Print-Info "공통 배포($dpNowCommon) 워크플로우 다운로드 중..."
+        $commonDeployWorkflows = @()
+        $yamlFiles = Get-ChildItem -Path $commonDeployDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+        $ymlFiles = Get-ChildItem -Path $commonDeployDir -Filter "*.yml" -ErrorAction SilentlyContinue
+        if ($yamlFiles) { $commonDeployWorkflows += $yamlFiles }
+        if ($ymlFiles) { $commonDeployWorkflows += $ymlFiles }
+        foreach ($workflow in $commonDeployWorkflows) {
+            $filename = $workflow.Name
+            $destPath = Join-Path $WORKFLOWS_DIR $filename
+            if (Test-Path $destPath) {
+                $backupPath = [string]$destPath + ".bak"
+                Move-Item -Path $destPath -Destination $backupPath -Force
+                Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                Write-Host "  ✓ $filename (deploy:$dpNowCommon, 백업: ${filename}.bak)"
+            } else {
+                Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                Write-Host "  ✓ $filename (deploy:$dpNowCommon)"
+            }
+            $optionalCopied++
+            $copied++
+        }
+    }
 
     # 4. Common Secret 백업 워크플로우 처리 (opt-in)
     $commonSecretDir = Join-Path $projectTypesDir "common\secret-backup"
@@ -4105,13 +4193,14 @@ function Start-Integration {
         }
     }
 
-    # 2.1 템플릿 옵션 저장 (Nexus / Secret 백업 등 선택 워크플로우 설정)
+    # 2.1 템플릿 옵션 저장 (배포/publish 축 + Secret 백업)
     if ($Mode -eq "full" -or $Mode -eq "workflows") {
-        # 설정되지 않은 경우 기본값 false 사용
-        # (해당 opt-in 폴더가 없는 타입을 위한 처리)
+        # 설정되지 않은 경우 기본값 사용
+        if ($null -eq $script:DeployTarget) { $script:DeployTarget = "docker-ssh" }
         if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
         if ($null -eq $script:IncludeSecretBackup) { $script:IncludeSecretBackup = $false }
         if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = $false }
+        if ($null -eq $script:IncludeGhPackages) { $script:IncludeGhPackages = $false }
         # 다운로드한 템플릿의 실제 버전 전달 (TemplateVersion 사용)
         Save-TemplateOptions $script:TemplateVersion
     }

@@ -6,7 +6,8 @@ test("기본값", () => {
   const r = parseArgs([]);
   assert.equal(r.mode, "interactive");
   assert.equal(r.force, false);
-  assert.equal(r.includeNexus, null);
+  assert.equal(r.deployTarget, null);
+  assert.equal(r.publishTargets, null);
   assert.deepEqual(r.types, []);
 });
 
@@ -36,10 +37,23 @@ test("빈 타입 throw", () => {
   assert.throws(() => parseArgs(["--type", " , "]), CliError);
 });
 
-test("nexus/secret-backup 플래그", () => {
-  assert.equal(parseArgs(["--nexus"]).includeNexus, true);
-  assert.equal(parseArgs(["--no-nexus"]).includeNexus, false);
+test("deploy/publish 축 플래그 (#439)", () => {
+  assert.equal(parseArgs(["--deploy", "vercel"]).deployTarget, "vercel");
+  assert.deepEqual(parseArgs(["--publish", "nexus,npm"]).publishTargets, ["nexus", "npm"]);
+  assert.throws(() => parseArgs(["--deploy", "bogus"]), CliError);
+  assert.throws(() => parseArgs(["--publish", "bogus"]), CliError);
   assert.equal(parseArgs(["--secret-backup"]).includeSecretBackup, true);
+});
+
+test("deprecated alias — --nexus/--npm-publish는 신 축으로 해석 (#439)", () => {
+  const r1 = parseArgs(["--nexus"]);
+  assert.deepEqual(r1.publishTargets, ["nexus"]);
+  assert.equal(r1.deployTarget, "none"); // 구 동작: nexus면 서버 배포 제외
+  const r2 = parseArgs(["--npm-publish"]);
+  assert.deepEqual(r2.publishTargets, ["npm"]);
+  assert.equal(r2.deployTarget, null);
+  const r3 = parseArgs(["--nexus", "--no-nexus"]);
+  assert.deepEqual(r3.publishTargets, []);
 });
 
 test("알 수 없는 옵션 throw", () => {

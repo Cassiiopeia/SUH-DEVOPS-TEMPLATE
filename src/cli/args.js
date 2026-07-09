@@ -1,6 +1,9 @@
 // CLI 인자 파싱 (.sh top-level while-case 등가) — template_integrator.sh 842~920.
 import { VALID_TYPES } from "../context.js";
 
+export const DEPLOY_TARGETS = ["docker-ssh", "vercel", "none"];
+export const PUBLISH_TARGETS = ["nexus", "npm", "github-packages"];
+
 // argv(process.argv.slice(2)) → 파싱 결과. 오류 시 throw(호출부에서 exit 1).
 export function parseArgs(argv) {
   const result = {
@@ -8,9 +11,9 @@ export function parseArgs(argv) {
     version: "",             // 통합 대상 프로젝트의 초기 버전 (--project-version)
     types: [],
     primaryType: "",
-    includeNexus: null,      // null=미설정
+    deployTarget: null,      // 배포 축 (#439): docker-ssh|vercel|none, null=미설정
+    publishTargets: null,    // publish 축 (#439): 타겟 배열, null=미설정
     includeSecretBackup: null,
-    includeNpmPublish: null,
     pathsCsv: "",            // "flutter=app,react=client" 원문 (정규화는 resolve 단계)
     force: false,
     help: false,
@@ -47,12 +50,46 @@ export function parseArgs(argv) {
         break;
       }
       case "--force": result.force = true; break;
-      case "--nexus": result.includeNexus = true; break;
-      case "--no-nexus": result.includeNexus = false; break;
+      case "--deploy": {
+        const v = args.shift() ?? "";
+        if (!DEPLOY_TARGETS.includes(v)) {
+          throw new CliError(`--deploy 값은 ${DEPLOY_TARGETS.join(" | ")} 중 하나여야 합니다: '${v}'`);
+        }
+        result.deployTarget = v;
+        break;
+      }
+      case "--publish": {
+        const csv = args.shift() ?? "";
+        const targets = [];
+        for (let t of csv.split(",")) {
+          t = t.replace(/\s/g, "");
+          if (t === "") continue;
+          if (!PUBLISH_TARGETS.includes(t)) {
+            throw new CliError(`--publish 값은 ${PUBLISH_TARGETS.join(" | ")} csv여야 합니다: '${t}'`);
+          }
+          if (!targets.includes(t)) targets.push(t);
+        }
+        result.publishTargets = targets;
+        break;
+      }
+      // ── deprecated alias (1 minor 유지 — #439) ──
+      case "--nexus":
+        process.stderr.write("⚠️  --nexus는 deprecated입니다. --publish nexus --deploy none 을 사용하세요.\n");
+        result.publishTargets = [...new Set([...(result.publishTargets ?? []), "nexus"])];
+        if (result.deployTarget === null) result.deployTarget = "none";
+        break;
+      case "--no-nexus":
+        result.publishTargets = (result.publishTargets ?? []).filter((t) => t !== "nexus");
+        break;
       case "--secret-backup": result.includeSecretBackup = true; break;
       case "--no-secret-backup": result.includeSecretBackup = false; break;
-      case "--npm-publish": result.includeNpmPublish = true; break;
-      case "--no-npm-publish": result.includeNpmPublish = false; break;
+      case "--npm-publish":
+        process.stderr.write("⚠️  --npm-publish는 deprecated입니다. --publish npm 을 사용하세요.\n");
+        result.publishTargets = [...new Set([...(result.publishTargets ?? []), "npm"])];
+        break;
+      case "--no-npm-publish":
+        result.publishTargets = (result.publishTargets ?? []).filter((t) => t !== "npm");
+        break;
       case "--paths": result.pathsCsv = args.shift() ?? ""; break;
       case "-h": case "--help": result.help = true; break;
       default:

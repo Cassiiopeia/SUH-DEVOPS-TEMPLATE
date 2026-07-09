@@ -41,11 +41,17 @@ const HEADER = `# ==============================================================
 `;
 
 // metadata.template.options 상태머신 파싱 (.sh read_template_options L2361~2416 등가).
-// 반환: { nexus: bool|null, secretBackup: bool|null, npmPublish: bool|null } — null=미기재.
+// 반환(#439 배포/publish 축): { deploy: string|null, publish: string[]|null, secretBackup: bool|null }
+//   deploy: 'docker-ssh'|'vercel'|'none', publish: ['nexus','npm','github-packages'] 부분집합. null=미기재.
+// 구 키(nexus/npm_publish)는 신 축으로 자동 마이그레이션해 읽는다 (v4.2.0 이전 파일 호환):
+//   nexus:true → publish에 'nexus' + deploy 미기재면 'none' (구 동작: nexus면 서버 배포 제외)
+//   npm_publish:true → publish에 'npm'
 // 구 synology 키 등 다른 키는 어느 분기에도 안 걸려 자연히 무시된다.
 // (options-ask.js가 이 함수를 import한다 — 순환 방지 위해 여기(version-yml)에 정의.)
 export function parseTemplateOptions(content) {
-  const out = { nexus: null, secretBackup: null, npmPublish: null };
+  const out = { deploy: null, publish: null, secretBackup: null };
+  let legacyNexus = null;
+  let legacyNpm = null;
   // 값 정규화: 따옴표 제거 + 트림 (.sh tr -d '"' | tr -d "'" | xargs 등가)
   const strip = (s) => String(s).replace(/["']/g, "").trim();
   let inTemplate = false;
@@ -54,11 +60,22 @@ export function parseTemplateOptions(content) {
     if (/^\s*template:/.test(line)) { inTemplate = true; continue; }
     if (inTemplate && /^\s+options:/.test(line)) { inOptions = true; continue; }
     if (inTemplate && inOptions) {
-      let m = line.match(/^\s+nexus:\s*(.+)/);
+      let m = line.match(/^\s+deploy:\s*(.+)/);
       if (m) {
         const v = strip(m[1]);
-        if (v === "true") out.nexus = true;
-        if (v === "false") out.nexus = false;
+        if (["docker-ssh", "vercel", "none"].includes(v)) out.deploy = v;
+        continue;
+      }
+      m = line.match(/^\s+publish:\s*\[([^\]]*)\]/);
+      if (m) {
+        out.publish = strip(m[1]).split(",").map((t) => t.trim()).filter(Boolean);
+        continue;
+      }
+      m = line.match(/^\s+nexus:\s*(.+)/);
+      if (m) {
+        const v = strip(m[1]);
+        if (v === "true") legacyNexus = true;
+        if (v === "false") legacyNexus = false;
         continue;
       }
       m = line.match(/^\s+secret_backup:\s*(.+)/);
@@ -71,8 +88,8 @@ export function parseTemplateOptions(content) {
       m = line.match(/^\s+npm_publish:\s*(.+)/);
       if (m) {
         const v = strip(m[1]);
-        if (v === "true") out.npmPublish = true;
-        if (v === "false") out.npmPublish = false;
+        if (v === "true") legacyNpm = true;
+        if (v === "false") legacyNpm = false;
         continue;
       }
       // 들여쓰기 0~4칸의 다른 키 → options 섹션 종료 (.sh L2404~2408)
@@ -80,6 +97,15 @@ export function parseTemplateOptions(content) {
     }
     // 최상위 키 → template 섹션 종료 (.sh L2411~2415)
     if (inTemplate && /^[a-z_]+:/.test(line)) { inTemplate = false; inOptions = false; }
+  }
+  // ── 구 키 마이그레이션 — 신 publish 키가 없을 때만 ──
+  if (out.publish === null && (legacyNexus !== null || legacyNpm !== null)) {
+    out.publish = [];
+    if (legacyNexus === true) {
+      out.publish.push("nexus");
+      if (out.deploy === null) out.deploy = "none";
+    }
+    if (legacyNpm === true) out.publish.push("npm");
   }
   return out;
 }
@@ -137,7 +163,7 @@ export function parseExisting(content) {
 //   now   = "YYYY-MM-DD HH:MM:SS" (UTC) — 결정성 위해 주입
 //   today = "YYYY-MM-DD" (UTC)
 //   pathMarkers = Map<type, markerFilename> (project_paths 주석용)
-//   templateOptions = { templateVersion, includeNexus, includeSecretBackup, optionsDate } (template 블록)
+//   templateOptions = { templateVersion, deployTarget, publishTargets, includeSecretBackup, optionsDate } (template 블록)
 export function buildVersionYml({ version, types = [], paths = new Map(), pathMarkers = new Map(), branch = "main", versionCode = 1, now, today, templateOptions = null, deployValues = new Map() }) {
   const typesJson = types.length ? `[${types.map((t) => `"${t}"`).join(",")}]` : `["basic"]`;
 
@@ -177,16 +203,17 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
 
   // template 옵션 블록 (.sh save_template_options 신규 추가 케이스). templateOptions 지정 시.
   if (templateOptions) {
-    const { templateVersion = "unknown", includeNexus = false, includeSecretBackup = false, includeNpmPublish = false, optionsDate = today } = templateOptions;
+    const { templateVersion = "unknown", deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, optionsDate = today } = templateOptions;
+    const publishJson = `[${publishTargets.map((t) => `"${t}"`).join(",")}]`;
     out += `  template:\n`;
     out += `    source: "projectops"\n`;
     out += `    version: "${templateVersion}"\n`;
     out += `    integrated_date: "${optionsDate}"\n`;
     out += `    last_update_date: "${optionsDate}"\n`;
     out += `    options:\n`;
-    out += `      nexus: ${includeNexus}\n`;
+    out += `      deploy: "${deployTarget}"\n`;
+    out += `      publish: ${publishJson}\n`;
     out += `      secret_backup: ${includeSecretBackup}\n`;
-    out += `      npm_publish: ${includeNpmPublish}\n`;
   }
   return out;
 }

@@ -30,7 +30,7 @@
 # - basic: version.yml만 사용
 # ===================================================================
 
-version: "4.1.3"
+version: "4.2.0"
 version_code: 394 # app build number
 project_types: ["basic"] # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능
 metadata:

@@ -110,6 +110,35 @@ test("askAllOptionalWorkflows: 대화형 — deploy=vercel / publish=[npm] / sec
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });
 
+test("askAllOptionalWorkflows: basic 단독 타입은 배포/publish 질문 스킵 → none·[] (UX 개선)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false }); // Secret 폴더 없음 → 질문 0
+  const target = makeTmp();
+  try {
+    const io = stubIo({ selects: ["vercel"], multiselects: [["npm"]] }); // 호출되면 값이 바뀜 — 호출 안 돼야 함
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["basic"], targetRoot: target, tty: true, io,
+    });
+    assert.deepEqual(r, { deploy: "none", publish: [], secretBackup: false });
+    assert.equal(io.calls.select.length, 0, "배포 방식 질문 안 함");
+    assert.equal(io.calls.multiselect.length, 0, "publish 질문 안 함");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: basic이어도 Secret 백업 폴더가 있으면 그 질문은 유지", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: true });
+  const target = makeTmp();
+  try {
+    const io = stubIo({ confirms: [false] }); // Secret 질문만 1회
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["basic"], targetRoot: target, tty: true, io,
+    });
+    assert.deepEqual(r, { deploy: "none", publish: [], secretBackup: false });
+    assert.equal(io.calls.select.length, 0);
+    assert.equal(io.calls.multiselect.length, 0);
+    assert.equal(io.calls.confirm.length, 1, "Secret 백업은 폴더 존재 게이트로 계속 질문");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
 test("askAllOptionalWorkflows: 비대화형 — current 유지, 미설정은 기본값", async () => {
   const tempDir = makeTemplateFixture();
   const target = makeTmp();

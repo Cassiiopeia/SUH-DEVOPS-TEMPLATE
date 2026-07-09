@@ -123,13 +123,15 @@ snake_case.sh / snake_case.py
 
 #### ⚠️ 배포/publish 타겟 축 (#439, v4.2.0 — agent 필독)
 
-배포는 **두 개의 독립 축**으로 표현된다 (타입 비종속). 마법사가 타입 확정 직후 물어본다.
+배포는 **두 개의 독립 축**으로 표현된다. 마법사가 타입 확정 직후 물어본다 (단 `basic` 단독은 스킵 — 아래).
 
 | 축 | 의미 | 다중성 | 값 | version.yml 키 |
 |----|------|--------|-----|---------------|
 | **deploy** | 실행물(서버/앱)을 어디에 올리나 | **택1** | `docker-ssh`(기본)·`vercel`·`none` | `options.deploy` |
 | **publish** | 라이브러리/패키지를 어느 레지스트리에 내나 | **0..n 공존** | `nexus`·`npm`·`github-packages` | `options.publish` 배열 |
 
+- **`basic` 단독 타입은 배포/publish 질문을 건너뛴다** — 서버·라이브러리 개념이 없는 범용 타입이라 물어보면 사용자가 당황한다. `deploy=none`·`publish=[]`로 조용히 확정하고 분석 카드에만 표시. 타입을 바꾸면(수정 메뉴 → 프로젝트 타입) 그때 질문이 등장한다. (3중 구현 모두: js `isBasicOnly`, `.sh` `_is_basic_only`, `.ps1` `Test-BasicOnly`)
+- 실타입 질문 앞에는 "**왜 묻는지**" 맥락 한 줄을 붙인다 (서버 올릴 계획 있으면 고르고 없으면 넘기라는 안내).
 - 비대화형: `--deploy docker-ssh|vercel|none` + `--publish nexus,npm`(csv). `.ps1`은 `-Deploy`/`-Publish`.
 - **구 플래그 `--nexus`/`--npm-publish`는 deprecated**(1 minor 유지) — `--publish nexus`/`--publish npm`으로 해석되며 경고를 출력한다. `--nexus`는 추가로 `--deploy none`을 함의(구 동작 보존).
 - version.yml의 구 키(`nexus`/`npm_publish`)는 통합/업데이트 시 **자동으로 신 축으로 변환·기록**된다 (SSOT — 이중 표기 금지).

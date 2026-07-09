@@ -63,6 +63,11 @@ export async function askAllOptionalWorkflows({
   let publish = current.publish ?? null;
   let secretBackup = current.secretBackup ?? null;
 
+  // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
+  // 배포/publish 질문을 건너뛰고 none·[]로 조용히 확정한다 (타입 변경 시 재질문됨).
+  // (basic은 "그 외" 폴백이라 항상 단독으로만 존재 — every로 안전 판정)
+  const isBasicOnly = types.length > 0 && types.every((t) => t === "basic");
+
   // ① --force-ask가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
   //    CLI 명시값(current)이 이미 있으면 그쪽이 우선 — 저장값은 빈 자리만 채운다.
   if (!forceAsk) {
@@ -84,47 +89,54 @@ export async function askAllOptionalWorkflows({
     }
   }
 
-  // ── ② 배포 방식 (택1) ──
-  if ((forceAsk || deploy === null)) {
-    if (force || !tty || typeof io.select !== "function") {
-      deploy = deploy ?? "docker-ssh";
-    } else {
-      say("");
-      say("🚀 이 프로젝트를 어디에 배포하나요?");
-      const ans = await io.select({
-        message: "배포 방식을 선택하세요",
-        options: [
-          { value: "docker-ssh", label: "Docker + SSH 서버 배포 (기본)" },
-          { value: "vercel", label: "Vercel" },
-          { value: "none", label: "배포하지 않음 (라이브러리/CI 전용)" },
-        ],
-      });
-      deploy = (!isCancel(ans) && DEPLOY_TARGETS.includes(ans)) ? ans : (deploy ?? "docker-ssh");
-      say(`배포 방식: ${deploy}`);
+  // ── ② 배포 방식 (택1) — basic 단독이면 질문 스킵, none으로 확정 ──
+  if (isBasicOnly) {
+    if (deploy === null) deploy = "none";
+    if (publish === null) publish = [];
+  } else {
+    if (forceAsk || deploy === null) {
+      if (force || !tty || typeof io.select !== "function") {
+        deploy = deploy ?? "docker-ssh";
+      } else {
+        say("");
+        say("🚀 이 프로젝트를 어디에 배포하나요?");
+        say("   서버·호스팅에 올릴 계획이 있으면 고르고, 지금 없으면 '배포 안 함'으로 두면 됩니다.");
+        const ans = await io.select({
+          message: "배포 방식을 선택하세요",
+          options: [
+            { value: "docker-ssh", label: "Docker + SSH 서버 배포 (기본)" },
+            { value: "vercel", label: "Vercel" },
+            { value: "none", label: "배포하지 않음 (라이브러리/CI 전용)" },
+          ],
+        });
+        deploy = (!isCancel(ans) && DEPLOY_TARGETS.includes(ans)) ? ans : (deploy ?? "docker-ssh");
+        say(`배포 방식: ${deploy}`);
+      }
     }
-  }
 
-  // ── ③ publish 타겟 (다중 선택) ──
-  if ((forceAsk || publish === null)) {
-    if (force || !tty || typeof io.multiselect !== "function") {
-      publish = publish ?? [];
-    } else {
-      say("");
-      say("📦 라이브러리/패키지 publish 레지스트리가 있나요? (없으면 그냥 Enter)");
-      const ans = await io.multiselect({
-        message: "publish 타겟을 선택하세요 (Space 토글, Enter 확정)",
-        options: [
-          { value: "nexus", label: "사내 Maven(Nexus) 라이브러리 배포" },
-          { value: "npm", label: "공개 npmjs 패키지 배포 (NPM_TOKEN)" },
-          { value: "github-packages", label: "GitHub Packages 라이브러리 배포" },
-        ],
-        initialValues: publish ?? [],
-        required: false,
-      });
-      publish = (!isCancel(ans) && Array.isArray(ans))
-        ? ans.filter((t) => PUBLISH_TARGETS.includes(t))
-        : (publish ?? []);
-      say(`Publish 타겟: ${publish.join(",") || "없음"}`);
+    // ── ③ publish 타겟 (다중 선택) ──
+    if (forceAsk || publish === null) {
+      if (force || !tty || typeof io.multiselect !== "function") {
+        publish = publish ?? [];
+      } else {
+        say("");
+        say("📦 라이브러리로 배포(publish)할 계획이 있나요?");
+        say("   사내 Nexus·npmjs·GitHub Packages 중 해당되는 걸 고르세요. 없으면 그냥 Enter.");
+        const ans = await io.multiselect({
+          message: "publish 타겟을 선택하세요 (Space 토글, Enter 확정)",
+          options: [
+            { value: "nexus", label: "사내 Maven(Nexus) 라이브러리 배포" },
+            { value: "npm", label: "공개 npmjs 패키지 배포 (NPM_TOKEN)" },
+            { value: "github-packages", label: "GitHub Packages 라이브러리 배포" },
+          ],
+          initialValues: publish ?? [],
+          required: false,
+        });
+        publish = (!isCancel(ans) && Array.isArray(ans))
+          ? ans.filter((t) => PUBLISH_TARGETS.includes(t))
+          : (publish ?? []);
+        say(`Publish 타겟: ${publish.join(",") || "없음"}`);
+      }
     }
   }
 

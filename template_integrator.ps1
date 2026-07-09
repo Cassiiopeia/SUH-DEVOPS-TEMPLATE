@@ -2431,9 +2431,29 @@ function Ask-AllOptionalWorkflows {
         -VarName "IncludeSecretBackup" -ForceAsk:$ForceAsk
 }
 
-# 배포/publish 축 질문 (#439) — force-ask가 아니고 값이 이미 있으면 재질문하지 않는다.
+# 현재 ProjectTypes가 basic 단독인지 (배포/publish 개념이 없는 범용 타입)
+function Test-BasicOnly {
+    $arr = if ($script:ProjectTypes.Count -gt 0) { $script:ProjectTypes } else { @($script:ProjectType) }
+    if ($arr.Count -eq 0) { return $false }
+    foreach ($t in $arr) { if ($t -ne 'basic') { return $false } }
+    return $true
+}
+
+# 배포/publish 축 질문 (#439)
+# basic 단독 타입은 서버 배포·라이브러리 publish가 개념상 성립하지 않으므로 질문을 건너뛰고
+# none·false로 조용히 확정한다 (타입을 바꾸면 그때 재질문됨).
+# force-ask가 아니고 값이 이미 있으면 재질문하지 않는다.
 function Ask-DeployPublish {
     param([switch]$ForceAsk)
+
+    # basic 단독 → 질문 스킵, none·false 확정
+    if (Test-BasicOnly) {
+        if ($null -eq $script:DeployTarget) { $script:DeployTarget = "none" }
+        if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
+        if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = $false }
+        if ($null -eq $script:IncludeGhPackages) { $script:IncludeGhPackages = $false }
+        return
+    }
 
     # 비대화형(-Force) → 기본값 확정
     if ($Force) {
@@ -2446,6 +2466,7 @@ function Ask-DeployPublish {
         Print-SeparatorLine
         Write-Host ""
         Write-Host "🚀 이 프로젝트를 어디에 배포하나요?"
+        Write-Host "   서버·호스팅에 올릴 계획이 있으면 고르고, 지금 없으면 '배포 안 함'으로 두면 됩니다."
         Write-Host ""
         $dpChoice = Invoke-ChooseMenu -CancelLabel "기본값(docker-ssh)" -Prompt "배포 방식을 선택하세요" -Options @(
             @{Value='docker-ssh'; Label='Docker + SSH 서버 배포 (기본)'},
@@ -2460,7 +2481,8 @@ function Ask-DeployPublish {
     # ── publish 타겟 (다중 선택) ──
     if ($ForceAsk -or ($null -eq $script:IncludeNexus) -or ($null -eq $script:IncludeNpmPublish) -or ($null -eq $script:IncludeGhPackages)) {
         Write-Host ""
-        Write-Host "📦 라이브러리/패키지 publish 레지스트리가 있나요? (없으면 그냥 Enter)"
+        Write-Host "📦 라이브러리로 배포(publish)할 계획이 있나요?"
+        Write-Host "   사내 Nexus·npmjs·GitHub Packages 중 해당되는 걸 고르세요. 없으면 그냥 Enter."
         Write-Host ""
         $preselect = @()
         if ($script:IncludeNexus -eq $true) { $preselect += 'nexus' }

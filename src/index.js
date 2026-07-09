@@ -109,6 +109,8 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     deployTarget: opts.deployTarget ?? existing?.options?.deploy ?? "docker-ssh",
     publishTargets: opts.publishTargets ?? existing?.options?.publish ?? [],
     includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
+    // 릴리스 배포 브랜치(#456): CLI 플래그 → version.yml 저장값 → 빈 값(미출력, 스킬이 develop 폴백)
+    deployBranch: opts.deployBranch || existing?.options?.deployBranch || "",
     repoName,
     // 실 resolver 4종 (.sh resolve_token 등가 — spring-app-yml 스텁 제거)
     resolvers: makeResolvers(cwd, repoName, paths),

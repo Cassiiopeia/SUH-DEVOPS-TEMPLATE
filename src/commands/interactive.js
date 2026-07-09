@@ -86,6 +86,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     let codeReviewCoderabbit = existing?.options?.codeReviewCoderabbit ?? true;
     let changelogProvider = existing?.options?.changelogProvider ?? "github-ai";
     let changelogBaseUrl = existing?.options?.changelogBaseUrl ?? "";
+    let deployBranch = existing?.options?.deployBranch ?? "develop"; // #456
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
 
@@ -101,6 +102,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           codeReviewCoderabbit: existing?.options?.codeReviewCoderabbit ?? null,
           changelogProvider: existing?.options?.changelogProvider ?? null,
           changelogBaseUrl: existing?.options?.changelogBaseUrl ?? null,
+          deployBranch: existing?.options?.deployBranch ?? null,
         },
         force: false, tty: realTty,
         io: {
@@ -116,6 +118,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       codeReviewCoderabbit = r.codeReviewCoderabbit;
       changelogProvider = r.changelogProvider;
       changelogBaseUrl = r.changelogBaseUrl;
+      deployBranch = r.deployBranch;
     }
 
     // 확인/수정 루프 — ESC는 '머무르기' (.sh L1877~1881: 명시적 '아니오'만 종료)
@@ -161,7 +164,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
             tempDir, types, targetRoot: cwd,
             current: {
               deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup,
-              codeReviewCoderabbit, changelogProvider, changelogBaseUrl,
+              codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch,
             },
             force: false, tty: realTty, forceAsk: true,
             io: {
@@ -177,6 +180,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           codeReviewCoderabbit = r.codeReviewCoderabbit;
           changelogProvider = r.changelogProvider;
           changelogBaseUrl = r.changelogBaseUrl;
+          deployBranch = r.deployBranch;
         } else if (what === "secret") {
           const y = await io.askYesNo("Secret 백업 워크플로우를 포함할까요?", includeSecretBackup);
           if (!isCancel(y)) includeSecretBackup = y === true;
@@ -209,7 +213,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     const { now, today } = clock || utcNow();
     const ctx = createContext({
       mode, force: true, types, version, versionCode, branch, paths, deployTarget, publishTargets, includeSecretBackup,
-      codeReviewCoderabbit, changelogProvider, changelogBaseUrl,
+      codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch,
       repoName, templateVersion, resolvers, envValues, envUseDefaults, now, today,
     });
     ctx.templateVersion = templateVersion;

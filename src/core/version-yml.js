@@ -50,7 +50,14 @@ const HEADER = `# ==============================================================
 // (options-ask.js가 이 함수를 import한다 — 순환 방지 위해 여기(version-yml)에 정의.)
 export function parseTemplateOptions(content) {
   const out = { deploy: null, publish: null, secretBackup: null,
-                changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null };
+                changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null,
+                deployBranch: null };
+  // deploy_branch는 metadata 직속(#456) — template.options 밖이라 별도로 스캔한다.
+  for (const line of String(content || "").split("\n")) {
+    if (line.startsWith("#")) continue;
+    const m = line.match(/^\s+deploy_branch:\s*"([^"]*)"/);
+    if (m) { out.deployBranch = m[1]; break; }
+  }
   let legacyNexus = null;
   let legacyNpm = null;
   // 값 정규화: 따옴표 제거 + 트림 (.sh tr -d '"' | tr -d "'" | xargs 등가)
@@ -168,9 +175,12 @@ export function parseExisting(content) {
       if (/^\S/.test(l)) break;
     }
   }
+  // 브랜치 정보 (#456) — default_branch(레포 기본)와 deploy_branch(릴리스 PR head)는 별개.
+  const defaultBranch = line(/^\s*default_branch:\s*"([^"]*)"/);
+  const deployBranch = line(/^\s*deploy_branch:\s*"([^"]*)"/);
   // 선택 워크플로우 옵션 (metadata.template.options — nexus/secret_backup)
   const options = parseTemplateOptions(text);
-  return { version, versionCode, types, paths, templateVersion, options };
+  return { version, versionCode, types, paths, templateVersion, options, defaultBranch, deployBranch };
 }
 
 // version.yml 전체 생성 (.sh create_version_yml + save_template_options 신규 케이스 등가).
@@ -180,7 +190,7 @@ export function parseExisting(content) {
 //   today = "YYYY-MM-DD" (UTC)
 //   pathMarkers = Map<type, markerFilename> (project_paths 주석용)
 //   templateOptions = { templateVersion, deployTarget, publishTargets, includeSecretBackup, optionsDate } (template 블록)
-export function buildVersionYml({ version, types = [], paths = new Map(), pathMarkers = new Map(), branch = "main", versionCode = 1, now, today, templateOptions = null, deployValues = new Map() }) {
+export function buildVersionYml({ version, types = [], paths = new Map(), pathMarkers = new Map(), branch = "main", deployBranch = "", versionCode = 1, now, today, templateOptions = null, deployValues = new Map() }) {
   const typesJson = types.length ? `[${types.map((t) => `"${t}"`).join(",")}]` : `["basic"]`;
 
   let out = HEADER + "\n";
@@ -202,6 +212,9 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
   out += `  last_updated: "${now}"\n`;
   out += `  last_updated_by: "template_integrator"\n`;
   out += `  default_branch: "${branch}"\n`;
+  // deploy_branch: 릴리스 PR의 head 브랜치(#456). default_branch(레포 기본)와 별개 개념.
+  // 지정된 경우에만 출력 — 미지정이면 스킬이 develop로 폴백(하위호환).
+  if (deployBranch) out += `  deploy_branch: "${deployBranch}"\n`;
   out += `  integrated_from: "projectops"\n`;
   out += `  integration_date: "${today}"\n`;
 

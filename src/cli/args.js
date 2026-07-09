@@ -13,6 +13,7 @@ export function parseArgs(argv) {
     primaryType: "",
     deployTarget: null,      // 배포 축 (#439): docker-ssh|vercel|none, null=미설정
     publishTargets: null,    // publish 축 (#439): 타겟 배열, null=미설정
+    deployBranch: "",        // 릴리스 PR head 브랜치 (#456): --deploy-branch, 빈 값=미지정
     includeSecretBackup: null,
     pathsCsv: "",            // "flutter=app,react=client" 원문 (정규화는 resolve 단계)
     force: false,
@@ -70,6 +71,12 @@ export function parseArgs(argv) {
           if (!targets.includes(t)) targets.push(t);
         }
         result.publishTargets = targets;
+        break;
+      }
+      case "--deploy-branch": {
+        // 릴리스 PR head 브랜치 (#456). default_branch와 별개.
+        const v = (args.shift() ?? "").trim();
+        if (v) result.deployBranch = v;
         break;
       }
       // ── deprecated alias (1 minor 유지 — #439) ──

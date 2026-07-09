@@ -23,6 +23,7 @@ export function createContext(overrides = {}) {
     changelogProvider: null, // 'github-ai'(기본) | 'coderabbit' | 'openai' | 'gemini' | 'claude' | 'ollama' | 'commit'
     changelogBaseUrl: null,  // ollama일 때만 값
     codeReviewCoderabbit: null,
+    deployBranch: "",        // 릴리스 PR head 브랜치 (#456). 빈 값=metadata.deploy_branch 미출력
     templateVersion: "",
     tempDir: "",
     deployValues: new Map(), // "type.KEY" -> value

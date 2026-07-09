@@ -67,6 +67,7 @@ export async function askAllOptionalWorkflows({
   let codeReviewCoderabbit = current.codeReviewCoderabbit ?? null;
   let changelogProvider = current.changelogProvider ?? null;
   let changelogBaseUrl = current.changelogBaseUrl ?? null;
+  let deployBranch = current.deployBranch ?? null; // #456 릴리스 PR head 브랜치
 
   // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
   // 배포/publish 질문을 건너뛰고 none·[]로 조용히 확정한다 (타입 변경 시 재질문됨).
@@ -95,6 +96,8 @@ export async function askAllOptionalWorkflows({
       if (codeReviewCoderabbit === null && saved.codeReviewCoderabbit !== null) codeReviewCoderabbit = saved.codeReviewCoderabbit;
       if (changelogProvider === null && saved.changelogProvider !== null) changelogProvider = saved.changelogProvider;
       if (changelogBaseUrl === null && saved.changelogBaseUrl !== null) changelogBaseUrl = saved.changelogBaseUrl;
+      // #456 deploy_branch 저장값 재사용
+      if (deployBranch === null && saved.deployBranch != null) deployBranch = saved.deployBranch;
     }
   }
 
@@ -197,6 +200,21 @@ export async function askAllOptionalWorkflows({
     changelogBaseUrl = "";
   }
 
+  // ── deploy_branch: 릴리스 PR의 head 브랜치 (#456 — default_branch와 별개) ──
+  //    대부분 develop→main 릴리스 구조라 기본값 develop. 다른 head를 쓰는 레포를 위해 물어본다.
+  if (forceAsk || deployBranch === null) {
+    if (force || !tty || typeof io.text !== "function") {
+      deployBranch = deployBranch ?? "develop";
+    } else {
+      say("");
+      say("🌿 릴리스 배포 브랜치(릴리스 PR의 head)는 무엇인가요?");
+      say("   develop→main 릴리스 구조면 develop 그대로 두세요. 배포 브랜치가 따로면 그 이름을 적어주세요.");
+      const ans = await io.text({ message: "배포 브랜치", initialValue: deployBranch ?? "develop" });
+      deployBranch = (typeof ans === "string" && !isCancel(ans) && ans.trim()) ? ans.trim() : (deployBranch ?? "develop");
+      say(`배포 브랜치: ${deployBranch}`);
+    }
+  }
+
   // ── ④ Secret 백업: 공통 폴더 (배포축 아님 — 기존 폴더 질문 유지) ──
   const real = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   const ptDir = existsSync(real) ? real : join(tempDir, PATHS.projectTypesDir);
@@ -211,5 +229,6 @@ export async function askAllOptionalWorkflows({
     codeReviewCoderabbit: codeReviewCoderabbit === true,
     changelogProvider: changelogProvider ?? "github-ai",
     changelogBaseUrl: changelogBaseUrl ?? "",
+    deployBranch: deployBranch ?? "develop",
   };
 }

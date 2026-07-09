@@ -23,7 +23,8 @@ export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
   const { version, types = [], paths = new Map(), branch = "main", versionCode = 1,
     force = true, now, today, templateVersion = "unknown",
     deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false,
-    changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true } = context;
+    changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true,
+    deployBranch = "" } = context;
 
   // project_paths 마커 계산 (.sh existing_marker_in_dir 등가 — 대표 마커명)
   const pathMarkers = new Map();
@@ -37,7 +38,7 @@ export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
   // 1. version.yml 생성 (전체 재생성 — metadata → deploy → template 순, .sh 최종형과 동일)
   writeText(join(targetRoot, PATHS.versionFile),
     buildVersionYml({
-      version, types, paths, pathMarkers, branch, versionCode, now, today,
+      version, types, paths, pathMarkers, branch, deployBranch, versionCode, now, today,
       deployValues,
       templateOptions: { templateVersion, deployTarget, publishTargets, includeSecretBackup, optionsDate: today,
         changelogProvider, changelogBaseUrl, codeReviewCoderabbit },

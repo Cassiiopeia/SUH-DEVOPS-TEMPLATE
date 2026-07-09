@@ -15,7 +15,7 @@ function makeTmp() { return mkdtempSync(join(tmpdir(), "optask-")); }
 
 // #455에서 추가된 changelog/code_review 필드의 기본값(미기재 → null).
 // 기존 deepEqual 기대값에 spread해 필드 추가로 인한 회귀를 막는다.
-const CL_NULL = { changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null };
+const CL_NULL = { changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null, deployBranch: null };
 
 // 실제 temp 레이아웃({tempDir}/.github/workflows/project-types)으로 픽스처 구성
 function makeTemplateFixture({ secretBackup = true } = {}) {
@@ -176,15 +176,36 @@ test("askAllOptionalWorkflows: changelog provider + coderabbit 질문 (#455)", a
   const target = makeTmp();
   try {
     // basic 단독이라 deploy/publish select 스킵 → select는 changelog provider 하나만
-    // confirm: code_review coderabbit
-    const io = stubIo({ confirms: [true], selects: ["github-ai"] });
+    // confirm: code_review coderabbit / text: deploy_branch(#456)
+    const io = stubIo({ confirms: [true], selects: ["github-ai"], texts: ["develop"] });
     const r = await askAllOptionalWorkflows({
       tempDir, types: ["basic"], targetRoot: target, tty: true, io,
     });
     assert.equal(r.codeReviewCoderabbit, true);
     assert.equal(r.changelogProvider, "github-ai");
     assert.equal(r.changelogBaseUrl, "");
-    assert.equal(io.calls.text.length, 0, "github-ai면 base_url 질문 안 함");
+    assert.equal(r.deployBranch, "develop");
+    assert.equal(io.calls.text.length, 1, "github-ai면 base_url 질문은 없고 deploy_branch만 1회");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("parseTemplateOptions: deploy_branch(metadata 직속) 파싱 (#456)", () => {
+  const yml = 'version: "1.0.0"\nmetadata:\n  default_branch: "main"\n  deploy_branch: "release"\n';
+  assert.equal(parseTemplateOptions(yml).deployBranch, "release");
+  const noBranch = 'version: "1.0.0"\nmetadata:\n  default_branch: "main"\n';
+  assert.equal(parseTemplateOptions(noBranch).deployBranch, null);
+});
+
+test("askAllOptionalWorkflows: deploy_branch 기본값 develop (#456)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    // deploy_branch 질문에 빈 응답이면 기본 develop 유지
+    const io = stubIo({ confirms: [false], selects: ["github-ai"], texts: [""] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["basic"], targetRoot: target, tty: true, io,
+    });
+    assert.equal(r.deployBranch, "develop");
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });
 
@@ -192,13 +213,15 @@ test("askAllOptionalWorkflows: changelog=ollama면 base_url 질문 (#455)", asyn
   const tempDir = makeTemplateFixture({ secretBackup: false });
   const target = makeTmp();
   try {
-    const io = stubIo({ confirms: [false], selects: ["ollama"], texts: ["https://ai.suhsaechan.kr/v1"] });
+    // text 순서: base_url(ollama) → deploy_branch(#456)
+    const io = stubIo({ confirms: [false], selects: ["ollama"], texts: ["https://ai.suhsaechan.kr/v1", "release"] });
     const r = await askAllOptionalWorkflows({
       tempDir, types: ["basic"], targetRoot: target, tty: true, io,
     });
     assert.equal(r.changelogProvider, "ollama");
     assert.equal(r.changelogBaseUrl, "https://ai.suhsaechan.kr/v1");
-    assert.equal(io.calls.text.length, 1, "ollama면 base_url 질문 1회");
+    assert.equal(r.deployBranch, "release");
+    assert.equal(io.calls.text.length, 2, "ollama면 base_url + deploy_branch 2회");
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });
 
@@ -266,7 +289,7 @@ test("askAllOptionalWorkflows: 비대화형 — current 유지, 미설정은 기
       targetRoot: target, force: true, tty: false, io,
     });
     assert.deepEqual(r, { deploy: "vercel", publish: [], secretBackup: false,
-      codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "" });
+      codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" });
     assert.equal(io.calls.select.length, 0);
     assert.equal(io.calls.multiselect.length, 0);
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }

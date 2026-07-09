@@ -325,6 +325,32 @@ def _read_project_types(project_root: Path) -> list[str]:
     return [m2.group(1)] if m2 else []
 
 
+def _read_release_branches(project_root: Path) -> dict:
+    """version.yml에서 릴리스 브랜치·changelog provider를 읽는다 (#456, SSOT).
+
+    - head = metadata.deploy_branch (릴리스 PR head) — 없으면 'develop' 폴백.
+    - base = metadata.default_branch (레포 기본) — 없으면 'main' 폴백.
+    - provider = metadata.template.options.changelog.provider — 없으면 'coderabbit' 폴백.
+    yaml 의존 없이 정규식으로만 파싱한다 (폐쇄망·표준 라이브러리 우선)."""
+    vy = project_root / "version.yml"
+    text = ""
+    if vy.exists():
+        try:
+            text = vy.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+
+    def _find(pattern, default):
+        m = re.search(pattern, text, re.MULTILINE)
+        return m.group(1) if m else default
+
+    return {
+        "head": _find(r"^\s*deploy_branch\s*:\s*[\"']?([A-Za-z0-9._/-]+)", "develop"),
+        "base": _find(r"^\s*default_branch\s*:\s*[\"']?([A-Za-z0-9._/-]+)", "main"),
+        "provider": _find(r"^\s*provider\s*:\s*[\"']?([a-z-]+)", "coderabbit"),
+    }
+
+
 def _scan_store_workflows(project_root: Path) -> list[str]:
     """.github/workflows 내 파일명을 스캔해 스토어 심사 워크플로우 파일명을 반환한다."""
     wf_dir = project_root / ".github" / "workflows"
@@ -372,6 +398,9 @@ def cmd_detect_release_context(args) -> int:
         else "agent: backend_only — 조용히 통과, 경고·질문 없음"
     )
 
+    # 릴리스 브랜치·provider (#456) — 스킬이 develop/main 하드코딩 대신 이 값을 쓴다.
+    branches = _read_release_branches(project_root)
+
     return emit({
         "ok": True,
         "project_root": str(project_root),
@@ -381,6 +410,7 @@ def cmd_detect_release_context(args) -> int:
             "has_store_workflow": has_store_workflow,
             "has_app_type": has_app_type,
         },
+        "branches": branches,   # {head, base, provider} — head→base로 릴리스 PR 생성
         "hint": hint,
         "next": next_hint,
     })

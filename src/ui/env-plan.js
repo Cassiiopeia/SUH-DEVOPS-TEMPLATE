@@ -32,13 +32,14 @@ export function scopeString(usages = []) {
 // ask KEY 수집 (.sh wf_collect_asks 등가) — 실제 설치되는 워크플로우와 같은 소스를 스캔한다.
 // tempDir: 다운로드 원본 루트. types: 설치 대상 타입 목록.
 // opts:
-//   resolvers    - @접두 기본값(@repo 등) 해석용 (.sh는 수집 시점에 resolve_token — 동일)
-//   includeNexus - true면 server-deploy 제외 + nexus/ 포함 (복사 엔진과 스캔 범위 일치)
-//   prompts      - wizard-labels 파싱 객체 (워크플로우 표시명용, null이면 확장자 제거 폴백)
+//   resolvers      - @접두 기본값(@repo 등) 해석용 (.sh는 수집 시점에 resolve_token — 동일)
+//   deployTarget   - #439 배포 축: docker-ssh(기본)일 때만 server-deploy 스캔 (복사 엔진과 일치)
+//   publishTargets - #439 publish 축: 선택된 타겟의 publish/<target>/ 스캔
+//   prompts        - wizard-labels 파싱 객체 (워크플로우 표시명용, null이면 확장자 제거 폴백)
 // 반환: { keys:[], defaults:Map<key,default>, typeDefaults:Map<"type|key",default>,
 //        usages:Map<key,[{type,workflowName}]> }
 export function collectAsks(tempDir, types = [], opts = {}) {
-  const { resolvers = {}, includeNexus = false, prompts = null } = opts;
+  const { resolvers = {}, deployTarget = "docker-ssh", publishTargets = [], prompts = null } = opts;
   const baseDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   const keys = [];
   const defaults = new Map();
@@ -48,10 +49,10 @@ export function collectAsks(tempDir, types = [], opts = {}) {
   for (const type of types) {
     const typeDir = join(baseDir, type);
     if (!exists(typeDir)) continue;
-    // 복사 엔진과 동일한 폴더 구성: 타입 직하위 + (nexus 아니면) server-deploy + (nexus면) nexus
+    // 복사 엔진과 동일한 폴더 구성: 타입 직하위 + (docker-ssh면) server-deploy + 선택된 publish/<target>
     const dirs = [typeDir];
-    if (!includeNexus) dirs.push(join(typeDir, "server-deploy"));
-    else dirs.push(join(typeDir, "nexus"));
+    if ((deployTarget || "docker-ssh") === "docker-ssh") dirs.push(join(typeDir, "server-deploy"));
+    for (const t of publishTargets) dirs.push(join(typeDir, "publish", t));
 
     for (const dir of dirs) {
       if (!exists(dir)) continue;
@@ -129,17 +130,17 @@ async function promptEach(io, prompts, asks, todoKeys, values, log) {
 //  - useDefaults=false → values에 담긴 키만 사용자 확정값으로 치환, 나머지는 기본값
 //    (⚠️ substituteEnv는 useDefaults=false일 때만 values를 참조하므로 이 플래그를 반드시 함께 전달)
 // 인자:
-//   tempDir/types/resolvers/includeNexus — collectAsks와 동일 의미
+//   tempDir/types/resolvers/deployTarget/publishTargets — collectAsks와 동일 의미
 //   targetRoot — wizard-prompts.yml 1차 탐색 위치(기본 ".")
 //   force      — true면 질문 없이 전부 기본값 (.sh FORCE_MODE 등가)
 //   io         — {select, multiselect, text} 주입 (기본 readline-engine). 테스트 스텁 지점.
 //   log        — 카드·안내 출력 함수 주입 (기본 stderr)
 export async function promptEnvPlan({
   tempDir, types = [], io = null, force = false, resolvers = {},
-  includeNexus = false, targetRoot = ".", repoName = "", log = defaultLog,
+  deployTarget = "docker-ssh", publishTargets = [], targetRoot = ".", repoName = "", log = defaultLog,
 } = {}) {
   const prompts = loadWizardPrompts(targetRoot, tempDir);
-  const asks = collectAsks(tempDir, types, { resolvers, includeNexus, prompts });
+  const asks = collectAsks(tempDir, types, { resolvers, deployTarget, publishTargets, prompts });
   const defaults = asks.defaults;
 
   // 수집 키 0개 → 질문 자체가 없음 (.sh `[ ${#WF_ASK_KEYS[@]} -eq 0 ]` 등가)

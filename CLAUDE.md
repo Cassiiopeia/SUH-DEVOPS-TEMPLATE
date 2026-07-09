@@ -45,14 +45,15 @@ suh-github-template/
 │   │   ├── PROJECT-TEMPLATE-INITIALIZER.yaml
 │   │   ├── PROJECT-COMMON-*.yaml
 │   │   └── project-types/
-│   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in)
+│   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in, deploy/vercel/ 배포타겟)
 │   │       ├── flutter/         # Flutter 전용 (배포 워크플로우 루트 포함)
-│   │       ├── spring/          # Spring 전용 (server-deploy/ 기본포함·Nexus면제외 + nexus/ opt-in)
+│   │       ├── spring/          # Spring 전용 (server-deploy/ + publish/{nexus,github-packages}/)
 │   │       ├── react/           # React/Next.js 공용 (next 타입은 v4.1.0에서 흡수됨)
-│   │       └── node/            # Node 전용 (npm-publish/ opt-in)
+│   │       └── node/            # Node 전용 (publish/npm/)
 │   ├── scripts/
-│   │   ├── version_manager.sh
+│   │   ├── version_manager.sh    # + version_manager.py (실 로직, #448)
 │   │   ├── changelog_manager.py
+│   │   ├── truncate_release_notes.sh  # + .py (실 로직, #448)
 │   │   └── template_initializer.sh
 │   ├── util/flutter/
 │   │   ├── playstore-wizard/
@@ -120,6 +121,19 @@ snake_case.sh / snake_case.py
 | `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
 | `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD` | 자체 서버(SMB) APK 배포 | 기본 |
 
+#### ⚠️ 배포/publish 타겟 축 (#439, v4.2.0 — agent 필독)
+
+배포는 **두 개의 독립 축**으로 표현된다 (타입 비종속). 마법사가 타입 확정 직후 물어본다.
+
+| 축 | 의미 | 다중성 | 값 | version.yml 키 |
+|----|------|--------|-----|---------------|
+| **deploy** | 실행물(서버/앱)을 어디에 올리나 | **택1** | `docker-ssh`(기본)·`vercel`·`none` | `options.deploy` |
+| **publish** | 라이브러리/패키지를 어느 레지스트리에 내나 | **0..n 공존** | `nexus`·`npm`·`github-packages` | `options.publish` 배열 |
+
+- 비대화형: `--deploy docker-ssh|vercel|none` + `--publish nexus,npm`(csv). `.ps1`은 `-Deploy`/`-Publish`.
+- **구 플래그 `--nexus`/`--npm-publish`는 deprecated**(1 minor 유지) — `--publish nexus`/`--publish npm`으로 해석되며 경고를 출력한다. `--nexus`는 추가로 `--deploy none`을 함의(구 동작 보존).
+- version.yml의 구 키(`nexus`/`npm_publish`)는 통합/업데이트 시 **자동으로 신 축으로 변환·기록**된다 (SSOT — 이중 표기 금지).
+
 #### Spring
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
@@ -127,20 +141,20 @@ snake_case.sh / snake_case.py
 | `PROJECT-SPRING-NONSTOP-TRAEFIK-CICD` | 무중단 배포 (Traefik Blue-Green) | spring/server-deploy/ |
 | `PROJECT-SPRING-NONSTOP-NGINX-CICD` | 무중단 배포 (Nginx Blue-Green) | spring/server-deploy/ |
 | `PROJECT-SPRING-PR-PREVIEW` | PR 프리뷰 배포 | spring/server-deploy/ |
-| `PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH` | GitHub Packages 라이브러리 배포 | spring/ 루트 |
-| `PROJECT-SPRING-NEXUS-CI` | Nexus CI | spring/nexus/ |
-| `PROJECT-SPRING-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | spring/nexus/ |
+| `PROJECT-SPRING-NEXUS-CI` / `-NEXUS-PUBLISH` | Nexus 라이브러리 배포 | spring/publish/nexus/ |
+| `PROJECT-SPRING-GITHUB-PACKAGES-PUBLISH` | GitHub Packages 라이브러리 배포 | spring/publish/github-packages/ |
 
-> 서버 배포 워크플로우(SIMPLE/NONSTOP-*/PR-PREVIEW)는 `server-deploy/`로 묶여 **기본 포함**됩니다. 단, **`--nexus`(라이브러리 publish) 프로젝트면 서버 배포가 불필요하므로 `server-deploy/` 폴더째 자동 제외**됩니다. `nexus/` 워크플로우는 `--nexus` 옵션으로 포함합니다.
+> 서버 배포 워크플로우(SIMPLE/NONSTOP-*/PR-PREVIEW)는 `server-deploy/`로 묶여 **`deploy=docker-ssh`일 때만 포함**된다(`vercel`/`none`이면 폴더째 제외). publish 워크플로우는 `<type>/publish/<target>/`에 있고 **선택된 publish 타겟 집합**으로 복사가 결정된다(타입은 파일 위치일 뿐 게이트 아님).
 >
-> **확장 규칙(agent 필독)**: 새 "서버 배포" 성격의 Spring 워크플로우를 추가할 땐 `spring/server-deploy/`에 파일만 넣으면 된다. integrator가 `INCLUDE_NEXUS=true`일 때 이 폴더를 통째로 건너뛰므로 마법사 코드 수정이 필요 없다. (빌드/라이브러리 publish 워크플로우는 `server-deploy/`에 넣지 않는다.)
+> **확장 규칙(agent 필독)**: 새 "서버 배포" 워크플로우는 `spring/server-deploy/`에 파일만 넣는다(deploy≠docker-ssh면 자동 제외). 새 publish 타겟은 `<type>/publish/<target>/`에 넣고 마법사 질문 목록에 값을 추가한다. 타입 비종속 배포 타겟(Vercel 등)은 `common/deploy/<target>/`에 넣는다.
 
-#### 공통 — Secret 백업 (opt-in)
-| 파일명 | 기능 | 위치 |
-|--------|------|------|
-| `PROJECT-COMMON-SECRET-FILE-UPLOAD` | GitHub Secret → 서버(SSH) 업로드 | common/secret-backup/ |
+#### 공통 — 배포 타겟 / Secret 백업
+| 파일명 | 기능 | 위치 | 조건 |
+|--------|------|------|------|
+| `PROJECT-COMMON-VERCEL-DEPLOY` | Vercel 프로덕션 배포 (React/Next 등) | common/deploy/vercel/ | `--deploy vercel` |
+| `PROJECT-COMMON-SECRET-FILE-UPLOAD` | GitHub Secret → 서버(SSH) 업로드 | common/secret-backup/ | `--secret-backup` |
 
-> `--secret-backup` 옵션으로 포함합니다.
+> Vercel은 `VERCEL_TOKEN`·`VERCEL_ORG_ID`·`VERCEL_PROJECT_ID` secret이 필요하다.
 
 #### React (Next.js 포함)
 | 파일명 | 용도 |
@@ -153,9 +167,9 @@ snake_case.sh / snake_case.py
 #### Node — npm publish (opt-in)
 | 파일명 | 용도 | 위치 |
 |--------|------|------|
-| `PROJECT-NODE-NPM-PUBLISH` | main push 시 version.yml 버전으로 공개 npmjs 배포 (멱등, NPM_TOKEN secret) | node/npm-publish/ |
+| `PROJECT-NODE-NPM-PUBLISH` | main push 시 version.yml 버전으로 공개 npmjs 배포 (멱등, NPM_TOKEN secret) | node/publish/npm/ |
 
-> `--npm-publish` 옵션(.ps1은 `-NpmPublish`, npx는 `--npm-publish`)으로 포함합니다. 선택 값은 `version.yml`의 `metadata.template.options.npm_publish`에 저장됩니다.
+> `--publish npm`으로 포함한다(구 `--npm-publish`는 deprecated alias). 선택 값은 `version.yml`의 `metadata.template.options.publish` 배열에 저장된다.
 
 ---
 
@@ -181,8 +195,9 @@ python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output rel
 
 ### template_integrator.sh / .ps1
 기존 프로젝트에 템플릿 기능을 추가하는 원격 실행 스크립트. 신규 통합 / 업데이트 / 되돌리기 모드 지원.
-배포 워크플로우(SSH+Docker)는 기본 포함되고, `--nexus` / `--secret-backup` / `--npm-publish` 옵션(.ps1은 `-Nexus` / `-SecretBackup` / `-NpmPublish`)으로 선택 워크플로우 포함 여부를 정한다.
-선택 값은 `version.yml`의 `metadata.template.options.nexus` / `.secret_backup` / `.npm_publish`에 저장.
+배포/publish 축(#439)을 `--deploy docker-ssh|vercel|none` + `--publish nexus,npm,github-packages`(csv)로 정한다(.ps1은 `-Deploy` / `-Publish`). Secret 백업은 `--secret-backup`(.ps1 `-SecretBackup`).
+선택 값은 `version.yml`의 `metadata.template.options.deploy` / `.publish`(배열) / `.secret_backup`에 저장.
+구 플래그 `--nexus` / `--npm-publish`는 deprecated alias(1 minor 유지 — `--publish nexus`/`--publish npm`으로 해석).
 
 **초기화/통합 시 복사되지 않는 템플릿 전용 파일**:
 ```

@@ -55,12 +55,13 @@ test("printAnalysisCard: 멀티타입·옵션·모노레포 경로 표시", () =
   const out = capture();
   printAnalysisCard({
     mode: "full", modeLabel: "전체 설치", types: ["spring", "react"], version: "1.2.3", branch: "main",
-    includeNexus: true, includeSecretBackup: false, showOptional: true,
+    deployTarget: "docker-ssh", publishTargets: ["nexus"], includeSecretBackup: false, showOptional: true,
     paths: new Map([["spring", "server"], ["react", "client"]]),
   }, out);
   const t = strip(out.text());
   assert.match(t, /타입\(멀티\).*spring, react/);
-  assert.match(t, /Nexus.*포함/);
+  assert.match(t, /배포.*docker-ssh/);
+  assert.match(t, /Publish.*nexus/);
   assert.match(t, /Secret백업.*제외/);
   assert.match(t, /spring→server, react→client/);
 });

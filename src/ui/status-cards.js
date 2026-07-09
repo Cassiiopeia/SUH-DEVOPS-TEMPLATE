@@ -25,7 +25,7 @@ export function printDetectionLog({ types = [], version = "", branch = "" }, out
 
 // 층3 — 프로젝트 분석 개요 카드 (.ps1 Print-ProjectAnalysis 등가+)
 export function printAnalysisCard({ mode = "", modeLabel = "", types = [], version = "", branch = "",
-  includeNexus = null, includeSecretBackup = null, includeNpmPublish = null, paths = new Map(), showOptional = false },
+  deployTarget = null, publishTargets = null, includeSecretBackup = null, paths = new Map(), showOptional = false },
   out = (s) => process.stdout.write(s)) {
   out(`${HEAD}  ${paint("프로젝트 분석 결과", A.bold)}\n`);
   const row = (icon, label, value) => out(`${GUT}  ${icon} ${label.padEnd(10)} ${value}\n`);
@@ -34,9 +34,10 @@ export function printAnalysisCard({ mode = "", modeLabel = "", types = [], versi
   row("🌿", "브랜치", branch);
   if (modeLabel || mode) row("💫", "통합 모드", modeLabel || mode);
   if (showOptional) {
-    row("📦", "Nexus", includeNexus === true ? paint("포함", A.green) : paint("제외", A.dim));
+    row("🚀", "배포", paint(deployTarget || "docker-ssh", A.bold));
+    const pub = (publishTargets ?? []).join(",");
+    row("📦", "Publish", pub ? paint(pub, A.green) : paint("없음", A.dim));
     row("🔐", "Secret백업", includeSecretBackup === true ? paint("포함", A.green) : paint("제외", A.dim));
-    row("📦", "npm publish", includeNpmPublish === true ? paint("포함", A.green) : paint("제외", A.dim));
   }
   // 모노레포 경로 — 루트가 아닌 항목이 하나라도 있으면 표시
   const nonRoot = [...paths.entries()].filter(([, p]) => p && p !== ".");

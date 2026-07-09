@@ -13,9 +13,10 @@ export const HELP_TEXT = `projectops — GitHub 프로젝트 자동화 템플릿
                            (next는 react로 흡수됨 — Next.js 프로젝트는 react 사용)
       --project-version V  통합 대상의 초기 버전 (예: 1.0.0). 미지정 시 자동 감지
       --paths "t=p,..."    타입별 프로젝트 경로 (모노레포). 예: flutter=app,react=client
-      --nexus / --no-nexus            Nexus 라이브러리 publish 워크플로우 포함/제외
+      --deploy TARGET      배포 방식 택1: docker-ssh(기본) | vercel | none
+      --publish CSV        publish 타겟 csv: nexus,npm,github-packages (기본: 없음)
       --secret-backup / --no-secret-backup   Secret 백업 워크플로우 포함/제외
-      --npm-publish / --no-npm-publish        npm 패키지 publish 워크플로우 포함/제외
+      --nexus / --npm-publish  (deprecated — --publish nexus / --publish npm 사용)
       --force              모든 확인 생략, 비대화형 기본값 사용
   -v, --version            projectops 버전 출력
   -h, --help               이 도움말 표시

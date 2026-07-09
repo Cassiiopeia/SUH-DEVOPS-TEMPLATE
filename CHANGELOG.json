@@ -1,14 +1,47 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-09T03:04:50Z",
-    "currentVersion": "4.1.2",
+    "lastUpdated": "2026-07-09T03:16:48Z",
+    "currentVersion": "4.1.3",
     "projectType": "basic",
-    "totalReleases": 184,
+    "totalReleases": 185,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.1.3",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-09",
+      "pr_number": 451,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 버전 관리 스크립트가 Python 기반으로 전환되어 Windows에서도 바로 실행됩니다\n  * 별도 도구(yq/jq) 설치 없이 버전 관리가 동작합니다\n\n* **개선**\n  * 릴리스 노트 길이 제한 도구가 독립 실행 파일로 분리되었습니다\n  * 템플릿 통합 시 새 스크립트 구성이 함께 설치됩니다\n\n* **문서**\n  * 배포/publish 방식 재설계 스펙 문서가 추가되었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "버전 관리 스크립트가 Python 기반으로 전환되어 Windows에서도 바로 실행됩니다",
+            "별도 도구(yq/jq) 설치 없이 버전 관리가 동작합니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "릴리스 노트 길이 제한 도구가 독립 실행 파일로 분리되었습니다",
+            "템플릿 통합 시 새 스크립트 구성이 함께 설치됩니다"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "배포/publish 방식 재설계 스펙 문서가 추가되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.1.2",
       "project_type": "basic",

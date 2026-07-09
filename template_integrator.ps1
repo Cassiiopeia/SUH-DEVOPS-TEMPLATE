@@ -1947,7 +1947,7 @@ function Create-VersionYml {
 # 연관된 워크플로우:
 # - .github/workflows/PROJECT-VERSION-CONTROL.yaml
 # - .github/workflows/PROJECT-README-VERSION-UPDATE.yaml
-# - .github/workflows/PROJECT-AUTO-CHANGELOG-CONTROL.yaml
+# - .github/workflows/PROJECT-RELEASE-CHANGELOG.yaml
 #
 # 주의사항:
 # - project_types는 최초 설정 후 변경하지 마세요

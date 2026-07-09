@@ -99,7 +99,7 @@ template_integrator 실행 시 Cursor 설치를 선택하면 자동으로 `skill
 - ✅ `version.yml` 자동 생성 (v0.0.0, basic 타입)
 - ✅ 공통 워크플로우 자동 설치 (주요 항목):
   - `PROJECT-COMMON-VERSION-CONTROL.yaml` (버전 자동 관리)
-  - `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml` (체인지로그 생성)
+  - `PROJECT-COMMON-RELEASE-CHANGELOG.yaml` (체인지로그 생성)
   - `PROJECT-COMMON-README-VERSION-UPDATE.yaml` (README 업데이트)
   - `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yml` (이슈 브랜치/커밋 제안)
   - `PROJECT-COMMON-QA-ISSUE-CREATION-BOT.yaml` (QA 이슈 자동 생성)

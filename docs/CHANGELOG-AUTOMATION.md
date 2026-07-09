@@ -137,7 +137,7 @@ Deploy 20260112-v1.2.3 : 새로운 로그인 기능 추가
 
 ## 워크플로우
 
-### PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml
+### PROJECT-COMMON-RELEASE-CHANGELOG.yaml
 
 ```yaml
 on:
@@ -255,7 +255,7 @@ git push
 
 ## 릴리스 버전 확정 커밋과 후속 워크플로우 트리거
 
-`AUTO-CHANGELOG-CONTROL`이 develop→main 릴리스 PR을 automerge하며 만드는 **버전 확정 커밋**은
+`RELEASE-CHANGELOG`이 develop→main 릴리스 PR을 automerge하며 만드는 **버전 확정 커밋**은
 `[skip ci]`를 **포함하지 않는다**. 이 커밋이 main HEAD가 되므로, main push 트리거 워크플로우
 (`NPM-PUBLISH`·`README-VERSION-UPDATE`·`PLUGIN-VERSION-SYNC` 및 각 프로젝트 배포 CICD)가
 **릴리스 시 자동으로 트리거**되어야 하기 때문이다. (default 브랜치 push = 배포 트리거)

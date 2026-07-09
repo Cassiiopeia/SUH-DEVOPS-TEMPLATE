@@ -99,7 +99,7 @@ snake_case.sh / snake_case.py
 | `PROJECT-TEMPLATE-INITIALIZER` | 저장소 생성 | 템플릿 초기화 (일회성) |
 | `PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC` | main 푸시 | 플러그인 매니페스트 버전 동기화 |
 | `PROJECT-COMMON-VERSION-CONTROL` | main 직접 푸시(안전망) | 릴리스 머지 외 push 시 patch 증가 |
-| `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` | main PR (develop→main) | 버전 확정 + AI 체인지로그 + automerge |
+| `PROJECT-COMMON-RELEASE-CHANGELOG` | main PR (develop→main) | 버전 확정 + AI 체인지로그 + automerge |
 | `PROJECT-COMMON-README-VERSION-UPDATE` | main 푸시 | README 버전 동기화 |
 | `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE` | 이슈 생성 | 브랜치명/커밋 제안 |
 | `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @projectops 멘션 | QA 이슈 자동 생성 |
@@ -640,8 +640,8 @@ skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 커밋 메시지 앞에 이모지·태그(`🚀[기능개선]`, `⚙️[기능추가]` 등) **절대 포함 금지**.
 이슈 제목에서 이모지+태그를 제거한 순수 내용만 사용한다.
 
-- 올바른 예: `AUTO-CHANGELOG-CONTROL PR 본문 초기화 보호 로직 추가 : feat : ... https://...`
-- 잘못된 예: `🚀[기능개선][ChangeLog] AUTO-CHANGELOG-CONTROL : feat : ...`
+- 올바른 예: `RELEASE-CHANGELOG PR 본문 초기화 보호 로직 추가 : feat : ... https://...`
+- 잘못된 예: `🚀[기능개선][ChangeLog] RELEASE-CHANGELOG : feat : ...`
 
 report·implement 등 커밋을 직접 실행하는 스킬도 이 규칙을 따른다.
 

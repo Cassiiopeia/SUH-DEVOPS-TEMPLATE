@@ -96,18 +96,20 @@ def cmd_deploy_status(args) -> int:
             })
 
         # 워크플로우 매칭 — name이 아니라 path로 매칭한다.
-        # name 필드는 사람이 보는 라벨(예: "AUTO UPDATE PROJECT CHANGELOG")이라 언제든 바뀌고,
-        # 실제 파일 path(`.github/workflows/PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml`)가 식별자다.
-        # 과거: `"AUTO-CHANGELOG-CONTROL" in name` → name은 "AUTO UPDATE PROJECT CHANGELOG"라 영원히 매칭 실패.
+        # name 필드는 사람이 보는 라벨(예: "RELEASE CHANGELOG")이라 언제든 바뀌고,
+        # 실제 파일 path(`.github/workflows/PROJECT-COMMON-RELEASE-CHANGELOG.yaml`)가 식별자다.
+        # #455에서 구 PROJECT-COMMON-AUTO-CHANGELOG-CONTROL → RELEASE-CHANGELOG로 리네임됨.
+        # 구 path도 폴백 지원(아직 리네임 안 된 레포 호환). name 매칭은 라벨이 바뀌어 실패한 이력 있어 path 우선.
         workflow = None
         try:
             run_data = resolve_pr_runs(args.owner, args.repo, pr["number"], pat)
             for r in run_data.get("runs", []):
                 path = (r.get("path") or "").lower()
                 name = (r.get("name") or "").upper()
-                # 1순위: 파일 path. 2순위(legacy fallback): name에 키워드.
-                if path.endswith("project-common-auto-changelog-control.yaml") \
-                        or ("CHANGELOG" in name and ("AUTO" in name or "DEPLOY" in name)):
+                # 1순위: 파일 path(신·구 둘 다). 2순위(legacy fallback): name에 키워드.
+                if path.endswith("project-common-release-changelog.yaml") \
+                        or path.endswith("project-common-auto-changelog-control.yaml") \
+                        or ("CHANGELOG" in name and ("AUTO" in name or "DEPLOY" in name or "RELEASE" in name)):
                     workflow = {
                         "name": r.get("name"),
                         "path": r.get("path"),
@@ -158,7 +160,7 @@ def cmd_deploy_status(args) -> int:
             summary = f"PR #{pr['number']} mergeable_state={pr['mergeable_state']} — 충돌/차단"
         elif workflow and workflow_conclusion == "failure":
             verdict = "workflow_failed"
-            summary = "AUTO-CHANGELOG-CONTROL 워크플로우 실패"
+            summary = "RELEASE-CHANGELOG 워크플로우 실패"
         elif workflow_running:
             # 워크플로우 진행 중이면 body·has_summary가 일시적으로 비어 보여도 정상 대기로 본다 (race 가드)
             verdict = "waiting_for_automerge"
@@ -263,7 +265,7 @@ def cmd_create_pr(args) -> int:
         result = create_pull_request(args.owner, args.repo, args.title, body, args.head, args.base, pat)
         pr_number = result.get("number")
 
-        # PR 생성 직후엔 AUTO-CHANGELOG-CONTROL 워크플로우 step 2가 본문을 초기화할 수 있다.
+        # PR 생성 직후엔 RELEASE-CHANGELOG 워크플로우 step 2가 본문을 초기화할 수 있다.
         # step 2는 PR opened 후 보통 3~10초 안에 실행되므로, 워크플로우 본문 초기화가 끝난 뒤
         # (대기 후) 본문을 다시 확인해 비어 있으면 update-pr로 재주입한다. 이렇게 하면 step 8
         # (CodeRabbit Summary 폴링)이 첫 attempt(5초 간격)에서 즉시 본문을 잡고 빠르게 머지된다.

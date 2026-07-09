@@ -1,6 +1,6 @@
 # 버전 관리 시스템
 
-정상 릴리스는 `develop → main` PR에서 AUTO-CHANGELOG-CONTROL이 버전을 확정합니다. VERSION-CONTROL은 **main 직접 푸시 시 patch 버전을 자동 증가시키는 안전망**입니다.
+정상 릴리스는 `develop → main` PR에서 RELEASE-CHANGELOG이 버전을 확정합니다. VERSION-CONTROL은 **main 직접 푸시 시 patch 버전을 자동 증가시키는 안전망**입니다.
 
 ---
 
@@ -9,7 +9,7 @@
 | 기능 | 설명 |
 |------|------|
 | **자동 증가 (안전망)** | main 직접 푸시 시 patch 버전 +1 (1.0.0 → 1.0.1). 릴리스 PR 머지(version.yml 변경 포함)인 경우는 건너뜁니다 |
-| **버전 확정 (정상 릴리스)** | `develop → main` PR에서 AUTO-CHANGELOG-CONTROL이 버전을 확정하고 CHANGELOG를 스탬프합니다 |
+| **버전 확정 (정상 릴리스)** | `develop → main` PR에서 RELEASE-CHANGELOG이 버전을 확정하고 CHANGELOG를 스탬프합니다 |
 | **멀티 파일 동기화** | version.yml ↔ 프로젝트 파일 양방향 동기화 |
 | **충돌 해결** | 버전 불일치 시 "높은 버전 우선" 정책 |
 | **Git 태그** | 버전 변경 시 자동 태그 생성 |
@@ -101,7 +101,7 @@ project_types: ["spring", "react", "python"]   # 첫 항목이 primary
 develop → main PR 생성 (release)
     │
     ▼
-AUTO-CHANGELOG-CONTROL 워크플로우
+RELEASE-CHANGELOG 워크플로우
     │
     ├─ 버전 확정 (PR 안에서 patch/minor/major 결정)
     ├─ CHANGELOG.json / CHANGELOG.md 스탬프
@@ -204,7 +204,7 @@ on:
 3. 프로젝트 파일 동기화
 4. Git 태그 생성
 
-> PR을 생성하지 않습니다. 정상 릴리스 버전 확정은 `develop → main` PR에서 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml`(트리거: `pull_request_target opened, branches: [main]`)이 담당합니다.
+> PR을 생성하지 않습니다. 정상 릴리스 버전 확정은 `develop → main` PR에서 `PROJECT-COMMON-RELEASE-CHANGELOG.yaml`(트리거: `pull_request_target opened, branches: [main]`)이 담당합니다.
 
 ---
 

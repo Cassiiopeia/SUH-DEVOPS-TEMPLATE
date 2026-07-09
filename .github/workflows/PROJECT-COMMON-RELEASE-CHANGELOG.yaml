@@ -1,10 +1,15 @@
 # ===================================================================
-# PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml
-# 자동 체인지로그 관리 워크플로우
+# PROJECT-COMMON-RELEASE-CHANGELOG.yaml
+# 릴리스 + 체인지로그 관리 워크플로우 (구 RELEASE-CHANGELOG)
 # ===================================================================
 #
-# 이 워크플로우는 main 브랜치로 릴리스 PR(develop→main)이 생성될 때 CodeRabbit AI의 리뷰를
-# 자동으로 감지하고 파싱하여 CHANGELOG.json과 CHANGELOG.md를 업데이트합니다.
+# 이 워크플로우는 main 브랜치로 릴리스 PR(develop→main)이 생성될 때 릴리스 노트를 만들어
+# CHANGELOG.json / CHANGELOG.md를 업데이트하고 자동 머지합니다.
+#
+# 릴리스 노트 생성기(provider)는 version.yml options.changelog.provider로 고른다 (#455):
+#   - coderabbit(기본·미설정 시): CodeRabbit Summary 요청 후 폴링, 없으면 commit 폴백
+#   - commit / github-ai / openai: CodeRabbit 폴링을 건너뛰고 fallback 사다리(현재 commit 안전망)로 생성
+# commit은 AI·외부봇 무의존이라 항상 완주하는 최후 보루 → 파이프라인이 멈추지 않는다.
 #
 # ===================================================================
 # 🔑 필수 GitHub Secrets
@@ -26,7 +31,7 @@
 # - 이 워크플로우 예상 사용량: ~130회/실행
 # ===================================================================
 
-name: AUTO UPDATE PROJECT CHANGELOG
+name: RELEASE CHANGELOG
 
 on:
   pull_request_target:
@@ -50,6 +55,7 @@ jobs:
       version: ${{ steps.get_version.outputs.version }}
       project_type: ${{ steps.get_version.outputs.project_type }}
       project_types: ${{ steps.get_version.outputs.project_types }}
+      changelog_provider: ${{ steps.get_version.outputs.changelog_provider }}
     steps:
       - name: PR 본문 초기화
         id: clear_body
@@ -134,10 +140,16 @@ jobs:
           fi
           [ -z "$PROJECT_TYPES" ] && PROJECT_TYPES="$PROJECT_TYPE"
 
+          # changelog provider 읽기 (#455) — version.yml options.changelog.provider.
+          # 미설정이면 coderabbit(기존 동작 100% 보존). commit/github-ai면 CodeRabbit 폴링을 건너뛴다.
+          CHANGELOG_PROVIDER=$(grep -A5 "changelog:" version.yml 2>/dev/null | grep "provider:" | head -1 | sed -E 's/.*provider: *"?([a-z-]+)"?.*/\1/' || true)
+          [ -z "$CHANGELOG_PROVIDER" ] && CHANGELOG_PROVIDER="coderabbit"
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "project_type=$PROJECT_TYPE" >> $GITHUB_OUTPUT
           echo "project_types=$PROJECT_TYPES" >> $GITHUB_OUTPUT
-          echo "✅ 버전: $VERSION, 프로젝트 타입: $PROJECT_TYPE (배열: $PROJECT_TYPES)"
+          echo "changelog_provider=$CHANGELOG_PROVIDER" >> $GITHUB_OUTPUT
+          echo "✅ 버전: $VERSION, 프로젝트 타입: $PROJECT_TYPE (배열: $PROJECT_TYPES), changelog: $CHANGELOG_PROVIDER"
 
       - name: PR 제목 즉시 변경
         run: |
@@ -155,8 +167,8 @@ jobs:
           echo "✅ PR 제목 변경 완료: $NEW_TITLE"
 
       - name: CodeRabbit Summary 요청
-        # 이미 Summary가 있으면 요청 불필요
-        if: steps.clear_body.outputs.already_found != 'true'
+        # 이미 Summary가 있으면 요청 불필요. provider가 coderabbit일 때만 요청(#455 — 아니면 fallback 사다리로).
+        if: steps.clear_body.outputs.already_found != 'true' && steps.get_version.outputs.changelog_provider == 'coderabbit'
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
 
@@ -172,6 +184,16 @@ jobs:
         id: detect_summary
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
+          CHANGELOG_PROVIDER="${{ steps.get_version.outputs.changelog_provider }}"
+
+          # provider가 coderabbit이 아니면(commit/github-ai/openai 등) CodeRabbit 폴링을 건너뛰고
+          # summary_found=false로 내려 fallback-summary(provider 사다리)가 릴리스 노트를 만들게 한다 (#455).
+          # 단, changelog-deploy 스킬이 미리 Summary를 넣었으면(already_found) 그건 그대로 존중.
+          if [ "${{ steps.clear_body.outputs.already_found }}" != "true" ] && [ "$CHANGELOG_PROVIDER" != "coderabbit" ]; then
+            echo "ℹ️ changelog provider='$CHANGELOG_PROVIDER' — CodeRabbit 폴링 생략, fallback 사다리로 위임"
+            echo "summary_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           # changelog-deploy가 이미 Summary를 작성한 경우 폴링 생략
           if [ "${{ steps.clear_body.outputs.already_found }}" = "true" ]; then
@@ -230,9 +252,12 @@ jobs:
           path: pr_body.md
           retention-days: 1
 
-  # Job 1-B: CodeRabbit 폴백 — rate limit 등으로 Summary 없을 때 커밋 분석으로 릴리스 노트 자동 생성
+  # Job 1-B: provider 사다리 — CodeRabbit Summary가 없을 때 릴리스 노트를 만든다 (#455).
+  #   provider=commit/github-ai/openai 모두 이 job으로 위임된다. 현재 구현은 commit 안전망
+  #   (커밋 분석, AI·외부봇 무의존 → 항상 완주)이 릴리스 노트를 만든다. github-ai/openai의
+  #   러너 내 AI 추론은 후속 확장 자리이며, 그때까지는 commit이 결정론 베이스라인으로 파이프라인을 완주시킨다.
   fallback-summary:
-    name: 커밋 분석으로 릴리스 노트 생성
+    name: 릴리스 노트 생성 (provider 사다리)
     runs-on: ubuntu-latest
     needs: detect-and-parse
     if: needs.detect-and-parse.outputs.summary_found == 'false'

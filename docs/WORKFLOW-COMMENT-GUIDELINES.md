@@ -95,7 +95,7 @@ name: PROJECT-SYNC-GITHUB-LABELS
 
 ```yaml
 # ===================================================================
-# PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml
+# PROJECT-COMMON-RELEASE-CHANGELOG.yaml
 # CodeRabbit 기반 CHANGELOG 자동 생성
 # ===================================================================
 #
@@ -115,7 +115,7 @@ name: PROJECT-SYNC-GITHUB-LABELS
 # 4. PR 자동 머지
 # ===================================================================
 
-name: PROJECT-COMMON-AUTO-CHANGELOG-CONTROL
+name: PROJECT-COMMON-RELEASE-CHANGELOG
 ```
 
 **Secrets 상세 설명이 필요한 경우 (예외적):**
@@ -123,7 +123,7 @@ name: PROJECT-COMMON-AUTO-CHANGELOG-CONTROL
 > 대부분의 Secrets는 1줄로 충분합니다. 권한이나 설정 방법은 별도 문서로 안내하세요.
 
 **적용 파일:**
-- AUTO-CHANGELOG-CONTROL
+- RELEASE-CHANGELOG
 - PROJECTS-SYNC-MANAGER
 - NEXUS-CI
 - NEXUS-PUBLISH
@@ -343,7 +343,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 | VERSION-CONTROL | A | ✅ |
 | README-VERSION-UPDATE | A | ✅ |
 | QA-ISSUE-CREATION-BOT | A | ✅ |
-| AUTO-CHANGELOG-CONTROL | B | ✅ |
+| RELEASE-CHANGELOG | B | ✅ |
 | SYNC-ISSUE-LABELS | A | ✅ |
 
 ### project-types/common/

@@ -362,7 +362,7 @@ jobs:
 # 워크플로우 파일명: PROJECT-FEATURE-NAME.yaml
 # 예시:
 # - PROJECT-VERSION-CONTROL.yaml
-# - PROJECT-AUTO-CHANGELOG-CONTROL.yaml
+# - PROJECT-RELEASE-CHANGELOG.yaml
 
 # Job 이름: kebab-case
 jobs:

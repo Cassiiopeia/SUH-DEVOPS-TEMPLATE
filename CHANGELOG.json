@@ -1,14 +1,39 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-09T05:36:27Z",
-    "currentVersion": "4.2.2",
+    "lastUpdated": "2026-07-09T06:14:18Z",
+    "currentVersion": "4.2.3",
     "projectType": "basic",
-    "totalReleases": 187,
+    "totalReleases": 188,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.3",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-09",
+      "pr_number": 454,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 설치 마법사에서 방향키로 항목을 옮길 때 메뉴가 아래로 밀려나던 문제 해결\n\n* **개선**\n  * 처음 설치인지 업데이트인지 왜 그렇게 판단했는지 안내가 추가되었습니다",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "설치 마법사에서 방향키로 항목을 옮길 때 메뉴가 아래로 밀려나던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "처음 설치인지 업데이트인지 왜 그렇게 판단했는지 안내가 추가되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.2",
       "project_type": "basic",

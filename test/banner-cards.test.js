@@ -102,14 +102,18 @@ test("printIdeStatus: 설치/미설치/CLI없음 3상태", () => {
   assert.match(t, /Gemini CLI.*CLI 없음/);
 });
 
-test("printInstallKind: 신규 vs 업데이트", () => {
+test("printInstallKind: 신규 vs 업데이트 + 판정 근거 라인", () => {
   const out = capture();
   printInstallKind({ currentTemplateVersion: "", templateVersion: "4.0.3" }, out);
-  assert.match(strip(out.text()), /신규 통합/);
+  const t1 = strip(out.text());
+  assert.match(t1, /신규 통합/);
+  assert.match(t1, /이전 통합 기록이 없어/, "왜 신규인지 근거를 밝힌다");
 
   const out2 = capture();
   printInstallKind({ currentTemplateVersion: "3.0.188", templateVersion: "4.0.3" }, out2);
-  assert.match(strip(out2.text()), /업데이트 — 템플릿 v3\.0\.188 → v4\.0\.3/);
+  const t2 = strip(out2.text());
+  assert.match(t2, /업데이트 — 템플릿 v3\.0\.188 → v4\.0\.3/);
+  assert.match(t2, /이전 통합 기록이 있어/, "왜 업데이트인지 근거를 밝힌다");
 });
 
 test("collectIdeStatuses: 어댑터 전체 순회 (예외 없음)", () => {

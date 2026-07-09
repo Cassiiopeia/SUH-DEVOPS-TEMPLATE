@@ -1,14 +1,35 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-09T02:50:55Z",
-    "currentVersion": "4.1.1",
-    "projectType": "",
-    "totalReleases": 183,
+    "lastUpdated": "2026-07-09T03:04:50Z",
+    "currentVersion": "4.1.2",
+    "projectType": "basic",
+    "totalReleases": 184,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.1.2",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-09",
+      "pr_number": 450,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * npm 패키지 자동 배포 워크플로우가 추가되었습니다 (선택 설치)\n  * 마법사에서 npm publish 포함 여부를 질문하고 설정을 기억합니다\n  * 이미 배포된 버전은 자동으로 건너뛰어 중복 배포를 방지합니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "npm 패키지 자동 배포 워크플로우가 추가되었습니다 (선택 설치)",
+            "마법사에서 npm publish 포함 여부를 질문하고 설정을 기억합니다",
+            "이미 배포된 버전은 자동으로 건너뛰어 중복 배포를 방지합니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.1.1",
       "project_type": "",

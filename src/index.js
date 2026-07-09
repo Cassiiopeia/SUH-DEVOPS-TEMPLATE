@@ -108,6 +108,7 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     // 옵션 워크플로우: CLI 플래그 최우선 → version.yml 저장 옵션(.sh read_template_options 등가) → false
     includeNexus: opts.includeNexus ?? existing?.options?.nexus ?? false,
     includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
+    includeNpmPublish: opts.includeNpmPublish ?? existing?.options?.npmPublish ?? false,
     repoName,
     // 실 resolver 4종 (.sh resolve_token 등가 — spring-app-yml 스텁 제거)
     resolvers: makeResolvers(cwd, repoName, paths),

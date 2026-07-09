@@ -150,7 +150,7 @@ export async function copyWorkflowsInteractive(context, tempDir, targetRoot = ".
 }
 
 function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters) {
-  const { includeNexus, force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null, decisions = new Map() } = ctx;
+  const { includeNexus, includeNpmPublish = false, force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null, decisions = new Map() } = ctx;
   const typeDir = join(projectTypesDir, type);
   const envOpts = envOptsFor(type);
   let unchangedNames = [];
@@ -195,8 +195,25 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
     }
   }
 
+  // npm-publish (opt-in — 현재 node/npm-publish/만 존재)
+  const npmPublishDir = join(typeDir, "npm-publish");
+  if (exists(npmPublishDir) && includeNpmPublish) {
+    for (const filename of listYamlFiles(npmPublishDir)) {
+      const src = join(npmPublishDir, filename);
+      const dst = join(workflowsDir, filename);
+      if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOpts)) {
+        counters.skipped++;
+        continue;
+      }
+      if (existsSync(dst)) renameSync(dst, dst + ".bak");
+      copyFileSync(src, dst);
+      counters.optionalCopied++;
+      counters.copied++;
+    }
+  }
+
   // env 치환 — 이 타입의 원본 디렉토리들에서 복사돼 존재하고 unchanged 아닌 파일만
-  for (const srcDir of [typeDir, serverDeployDir, nexusDir]) {
+  for (const srcDir of [typeDir, serverDeployDir, nexusDir, npmPublishDir]) {
     if (!exists(srcDir)) continue;
     for (const filename of listYamlFiles(srcDir)) {
       const target = join(workflowsDir, filename);

@@ -22,7 +22,7 @@ import { ensureGitignore } from "../core/copy/gitignore.js";
 export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
   const { version, types = [], paths = new Map(), branch = "main", versionCode = 1,
     force = true, now, today, templateVersion = "unknown",
-    includeNexus = false, includeSecretBackup = false } = context;
+    includeNexus = false, includeSecretBackup = false, includeNpmPublish = false } = context;
 
   // project_paths 마커 계산 (.sh existing_marker_in_dir 등가 — 대표 마커명)
   const pathMarkers = new Map();
@@ -38,7 +38,7 @@ export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
     buildVersionYml({
       version, types, paths, pathMarkers, branch, versionCode, now, today,
       deployValues,
-      templateOptions: { templateVersion, includeNexus, includeSecretBackup, optionsDate: today },
+      templateOptions: { templateVersion, includeNexus, includeSecretBackup, includeNpmPublish, optionsDate: today },
     }));
 
   // 2. README 버전 섹션

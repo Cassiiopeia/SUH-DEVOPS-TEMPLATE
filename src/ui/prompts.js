@@ -41,6 +41,7 @@ export async function editMenu({ showOptional = false } = {}) {
   if (showOptional) {
     options.push({ value: "nexus", label: "Nexus publish 포함 여부" });
     options.push({ value: "secret", label: "Secret 백업 포함 여부" });
+    options.push({ value: "npm-publish", label: "npm publish 포함 여부" });
   }
   options.push({ value: "done", label: "모두 맞음, 계속" });
   return engine.select({ message: "어떤 항목을 수정할까요?", options });

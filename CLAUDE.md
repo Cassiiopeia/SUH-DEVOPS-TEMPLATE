@@ -161,15 +161,16 @@ snake_case.sh / snake_case.py
 
 ## 핵심 스크립트
 
-### version_manager.sh
+### version_manager (.py가 실 로직, .sh는 위임 shim — #448)
 ```bash
-.github/scripts/version_manager.sh get
+.github/scripts/version_manager.sh get            # 또는: python .github/scripts/version_manager.py get
 .github/scripts/version_manager.sh increment       # patch +1
 .github/scripts/version_manager.sh set 2.0.0
 .github/scripts/version_manager.sh sync
 .github/scripts/version_manager.sh get-code
 .github/scripts/version_manager.sh increment-code
 ```
+> v4.2부터 로직은 `version_manager.py`(stdlib 전용 — yq/jq 불필요)에 있고 `.sh`는 Python 위임 shim이다. Windows에서는 `python .github/scripts/version_manager.py get`을 직접 실행한다. **integrator 복사 목록에 `.sh`+`.py` 한 쌍이 모두 있어야 한다** (`truncate_release_notes.*`도 동일).
 
 ### changelog_manager.py
 ```bash

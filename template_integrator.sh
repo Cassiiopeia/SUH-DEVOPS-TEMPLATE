@@ -5833,10 +5833,34 @@ print_summary() {
 }
 
 # 메인 실행
+# npx 단일화 라우팅 안내 (#458) — 이 스크립트는 유지되지만 npx가 정식 경로다.
+# 본문 로직은 그대로 두되, 실행 시 npx projectops로 유도한다. 안내만 하고 계속 진행 가능.
+print_npx_routing_notice() {
+    echo "" >&2
+    print_warning "이 스크립트(template_integrator.sh)는 더 이상 정식 통합 경로가 아닙니다."
+    print_info "이제 크로스플랫폼 단일 CLI로 통합하세요:"
+    echo "" >&2
+    echo "    npx projectops" >&2
+    echo "" >&2
+    print_info "npx는 Windows/macOS/Linux에서 동일하게 동작하며 버전 고정·롤백이 가능합니다."
+    echo "" >&2
+}
+
 main() {
     # 터미널 상태 감지 (최우선)
     detect_terminal
-    
+
+    # npx 정식 경로 안내 (#458). 대화형이면 계속 진행할지 확인, 비대화형은 안내만 하고 진행.
+    print_npx_routing_notice
+    if [ "$MODE" = "interactive" ] && [ "$FORCE_MODE" = false ] && [ "$TTY_AVAILABLE" = true ]; then
+        printf "그래도 이 스크립트로 계속 진행할까요? (권장: npx projectops) [y/N]: " >&2
+        _ans=""; read -r _ans < /dev/tty 2>/dev/null || _ans=""
+        case "$_ans" in
+            y|Y|yes|YES) : ;;  # 계속 진행
+            *) print_info "npx projectops 로 다시 실행해 주세요. 종료합니다."; exit 0 ;;
+        esac
+    fi
+
     # stdin 모드 디버그 정보 (개발 시 유용)
     if [ "$STDIN_MODE" = true ]; then
         if [ "$TTY_AVAILABLE" = true ]; then

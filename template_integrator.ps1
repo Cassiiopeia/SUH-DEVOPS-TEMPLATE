@@ -5254,13 +5254,35 @@ function Show-Summary {
 # 메인 실행
 # ===================================================================
 
+# npx 단일화 라우팅 안내 (#458) — 본문 로직은 유지하되 npx projectops로 유도한다.
+function Print-NpxRoutingNotice {
+    Write-Host ""
+    Print-Warning "이 스크립트(template_integrator.ps1)는 더 이상 정식 통합 경로가 아닙니다."
+    Print-Info "이제 크로스플랫폼 단일 CLI로 통합하세요:"
+    Write-Host ""
+    Write-Host "    npx projectops"
+    Write-Host ""
+    Print-Info "npx는 Windows/macOS/Linux에서 동일하게 동작하며 버전 고정·롤백이 가능합니다."
+    Write-Host ""
+}
+
 function Main {
     # 도움말 표시
     if ($Help) {
         Show-Help
         exit 0
     }
-    
+
+    # npx 정식 경로 안내 (#458). 대화형이면 계속 진행할지 확인, 비대화형(-Force)은 안내만 하고 진행.
+    Print-NpxRoutingNotice
+    if ($Mode -eq "interactive" -and -not $Force) {
+        $proceed = Read-UserInput "그래도 이 스크립트로 계속 진행할까요? (권장: npx projectops) (y/N)" "N"
+        if ($proceed -notmatch '^(y|Y|yes|YES)$') {
+            Print-Info "npx projectops 로 다시 실행해 주세요. 종료합니다."
+            return
+        }
+    }
+
     # 파라미터 검증
     $validModes = @("interactive", "full", "version", "workflows", "issues", "skills")
     if ($Mode -ne "" -and $Mode -notin $validModes) {

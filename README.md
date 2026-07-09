@@ -94,7 +94,9 @@ npx projectops
 > Node.js 20.12+ 만 있으면 별도 설치 없이 대화형 마법사가 실행됩니다. 비대화형: `npx projectops --mode full --type spring,react --force`
 
 <details>
-<summary>대안 — 스크립트 직접 실행 (Node 없이)</summary>
+<summary>대안 — 스크립트 직접 실행 (Node 없이, <b>deprecated</b>)</summary>
+
+> ⚠️ **`template_integrator.sh` / `.ps1`은 deprecated입니다 (#458).** 실행하면 `npx projectops`로 안내하며, 다음 minor에서 제거될 수 있습니다. Node 20.12+를 쓸 수 있으면 위의 `npx projectops`를 사용하세요.
 
 ```bash
 # macOS / Linux

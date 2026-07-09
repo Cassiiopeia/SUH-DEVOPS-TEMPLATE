@@ -17,6 +17,8 @@ export { parseTemplateOptions };
 
 export const DEPLOY_TARGETS = ["docker-ssh", "vercel", "none"];
 export const PUBLISH_TARGETS = ["nexus", "npm", "github-packages"];
+// #455 — changelog 생성기 provider. github-ai가 기본(설정 제로). openai/gemini/claude/ollama는 openai 호환 한 갈래.
+export const CHANGELOG_PROVIDERS = ["github-ai", "coderabbit", "openai", "gemini", "claude", "ollama", "commit"];
 
 const isCancel = (v) => typeof v === "symbol";
 
@@ -62,6 +64,9 @@ export async function askAllOptionalWorkflows({
   let deploy = current.deploy ?? null;
   let publish = current.publish ?? null;
   let secretBackup = current.secretBackup ?? null;
+  let codeReviewCoderabbit = current.codeReviewCoderabbit ?? null;
+  let changelogProvider = current.changelogProvider ?? null;
+  let changelogBaseUrl = current.changelogBaseUrl ?? null;
 
   // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
   // 배포/publish 질문을 건너뛰고 none·[]로 조용히 확정한다 (타입 변경 시 재질문됨).
@@ -86,6 +91,10 @@ export async function askAllOptionalWorkflows({
         secretBackup = saved.secretBackup;
         say(`Secret 백업 옵션: version.yml 저장값(${secretBackup}) 유지 — 재질문 생략`);
       }
+      // #455 changelog/code_review 저장값 재사용
+      if (codeReviewCoderabbit === null && saved.codeReviewCoderabbit !== null) codeReviewCoderabbit = saved.codeReviewCoderabbit;
+      if (changelogProvider === null && saved.changelogProvider !== null) changelogProvider = saved.changelogProvider;
+      if (changelogBaseUrl === null && saved.changelogBaseUrl !== null) changelogBaseUrl = saved.changelogBaseUrl;
     }
   }
 
@@ -140,6 +149,54 @@ export async function askAllOptionalWorkflows({
     }
   }
 
+  // ── code_review: CodeRabbit AI 코드 리뷰 (changelog와 무관 — #455) ──
+  if (forceAsk || codeReviewCoderabbit === null) {
+    if (force || !tty || typeof io.confirm !== "function") {
+      codeReviewCoderabbit = codeReviewCoderabbit ?? false;
+    } else {
+      say("");
+      say("🤖 CodeRabbit AI 코드 리뷰를 쓸까요? (PR 올릴 때 코드 리뷰 댓글을 답니다)");
+      const ans = await io.confirm({ message: "CodeRabbit AI 코드 리뷰 사용", initialValue: false });
+      codeReviewCoderabbit = (ans === true && !isCancel(ans));
+      say(`CodeRabbit 코드 리뷰: ${codeReviewCoderabbit ? "사용" : "미사용"}`);
+    }
+  }
+
+  // ── changelog: 릴리스 노트 생성기 (기본 커서 = github-ai — #455) ──
+  if (forceAsk || changelogProvider === null) {
+    if (force || !tty || typeof io.select !== "function") {
+      changelogProvider = changelogProvider ?? "github-ai";
+    } else {
+      say("");
+      say("📝 릴리스 노트(changelog)는 뭘로 만들까요?");
+      say("   GitHub AI는 설정 없이 바로 됩니다. 나머지는 나중에 GitHub Secret 등록이 필요할 수 있어요.");
+      const ans = await io.select({
+        message: "changelog 생성기를 선택하세요",
+        options: [
+          { value: "github-ai", label: "GitHub AI (추천 · 설정 불필요)" },
+          { value: "coderabbit", label: "CodeRabbit" },
+          { value: "openai", label: "OpenAI 호환 API (키 등록 필요)" },
+          { value: "commit", label: "커밋 분석만 (AI 없음)" },
+        ],
+      });
+      changelogProvider = (!isCancel(ans) && CHANGELOG_PROVIDERS.includes(ans)) ? ans : (changelogProvider ?? "github-ai");
+      say(`changelog 생성기: ${changelogProvider}`);
+    }
+  }
+
+  // ollama 선택 시에만 base_url 질문 (나머지 provider는 preset base_url 자동 — #455)
+  if (changelogProvider === "ollama" && (forceAsk || changelogBaseUrl === null || changelogBaseUrl === "")) {
+    if (force || !tty || typeof io.text !== "function") {
+      changelogBaseUrl = changelogBaseUrl ?? "";
+    } else {
+      const ans = await io.text({ message: "Ollama 서버 base_url (예: https://ai.suhsaechan.kr/v1)" });
+      changelogBaseUrl = (typeof ans === "string" && !isCancel(ans)) ? ans.trim() : "";
+      say(`Ollama base_url: ${changelogBaseUrl || "(미지정)"}`);
+    }
+  } else if (changelogBaseUrl === null) {
+    changelogBaseUrl = "";
+  }
+
   // ── ④ Secret 백업: 공통 폴더 (배포축 아님 — 기존 폴더 질문 유지) ──
   const real = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   const ptDir = existsSync(real) ? real : join(tempDir, PATHS.projectTypesDir);
@@ -149,5 +206,10 @@ export async function askAllOptionalWorkflows({
     current: secretBackup, force, tty, io, forceAsk, say,
   });
 
-  return { deploy: deploy ?? "docker-ssh", publish: publish ?? [], secretBackup: secretBackup === true };
+  return {
+    deploy: deploy ?? "docker-ssh", publish: publish ?? [], secretBackup: secretBackup === true,
+    codeReviewCoderabbit: codeReviewCoderabbit === true,
+    changelogProvider: changelogProvider ?? "github-ai",
+    changelogBaseUrl: changelogBaseUrl ?? "",
+  };
 }

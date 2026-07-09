@@ -28,14 +28,25 @@ def test_absolute_path_missing_returns_none(tmp_path):
 
 
 def test_relative_name_found_in_home_tmp(monkeypatch, tmp_path):
-    # HOME을 tmp_path로 바꿔 ~/.suh-template/tmp/ 를 격리 검증
+    # HOME을 tmp_path로 바꿔 ~/.projectops/tmp/ 를 격리 검증 (신 경로 — #459 이주)
+    fake_home = tmp_path
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    notes_dir = fake_home / ".projectops" / "tmp"
+    notes_dir.mkdir(parents=True)
+    target = notes_dir / "owner__repo__release_notes.md"
+    target.write_text("note", encoding="utf-8")
+    # 상대경로(파일명만) 입력 → 홈 tmp에서 발견되어야 함
+    assert _resolve("owner__repo__release_notes.md") == target
+
+
+def test_relative_name_found_in_legacy_suh_template_tmp(monkeypatch, tmp_path):
+    # 구 ~/.suh-template/tmp/ 도 과도기 폴백 후보로 여전히 발견되어야 함 (#459)
     fake_home = tmp_path
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
     notes_dir = fake_home / ".suh-template" / "tmp"
     notes_dir.mkdir(parents=True)
     target = notes_dir / "owner__repo__release_notes.md"
     target.write_text("note", encoding="utf-8")
-    # 상대경로(파일명만) 입력 → 홈 tmp에서 발견되어야 함
     assert _resolve("owner__repo__release_notes.md") == target
 
 

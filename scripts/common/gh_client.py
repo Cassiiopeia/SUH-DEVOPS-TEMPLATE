@@ -62,7 +62,7 @@ def _request(method: str, url: str, data: dict | None, pat: str, raw: bool = Fal
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
-            "User-Agent": "suh-template",
+            "User-Agent": "projectops",
         },
     )
     try:

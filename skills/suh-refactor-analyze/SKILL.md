@@ -76,7 +76,7 @@ Step 1~N: 기법 + Before/After + 테스트 확인
 
 ## 산출물 저장
 
-**산출물 저장 경로**: `{PROJECT_ROOT}/docs/suh-template/refactor-analyze/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
+**산출물 저장 경로**: `{PROJECT_ROOT}/docs/projectops/refactor-analyze/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 
 - 이슈번호 없으면 순번(`001`, `002`…) 자동 사용
 - 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내

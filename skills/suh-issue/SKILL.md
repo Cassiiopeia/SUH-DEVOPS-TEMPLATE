@@ -221,14 +221,14 @@ PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
 `references/doc-output-path.md` 규칙을 따른다.
 
 저장 경로를 agent가 직접 계산한다:
-- 형식: `{PROJECT_ROOT}/docs/suh-template/issue/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
+- 형식: `{PROJECT_ROOT}/docs/projectops/issue/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 - 이슈 번호는 GitHub 등록 전이므로 임시로 `TMP1`, `TMP2`… 를 사용한다 (GitHub 등록 후 실제 번호로 rename)
 - **`issue_cli.py`의 `get-next-seq` 서브커맨드를 호출하지 않는다.** 이슈 #329로 CLI에서 제거됨 — 임시 번호는 agent가 직접 생성한다.
 - 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
 
 **저장 직전**: `references/common-rules.md`의 **파일 저장 직전 자체검토 프로토콜**을 따라 작성한 이슈 본문 전체를 검토한다. 민감 정보가 발견되면 마스킹 처리 후 저장한다.
 
-반환된 경로(`docs/suh-template/issue/YYYYMMDD_번호_제목.md`)에 파일을 저장한다.
+반환된 경로(`docs/projectops/issue/YYYYMMDD_번호_제목.md`)에 파일을 저장한다.
 
 파일 저장 후 [시작 전 §5]에서 판정한 `AUTO_APPROVE` / `CONFIG_HAS_KEY` 값에 따라 분기한다.
 
@@ -240,7 +240,7 @@ PYTHONIOENCODING=utf-8 "$PYTHON" issue_cli.py \
 🤖 이 레포는 확인 없이 바로 등록되도록 설정돼 있어 안내드리고 GitHub에 등록합니다.
    (다시 매번 확인받고 싶으시면 "확인받게 해줘"라고 말씀해주세요.)
 
-이슈 파일: docs/suh-template/issue/20260419_TMP1_제목.md
+이슈 파일: docs/projectops/issue/20260419_TMP1_제목.md
 제목: ⚙️[기능추가][Skills] issue 스킬 GitHub API 연동
 라벨: 작업전
 담당자: {ASSIGNEE}
@@ -253,7 +253,7 @@ GitHub에 등록합니다.
 #### B. 수동 모드 (`AUTO_APPROVE == false`)
 
 ```
-이슈 파일을 생성했습니다: docs/suh-template/issue/20260419_222_제목.md
+이슈 파일을 생성했습니다: docs/projectops/issue/20260419_222_제목.md
 
 제목: ⚙️[기능추가][Skills] issue 스킬 GitHub API 연동
 라벨: 작업전
@@ -423,4 +423,4 @@ agent가 직접 생성한다:
 
 ## 산출물 저장
 
-`references/doc-output-path.md` 규칙을 따른다. agent가 직접 경로를 계산하여 `docs/suh-template/issue/` 하위에 저장한다 (Step 4에서 처리).
+`references/doc-output-path.md` 규칙을 따른다. agent가 직접 경로를 계산하여 `docs/projectops/issue/` 하위에 저장한다 (Step 4에서 처리).

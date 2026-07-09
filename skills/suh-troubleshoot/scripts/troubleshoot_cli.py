@@ -47,7 +47,7 @@ def cmd_get_output_path(args) -> int:
         return emit({"ok": False, "code": "git_not_found", "error": "git 저장소 아님"})
 
     project_root = Path(root_str)
-    output_base = project_root / "docs" / "suh-template"
+    output_base = project_root / "docs" / "projectops"
     skill_dir = output_base / args.skill_id
 
     number = issue_num if issue_num else get_next_seq(skill_dir, today)

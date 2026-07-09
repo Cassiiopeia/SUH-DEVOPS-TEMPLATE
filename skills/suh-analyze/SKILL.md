@@ -34,11 +34,11 @@ description: "Analyze Mode (HOW 구체화) - plan 문서(WHAT)를 기반으로 '
 
 > **Phase -1 역할**: 파일 존재 여부만 판단. 실제 파일 읽기는 Phase 0에서.
 
-`docs/suh-template/` 하위 스캔:
+`docs/projectops/` 하위 스캔:
 
 ```
-docs/suh-template/plan/     → suh-plan 산출물 (.md)
-docs/suh-template/analyze/  → suh-analyze 산출물 (.md)
+docs/projectops/plan/     → suh-plan 산출물 (.md)
+docs/projectops/analyze/  → suh-analyze 산출물 (.md)
 ```
 
 > suh-implement는 별도 산출물 md를 만들지 않음 — 코드 자체가 결과.
@@ -85,7 +85,7 @@ plan.md를 읽고 다음을 정리:
 
 ### 산출 위치
 
-`{PROJECT_ROOT}/docs/suh-template/analyze/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
+`{PROJECT_ROOT}/docs/projectops/analyze/YYYYMMDD_{이슈번호}_{정규화된제목}.md`
 
 - 이슈번호 없으면 순번(`001`, `002`…) 자동 사용
 - 제목 정규화: 특수문자 제거, 공백→`_`, 50자 이내
@@ -107,7 +107,7 @@ plan.md를 읽고 다음을 정리:
 # {제목} — HOW 계획
 
 작성일: {YYYY-MM-DD}
-참조: docs/suh-template/plan/{파일명}.md
+참조: docs/projectops/plan/{파일명}.md
 GitHub 이슈: {이슈 번호 또는 없음}
 
 ## 1. 변경 파일 목록

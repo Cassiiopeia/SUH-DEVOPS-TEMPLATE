@@ -79,14 +79,33 @@ def config_path() -> Path:
    - 보존 대상(`suh-logger`·`suh-project-utility`)은 여전히 존재(과잉 치환 방지).
 4. **전체 회귀**: `npm test`(174+) + `pytest`(36+) 전량 통과.
 
-## 7. 실행 순서 (안전)
+## 7. 대소문자 구분 (조사 확정 — 핵심)
 
-1. config.py 마이그레이션 + 테스트 (가장 위험 → 먼저 안전장치).
-2. 파이썬 하드코딩 경로 치환 (changelog/report/review/troubleshoot_cli, gh_client).
-3. 스킬 폴더 25개 리네임 (`git mv`) + SKILL.md 내부 참조.
-4. 매니페스트 플러그인명 치환.
-5. @suh-lab 트리거 치환.
-6. README·CLAUDE.md·docs 스킬 커맨드 표기 일괄 치환(보존 목록 제외).
-7. 정합성 테스트 + 전체 회귀.
+- **`cassiiopeia`(소문자)** = 플러그인/네임스페이스명 → **치환 O** (`projectops`). 6개 매니페스트 + 6개 src/core/ide 어댑터 + JS 테스트.
+- **`Cassiiopeia`(대문자)** = 실제 GitHub 조직명 → **보존** (`Cassiiopeia/projectops` repo URL·author).
+- 커맨드 접두사 `/cassiiopeia:suh-issue`는 폴더명이 아니라 **플러그인명**에서 파생 → 플러그인명 치환 + 폴더 리네임 둘 다 필요.
 
-각 단계 후 `pytest`·`npm test`로 회귀 0 확인하며 진행.
+## 8. docs/suh-template 산출물 디렉토리
+
+- `docs/suh-template/`(issue/report/analyze/... 실제 산출물) 존재. report/review/troubleshoot_cli.py가 `docs/suh-template`에 출력.
+- **결정**: 코드 출력 경로는 `docs/projectops`로 바꾸되, **기존 `docs/suh-template/` 디렉토리는 git mv로 rename**(과거 산출물 보존). harness/WORKFLOW.md·PERSONA.md의 경로도 갱신.
+
+## 9. 방출 코드 보존 (조사 확정 — 치환 시 사용자 빌드 파손)
+
+- `skills/suh-spring-test/SKILL.md`의 `me.suhsaechan:suh-logger`, `import static me.suhsaechan.suhlogger.util.SuhLogger.*` → **폴더는 spring-test로 rename하되 본문 이 라인들은 절대 보존**.
+- `*.suhsaechan.kr` 도메인(PR-preview·AI base_url 예시), `suh-project-utility`(레포명), `kr.suhsaechan.*` bundle id → 보존.
+- **일괄 sed 금지**: `suh-` prefix가 스킬명·로거·레포명·도메인에 공존 → **화이트리스트(25개 스킬명) 기반 정확 치환**만. negative match로 보존 목록 회피.
+
+## 10. 실행 순서 (안전 — 조사 반영)
+
+1. ✅ config.py 마이그레이션 + 테스트 (완료).
+2. 파이썬 하드코딩 경로 치환: changelog_cli tmp(완료), report/review/troubleshoot_cli `docs/suh-template`→`docs/projectops`, gh_client User-Agent. + 테스트 갱신(test_changelog_resolve_body_file, test_config).
+3. docs/suh-template 디렉토리 git mv → docs/projectops. harness 문서 경로 갱신.
+4. 스킬 폴더 25개 git mv (`suh-<name>`→`<name>`) + 각 SKILL.md 내부 상호참조·스크립트 경로·캐시 glob 치환.
+5. 파이썬 테스트의 스킬 폴더 하드코딩 경로 갱신(test_cli_signatures_doc_sync, test_skill_docs, test_cli_body_file, test_changelog_resolve_body_file).
+6. 매니페스트 플러그인명 `cassiiopeia`→`projectops` (6개) + src/core/ide 어댑터(6개) + JS 테스트(ide.test.js).
+7. @suh-lab 트리거 치환(워크플로우 로직 + 안내 문자열, 도메인 suhsaechan.kr 회피).
+8. README·CLAUDE.md·docs 스킬 커맨드 표기 일괄 치환(보존 목록 제외).
+9. 정합성 테스트 + 전체 회귀(pytest + npm test).
+
+각 단계 후 `pytest`·`npm test`로 회귀 0 확인하며 진행. **단계마다 커밋**해 롤백 지점 확보.

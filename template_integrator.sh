@@ -2151,10 +2151,10 @@ download_template() {
         fi
     done
 
-    # 사용자 적용 가이드 문서는 포함 (SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)
+    # 사용자 적용 가이드 문서는 포함 (PROJECTOPS-SETUP-GUIDE.md)
     print_info "사용자용 적용 가이드 문서를 내려받고 있습니다..."
-    if [ -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
-        print_info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+    if [ -f "$TEMP_DIR/PROJECTOPS-SETUP-GUIDE.md" ]; then
+        print_info "✓ PROJECTOPS-SETUP-GUIDE.md"
     fi
 
     # 다운로드한 템플릿에서 버전 읽기 (TEMPLATE_VERSION 전역 변수에 저장)
@@ -4316,19 +4316,19 @@ EOF
     print_success ".gitignore 업데이트 완료 ($added개 항목 추가)"
 }
 
-# SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
+# PROJECTOPS-SETUP-GUIDE.md 다운로드
 copy_setup_guide() {
     print_step "템플릿 설정 가이드 다운로드 중..."
     
-    if [ ! -f "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" ]; then
-        print_info "설정 가이드(SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)가 템플릿에 없어 건너뜁니다."
+    if [ ! -f "$TEMP_DIR/PROJECTOPS-SETUP-GUIDE.md" ]; then
+        print_info "설정 가이드(PROJECTOPS-SETUP-GUIDE.md)가 템플릿에 없어 건너뜁니다."
         return
     fi
     
     # 항상 최신 버전으로 다운로드 (기존 파일 덮어쓰기)
-    cp "$TEMP_DIR/SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" .
+    cp "$TEMP_DIR/PROJECTOPS-SETUP-GUIDE.md" .
     print_success "템플릿 설정 가이드를 적용했습니다 (최신 버전)"
-    print_info "📖 템플릿 사용법을 SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md에서 확인하세요"
+    print_info "📖 템플릿 사용법을 PROJECTOPS-SETUP-GUIDE.md에서 확인하세요"
 }
 
 # ===================================================================
@@ -5828,7 +5828,7 @@ print_summary() {
     print_separator_line
     echo "" >&2
     echo -e "${CYAN}📖 자세한 설정 방법은 다음 파일을 참고하세요:${NC}" >&2
-    echo "   → SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md" >&2
+    echo "   → PROJECTOPS-SETUP-GUIDE.md" >&2
     echo "" >&2
 }
 

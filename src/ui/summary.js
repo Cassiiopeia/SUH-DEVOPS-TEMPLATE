@@ -168,6 +168,6 @@ export function printSummary(ctx, targetRoot = ".") {
   err(SEPARATOR);
   err("");
   err(`${CYAN}📖 자세한 설정 방법은 다음 파일을 참고하세요:${NC}`);
-  err("   → SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md");
+  err("   → PROJECTOPS-SETUP-GUIDE.md");
   err("");
 }

@@ -37,7 +37,7 @@ Common routing:
 **Method 1 (recommended):** Plugin marketplace source registration:
 
 ```bash
-codex plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+codex plugin marketplace add Cassiiopeia/projectops
 ```
 
 After registering, open `/plugins` in Codex and verify the `projectops` entry.
@@ -46,7 +46,7 @@ After registering, open `/plugins` in Codex and verify the `projectops` entry.
 marketplace:
 
 ```bash
-git clone https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE.git ~/.codex/projectops
+git clone https://github.com/Cassiiopeia/projectops.git ~/.codex/projectops
 mkdir -p ~/.agents/skills
 ln -s ~/.codex/projectops/skills ~/.agents/skills/projectops
 ```

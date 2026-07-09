@@ -113,5 +113,5 @@
     "node": ">=18.0.0",
     "wrangler": ">=3.0.0"
   },
-  "repository": "https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE"
+  "repository": "https://github.com/Cassiiopeia/projectops"
 }

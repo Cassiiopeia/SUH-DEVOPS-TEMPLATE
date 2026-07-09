@@ -41,7 +41,7 @@ test("printSummary: full 모드 스모크 — 워크플로우 분류·타입 안
     assert.match(out, /Flutter 배포 마법사 사용법/);                      // flutter 안내
     assert.match(out, /_GITHUB_PAT_TOKEN/);                             // 다음 3가지 작업
     assert.match(out, /coderabbit\.ai/);
-    assert.match(out, /SUH-DEVOPS-TEMPLATE-SETUP-GUIDE\.md/);
+    assert.match(out, /PROJECTOPS-SETUP-GUIDE\.md/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

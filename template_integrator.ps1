@@ -1745,9 +1745,9 @@ function Download-Template {
 
     # 사용자 적용 가이드 문서는 포함
     Print-Info "사용자용 적용 가이드 문서를 내려받고 있습니다..."
-    $guidePath = Join-Path $TEMP_DIR "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+    $guidePath = Join-Path $TEMP_DIR "PROJECTOPS-SETUP-GUIDE.md"
     if (Test-Path $guidePath) {
-        Print-Info "✓ SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+        Print-Info "✓ PROJECTOPS-SETUP-GUIDE.md"
     }
 
     # 다운로드한 템플릿에서 버전 읽기 (TemplateVersion 전역 변수에 저장)
@@ -3847,22 +3847,22 @@ function Ensure-GitIgnore {
 }
 
 # ===================================================================
-# SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 다운로드
+# PROJECTOPS-SETUP-GUIDE.md 다운로드
 # ===================================================================
 
 function Copy-SetupGuide {
     Print-Step "템플릿 설정 가이드 다운로드 중..."
     
-    $srcGuide = Join-Path $TEMP_DIR "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+    $srcGuide = Join-Path $TEMP_DIR "PROJECTOPS-SETUP-GUIDE.md"
     if (-not (Test-Path $srcGuide)) {
-        Print-Info "설정 가이드(SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md)가 템플릿에 없어 건너뜁니다."
+        Print-Info "설정 가이드(PROJECTOPS-SETUP-GUIDE.md)가 템플릿에 없어 건너뜁니다."
         return
     }
     
     # 항상 최신 버전으로 다운로드
     Copy-Item -Path $srcGuide -Destination "." -Force
     Print-Success "템플릿 설정 가이드를 적용했습니다 (최신 버전)"
-    Print-Info "📖 템플릿 사용법을 SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md에서 확인하세요"
+    Print-Info "📖 템플릿 사용법을 PROJECTOPS-SETUP-GUIDE.md에서 확인하세요"
 }
 
 # ===================================================================
@@ -5246,7 +5246,7 @@ function Show-Summary {
     Print-SeparatorLine
     Write-Host ""
     Write-ColorOutput "📖 자세한 설정 방법은 다음 파일을 참고하세요:" -ForegroundColor Cyan
-    Write-Host "   → SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"
+    Write-Host "   → PROJECTOPS-SETUP-GUIDE.md"
     Write-Host ""
 }
 

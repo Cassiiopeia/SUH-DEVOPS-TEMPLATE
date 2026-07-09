@@ -18,7 +18,7 @@ function apply(io) {
   }
   if (piInstalled(io)) {
     io.log("  PI 패키지 설치 / 업데이트 완료");
-    io.log("  → 'pi' 재실행 후 'pi list' 로 확인, 채팅창에서 /suh-analyze 등 호출");
+    io.log("  → 'pi' 재실행 후 'pi list' 로 확인, 채팅창에서 /projectops:analyze 등 호출");
     return true;
   }
   io.log(`  PI 설치/업데이트 실패 — 수동: pi install ${PI_PACKAGE_URL}`);

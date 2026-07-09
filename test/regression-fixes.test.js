@@ -105,7 +105,7 @@ function makeTemplateFixture() {
   write(tpl, ".github/config/wizard-prompts.yml", "PROJECT_NAME:\n  label: \"이름\"\n");
   write(tpl, ".github/workflows/project-types/common/PROJECT-COMMON-CI.yaml", "name: ci\n");
   writeFileSync(join(tpl, "version.yml"), 'version: "4.0.3"\n');
-  writeFileSync(join(tpl, "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"), "# guide\n");
+  writeFileSync(join(tpl, "PROJECTOPS-SETUP-GUIDE.md"), "# guide\n");
   return tpl;
 }
 

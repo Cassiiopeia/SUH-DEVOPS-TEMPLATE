@@ -612,7 +612,7 @@ async function exportZip() {
     list.forEach(s => folder.file(`${s.key}.txt`, s.value));
 
     // setup 스크립트 — GitHub raw에서 fetch 시도, 실패 시 README 안내만
-    const wizardBaseUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/flutter/firebase-wizard';
+    const wizardBaseUrl = 'https://raw.githubusercontent.com/Cassiiopeia/projectops/main/.github/util/flutter/firebase-wizard';
     try {
         const [shResp, ps1Resp] = await Promise.all([
             fetch(`${wizardBaseUrl}/firebase-wizard-setup.sh`).then(r => r.ok ? r.text() : null).catch(() => null),

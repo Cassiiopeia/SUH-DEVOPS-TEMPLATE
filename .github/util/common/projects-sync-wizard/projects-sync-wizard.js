@@ -1291,7 +1291,7 @@ function updateInstallCommands() {
 
 function buildBashCommand() {
     // Mac/Linux bash 스크립트 URL
-    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.sh';
+    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/projectops/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.sh';
 
     // 인자 구성 (Organization 전용)
     const args = [];
@@ -1318,7 +1318,7 @@ function buildPowerShellCommand() {
     envVars.push(`$env:WIZARD_LABELS='${state.statusLabels.join(',')}'`);
 
     // PowerShell 스크립트 URL
-    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.ps1';
+    const scriptUrl = 'https://raw.githubusercontent.com/Cassiiopeia/projectops/main/.github/util/common/projects-sync-wizard/projects-sync-wizard-setup.ps1';
 
     // PowerShell 명령어 생성
     return `${envVars.join('; ')}; irm '${scriptUrl}' | iex`;

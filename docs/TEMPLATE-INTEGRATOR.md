@@ -432,5 +432,5 @@ powershell -ExecutionPolicy Bypass -Command "..."
 ## 관련 문서
 
 - [README.md](../README.md) - 프로젝트 메인 문서
-- [SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md](../SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md) - 초기 설정 가이드
+- [PROJECTOPS-SETUP-GUIDE.md](../PROJECTOPS-SETUP-GUIDE.md) - 초기 설정 가이드
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - 기여 가이드

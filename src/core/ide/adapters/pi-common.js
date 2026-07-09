@@ -11,7 +11,7 @@ export function piInstalled(io) {
   if (!io.which("pi")) return false;
   const r = io.run("pi", ["list"]); // pi는 일부 출력을 stderr로 보냄 → 둘 다 검사
   const out = (r.stdout || "") + (r.stderr || "");
-  return /SUH-DEVOPS-TEMPLATE|projectops|projectops/i.test(out);
+  return /SUH-DEVOPS-TEMPLATE|projectops/i.test(out);
 }
 
 // pi 클론 경로(harness loader가 사는 곳). 레포명 변경 전 구 경로 하위호환.

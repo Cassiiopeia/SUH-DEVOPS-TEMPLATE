@@ -70,7 +70,7 @@ template_integrator로 통합 시 자동 안내되지만, 수동으로도 설치
 
 ```bash
 # 마켓플레이스 등록 + 플러그인 설치
-claude plugin marketplace add Cassiiopeia/SUH-DEVOPS-TEMPLATE
+claude plugin marketplace add Cassiiopeia/projectops
 claude plugin install projectops@projectops-marketplace --scope user
 ```
 
@@ -115,10 +115,10 @@ template_integrator 실행 시 Cursor 설치를 선택하면 자동으로 `skill
 
 ```bash
 # 대화형 모드 (권장)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
 
 # 비대화형 모드 (Spring Boot 전체 통합 예시)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh") \
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") \
   --mode full --type spring --version 1.0.0 --force
 ```
 
@@ -321,7 +321,7 @@ remote: Permission to ... denied to github-actions[bot]
 
 ```bash
 # 원격 스크립트로 타입 변경 
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/main/template_integrator.sh")
+bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
 ```
 
 ### 고급 기능 활용
@@ -334,4 +334,4 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/SUH-DEVOPS-TEMP
 
 **🎉 축하합니다! 이제 완전 자동화된 DevOps 환경이 구축되었습니다.**
 
-추가 질문이나 문제가 있다면 [이슈를 생성](https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/new/choose)해 주세요.
+추가 질문이나 문제가 있다면 [이슈를 생성](https://github.com/Cassiiopeia/projectops/issues/new/choose)해 주세요.

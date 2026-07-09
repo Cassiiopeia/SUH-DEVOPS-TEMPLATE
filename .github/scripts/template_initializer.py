@@ -210,7 +210,7 @@ CLEANUP_TARGETS = [
 
 def cleanup_template_files():
     print_step("템플릿 관련 파일 삭제 중...")
-    # 주의: SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md는 보존한다.
+    # 주의: PROJECTOPS-SETUP-GUIDE.md는 보존한다.
     for rel, label in CLEANUP_TARGETS:
         p = Path(rel)
         if p.is_dir():

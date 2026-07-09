@@ -50,8 +50,8 @@ export function copyDiscussionTemplates(tempDir, targetRoot = ".") {
   return true;
 }
 
-// SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md 루트로 덮어쓰기. 없으면 스킵.
-export const SETUP_GUIDE_NAME = "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md";
+// PROJECTOPS-SETUP-GUIDE.md 루트로 덮어쓰기. 없으면 스킵.
+export const SETUP_GUIDE_NAME = "PROJECTOPS-SETUP-GUIDE.md";
 export function copySetupGuide(tempDir, targetRoot = ".") {
   const src = join(tempDir, SETUP_GUIDE_NAME);
   if (!exists(src)) return false;

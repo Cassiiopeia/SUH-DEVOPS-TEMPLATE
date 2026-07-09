@@ -315,9 +315,9 @@ PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py get-issue {owner} {repo} {number}
 이슈 제목이 `⚙️[기능추가][Skills] commit 스킬 신규 추가`인 경우, SUH-ISSUE-HELPER가 생성하는 커밋 템플릿은 이모지+태그를 제거한 순수 내용만 사용한다:
 
 ```
-commit 스킬 신규 추가 : feat : 이슈 컨텍스트 기반 커밋 메시지 자동 생성 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
-commit 스킬 신규 추가 : docs : common-rules 커밋 컨벤션 예시 수정 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
-commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/224
+commit 스킬 신규 추가 : feat : 이슈 컨텍스트 기반 커밋 메시지 자동 생성 https://github.com/Cassiiopeia/projectops/issues/224
+commit 스킬 신규 추가 : docs : common-rules 커밋 컨벤션 예시 수정 https://github.com/Cassiiopeia/projectops/issues/224
+commit 스킬 신규 추가 : fix : owner/repo 추출 로직 버그 수정 https://github.com/Cassiiopeia/projectops/issues/224
 ```
 
 **핵심 규칙**:

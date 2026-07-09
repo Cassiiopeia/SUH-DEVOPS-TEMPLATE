@@ -76,8 +76,7 @@ ${BLUE}옵션:${NC}
                            지원 타입:
                              • spring          - Spring Boot 백엔드
                              • flutter         - Flutter 모바일 앱
-                             • next            - Next.js 웹 앱
-                             • react           - React 웹 앱
+                             • react           - React / Next.js 웹 앱
                              • react-native    - React Native 모바일 앱
                              • react-native-expo - React Native Expo 앱
                              • node            - Node.js 프로젝트
@@ -117,8 +116,8 @@ PROJECT_TYPE="basic"
 GITHUB_USER="${GITHUB_ACTOR:-$(whoami)}"
 REPO_OWNER="${GITHUB_REPOSITORY%/*}"
 
-# 지원하는 프로젝트 타입
-VALID_TYPES=("spring" "flutter" "next" "react" "react-native" "react-native-expo" "node" "python" "basic")
+# 지원하는 프로젝트 타입 (next는 v4.1.0에서 react로 흡수)
+VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
 
 # 템플릿 버전 (version.yml에서 읽어옴)
 get_template_version() {
@@ -255,7 +254,7 @@ create_version_yml() {
 # 프로젝트 타입별 동기화 파일:
 # - spring: build.gradle (version = "x.y.z")
 # - flutter: pubspec.yaml (version: x.y.z+i, buildNumber 포함)
-# - react/next/node: package.json ("version": "x.y.z")
+# - react/node: package.json ("version": "x.y.z")
 # - react-native: iOS Info.plist 또는 Android build.gradle
 # - react-native-expo: app.json (expo.version)
 # - python: pyproject.toml (version = "x.y.z")

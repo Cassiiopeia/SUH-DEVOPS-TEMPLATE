@@ -775,8 +775,7 @@ ${BLUE}자동 감지 기능:${NC}
   우선순위 2 (Node.js 에코시스템 세부 분류):
     • package.json 내용 분석
       - @react-native → React Native
-      - "next" → Next.js
-      - "react" → React
+      - "react"/"next" → React (Next.js는 react로 흡수)
       - 기타 → Node.js
 
 ${BLUE}사용 예시:${NC}
@@ -836,8 +835,8 @@ INCLUDE_NEXUS=""          # Nexus 라이브러리 publish 워크플로우 (sprin
 INCLUDE_SECRET_BACKUP=""  # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
 PROJECT_PATHS_CSV=""  # 타입별 경로 "flutter=app,react=client" — 빈 값이면 미확정 (bash 3.2 호환: 연관배열 금지)
 
-# 지원하는 프로젝트 타입 (next 포함 — sh/ps1 일관성)
-VALID_TYPES=("spring" "flutter" "next" "react" "react-native" "react-native-expo" "node" "python" "basic")
+# 지원하는 프로젝트 타입 (next는 v4.1.0에서 react로 흡수 — sh/ps1 일관성)
+VALID_TYPES=("spring" "flutter" "react" "react-native" "react-native-expo" "node" "python" "basic")
 
 # 파라미터 파싱
 while [[ $# -gt 0 ]]; do
@@ -970,15 +969,8 @@ detect_project_type() {
             fi
         fi
 
-        # Next.js 체크 (React보다 먼저 체크해야 함)
-        if grep -q "\"next\"" package.json; then
-            print_info "✓ Next.js 감지됨"
-            echo "next"
-            return
-        fi
-
-        # React 체크
-        if grep -q "\"react\"" package.json; then
+        # React 체크 ("next" 의존성도 react로 흡수 — v4.1.0)
+        if grep -q "\"react\"" package.json || grep -q "\"next\"" package.json; then
             print_info "✓ React 감지됨"
             echo "react"
             return
@@ -1000,8 +992,9 @@ detect_project_type() {
 # 프로젝트 타입 자동 감지 (멀티 — 모든 일치 타입을 csv로 반환)
 # detect_project_type(단수)은 첫 일치 하나만 반환하지만, 모노레포는 여러 타입이
 # 공존할 수 있으므로 전부 감지해 사용자가 다중 선택 메뉴로 확정하게 한다.
-# package.json 경로를 받아 react/next/node/react-native(-expo) 중 하나로 판별
+# package.json 경로를 받아 react/node/react-native(-expo) 중 하나로 판별
 # detect_project_types의 인라인 판별 로직을 추출 — 서브폴더 package.json에도 재사용
+# ("next" 의존성은 react로 흡수 — v4.1.0)
 classify_package_json() {
     local pj=$1
     [ -f "$pj" ] || { echo ""; return; }
@@ -1011,9 +1004,7 @@ classify_package_json() {
         else
             echo "react-native"
         fi
-    elif grep -q "\"next\"" "$pj"; then
-        echo "next"
-    elif grep -q "\"react\"" "$pj"; then
+    elif grep -q "\"react\"" "$pj" || grep -q "\"next\"" "$pj"; then
         echo "react"
     else
         echo "node"
@@ -1076,8 +1067,9 @@ detect_project_types() {
         detected+=("python")
     fi
 
-    # package.json 기반 — next / react-native / react-native-expo / react / node 구분
+    # package.json 기반 — react-native / react-native-expo / react / node 구분
     # (단, spring/flutter에서 build 도구로 쓰는 package.json과 구분하기 위해 내용 검사)
+    # ("next" 의존성은 react로 흡수 — v4.1.0)
     if [ -f "package.json" ]; then
         if grep -q "@react-native" package.json || grep -q "react-native" package.json; then
             if grep -q "expo" package.json; then
@@ -1085,9 +1077,7 @@ detect_project_types() {
             else
                 detected+=("react-native")
             fi
-        elif grep -q "\"next\"" package.json; then
-            detected+=("next")
-        elif grep -q "\"react\"" package.json; then
+        elif grep -q "\"react\"" package.json || grep -q "\"next\"" package.json; then
             detected+=("react")
         else
             # spring/flutter가 이미 감지된 경우 순수 node 보조 도구일 수 있어 중복 추가 방지
@@ -1119,7 +1109,7 @@ suggest_types_by_scan() {
         [ -n "$_cand" ] && _found="$_found $_mt"
     done
 
-    # package.json 계열 — react/next/node/react-native를 디렉터리별 내용으로 판별
+    # package.json 계열 — react/node/react-native를 디렉터리별 내용으로 판별
     _cand=$(find_type_path_candidates react)   # react 토큰 = package.json 검색
     if [ -n "$_cand" ]; then
         while IFS= read -r _d; do
@@ -1159,7 +1149,7 @@ suggest_types_by_scan() {
     fi
 
     # ── 3) 메뉴 정의 순서로 정렬 + 중복 제거 → csv ──
-    local _order="spring flutter next react react-native react-native-expo node python basic"
+    local _order="spring flutter react react-native react-native-expo node python basic"
     local _o _out=""
     for _o in $_order; do
         case " $_found " in
@@ -1215,7 +1205,7 @@ set_path_for_type() {
 marker_for_type() {
     case "$1" in
         flutter) echo "pubspec.yaml" ;;
-        react|next|node|react-native) echo "package.json" ;;
+        react|node|react-native) echo "package.json" ;;
         react-native-expo) echo "app.json" ;;
         python) echo "pyproject.toml" ;;
         spring) echo "build.gradle" ;;
@@ -1264,7 +1254,7 @@ find_type_path_candidates() {
     local names=""
     case "$t" in
         flutter)            names="pubspec.yaml" ;;
-        react|next|node)    names="package.json" ;;
+        react|node)         names="package.json" ;;
         react-native)       names="package.json" ;;
         react-native-expo)  names="app.json" ;;
         python)             names="pyproject.toml setup.py requirements.txt" ;;
@@ -1775,8 +1765,7 @@ show_project_type_menu() {
     selected=$(choose_menu --multi --cancel-label="뒤로" --preselect="$_preselect" "프로젝트 타입을 선택하세요" \
         "spring|Spring Boot 백엔드" \
         "flutter|Flutter 모바일 앱" \
-        "next|Next.js 웹 앱" \
-        "react|React 웹 앱" \
+        "react|React / Next.js 웹 앱" \
         "react-native|React Native 모바일 앱" \
         "react-native-expo|React Native Expo 앱" \
         "node|Node.js 프로젝트" \

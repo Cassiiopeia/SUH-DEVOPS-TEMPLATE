@@ -51,8 +51,7 @@ project_types: ["spring", "react", "python"]   # 첫 항목이 primary
 |------|----------|----------|
 | `spring` | `build.gradle` | `version = '1.0.0'` |
 | `flutter` | `pubspec.yaml` | `version: 1.0.0+1` |
-| `react` | `package.json` | `"version": "1.0.0"` |
-| `next` | `package.json` | `"version": "1.0.0"` |
+| `react` (Next.js 포함) | `package.json` | `"version": "1.0.0"` |
 | `node` | `package.json` | `"version": "1.0.0"` |
 | `python` | `pyproject.toml` | `version = "1.0.0"` |
 | `react-native` | `Info.plist` + `build.gradle` | iOS/Android 분리 |

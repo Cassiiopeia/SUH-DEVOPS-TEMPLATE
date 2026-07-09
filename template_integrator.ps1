@@ -131,7 +131,8 @@ $script:DetectedBranch = ""
 $script:IsInteractiveMode = $false
 $script:WorkflowsCopied = 0
 $script:UtilModulesCopied = 0
-$script:ValidTypes = @("spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic")
+# next는 v4.1.0에서 react로 흡수됨 (breaking)
+$script:ValidTypes = @("spring", "flutter", "react", "react-native", "react-native-expo", "node", "python", "basic")
 # 선택적(opt-in) 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
 $script:IncludeNexus = $null          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
 $script:IncludeSecretBackup = $null   # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
@@ -718,7 +719,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -Help                 이 도움말 표시
 
 지원 프로젝트 타입:
-  • node / react / next / react-native - Node.js 기반 프로젝트
+  • node / react / react-native - Node.js 기반 프로젝트 (Next.js는 react로 흡수)
   • spring            - Spring Boot 백엔드
   • flutter           - Flutter 모바일 앱
   • python            - Python 프로젝트
@@ -732,8 +733,7 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   우선순위 2 (Node.js 에코시스템 세부 분류):
     • package.json 내용 분석
       - @react-native → React Native
-      - "next" → Next.js
-      - "react" → React
+      - "react"/"next" → React (Next.js는 react로 흡수)
       - 기타 → Node.js
 
 사용 예시:
@@ -816,14 +816,8 @@ function Detect-ProjectType {
             }
         }
 
-        # Next.js 체크 (React보다 먼저 체크해야 함)
-        if ($packageJson -match '"next"') {
-            Print-Info "✓ Next.js 감지됨"
-            return "next"
-        }
-
-        # React 체크
-        if ($packageJson -match '"react"') {
+        # React 체크 ("next" 의존성도 react로 흡수 — v4.1.0)
+        if ($packageJson -match '"react"' -or $packageJson -match '"next"') {
             Print-Info "✓ React 감지됨"
             return "react"
         }
@@ -844,7 +838,8 @@ function Detect-ProjectType {
 # 프로젝트 타입 멀티 감지 — 모든 일치 타입을 csv로 반환 (sh detect_project_types 포팅)
 # ===================================================================
 
-# package.json 경로 → react/next/node/react-native(-expo) 판별 (sh classify_package_json 대응)
+# package.json 경로 → react/node/react-native(-expo) 판별 (sh classify_package_json 대응)
+# ("next" 의존성은 react로 흡수 — v4.1.0)
 function Get-PackageJsonType {
     param([string]$PjPath)
     if (-not (Test-Path $PjPath -PathType Leaf)) { return "" }
@@ -852,9 +847,7 @@ function Get-PackageJsonType {
     if ($content -match "@react-native|react-native") {
         if ($content -match "expo") { return "react-native-expo" }
         return "react-native"
-    } elseif ($content -match '"next"') {
-        return "next"
-    } elseif ($content -match '"react"') {
+    } elseif ($content -match '"react"' -or $content -match '"next"') {
         return "react"
     } else {
         return "node"
@@ -915,8 +908,9 @@ function Detect-ProjectTypes {
         $detected += "python"
     }
 
-    # package.json 기반 — next / react-native / react-native-expo / react / node 구분
+    # package.json 기반 — react-native / react-native-expo / react / node 구분
     # (spring/flutter가 build 도구로 쓰는 package.json과 구분하기 위해 내용 검사)
+    # ("next" 의존성은 react로 흡수 — v4.1.0)
     if (Test-Path "package.json") {
         $packageJson = Get-Content "package.json" -Raw
         if ($packageJson -match "@react-native|react-native") {
@@ -925,9 +919,7 @@ function Detect-ProjectTypes {
             } else {
                 $detected += "react-native"
             }
-        } elseif ($packageJson -match '"next"') {
-            $detected += "next"
-        } elseif ($packageJson -match '"react"') {
+        } elseif ($packageJson -match '"react"' -or $packageJson -match '"next"') {
             $detected += "react"
         } else {
             # spring/flutter가 이미 감지된 경우 순수 node 보조 도구일 수 있어 중복 추가 방지
@@ -981,7 +973,7 @@ function Get-SuggestedTypesByScan {
     }
 
     # ── 3) 메뉴 순서 정렬 + 중복 제거 ──
-    $order = @('spring','flutter','next','react','react-native','react-native-expo','node','python','basic')
+    $order = @('spring','flutter','react','react-native','react-native-expo','node','python','basic')
     $out = @()
     foreach ($o in $order) {
         if ($found -contains $o -and $out -notcontains $o) { $out += $o }
@@ -1002,7 +994,6 @@ function Get-MarkerForType {
     switch ($ProjType) {
         "flutter" { return "pubspec.yaml" }
         "react" { return "package.json" }
-        "next" { return "package.json" }
         "node" { return "package.json" }
         "react-native" { return "package.json" }
         "react-native-expo" { return "app.json" }
@@ -1064,7 +1055,6 @@ function Find-TypePathCandidates {
     switch ($ProjType) {
         "flutter"           { $markerNames = @("pubspec.yaml") }
         "react"             { $markerNames = @("package.json") }
-        "next"              { $markerNames = @("package.json") }
         "node"              { $markerNames = @("package.json") }
         "react-native"      { $markerNames = @("package.json") }
         "react-native-expo" { $markerNames = @("app.json") }
@@ -1464,8 +1454,7 @@ function Show-ProjectTypeMenu {
     $selected = Invoke-ChooseMenu -Multi -CancelLabel "뒤로" -Preselect $preselect -Prompt "프로젝트 타입을 선택하세요" -Options @(
         @{Value='spring';            Label='Spring Boot 백엔드'},
         @{Value='flutter';           Label='Flutter 모바일 앱'},
-        @{Value='next';              Label='Next.js 웹 앱'},
-        @{Value='react';             Label='React 웹 앱'},
+        @{Value='react';             Label='React / Next.js 웹 앱'},
         @{Value='react-native';      Label='React Native 모바일 앱'},
         @{Value='react-native-expo'; Label='React Native Expo 앱'},
         @{Value='node';              Label='Node.js 프로젝트'},
@@ -1929,7 +1918,7 @@ function Create-VersionYml {
 # 프로젝트 타입별 동기화 파일:
 # - spring: build.gradle (version = "x.y.z")
 # - flutter: pubspec.yaml (version: x.y.z+i, buildNumber 포함)
-# - react/next/node: package.json ("version": "x.y.z")
+# - react/node: package.json ("version": "x.y.z")
 # - react-native: iOS Info.plist 또는 Android build.gradle
 # - react-native-expo: app.json (expo.version)
 # - python: pyproject.toml (version = "x.y.z")

@@ -47,9 +47,8 @@
 
   "4.1.0": {
     "severity": "critical",
-    "title": "version.yml 단수 project_type 키 제거 — project_types 배열이 유일한 소스(SSOT)",
-    "message": "version.yml의 단수 project_type 키가 완전히 제거되었습니다. 이제 project_types 배열이 유일한 소스이며 첫 항목이 primary 타입입니다. 배열과 단수 키가 같이 있으면 단수 키는 무시되고(경고 출력), 단수 키만 있는 v4.0 이전 형식은 version_manager.sh가 명시적으로 실패합니다(조용한 오작동 방지). 전환 절차: version.yml에서 project_type 라인을 삭제하고 project_types: [\"타입\"] 배열만 남기세요. 예) project_type: \"spring\" → project_types: [\"spring\"]. 템플릿 재통합(npx projectops 업데이트 모드)을 실행하면 version.yml이 새 형식으로 자동 재작성됩니다.",
-    "_comment_placeholder_437": "next 타입 제거 내용은 #437 작업에서 이 메시지에 병합 예정"
+    "title": "version.yml 단수 project_type 키 제거(SSOT) + next 타입 제거(react로 흡수)",
+    "message": "[1] version.yml의 단수 project_type 키가 완전히 제거되었습니다. 이제 project_types 배열이 유일한 소스이며 첫 항목이 primary 타입입니다. 배열과 단수 키가 같이 있으면 단수 키는 무시되고(경고 출력), 단수 키만 있는 v4.0 이전 형식은 version_manager.sh가 명시적으로 실패합니다(조용한 오작동 방지). 전환: project_type: \"spring\" → project_types: [\"spring\"]. [2] next 프로젝트 타입이 완전히 제거되고 react로 흡수되었습니다. react 배포 워크플로우(PROJECT-REACT-CICD)가 Next.js SSR 옵션(NODE_ENV=production, --restart unless-stopped)을 포함하므로 Next.js 프로젝트도 그대로 동작합니다. 전환: version.yml의 project_types에서 \"next\"를 \"react\"로 변경 후 템플릿 재통합(npx projectops 업데이트 모드)을 실행하세요. 기존 PROJECT-NEXT-CI/CICD 워크플로우 파일은 수동 삭제하고, 배포 컨테이너명이 {프로젝트}-nextjs-deploy에서 {프로젝트}-front-deploy로 바뀌므로 기존 nextjs 컨테이너는 서버에서 수동 정리가 필요합니다."
   },
 
   "4.0.0": {

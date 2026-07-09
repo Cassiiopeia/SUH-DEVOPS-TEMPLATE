@@ -5,7 +5,8 @@ import { classifyPackageText, classifyPackageJson, detectTypesFromMarkers, detec
 test("classifyPackageText (raw grep 등가)", () => {
   assert.equal(classifyPackageText('{"dependencies":{"react-native":"1","expo":"1"}}'), "react-native-expo");
   assert.equal(classifyPackageText('{"dependencies":{"react-native":"1"}}'), "react-native");
-  assert.equal(classifyPackageText('{"dependencies":{"next":"1","react":"1"}}'), "next");
+  assert.equal(classifyPackageText('{"dependencies":{"next":"1","react":"1"}}'), "react"); // next는 react로 흡수 (v4.1.0)
+  assert.equal(classifyPackageText('{"dependencies":{"next":"1"}}'), "react"); // next 단독도 react
   assert.equal(classifyPackageText('{"dependencies":{"react":"1"}}'), "react");
   assert.equal(classifyPackageText('{"dependencies":{"express":"1"}}'), "node");
 });

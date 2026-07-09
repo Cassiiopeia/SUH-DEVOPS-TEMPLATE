@@ -73,7 +73,7 @@ check_required_tools() {
 
     # JSON 프로젝트는 jq 필요
     case "$project_type" in
-        "react"|"next"|"node"|"react-native-expo")
+        "react"|"node"|"react-native-expo")
             if ! command -v jq >/dev/null 2>&1; then
                 missing_tools+=("jq")
             fi
@@ -172,7 +172,7 @@ read_version_config() {
         "flutter")
             VERSION_FILE="$_ppath/pubspec.yaml"
             ;;
-        "react"|"next"|"node")
+        "react"|"node")
             VERSION_FILE="$_ppath/package.json"
             ;;
         "react-native")
@@ -351,7 +351,7 @@ get_project_file_version() {
             full_version=$(yq -r '.version // ""' "$VERSION_FILE")
             project_version=$(echo "$full_version" | cut -d'+' -f1)
             ;;
-        "react"|"next"|"node")
+        "react"|"node")
             # JSON: jq 사용
             project_version=$(jq -r '.version // ""' "$VERSION_FILE")
             ;;
@@ -469,7 +469,7 @@ update_project_file_version() {
 
             yq -i ".version = \"$full_version\"" "$VERSION_FILE"
             ;;
-        "react"|"next"|"node")
+        "react"|"node")
             # JSON: jq 사용
             jq ".version = \"$new_version\"" "$VERSION_FILE" > tmp.json && mv tmp.json "$VERSION_FILE"
             ;;
@@ -537,7 +537,7 @@ sync_for_type() {
                 log_warning "flutter: $p/pubspec.yaml 없음 — 건너뜀"
             fi
             ;;
-        "react"|"next"|"node")
+        "react"|"node")
             if [ -f "$p/package.json" ]; then
                 jq ".version = \"$new_version\"" "$p/package.json" > tmp.json && mv tmp.json "$p/package.json"
                 log_success "업데이트: $p/package.json"

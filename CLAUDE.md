@@ -23,8 +23,7 @@
 |------|------|-----------------|
 | `spring` | Spring Boot | `build.gradle` |
 | `flutter` | Flutter | `pubspec.yaml` |
-| `react` | React.js | `package.json` |
-| `next` | Next.js | `package.json` |
+| `react` | React.js / Next.js | `package.json` |
 | `node` | Node.js | `package.json` |
 | `python` | FastAPI/Django | `pyproject.toml` |
 | `react-native` | React Native CLI | `Info.plist` + `build.gradle` |
@@ -49,8 +48,7 @@ suh-github-template/
 │   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in)
 │   │       ├── flutter/         # Flutter 전용 (배포 워크플로우 루트 포함)
 │   │       ├── spring/          # Spring 전용 (server-deploy/ 기본포함·Nexus면제외 + nexus/ opt-in)
-│   │       ├── react/
-│   │       └── next/
+│   │       └── react/           # React/Next.js 공용 (next 타입은 v4.1.0에서 흡수됨)
 │   ├── scripts/
 │   │   ├── version_manager.sh
 │   │   ├── changelog_manager.py
@@ -80,7 +78,7 @@ suh-github-template/
 ```
 PROJECT-[TYPE]-[FEATURE]-[DETAIL].yaml
 
-TYPE: TEMPLATE | COMMON | FLUTTER | SPRING | REACT | NEXT
+TYPE: TEMPLATE | COMMON | FLUTTER | SPRING | REACT
 ```
 
 ### 스크립트 파일
@@ -143,11 +141,13 @@ snake_case.sh / snake_case.py
 
 > `--secret-backup` 옵션으로 포함합니다.
 
-#### React / Next
+#### React (Next.js 포함)
 | 파일명 | 용도 |
 |--------|------|
-| `PROJECT-REACT-CI` / `PROJECT-NEXT-CI` | 빌드 검증 |
-| `PROJECT-REACT-CICD` / `PROJECT-NEXT-CICD` | Docker 빌드 및 배포 |
+| `PROJECT-REACT-CI` | 빌드 검증 (.next/cache 캐싱 포함) |
+| `PROJECT-REACT-CICD` | Docker 빌드 및 배포 (Next.js SSR 옵션 포함) |
+
+> `next` 타입은 v4.1.0에서 `react`로 흡수되었습니다 (PROJECT-NEXT-* 워크플로우 삭제).
 
 ---
 

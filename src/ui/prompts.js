@@ -48,7 +48,7 @@ export async function editMenu({ showOptional = false } = {}) {
 
 // 타입 멀티선택.
 export async function selectTypes(current = []) {
-  const all = ["spring", "flutter", "next", "react", "react-native", "react-native-expo", "node", "python", "basic"];
+  const all = ["spring", "flutter", "react", "react-native", "react-native-expo", "node", "python", "basic"];
   return engine.multiselect({
     message: "프로젝트 타입을 선택하세요 (Space 토글, Enter 확정)",
     options: all.map((t) => ({ value: t, label: t })),

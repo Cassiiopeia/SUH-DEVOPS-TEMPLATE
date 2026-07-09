@@ -218,8 +218,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 |------|----------|-------|
 | `spring` | build.gradle | SSH+Docker 배포, Nexus |
 | `flutter` | pubspec.yaml | TestFlight, Play Store |
-| `react` | package.json | Docker |
-| `next` | package.json | Docker |
+| `react` (Next.js 포함) | package.json | Docker |
 | `node` | package.json | Docker |
 | `python` | pyproject.toml | SSH+Docker 배포 |
 | `react-native` | Info.plist + build.gradle | — |

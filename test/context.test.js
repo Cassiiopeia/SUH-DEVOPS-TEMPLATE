@@ -7,7 +7,8 @@ test("createContext defaults", () => {
   assert.equal(c.mode, "interactive");
   assert.equal(c.force, false);
   assert.ok(c.paths instanceof Map);
-  assert.equal(VALID_TYPES.length, 9);
+  assert.equal(VALID_TYPES.length, 8); // next 제거 (v4.1.0 — react로 흡수)
+  assert.ok(!VALID_TYPES.includes("next"));
 });
 
 test("createContext overrides", () => {

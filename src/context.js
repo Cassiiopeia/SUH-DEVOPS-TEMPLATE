@@ -16,6 +16,7 @@ export function createContext(overrides = {}) {
     branch: "",
     paths: new Map(),        // type -> path
     includeNexus: null,      // null=미설정, true/false=명시
+    includeNpmPublish: null, // null=미설정, true/false=명시 (node/npm-publish/)
     includeSecretBackup: null,
     templateVersion: "",
     tempDir: "",

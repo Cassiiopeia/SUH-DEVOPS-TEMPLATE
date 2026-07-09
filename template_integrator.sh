@@ -757,6 +757,8 @@ ${BLUE}옵션:${NC}
   --no-nexus               Nexus publish 워크플로우 제외
   --secret-backup          GitHub Secret 서버 백업 워크플로우 포함 (기본: 제외)
   --no-secret-backup       Secret 백업 워크플로우 제외
+  --npm-publish            npm 패키지 publish 워크플로우 포함 (기본: 제외)
+  --no-npm-publish         npm publish 워크플로우 제외
   --paths "T=P,..."        타입별 프로젝트 경로 (모노레포용, 예: --paths "flutter=app,react=client")
   -h, --help               이 도움말 표시
 
@@ -833,6 +835,7 @@ IS_INTERACTIVE_MODE=false  # interactive_mode()에서 왔는지 추적
 # 선택적(opt-in) 워크플로우 포함 여부 (빈 값: 미설정, true/false: 명시적 설정)
 INCLUDE_NEXUS=""          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
 INCLUDE_SECRET_BACKUP=""  # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
+INCLUDE_NPM_PUBLISH=""    # npm 패키지 publish 워크플로우 (node/npm-publish/)
 PROJECT_PATHS_CSV=""  # 타입별 경로 "flutter=app,react=client" — 빈 값이면 미확정 (bash 3.2 호환: 연관배열 금지)
 
 # 지원하는 프로젝트 타입 (next는 v4.1.0에서 react로 흡수 — sh/ps1 일관성)
@@ -898,6 +901,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-secret-backup)
             INCLUDE_SECRET_BACKUP=false
+            shift
+            ;;
+        --npm-publish)
+            INCLUDE_NPM_PUBLISH=true
+            shift
+            ;;
+        --no-npm-publish)
+            INCLUDE_NPM_PUBLISH=false
             shift
             ;;
         --paths)
@@ -1817,6 +1828,11 @@ print_project_analysis() {
     elif [ "$INCLUDE_SECRET_BACKUP" = false ]; then
         print_to_user "       🔐 Secret 백업      : 제외"
     fi
+    if [ "$INCLUDE_NPM_PUBLISH" = true ]; then
+        print_to_user "       📦 npm publish      : 포함"
+    elif [ "$INCLUDE_NPM_PUBLISH" = false ]; then
+        print_to_user "       📦 npm publish      : 제외"
+    fi
     # 프로젝트 경로 : full/version에서 확정된 경우만 표시 (멀티경로 한눈에)
     if [ -n "$PROJECT_PATHS_CSV" ]; then
         print_to_user "       📁 프로젝트 경로    : $(echo "$PROJECT_PATHS_CSV" | sed 's/=/→/g; s/,/, /g')"
@@ -1921,8 +1937,10 @@ handle_project_edit_menu() {
         if [ "$MODE" = "full" ] || [ "$MODE" = "workflows" ]; then
             local _nx_state="제외"; [ "$INCLUDE_NEXUS" = "true" ] && _nx_state="포함"
             local _sb_state="제외"; [ "$INCLUDE_SECRET_BACKUP" = "true" ] && _sb_state="포함"
+            local _np_state="제외"; [ "$INCLUDE_NPM_PUBLISH" = "true" ] && _np_state="포함"
             _edit_opts+=("Nexus publish 포함 여부 (현재: ${_nx_state})|")
             _edit_opts+=("Secret 백업 포함 여부 (현재: ${_sb_state})|")
+            _edit_opts+=("npm publish 포함 여부 (현재: ${_np_state})|")
         fi
         _edit_opts+=("모두 맞음, 계속|" "뒤로 (변경 없이 확인 화면으로)|")
 
@@ -1941,6 +1959,7 @@ handle_project_edit_menu() {
                 기본\ 브랜치*)   edit_choice="branch" ;;
                 Nexus*)          edit_choice="optional" ;;
                 Secret*)         edit_choice="optional" ;;
+                npm\ publish*)   edit_choice="optional" ;;
                 모두\ 맞음*)     edit_choice="done" ;;
                 뒤로*)           edit_choice="back" ;;
                 *)               edit_choice="back" ;;
@@ -2381,6 +2400,12 @@ read_template_options() {
                 [ "$_v" = "false" ] && INCLUDE_SECRET_BACKUP=false
                 continue
             fi
+            if [[ "$line" =~ ^[[:space:]]+npm_publish:[[:space:]]*(.+) ]]; then
+                local _v=$(echo "${BASH_REMATCH[1]}" | tr -d '"' | tr -d "'" | xargs)
+                [ "$_v" = "true" ] && INCLUDE_NPM_PUBLISH=true
+                [ "$_v" = "false" ] && INCLUDE_NPM_PUBLISH=false
+                continue
+            fi
 
             # 다른 최상위 키 만나면 options 섹션 종료
             if [[ "$line" =~ ^[[:space:]]{0,4}[a-z_]+: ]]; then
@@ -2406,6 +2431,7 @@ save_template_options() {
     # 미설정(빈 값)이면 false로 보정 — 항상 명시적 true/false를 기록한다.
     : "${INCLUDE_NEXUS:=false}"
     : "${INCLUDE_SECRET_BACKUP:=false}"
+    : "${INCLUDE_NPM_PUBLISH:=false}"
 
     if [ ! -f "$version_file" ]; then
         return
@@ -2432,6 +2458,14 @@ save_template_options() {
       secret_backup: $INCLUDE_SECRET_BACKUP" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
         fi
 
+        # options.npm_publish 값 업데이트 또는 추가
+        if grep -q "npm_publish:" "$version_file"; then
+            sed "s/npm_publish:.*$/npm_publish: $INCLUDE_NPM_PUBLISH/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        elif grep -q "options:" "$version_file"; then
+            sed "/options:/a\\
+      npm_publish: $INCLUDE_NPM_PUBLISH" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
+        fi
+
         # last_update_date 업데이트
         if grep -q "last_update_date:" "$version_file"; then
             sed "s/last_update_date:.*$/last_update_date: \"$today\"/" "$version_file" > "$version_file.tmp" && mv "$version_file.tmp" "$version_file"
@@ -2448,6 +2482,7 @@ save_template_options() {
     options:
       nexus: $INCLUDE_NEXUS
       secret_backup: $INCLUDE_SECRET_BACKUP
+      npm_publish: $INCLUDE_NPM_PUBLISH
 EOF
         print_info "version.yml에 템플릿 설정 저장됨"
     fi
@@ -2703,6 +2738,12 @@ ask_all_optional_workflows() {
         ask_optional_workflow $_fa "$_td/nexus" "📦" "Nexus 라이브러리 publish" \
             "라이브러리/모듈을 Maven 저장소(Nexus)에 배포하는 워크플로우입니다. 일반 서버 배포가 아니라 라이브러리 프로젝트에만 필요합니다." \
             INCLUDE_NEXUS
+    done
+    # npm publish: 각 타입의 npm-publish/ 폴더 (현재 node만 존재)
+    for _td in "${type_dirs[@]}"; do
+        ask_optional_workflow $_fa "$_td/npm-publish" "📦" "npm 패키지 publish" \
+            "패키지를 공개 npmjs 레지스트리에 자동 배포하는 워크플로우입니다. npm 라이브러리/CLI 프로젝트에만 필요합니다 (NPM_TOKEN secret 필요)." \
+            INCLUDE_NPM_PUBLISH
     done
     # Secret 백업: 공통 폴더
     ask_optional_workflow $_fa "$_common_root/secret-backup" "🔐" "Secret 서버 백업" \
@@ -3631,11 +3672,47 @@ _copy_workflows_for_type() {
         fi
     fi
 
+    # 타입별 npm-publish 하위폴더 처리 (opt-in — 현재 node/npm-publish/만 존재)
+    # npm 라이브러리를 공개 npmjs에 배포하는 프로젝트만 --npm-publish로 포함한다.
+    local npm_publish_dir="$project_types_dir/$type/npm-publish"
+    if [ -d "$npm_publish_dir" ]; then
+        if [ "$INCLUDE_NPM_PUBLISH" = true ]; then
+            print_info "$type npm publish 워크플로우 다운로드 중..."
+            for workflow in "$npm_publish_dir"/*.{yaml,yml}; do
+                [ -e "$workflow" ] || continue
+                local filename=$(basename "$workflow")
+                if [ -f "$WORKFLOWS_DIR/$filename" ] && _wf_is_unchanged "$type" "$workflow" "$WORKFLOWS_DIR/$filename"; then
+                    echo "  ⏭ $filename (npm publish $type, 변경 없음)"
+                    _wf_skipped=$((_wf_skipped + 1))
+                    continue
+                fi
+                if [ -f "$WORKFLOWS_DIR/$filename" ]; then
+                    mv "$WORKFLOWS_DIR/$filename" "$WORKFLOWS_DIR/${filename}.bak"
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (npm publish $type, 백업: ${filename}.bak)"
+                else
+                    cp "$workflow" "$WORKFLOWS_DIR/"
+                    echo "  ✓ $filename (npm publish $type)"
+                fi
+                _wf_optional_copied=$((_wf_optional_copied + 1))
+                _wf_copied=$((_wf_copied + 1))
+            done
+        else
+            local npm_publish_count=0
+            for f in "$npm_publish_dir"/*.{yaml,yml}; do
+                [ -e "$f" ] && npm_publish_count=$((npm_publish_count + 1))
+            done
+            if [ $npm_publish_count -gt 0 ]; then
+                print_info "$type npm publish 워크플로우 $npm_publish_count개 제외됨 (--npm-publish 옵션으로 포함 가능)"
+            fi
+        fi
+    fi
+
     # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
-    # 이 타입의 원본 디렉토리(+nexus)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
+    # 이 타입의 원본 디렉토리(+nexus+npm-publish)에 있던 파일 중, WORKFLOWS_DIR에 실제 복사돼
     # @wizard 마커를 가진 것만 configure. (.template.yaml/.bak은 대상 아님)
     local _src_dir _wf _bn _target
-    for _src_dir in "$type_dir" "$server_deploy_dir" "$nexus_dir"; do
+    for _src_dir in "$type_dir" "$server_deploy_dir" "$nexus_dir" "$npm_publish_dir"; do
         [ -d "$_src_dir" ] || continue
         for _wf in "$_src_dir"/*.{yaml,yml}; do
             [ -e "$_wf" ] || continue
@@ -4532,6 +4609,7 @@ execute_integration() {
         # (해당 opt-in 폴더가 없는 타입을 위한 처리)
         [ -z "$INCLUDE_NEXUS" ] && INCLUDE_NEXUS=false
         [ -z "$INCLUDE_SECRET_BACKUP" ] && INCLUDE_SECRET_BACKUP=false
+        [ -z "$INCLUDE_NPM_PUBLISH" ] && INCLUDE_NPM_PUBLISH=false
         # 다운로드한 템플릿의 실제 버전 전달 (TEMPLATE_VERSION 사용)
         save_template_options "$TEMPLATE_VERSION"
     fi

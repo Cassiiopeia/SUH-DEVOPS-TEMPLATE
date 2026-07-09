@@ -82,6 +82,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     // 선택 워크플로우 초기값: version.yml 저장 옵션 (.sh read_template_options L2361 등가)
     let includeNexus = existing?.options?.nexus ?? false;
     let includeSecretBackup = existing?.options?.secretBackup ?? false;
+    let includeNpmPublish = existing?.options?.npmPublish ?? false;
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
 
@@ -92,12 +93,13 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     if (showOptional) {
       const r = await askAllOptionalWorkflows({
         tempDir, types, targetRoot: cwd,
-        current: { nexus: existing?.options?.nexus ?? null, secretBackup: existing?.options?.secretBackup ?? null },
+        current: { nexus: existing?.options?.nexus ?? null, secretBackup: existing?.options?.secretBackup ?? null, npmPublish: existing?.options?.npmPublish ?? null },
         force: false, tty: realTty,
         io: { confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue) },
       });
       includeNexus = r.nexus;
       includeSecretBackup = r.secretBackup;
+      includeNpmPublish = r.npmPublish;
     }
 
     // 확인/수정 루프 — ESC는 '머무르기' (.sh L1877~1881: 명시적 '아니오'만 종료)
@@ -106,9 +108,9 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     while (!confirmed) {
       // 층3 — 프로젝트 분석 개요 카드 (#446). 스텁엔 없음 → note 폴백.
       if (io.analysisCard) {
-        io.analysisCard({ mode, modeLabel: modeLabel(mode), types, version, branch, includeNexus, includeSecretBackup, showOptional, paths });
+        io.analysisCard({ mode, modeLabel: modeLabel(mode), types, version, branch, includeNexus, includeSecretBackup, includeNpmPublish, showOptional, paths });
       } else {
-        io.note?.(summarize({ mode, types, version, branch, includeNexus, includeSecretBackup, showOptional }), "프로젝트 분석 결과");
+        io.note?.(summarize({ mode, types, version, branch, includeNexus, includeSecretBackup, includeNpmPublish, showOptional }), "프로젝트 분석 결과");
       }
       const choice = await io.confirmProjectMenu();
       if (choice === "cancel") { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
@@ -143,6 +145,9 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         } else if (what === "secret") {
           const y = await io.askYesNo("Secret 백업 워크플로우를 포함할까요?", includeSecretBackup);
           if (!isCancel(y)) includeSecretBackup = y === true;
+        } else if (what === "npm-publish") {
+          const y = await io.askYesNo("npm publish 워크플로우를 포함할까요?", includeNpmPublish);
+          if (!isCancel(y)) includeNpmPublish = y === true;
         }
       }
     }
@@ -171,7 +176,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
 
     const { now, today } = clock || utcNow();
     const ctx = createContext({
-      mode, force: true, types, version, versionCode, branch, paths, includeNexus, includeSecretBackup,
+      mode, force: true, types, version, versionCode, branch, paths, includeNexus, includeSecretBackup, includeNpmPublish,
       repoName, templateVersion, resolvers, envValues, envUseDefaults, now, today,
     });
     ctx.templateVersion = templateVersion;
@@ -222,7 +227,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
   }
 }
 
-function summarize({ mode, types, version, branch, includeNexus, includeSecretBackup, showOptional }) {
+function summarize({ mode, types, version, branch, includeNexus, includeSecretBackup, includeNpmPublish, showOptional }) {
   const lines = [
     `통합 모드 : ${modeLabel(mode)}`,
     `프로젝트 타입 : ${types.join(", ")}${types.length > 1 ? " (멀티)" : ""}`,
@@ -232,6 +237,7 @@ function summarize({ mode, types, version, branch, includeNexus, includeSecretBa
   if (showOptional) {
     lines.push(`Nexus publish : ${includeNexus ? "포함" : "제외"}`);
     lines.push(`Secret 백업 : ${includeSecretBackup ? "포함" : "제외"}`);
+    lines.push(`npm publish : ${includeNpmPublish ? "포함" : "제외"}`);
   }
   return lines.join("\n");
 }

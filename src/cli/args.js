@@ -10,6 +10,7 @@ export function parseArgs(argv) {
     primaryType: "",
     includeNexus: null,      // null=미설정
     includeSecretBackup: null,
+    includeNpmPublish: null,
     pathsCsv: "",            // "flutter=app,react=client" 원문 (정규화는 resolve 단계)
     force: false,
     help: false,
@@ -50,6 +51,8 @@ export function parseArgs(argv) {
       case "--no-nexus": result.includeNexus = false; break;
       case "--secret-backup": result.includeSecretBackup = true; break;
       case "--no-secret-backup": result.includeSecretBackup = false; break;
+      case "--npm-publish": result.includeNpmPublish = true; break;
+      case "--no-npm-publish": result.includeNpmPublish = false; break;
       case "--paths": result.pathsCsv = args.shift() ?? ""; break;
       case "-h": case "--help": result.help = true; break;
       default:

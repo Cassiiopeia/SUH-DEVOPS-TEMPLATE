@@ -49,8 +49,8 @@ async function askOptionalWorkflow({ dir, icon, short, desc, current, force, tty
 // 모든 opt-in 워크플로우를 순서대로 질문 (.sh ask_all_optional_workflows 등가).
 // tempDir: 템플릿 다운로드 루트 — project-types는 {tempDir}/.github/workflows/project-types
 //          (copyWorkflows와 동일 규약. 테스트 픽스처용으로 {tempDir}/project-types 도 허용.)
-// current: { nexus: bool|null, secretBackup: bool|null } — CLI(--nexus 등) 명시값
-// 반환: { nexus: bool, secretBackup: bool } (미결정 null은 false로 확정)
+// current: { nexus: bool|null, secretBackup: bool|null, npmPublish: bool|null } — CLI(--nexus 등) 명시값
+// 반환: { nexus: bool, secretBackup: bool, npmPublish: bool } (미결정 null은 false로 확정)
 export async function askAllOptionalWorkflows({
   tempDir, types = [], current = {}, targetRoot = ".",
   force = false, tty = true, io = {}, forceAsk = false,
@@ -58,6 +58,7 @@ export async function askAllOptionalWorkflows({
   const say = io.log || ((m) => process.stderr.write(`${m}\n`));
   let nexus = current.nexus ?? null;
   let secretBackup = current.secretBackup ?? null;
+  let npmPublish = current.npmPublish ?? null;
 
   // ① --force-ask가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다 (.sh L2715~2717).
   //    CLI 명시값(current)이 이미 있으면 그쪽이 우선 — 저장값은 빈 자리만 채운다.
@@ -72,6 +73,10 @@ export async function askAllOptionalWorkflows({
       if (secretBackup === null && saved.secretBackup !== null) {
         secretBackup = saved.secretBackup;
         say(`Secret 백업 옵션: version.yml 저장값(${secretBackup}) 유지 — 재질문 생략`);
+      }
+      if (npmPublish === null && saved.npmPublish !== null) {
+        npmPublish = saved.npmPublish;
+        say(`npm publish 옵션: version.yml 저장값(${npmPublish}) 유지 — 재질문 생략`);
       }
     }
   }
@@ -88,6 +93,14 @@ export async function askAllOptionalWorkflows({
       current: nexus, force, tty, io, forceAsk, say,
     });
   }
+  // ②-2 npm publish: 각 타입의 npm-publish/ 폴더 (현재 node만 존재)
+  for (const t of types) {
+    npmPublish = await askOptionalWorkflow({
+      dir: join(ptDir, t, "npm-publish"), icon: "📦", short: "npm 패키지 publish",
+      desc: "패키지를 공개 npmjs 레지스트리에 자동 배포하는 워크플로우입니다. npm 라이브러리/CLI 프로젝트에만 필요합니다 (NPM_TOKEN secret 필요).",
+      current: npmPublish, force, tty, io, forceAsk, say,
+    });
+  }
   // ③ Secret 백업: 공통 폴더 (.sh L2726~2729)
   secretBackup = await askOptionalWorkflow({
     dir: join(ptDir, "common", "secret-backup"), icon: "🔐", short: "Secret 서버 백업",
@@ -96,5 +109,5 @@ export async function askAllOptionalWorkflows({
   });
 
   // ④ 미결정(null)은 false로 확정 — .sh에서 빈 INCLUDE_* 가 이후 false 취급되는 것과 동일
-  return { nexus: nexus === true, secretBackup: secretBackup === true };
+  return { nexus: nexus === true, secretBackup: secretBackup === true, npmPublish: npmPublish === true };
 }

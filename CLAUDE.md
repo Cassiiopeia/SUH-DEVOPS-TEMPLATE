@@ -48,7 +48,8 @@ suh-github-template/
 │   │       ├── common/          # 공통 원본 (+ secret-backup/ opt-in)
 │   │       ├── flutter/         # Flutter 전용 (배포 워크플로우 루트 포함)
 │   │       ├── spring/          # Spring 전용 (server-deploy/ 기본포함·Nexus면제외 + nexus/ opt-in)
-│   │       └── react/           # React/Next.js 공용 (next 타입은 v4.1.0에서 흡수됨)
+│   │       ├── react/           # React/Next.js 공용 (next 타입은 v4.1.0에서 흡수됨)
+│   │       └── node/            # Node 전용 (npm-publish/ opt-in)
 │   ├── scripts/
 │   │   ├── version_manager.sh
 │   │   ├── changelog_manager.py
@@ -149,6 +150,13 @@ snake_case.sh / snake_case.py
 
 > `next` 타입은 v4.1.0에서 `react`로 흡수되었습니다 (PROJECT-NEXT-* 워크플로우 삭제).
 
+#### Node — npm publish (opt-in)
+| 파일명 | 용도 | 위치 |
+|--------|------|------|
+| `PROJECT-NODE-NPM-PUBLISH` | main push 시 version.yml 버전으로 공개 npmjs 배포 (멱등, NPM_TOKEN secret) | node/npm-publish/ |
+
+> `--npm-publish` 옵션(.ps1은 `-NpmPublish`, npx는 `--npm-publish`)으로 포함합니다. 선택 값은 `version.yml`의 `metadata.template.options.npm_publish`에 저장됩니다.
+
 ---
 
 ## 핵심 스크립트
@@ -172,8 +180,8 @@ python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output rel
 
 ### template_integrator.sh / .ps1
 기존 프로젝트에 템플릿 기능을 추가하는 원격 실행 스크립트. 신규 통합 / 업데이트 / 되돌리기 모드 지원.
-배포 워크플로우(SSH+Docker)는 기본 포함되고, `--nexus` / `--secret-backup` 옵션(.ps1은 `-Nexus` / `-SecretBackup`)으로 선택 워크플로우 포함 여부를 정한다.
-선택 값은 `version.yml`의 `metadata.template.options.nexus` / `.secret_backup`에 저장.
+배포 워크플로우(SSH+Docker)는 기본 포함되고, `--nexus` / `--secret-backup` / `--npm-publish` 옵션(.ps1은 `-Nexus` / `-SecretBackup` / `-NpmPublish`)으로 선택 워크플로우 포함 여부를 정한다.
+선택 값은 `version.yml`의 `metadata.template.options.nexus` / `.secret_backup` / `.npm_publish`에 저장.
 
 **초기화/통합 시 복사되지 않는 템플릿 전용 파일**:
 ```

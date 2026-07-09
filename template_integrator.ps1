@@ -85,6 +85,12 @@ param(
     [switch]$NoSecretBackup,
 
     [Parameter(Mandatory=$false)]
+    [switch]$NpmPublish,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NoNpmPublish,
+
+    [Parameter(Mandatory=$false)]
     [string]$Paths = "",
 
     [Parameter(Mandatory=$false)]
@@ -136,6 +142,7 @@ $script:ValidTypes = @("spring", "flutter", "react", "react-native", "react-nati
 # 선택적(opt-in) 워크플로우 포함 여부 ($null: 미설정, $true/$false: 명시적 설정)
 $script:IncludeNexus = $null          # Nexus 라이브러리 publish 워크플로우 (spring/nexus/)
 $script:IncludeSecretBackup = $null   # GitHub Secret 파일 서버 백업 워크플로우 (common/secret-backup/)
+$script:IncludeNpmPublish = $null     # npm 패키지 publish 워크플로우 (node/npm-publish/)
 $script:TemplateVersion = ""  # 다운로드한 템플릿의 실제 버전 (Download-Template에서 설정됨)
 $script:PiPackageUrl = "https://github.com/Cassiiopeia/projectops"  # pi install/update/remove 대상
 
@@ -715,6 +722,8 @@ GitHub 템플릿 통합 스크립트 v1.0.0 (Windows PowerShell)
   -NoNexus              Nexus publish 워크플로우 제외
   -SecretBackup         GitHub Secret 서버 백업 워크플로우 포함 (기본: 제외)
   -NoSecretBackup       Secret 백업 워크플로우 제외
+  -NpmPublish           npm 패키지 publish 워크플로우 포함 (기본: 제외)
+  -NoNpmPublish         npm publish 워크플로우 제외
   -Paths "T=P,..."      타입별 프로젝트 경로 (모노레포용, 예: -Paths "flutter=app,react=client")
   -Help                 이 도움말 표시
 
@@ -1496,6 +1505,8 @@ function Print-ProjectAnalysis {
     elseif ($script:IncludeNexus -eq $false) { Write-Host "       📦 Nexus publish    : 제외" }
     if ($script:IncludeSecretBackup -eq $true)  { Write-Host "       🔐 Secret 백업      : 포함" }
     elseif ($script:IncludeSecretBackup -eq $false) { Write-Host "       🔐 Secret 백업      : 제외" }
+    if ($script:IncludeNpmPublish -eq $true)  { Write-Host "       📦 npm publish      : 포함" }
+    elseif ($script:IncludeNpmPublish -eq $false) { Write-Host "       📦 npm publish      : 제외" }
     if ($script:ProjectPaths -and $script:ProjectPaths.Count -gt 0) {
         $pathPairs = @($script:ProjectPaths.GetEnumerator() | ForEach-Object { "$($_.Key)→$($_.Value)" }) -join ', '
         Write-Host "       📁 프로젝트 경로    : $pathPairs"
@@ -1525,8 +1536,10 @@ function Edit-ProjectInfo {
         if ($_optEditable) {
             $_nxState = if ($script:IncludeNexus -eq $true) { '포함' } else { '제외' }
             $_sbState = if ($script:IncludeSecretBackup -eq $true) { '포함' } else { '제외' }
+            $_npState = if ($script:IncludeNpmPublish -eq $true) { '포함' } else { '제외' }
             $_editOptions += @{Value='optional'; Label="Nexus publish 포함 여부 (현재: $_nxState)"}
             $_editOptions += @{Value='optional'; Label="Secret 백업 포함 여부 (현재: $_sbState)"}
+            $_editOptions += @{Value='optional'; Label="npm publish 포함 여부 (현재: $_npState)"}
         }
         $_editOptions += @{Value='done';    Label='모두 맞음, 계속'}
         $_editOptions += @{Value='back';    Label='뒤로 (변경 없이 확인 화면으로)'}
@@ -2004,6 +2017,12 @@ function Read-TemplateOptions {
                 elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeSecretBackup = $false }
                 continue
             }
+            if ($line -match "^\s+npm_publish:\s*(.+)") {
+                $v = $matches[1].Trim().Trim('"').Trim("'")
+                if ($v -eq "true" -or $v -eq "True") { $script:IncludeNpmPublish = $true }
+                elseif ($v -eq "false" -or $v -eq "False") { $script:IncludeNpmPublish = $false }
+                continue
+            }
 
             # 다른 최상위 키 만나면 options 섹션 종료
             if ($line -match "^\s{0,4}[a-z_]+:") {
@@ -2029,8 +2048,10 @@ function Save-TemplateOptions {
     # 미설정($null)이면 false로 보정 — 항상 명시적 true/false를 기록한다.
     if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
     if ($null -eq $script:IncludeSecretBackup) { $script:IncludeSecretBackup = $false }
+    if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = $false }
     $nexusVal = $script:IncludeNexus.ToString().ToLower()
     $sbVal = $script:IncludeSecretBackup.ToString().ToLower()
+    $npVal = $script:IncludeNpmPublish.ToString().ToLower()
 
     if (-not (Test-Path $versionFile)) {
         return
@@ -2056,6 +2077,14 @@ function Save-TemplateOptions {
             $content = $content -replace "(options:)", "`$1`n      secret_backup: $sbVal"
         }
 
+        # npm_publish 값 업데이트 또는 추가
+        if ($content -match "npm_publish:") {
+            $content = $content -replace "(?m)npm_publish:.*$", "npm_publish: $npVal"
+        }
+        elseif ($content -match "options:") {
+            $content = $content -replace "(options:)", "`$1`n      npm_publish: $npVal"
+        }
+
         # last_update_date 업데이트
         if ($content -match "last_update_date:") {
             $content = $content -replace '(?m)last_update_date:.*$', "last_update_date: `"$today`""
@@ -2074,6 +2103,7 @@ function Save-TemplateOptions {
     options:
       nexus: $nexusVal
       secret_backup: $sbVal
+      npm_publish: $npVal
 "@
         Add-Content -Path $versionFile -Value $templateSection -Encoding UTF8
         Print-Info "version.yml에 템플릿 설정 저장됨"
@@ -2313,6 +2343,8 @@ function Ask-AllOptionalWorkflows {
     if ($NoNexus)        { $script:IncludeNexus = $false }
     if ($SecretBackup)   { $script:IncludeSecretBackup = $true }
     if ($NoSecretBackup) { $script:IncludeSecretBackup = $false }
+    if ($NpmPublish)     { $script:IncludeNpmPublish = $true }
+    if ($NoNpmPublish)   { $script:IncludeNpmPublish = $false }
 
     # -ForceAsk가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
     # (Ask-OptionalWorkflow가 변수값으로 판단하므로 여기서 한 번만 읽는다.)
@@ -2323,6 +2355,12 @@ function Ask-AllOptionalWorkflows {
         Ask-OptionalWorkflow -Dir (Join-Path $td "nexus") -Icon "📦" -Short "Nexus 라이브러리 publish" `
             -Desc "라이브러리/모듈을 Maven 저장소(Nexus)에 배포하는 워크플로우입니다. 일반 서버 배포가 아니라 라이브러리 프로젝트에만 필요합니다." `
             -VarName "IncludeNexus" -ForceAsk:$ForceAsk
+    }
+    # npm publish: 각 타입의 npm-publish/ 폴더 (현재 node만 존재)
+    foreach ($td in $TypeDirs) {
+        Ask-OptionalWorkflow -Dir (Join-Path $td "npm-publish") -Icon "📦" -Short "npm 패키지 publish" `
+            -Desc "패키지를 공개 npmjs 레지스트리에 자동 배포하는 워크플로우입니다. npm 라이브러리/CLI 프로젝트에만 필요합니다 (NPM_TOKEN secret 필요)." `
+            -VarName "IncludeNpmPublish" -ForceAsk:$ForceAsk
     }
     # Secret 백업: 공통 폴더
     Ask-OptionalWorkflow -Dir (Join-Path $commonRoot "secret-backup") -Icon "🔐" -Short "Secret 서버 백업" `
@@ -3139,12 +3177,60 @@ function Copy-Workflows-ForType {
         }
     }
 
+    # 3.5 타입별 npm-publish 하위폴더 처리 (opt-in — 현재 node/npm-publish/만 존재)
+    $npmPublishDir = Join-Path $ProjectTypesDir "$Type\npm-publish"
+
+    if (Test-Path $npmPublishDir) {
+        if ($script:IncludeNpmPublish -eq $true) {
+            Print-Info "$Type npm publish 워크플로우 다운로드 중..."
+
+            $npmWorkflows = @()
+            $yamlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $npmWorkflows += $yamlFiles }
+            if ($ymlFiles) { $npmWorkflows += $ymlFiles }
+
+            foreach ($workflow in $npmWorkflows) {
+                $filename = $workflow.Name
+                $destPath = Join-Path $WORKFLOWS_DIR $filename
+
+                if ((Test-Path $destPath) -and (Test-WorkflowUnchanged -Type $Type -SrcPath $workflow.FullName -ExistingPath $destPath)) {
+                    Write-Host "  ⏭ $filename (npm publish $Type, 변경 없음)"
+                    $Counters.skipped++
+                    continue
+                }
+
+                if (Test-Path $destPath) {
+                    $backupPath = [string]$destPath + ".bak"
+                    Move-Item -Path $destPath -Destination $backupPath -Force
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $filename (npm publish $Type, 백업: ${filename}.bak)"
+                } else {
+                    Copy-Item -Path $workflow.FullName -Destination $WORKFLOWS_DIR -Force
+                    Write-Host "  ✓ $filename (npm publish $Type)"
+                }
+                $Counters.optionalCopied++
+                $Counters.copied++
+            }
+        } else {
+            $npmFiles = @()
+            $yamlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yaml" -ErrorAction SilentlyContinue
+            $ymlFiles = Get-ChildItem -Path $npmPublishDir -Filter "*.yml" -ErrorAction SilentlyContinue
+            if ($yamlFiles) { $npmFiles += $yamlFiles }
+            if ($ymlFiles) { $npmFiles += $ymlFiles }
+
+            if ($npmFiles.Count -gt 0) {
+                Print-Info "$Type npm publish 워크플로우 $($npmFiles.Count)개 제외됨 (-NpmPublish 옵션으로 포함 가능)"
+            }
+        }
+    }
+
     # ── 복사된 워크플로우 env 동적 설정 (토큰+@wizard 마커 치환) ──
     # ⚠️ Get-ChildItem -Include 는 경로 끝에 \* 또는 -Recurse 가 없으면 PS 5.1에서
     #    조용히 0개를 반환한다(알려진 함정). 그러면 Configure-WorkflowEnv 가 한 번도
     #    호출되지 않아 __PROJECT_NAME__ 등 @wizard 토큰 치환이 통째로 스킵된다.
     #    → -Filter 를 yaml/yml 각각 누적하는 방식으로 처리(Windows PS 5.1 + macOS PS Core 공통 동작).
-    foreach ($srcDir in @($typeDir, $serverDeployDir, $nexusDir)) {
+    foreach ($srcDir in @($typeDir, $serverDeployDir, $nexusDir, $npmPublishDir)) {
         if (-not (Test-Path $srcDir)) { continue }
         $wfFiles = @()
         $wfFiles += Get-ChildItem -Path $srcDir -Filter '*.yaml' -File -ErrorAction SilentlyContinue
@@ -4021,6 +4107,7 @@ function Start-Integration {
         # (해당 opt-in 폴더가 없는 타입을 위한 처리)
         if ($null -eq $script:IncludeNexus) { $script:IncludeNexus = $false }
         if ($null -eq $script:IncludeSecretBackup) { $script:IncludeSecretBackup = $false }
+        if ($null -eq $script:IncludeNpmPublish) { $script:IncludeNpmPublish = $false }
         # 다운로드한 템플릿의 실제 버전 전달 (TemplateVersion 사용)
         Save-TemplateOptions $script:TemplateVersion
     }

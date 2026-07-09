@@ -41,11 +41,11 @@ const HEADER = `# ==============================================================
 `;
 
 // metadata.template.options 상태머신 파싱 (.sh read_template_options L2361~2416 등가).
-// 반환: { nexus: bool|null, secretBackup: bool|null } — null=미기재.
+// 반환: { nexus: bool|null, secretBackup: bool|null, npmPublish: bool|null } — null=미기재.
 // 구 synology 키 등 다른 키는 어느 분기에도 안 걸려 자연히 무시된다.
 // (options-ask.js가 이 함수를 import한다 — 순환 방지 위해 여기(version-yml)에 정의.)
 export function parseTemplateOptions(content) {
-  const out = { nexus: null, secretBackup: null };
+  const out = { nexus: null, secretBackup: null, npmPublish: null };
   // 값 정규화: 따옴표 제거 + 트림 (.sh tr -d '"' | tr -d "'" | xargs 등가)
   const strip = (s) => String(s).replace(/["']/g, "").trim();
   let inTemplate = false;
@@ -66,6 +66,13 @@ export function parseTemplateOptions(content) {
         const v = strip(m[1]);
         if (v === "true") out.secretBackup = true;
         if (v === "false") out.secretBackup = false;
+        continue;
+      }
+      m = line.match(/^\s+npm_publish:\s*(.+)/);
+      if (m) {
+        const v = strip(m[1]);
+        if (v === "true") out.npmPublish = true;
+        if (v === "false") out.npmPublish = false;
         continue;
       }
       // 들여쓰기 0~4칸의 다른 키 → options 섹션 종료 (.sh L2404~2408)
@@ -170,7 +177,7 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
 
   // template 옵션 블록 (.sh save_template_options 신규 추가 케이스). templateOptions 지정 시.
   if (templateOptions) {
-    const { templateVersion = "unknown", includeNexus = false, includeSecretBackup = false, optionsDate = today } = templateOptions;
+    const { templateVersion = "unknown", includeNexus = false, includeSecretBackup = false, includeNpmPublish = false, optionsDate = today } = templateOptions;
     out += `  template:\n`;
     out += `    source: "projectops"\n`;
     out += `    version: "${templateVersion}"\n`;
@@ -179,6 +186,7 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
     out += `    options:\n`;
     out += `      nexus: ${includeNexus}\n`;
     out += `      secret_backup: ${includeSecretBackup}\n`;
+    out += `      npm_publish: ${includeNpmPublish}\n`;
   }
   return out;
 }

@@ -2,6 +2,7 @@
 
 > **배경**: v4.2.0(#439) 배포/publish 축 도입 후, `basic` 타입에서도 "배포 방식", "publish 레지스트리", "Secret 백업" 3질문을 무조건 던져 사용자가 "내 프로젝트는 basic인데 왜 이걸 묻지?"라고 당황. 추가로 분석 카드가 CJK 폭 미계산으로 정렬이 깨짐.
 > **원칙**: 질문을 없애는 게 목적이 아니라 — **묻든 안 묻든 사용자가 "왜 지금 이걸 하는지" 납득되게** 한다.
+> **상태**: **구현 완료**. 3중(js `isBasicOnly`·`.sh` `_is_basic_only`·`.ps1` `Test-BasicOnly`) basic 스킵 + 맥락 문구, npx 카드 `padEndVisual` 정렬. 테스트 161/161 green, basic/spring 흐름 실측 확인.
 
 ---
 

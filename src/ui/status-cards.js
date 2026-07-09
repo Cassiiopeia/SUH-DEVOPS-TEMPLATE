@@ -1,6 +1,6 @@
 // 첫 화면 상태 표시 층 (#446 층2~5) — 감지 로그 · 분석 카드 · IDE 상태 · 신규/업데이트 판별
 // (층5의 Breaking Changes 박스는 core/breaking-check.js가 담당)
-import { A, paint } from "./ansi.js";
+import { A, paint, padEndVisual } from "./ansi.js";
 import { ADAPTERS } from "../core/ide/registry.js";
 import { markerForType } from "../core/detect.js";
 
@@ -28,7 +28,9 @@ export function printAnalysisCard({ mode = "", modeLabel = "", types = [], versi
   deployTarget = null, publishTargets = null, includeSecretBackup = null, paths = new Map(), showOptional = false },
   out = (s) => process.stdout.write(s)) {
   out(`${HEAD}  ${paint("프로젝트 분석 결과", A.bold)}\n`);
-  const row = (icon, label, value) => out(`${GUT}  ${icon} ${label.padEnd(10)} ${value}\n`);
+  // 라벨을 시각 폭(CJK 2칸) 기준으로 패딩 — 한글·영문 혼합 라벨(타입·Publish·Secret백업) 열 정렬.
+  // 가장 긴 라벨 "Secret백업"(=8칸) 기준 여유 두고 12.
+  const row = (icon, label, value) => out(`${GUT}  ${icon} ${padEndVisual(label, 12)} ${value}\n`);
   row("📂", types.length > 1 ? "타입(멀티)" : "타입", paint(types.join(", ") || "basic", A.bold));
   row("🌙", "버전", paint(`v${version}`, A.green));
   row("🌿", "브랜치", branch);

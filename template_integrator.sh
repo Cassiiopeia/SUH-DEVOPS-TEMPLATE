@@ -2791,11 +2791,33 @@ ask_optional_workflow() {
     return 0
 }
 
-# 배포/publish 축 질문 (#439 — 타입 비종속)
+# 현재 PROJECT_TYPES가 basic 단독인지 (배포/publish 개념이 없는 범용 타입)
+_is_basic_only() {
+    local _arr=("${PROJECT_TYPES[@]:-$PROJECT_TYPE}")
+    [ ${#_arr[@]} -eq 0 ] && return 1
+    local _t
+    for _t in "${_arr[@]}"; do
+        [ "$_t" = "basic" ] || return 1
+    done
+    return 0
+}
+
+# 배포/publish 축 질문 (#439)
+# basic 단독 타입은 서버 배포·라이브러리 publish가 개념상 성립하지 않으므로 질문을 건너뛰고
+# none·false로 조용히 확정한다 (타입을 바꾸면 그때 재질문됨).
 # force-ask가 아니고 값이 이미 있으면(CLI/version.yml) 재질문하지 않는다.
 ask_deploy_publish() {
     local _force_ask=false
     if [ "${1:-}" = "--force-ask" ]; then _force_ask=true; fi
+
+    # basic 단독 → 질문 스킵, none·false 확정
+    if _is_basic_only; then
+        [ -z "$DEPLOY_TARGET" ] && DEPLOY_TARGET="none"
+        [ -z "$INCLUDE_NEXUS" ] && INCLUDE_NEXUS=false
+        [ -z "$INCLUDE_NPM_PUBLISH" ] && INCLUDE_NPM_PUBLISH=false
+        [ -z "$INCLUDE_GH_PACKAGES" ] && INCLUDE_GH_PACKAGES=false
+        return 0
+    fi
 
     # 비대화형 → 기본값 확정 (deploy=docker-ssh, publish 미설정=false)
     if [ "$TTY_AVAILABLE" = false ] || [ "$FORCE_MODE" = true ]; then
@@ -2808,6 +2830,7 @@ ask_deploy_publish() {
         print_separator_line
         print_to_user ""
         print_to_user "🚀 이 프로젝트를 어디에 배포하나요?"
+        print_to_user "   서버·호스팅에 올릴 계획이 있으면 고르고, 지금 없으면 '배포 안 함'으로 두면 됩니다."
         print_to_user ""
         local _dp_label _dp_rc=0
         _dp_label=$(choose_menu --cancel-label="기본값(docker-ssh)" "배포 방식을 선택하세요" \
@@ -2830,7 +2853,8 @@ ask_deploy_publish() {
     # ── publish 타겟 (다중 선택) ──
     if [ "$_force_ask" = true ] || [ -z "$INCLUDE_NEXUS" ] || [ -z "$INCLUDE_NPM_PUBLISH" ] || [ -z "$INCLUDE_GH_PACKAGES" ]; then
         print_to_user ""
-        print_to_user "📦 라이브러리/패키지 publish 레지스트리가 있나요? (없으면 그냥 Enter)"
+        print_to_user "📦 라이브러리로 배포(publish)할 계획이 있나요?"
+        print_to_user "   사내 Nexus·npmjs·GitHub Packages 중 해당되는 걸 고르세요. 없으면 그냥 Enter."
         print_to_user ""
         local _preselect=""
         [ "$INCLUDE_NEXUS" = true ] && _preselect="${_preselect:+$_preselect,}nexus"
@@ -2858,7 +2882,7 @@ ask_deploy_publish() {
 
 # 모든 opt-in 워크플로우를 순서대로 묻는다.
 # 인자: [--force-ask] type_dirs... (project_types_dir 하위 타입 폴더 목록)
-# - 배포/publish 축 (#439): ask_deploy_publish (타입 비종속 질문)
+# - 배포/publish 축 (#439): ask_deploy_publish (basic 단독이면 스킵, 실타입만 질문)
 # - Secret 백업: 공통 secret-backup/ 폴더 (배포축 아님 — 기존 폴더 질문 유지)
 ask_all_optional_workflows() {
     local _fa=""

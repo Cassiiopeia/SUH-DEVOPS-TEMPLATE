@@ -5,6 +5,7 @@ import { printBanner, printBannerCompact } from "../src/ui/banner.js";
 import {
   printDetectionLog, printAnalysisCard, printIdeStatus, printInstallKind, collectIdeStatuses,
 } from "../src/ui/status-cards.js";
+import { visualWidth } from "../src/ui/ansi.js";
 
 const capture = () => {
   const buf = [];
@@ -64,6 +65,28 @@ test("printAnalysisCard: 멀티타입·옵션·모노레포 경로 표시", () =
   assert.match(t, /Publish.*nexus/);
   assert.match(t, /Secret백업.*제외/);
   assert.match(t, /spring→server, react→client/);
+});
+
+test("printAnalysisCard: 한글·영문 혼합 라벨이 시각 폭으로 정렬됨 (CJK 폭 버그 수정)", () => {
+  const out = capture();
+  printAnalysisCard({
+    mode: "full", modeLabel: "전체 설치", types: ["basic"], version: "4.2.1", branch: "main",
+    deployTarget: "none", publishTargets: [], includeSecretBackup: false, showOptional: true,
+    paths: new Map(),
+  }, out);
+  // 각 데이터 행: "│  {icon} {padEndVisual(label,12)} {value}"
+  // 값(color 제거 후 첫 비공백)이 시작하는 시각 컬럼이 모든 행에서 동일해야 정렬이 맞다.
+  const lines = strip(out.text()).split("\n").filter((l) => /[📂🌙🌿💫🚀📦🔐]/u.test(l));
+  assert.ok(lines.length >= 6, `데이터 행 6개 이상 (실제 ${lines.length})`);
+  // 라벨 뒤 마지막 "2칸+ 공백"이 라벨↔값 구분자. 그 구분자 끝까지의 시각 폭 = 값 시작 컬럼.
+  const valueStartCols = lines.map((l) => {
+    const idx = l.search(/[📂🌙🌿💫🚀📦🔐]/u);
+    const afterIcon = l.slice(idx);
+    const m = afterIcon.match(/^(.*?\s{2,})\S/u); // 최소 매칭: 아이콘~라벨~구분공백 뒤 첫 값 글자
+    return m ? visualWidth(m[1]) : -1;
+  });
+  const first = valueStartCols[0];
+  assert.ok(first > 0 && valueStartCols.every((c) => c === first), `모든 값 시작 컬럼이 동일해야 함: ${valueStartCols}`);
 });
 
 test("printIdeStatus: 설치/미설치/CLI없음 3상태", () => {

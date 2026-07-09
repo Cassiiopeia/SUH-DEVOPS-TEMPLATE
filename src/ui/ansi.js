@@ -24,3 +24,10 @@ export function visualWidth(s) {
   }
   return w;
 }
+
+// 시각 폭(CJK 2칸) 기준으로 오른쪽 스페이스 패딩 — 한글·영문 혼합 라벨 열 정렬용.
+// JS 기본 String.padEnd는 문자 수 기준이라 한글이 섞이면 열이 어긋난다.
+export function padEndVisual(s, targetWidth) {
+  const pad = targetWidth - visualWidth(s);
+  return pad > 0 ? String(s) + " ".repeat(pad) : String(s);
+}

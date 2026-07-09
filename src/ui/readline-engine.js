@@ -6,6 +6,7 @@
 // 계약: 취소(ESC/Ctrl+C)는 CANCEL 심볼 반환. 각 함수 async.
 import { emitKeypressEvents } from "node:readline";
 import { stdin, stdout } from "node:process";
+import { visualWidth } from "./ansi.js";
 
 export const CANCEL = Symbol("cancel");
 
@@ -28,18 +29,31 @@ const S_BAR = paint("│", c.gray);
 const S_Q = paint("◆", c.cyan);
 const S_DONE = paint("◇", c.green);
 
+// 한 논리 라인이 터미널 폭에서 차지하는 물리 줄 수 (wrap 고려).
+// WHY: 긴 라벨(한글 2칸 포함)이 터미널 폭을 넘으면 터미널이 자동 줄바꿈해 물리적으로 2줄+가 된다.
+//   커서 되감기(ESC[nA)는 물리 줄 기준이므로, 논리 줄 수만 세면 wrap된 만큼 덜 올라가
+//   이전 출력이 안 지워지고 매 렌더마다 화면이 아래로 밀린다. (실측: Windows PowerShell 폭 80)
+export function physicalRows(line, cols) {
+  const w = visualWidth(line); // ANSI 시퀀스 제외 + CJK 2칸
+  if (cols <= 0) return 1;
+  // 빈 줄도 최소 1행. 폭의 정수배로 딱 떨어지면 wrap 안 되므로 그대로(80칸 라인@80폭 = 1행).
+  if (w === 0) return 1;
+  return Math.max(1, Math.ceil(w / cols));
+}
+
 // 여러 줄 지운 뒤 커서를 블록 시작으로 되돌리는 렌더러.
-// prevLines 만큼 위로 올라가 지우고 새로 그린다.
+// 직전 렌더의 "물리 줄 수"만큼 위로 올라가 지우고 새로 그린다 (wrap 안전).
 function makeRenderer() {
-  let prevLines = 0;
+  let prevRows = 0; // 직전 렌더가 실제로 차지한 물리 줄 수
   return {
     render(lines) {
-      if (prevLines > 0) stdout.write(`${ESC}${prevLines}A`); // 위로
+      if (prevRows > 0) stdout.write(`${ESC}${prevRows}A`); // 물리 줄 기준으로 위로
       stdout.write(`${ESC}0J`); // 커서 아래 전부 지우기
       stdout.write(lines.join("\n") + "\n");
-      prevLines = lines.length;
+      const cols = stdout.columns || 80; // 터미널 폭 (파이프 등으로 없으면 80 가정)
+      prevRows = lines.reduce((sum, l) => sum + physicalRows(l, cols), 0);
     },
-    reset() { prevLines = 0; },
+    reset() { prevRows = 0; },
   };
 }
 

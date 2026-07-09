@@ -49,17 +49,33 @@ const HEADER = `# ==============================================================
 // 구 synology 키 등 다른 키는 어느 분기에도 안 걸려 자연히 무시된다.
 // (options-ask.js가 이 함수를 import한다 — 순환 방지 위해 여기(version-yml)에 정의.)
 export function parseTemplateOptions(content) {
-  const out = { deploy: null, publish: null, secretBackup: null };
+  const out = { deploy: null, publish: null, secretBackup: null,
+                changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null };
   let legacyNexus = null;
   let legacyNpm = null;
   // 값 정규화: 따옴표 제거 + 트림 (.sh tr -d '"' | tr -d "'" | xargs 등가)
   const strip = (s) => String(s).replace(/["']/g, "").trim();
   let inTemplate = false;
   let inOptions = false;
+  let inCodeReview = false;
+  let inChangelog = false;
   for (const line of String(content || "").split("\n")) {
     if (/^\s*template:/.test(line)) { inTemplate = true; continue; }
     if (inTemplate && /^\s+options:/.test(line)) { inOptions = true; continue; }
     if (inTemplate && inOptions) {
+      // 중첩 블록 헤더 감지 (options 밑 한 단계) — code_review / changelog (#455)
+      if (/^\s+code_review:\s*$/.test(line)) { inCodeReview = true; inChangelog = false; continue; }
+      if (/^\s+changelog:\s*$/.test(line)) { inChangelog = true; inCodeReview = false; continue; }
+      if (inCodeReview) {
+        const cm = line.match(/^\s+coderabbit:\s*(.+)/);
+        if (cm) { const v = strip(cm[1]); if (v === "true") out.codeReviewCoderabbit = true; if (v === "false") out.codeReviewCoderabbit = false; continue; }
+      }
+      if (inChangelog) {
+        const pm = line.match(/^\s+provider:\s*(.+)/);
+        if (pm) { out.changelogProvider = strip(pm[1]); continue; }
+        const bm = line.match(/^\s+base_url:\s*(.*)/);
+        if (bm) { out.changelogBaseUrl = strip(bm[1]); continue; }
+      }
       let m = line.match(/^\s+deploy:\s*(.+)/);
       if (m) {
         const v = strip(m[1]);

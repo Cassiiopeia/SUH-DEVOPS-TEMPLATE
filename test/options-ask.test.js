@@ -13,6 +13,10 @@ function touch(root, rel, content = "") {
 }
 function makeTmp() { return mkdtempSync(join(tmpdir(), "optask-")); }
 
+// #455에서 추가된 changelog/code_review 필드의 기본값(미기재 → null).
+// 기존 deepEqual 기대값에 spread해 필드 추가로 인한 회귀를 막는다.
+const CL_NULL = { changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null };
+
 // 실제 temp 레이아웃({tempDir}/.github/workflows/project-types)으로 픽스처 구성
 function makeTemplateFixture({ secretBackup = true } = {}) {
   const dir = makeTmp();
@@ -49,6 +53,25 @@ metadata:
       secret_backup: ${secret}
 `;
 
+// version.yml — changelog/code_review 옵션 포함 (#455)
+const VY_CHANGELOG = (provider, baseUrl, coderabbit) => `version: "1.0.0"
+project_types: ["basic"]
+metadata:
+  last_updated: "2026-07-09"
+  template:
+    source: "projectops"
+    version: "4.3.0"
+    options:
+      deploy: "none"
+      publish: []
+      secret_backup: false
+      code_review:
+        coderabbit: ${coderabbit}
+      changelog:
+        provider: "${provider}"
+        base_url: "${baseUrl}"
+`;
+
 // io 스텁 — confirm(Secret) + select(deploy) + multiselect(publish) 응답 시퀀스
 function stubIo({ confirms = [], selects = [], multiselects = [] } = {}) {
   const calls = { confirm: [], select: [], multiselect: [] };
@@ -63,18 +86,18 @@ function stubIo({ confirms = [], selects = [], multiselects = [] } = {}) {
 
 test("parseTemplateOptions: 신 축 deploy/publish 파싱", () => {
   assert.deepEqual(parseTemplateOptions(VY_NEW("vercel", ["npm", "nexus"], false)),
-    { deploy: "vercel", publish: ["npm", "nexus"], secretBackup: false });
+    { deploy: "vercel", publish: ["npm", "nexus"], secretBackup: false, ...CL_NULL });
   assert.deepEqual(parseTemplateOptions(VY_NEW("docker-ssh", [], true)),
-    { deploy: "docker-ssh", publish: [], secretBackup: true });
+    { deploy: "docker-ssh", publish: [], secretBackup: true, ...CL_NULL });
   assert.deepEqual(parseTemplateOptions('version: "1.0.0"\nproject_types: ["spring"]\n'),
-    { deploy: null, publish: null, secretBackup: null }); // options 블록 없음 → null
+    { deploy: null, publish: null, secretBackup: null, ...CL_NULL }); // options 블록 없음 → null
 });
 
 test("parseTemplateOptions: 구 키 자동 마이그레이션 (nexus:true → publish:[nexus] + deploy:none)", () => {
   assert.deepEqual(parseTemplateOptions(VY_LEGACY("true", "false")),
-    { deploy: "none", publish: ["nexus"], secretBackup: false });
+    { deploy: "none", publish: ["nexus"], secretBackup: false, ...CL_NULL });
   assert.deepEqual(parseTemplateOptions(VY_LEGACY("false", "true")),
-    { deploy: null, publish: [], secretBackup: true }); // nexus:false → publish 빈배열, deploy 미변경
+    { deploy: null, publish: [], secretBackup: true, ...CL_NULL }); // nexus:false → publish 빈배열, deploy 미변경
 });
 
 test("parseTemplateOptions: 신 publish 키가 있으면 구 키 마이그레이션 안 함", () => {
@@ -84,14 +107,32 @@ test("parseTemplateOptions: 신 publish 키가 있으면 구 키 마이그레이
   assert.deepEqual(r.publish, ["npm"]); // 신 publish 우선 — 구 nexus 무시
 });
 
+test("parseTemplateOptions: changelog/code_review 파싱 (#455)", () => {
+  const r = parseTemplateOptions(VY_CHANGELOG("github-ai", "", "true"));
+  assert.equal(r.changelogProvider, "github-ai");
+  assert.equal(r.changelogBaseUrl, "");
+  assert.equal(r.codeReviewCoderabbit, true);
+
+  const r2 = parseTemplateOptions(VY_CHANGELOG("ollama", "https://ai.suhsaechan.kr/v1", "false"));
+  assert.equal(r2.changelogProvider, "ollama");
+  assert.equal(r2.changelogBaseUrl, "https://ai.suhsaechan.kr/v1");
+  assert.equal(r2.codeReviewCoderabbit, false);
+
+  // 필드 없으면 null (기존 형식 하위호환)
+  const r3 = parseTemplateOptions(VY_NEW("vercel", ["npm"], false));
+  assert.equal(r3.changelogProvider, null);
+  assert.equal(r3.changelogBaseUrl, null);
+  assert.equal(r3.codeReviewCoderabbit, null);
+});
+
 test("parseTemplateOptions: template 섹션 밖의 nexus 키는 무시", () => {
   const y = 'nexus: true\nmetadata:\n  foo: "bar"\n';
-  assert.deepEqual(parseTemplateOptions(y), { deploy: null, publish: null, secretBackup: null });
+  assert.deepEqual(parseTemplateOptions(y), { deploy: null, publish: null, secretBackup: null, ...CL_NULL });
 });
 
 test("parseExisting: options 필드 포함 반환 (신 축)", () => {
   const r = parseExisting(VY_NEW("vercel", ["npm"], false));
-  assert.deepEqual(r.options, { deploy: "vercel", publish: ["npm"], secretBackup: false });
+  assert.deepEqual(r.options, { deploy: "vercel", publish: ["npm"], secretBackup: false, ...CL_NULL });
   assert.equal(r.version, "1.0.0");
 });
 

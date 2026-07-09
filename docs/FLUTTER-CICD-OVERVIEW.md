@@ -47,7 +47,7 @@ SUH-DEVOPS-TEMPLATE의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitH
 │                                                                  │
 │  PR/이슈에 빌드 명령어 댓글 (build app/apk build/ios build)     │
 │                     ↓                                            │
-│  PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml (트리거)        │
+│  PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml (트리거)        │
 │                     ↓                                            │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │ PROJECT-FLUTTER-ANDROID-TEST-APK.yaml  → APK 아티팩트   │    │
@@ -113,7 +113,7 @@ SUH-DEVOPS-TEMPLATE의 Flutter CI/CD 시스템은 **마법사 도구**와 **GitH
 
 | 워크플로우 | 용도 | 트리거 |
 |-----------|------|--------|
-| `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml` | 빌드 트리거 감지 | `@suh-lab build app/apk build/ios build` 댓글 |
+| `PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml` | 빌드 트리거 감지 | `@projectops build app/apk build/ios build` 댓글 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml` | iOS 테스트 빌드 | repository_dispatch |
 | `PROJECT-FLUTTER-ANDROID-TEST-APK.yaml` | Android APK 테스트 빌드 | repository_dispatch |
 
@@ -162,9 +162,9 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 
 PR 또는 이슈에 댓글 작성:
 ```
-@suh-lab build app    # Android + iOS 모두 빌드
-@suh-lab apk build    # Android만 빌드
-@suh-lab ios build    # iOS만 빌드
+@projectops build app    # Android + iOS 모두 빌드
+@projectops apk build    # Android만 빌드
+@projectops ios build    # iOS만 빌드
 ```
 
 ---
@@ -196,7 +196,7 @@ PR 또는 이슈에 댓글 작성:
     ├── PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml
     ├── PROJECT-FLUTTER-ANDROID-PLAYSTORE-CICD.yaml
     ├── PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD.yaml
-    ├── PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml
+    ├── PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml
     ├── PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml
     └── PROJECT-FLUTTER-ANDROID-TEST-APK.yaml
 ```

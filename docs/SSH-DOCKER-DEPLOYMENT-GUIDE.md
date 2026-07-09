@@ -353,7 +353,7 @@ env:
 **파일**: `PROJECT-SPRING-PR-PREVIEW.yaml`
 
 **트리거**:
-- PR 코멘트에 `@suh-lab pr build/destroy/status` 입력
+- PR 코멘트에 `@projectops pr build/destroy/status` 입력
 - PR 종료 시 자동 삭제
 
 ### 사전 요구사항
@@ -415,9 +415,9 @@ PR 코멘트에 다음 명령어 입력:
 
 | 명령어 | 설명 |
 |--------|------|
-| `@suh-lab pr build` | PR Preview 빌드 및 배포 |
-| `@suh-lab pr destroy` | Preview 환경 삭제 |
-| `@suh-lab pr status` | 현재 상태 확인 |
+| `@projectops pr build` | PR Preview 빌드 및 배포 |
+| `@projectops pr destroy` | Preview 환경 삭제 |
+| `@projectops pr status` | 현재 상태 확인 |
 
 ### 리소스 네이밍 규칙
 

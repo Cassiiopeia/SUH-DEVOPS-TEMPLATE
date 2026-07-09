@@ -3,12 +3,12 @@
 # 자동 QA 이슈 생성 워크플로우
 # ===================================================================
 #
-# 이 워크플로우는 GitHub 이슈/PR 댓글에서 @suh-lab 멘션을 감지하여
+# 이 워크플로우는 GitHub 이슈/PR 댓글에서 @projectops 멘션을 감지하여
 # QA(시험요청) 이슈를 자동으로 생성합니다.
 #
 # ===================================================================
 # 작동 방식:
-# 1. 이슈 또는 PR 댓글에서 "@suh-lab" + "create" + "qa" 감지 (순서 무관)
+# 1. 이슈 또는 PR 댓글에서 "@projectops" + "create" + "qa" 감지 (순서 무관)
 # 2. 댓글에 👀 리액션 추가 (확인 표시)
 # 3. 원본 이슈/PR 제목 또는 브랜치명에서 이슈 번호 추출
 # 4. 제목에서 불필요한 이모지 및 키워드 제거
@@ -19,7 +19,7 @@
 # 지원 기능:
 # - 이슈와 PR 모두 지원
 # - PR 브랜치명에서 이슈 번호 자동 추출
-# - 명령어 순서 무관 (@suh-lab create qa, @suh-lab qa create 모두 가능)
+# - 명령어 순서 무관 (@projectops create qa, @projectops qa create 모두 가능)
 # - 이모지 자동 제거 (🚀, 🔥, ⌛ 등)
 # - 이슈 타입 키워드 제거 ([버그], [디자인], [기능요청] 등)
 # - 카테고리 및 내용 자동 추출
@@ -32,7 +32,7 @@
 # QA 이슈: "🔍 [시험요청][로그인] 소셜 로그인 추가"
 #
 # 트리거 방법:
-# 이슈/PR 댓글에 "@suh-lab create qa" 또는 "@suh-lab qa create" 입력
+# 이슈/PR 댓글에 "@projectops create qa" 또는 "@projectops qa create" 입력
 # ===================================================================
 
 name: PROJECT-CREATE-QA-ISSUE
@@ -52,9 +52,9 @@ env:
 
 jobs:
   create-qa:
-    # @suh-lab과 create, qa 키워드가 모두 포함되어 있으면 실행 (순서 무관)
+    # @projectops과 create, qa 키워드가 모두 포함되어 있으면 실행 (순서 무관)
     if: |
-      contains(github.event.comment.body, '@suh-lab') && 
+      contains(github.event.comment.body, '@projectops') && 
       contains(github.event.comment.body, 'create') &&
       contains(github.event.comment.body, 'qa')
     runs-on: ubuntu-latest
@@ -191,7 +191,7 @@ jobs:
             - **요청자**: @${issue.user.login}
 
             ---
-            *🤖 이 이슈는 @suh-lab 봇에 의해 자동 생성되었습니다.*`;
+            *🤖 이 이슈는 @projectops 봇에 의해 자동 생성되었습니다.*`;
 
             try {
               // QA 이슈 생성

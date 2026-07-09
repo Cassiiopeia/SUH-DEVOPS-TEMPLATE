@@ -148,7 +148,7 @@ git commit -m "fix: add execute permission to scripts"
 
 ### 빌드 실패
 
-**증상**: `@suh-lab server build` 후 에러
+**증상**: `@projectops server build` 후 에러
 
 **확인 사항**:
 ```

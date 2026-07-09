@@ -9,7 +9,7 @@
 | 기능 | 트리거 | 설명 |
 |------|--------|------|
 | **Issue Helper** | 이슈 생성 | 브랜치명, 커밋 메시지 자동 제안 |
-| **QA 봇** | `@suh-lab create qa` 댓글 | QA 이슈 자동 생성 |
+| **QA 봇** | `@projectops create qa` 댓글 | QA 이슈 자동 생성 |
 | **라벨 동기화** | `issue-labels.yml` 변경 | GitHub 라벨 자동 동기화 |
 
 ---
@@ -72,18 +72,18 @@ on:
 
 ## QA 봇
 
-Issue나 PR에 `@suh-lab create qa` 댓글을 작성하면 QA 이슈를 자동 생성합니다.
+Issue나 PR에 `@projectops create qa` 댓글을 작성하면 QA 이슈를 자동 생성합니다.
 
 ### 사용법
 
 ```
-@suh-lab create qa
+@projectops create qa
 ```
 
 ### 동작 방식
 
 ```
-1. Issue/PR에 @suh-lab create qa 댓글 작성
+1. Issue/PR에 @projectops create qa 댓글 작성
 2. QA-ISSUE-CREATION-BOT 워크플로우 실행
 3. QA 이슈 템플릿으로 새 이슈 생성
 4. 원본 Issue/PR에 링크 댓글
@@ -119,7 +119,7 @@ on:
 ```
 
 **트리거 조건**:
-- 댓글에 `@suh-lab create qa` 포함
+- 댓글에 `@projectops create qa` 포함
 - Issue 또는 PR 모두 지원
 
 ---
@@ -212,7 +212,7 @@ on:
 ### QA 이슈 생성 안됨
 
 **확인 사항**:
-1. 댓글에 정확히 `@suh-lab create qa` 입력했는지 확인
+1. 댓글에 정확히 `@projectops create qa` 입력했는지 확인
 2. 워크플로우 권한 확인 (Issues 쓰기 권한)
 
 ### 라벨 동기화 안됨
@@ -225,6 +225,6 @@ on:
 
 ## 관련 문서
 
-- [PR Preview](PR-PREVIEW.md) - `@suh-lab server` 명령어
-- [Flutter 빌드 트리거](FLUTTER-TEST-BUILD-TRIGGER.md) - `@suh-lab build app/apk build/ios build` 명령어
+- [PR Preview](PR-PREVIEW.md) - `@projectops server` 명령어
+- [Flutter 빌드 트리거](FLUTTER-TEST-BUILD-TRIGGER.md) - `@projectops build app/apk build/ios build` 명령어
 - [트러블슈팅](TROUBLESHOOTING.md)

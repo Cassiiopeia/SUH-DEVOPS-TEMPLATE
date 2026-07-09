@@ -233,13 +233,13 @@ Issue나 PR에 댓글로 자동화를 실행합니다.
 
 | 명령어 | 기능 | 대상 |
 |--------|------|------|
-| `@suh-lab server build` | 임시 서버 배포 | Spring, Python |
-| `@suh-lab server destroy` | 서버 삭제 | Spring, Python |
-| `@suh-lab server status` | 서버 상태 확인 | Spring, Python |
-| `@suh-lab build app` | iOS + Android 빌드 | Flutter |
-| `@suh-lab apk build` | Android만 빌드 | Flutter |
-| `@suh-lab ios build` | iOS만 빌드 | Flutter |
-| `@suh-lab create qa` | QA 이슈 자동 생성 | 모든 프로젝트 |
+| `@projectops server build` | 임시 서버 배포 | Spring, Python |
+| `@projectops server destroy` | 서버 삭제 | Spring, Python |
+| `@projectops server status` | 서버 상태 확인 | Spring, Python |
+| `@projectops build app` | iOS + Android 빌드 | Flutter |
+| `@projectops apk build` | Android만 빌드 | Flutter |
+| `@projectops ios build` | iOS만 빌드 | Flutter |
+| `@projectops create qa` | QA 이슈 자동 생성 | 모든 프로젝트 |
 
 > 상세: [PR Preview](docs/PR-PREVIEW.md) | [Flutter 빌드](docs/FLUTTER-TEST-BUILD-TRIGGER.md) | [이슈 자동화](docs/ISSUE-AUTOMATION.md)
 

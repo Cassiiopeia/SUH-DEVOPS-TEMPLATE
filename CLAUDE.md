@@ -102,7 +102,7 @@ snake_case.sh / snake_case.py
 | `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` | main PR (develop→main) | 버전 확정 + AI 체인지로그 + automerge |
 | `PROJECT-COMMON-README-VERSION-UPDATE` | main 푸시 | README 버전 동기화 |
 | `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE` | 이슈 생성 | 브랜치명/커밋 제안 |
-| `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @suh-lab 멘션 | QA 이슈 자동 생성 |
+| `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @projectops 멘션 | QA 이슈 자동 생성 |
 | `PROJECT-COMMON-SYNC-ISSUE-LABELS` | 라벨 파일 변경 | GitHub 라벨 동기화 |
 | `PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC` | version.json 변경 | Util HTML 버전 동기화 |
 | `PROJECT-COMMON-PROJECTS-SYNC-MANAGER` | 이슈 라벨 변경 | Issue Label → Projects Status 동기화 |
@@ -118,7 +118,7 @@ snake_case.sh / snake_case.py
 | `PROJECT-FLUTTER-ANDROID-TEST-APK` | 테스트 APK 빌드 | 기본 |
 | `PROJECT-FLUTTER-IOS-TESTFLIGHT` | TestFlight 배포 | 기본 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT` | 테스트 빌드 | 기본 |
-| `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
+| `PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER` | 댓글 트리거 빌드 | 기본 |
 | `PROJECT-FLUTTER-ANDROID-SELFHOSTED-CICD` | 자체 서버(SMB) APK 배포 | 기본 |
 
 #### ⚠️ 배포/publish 타겟 축 (#439, v4.2.0 — agent 필독)
@@ -383,10 +383,10 @@ EOF
 ### 댓글 기반
 | 키워드 | 워크플로우 | 기능 |
 |--------|-----------|------|
-| `@suh-lab create qa` | QA-ISSUE-CREATION-BOT | QA 이슈 자동 생성 |
-| `@suh-lab build app` | SUH-LAB-APP-BUILD-TRIGGER | Android + iOS 빌드 |
-| `@suh-lab apk build` | SUH-LAB-APP-BUILD-TRIGGER | Android만 빌드 |
-| `@suh-lab ios build` | SUH-LAB-APP-BUILD-TRIGGER | iOS만 빌드 |
+| `@projectops create qa` | QA-ISSUE-CREATION-BOT | QA 이슈 자동 생성 |
+| `@projectops build app` | PROJECTOPS-APP-BUILD-TRIGGER | Android + iOS 빌드 |
+| `@projectops apk build` | PROJECTOPS-APP-BUILD-TRIGGER | Android만 빌드 |
+| `@projectops ios build` | PROJECTOPS-APP-BUILD-TRIGGER | iOS만 빌드 |
 
 ### 브랜치 기반
 | 브랜치 | 트리거 | 워크플로우 |

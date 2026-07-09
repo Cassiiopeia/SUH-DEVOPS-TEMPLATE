@@ -36,16 +36,16 @@ Issue나 PR에 댓글로 다음 명령어를 입력합니다.
 
 | 명령어 | 기능 |
 |--------|------|
-| `@suh-lab server build` | Preview 서버 빌드 및 배포 |
-| `@suh-lab server destroy` | Preview 서버 삭제 |
-| `@suh-lab server status` | 현재 상태 확인 |
+| `@projectops server build` | Preview 서버 빌드 및 배포 |
+| `@projectops server destroy` | Preview 서버 삭제 |
+| `@projectops server status` | 현재 상태 확인 |
 
 ### 사용 시나리오
 
 #### PR에서 사용
 ```
 1. PR 생성
-2. 댓글: @suh-lab server build
+2. 댓글: @projectops server build
 3. → 빌드 및 배포 진행
 4. → Preview URL 댓글로 안내
 5. PR 닫힘 시 자동 삭제
@@ -56,7 +56,7 @@ Issue나 PR에 댓글로 다음 명령어를 입력합니다.
 1. Issue 생성
 2. Issue Helper가 브랜치명 자동 제안 (댓글)
 3. 해당 브랜치로 코드 푸시
-4. 댓글: @suh-lab server build
+4. 댓글: @projectops server build
 5. → 브랜치 자동 감지 후 빌드
 6. Issue 닫힘 시 자동 삭제
 ```
@@ -182,7 +182,7 @@ HEALTH_CHECK_LOG_PATTERN: 'Uvicorn running on'
 
 ### 빌드 실패
 
-**증상**: `@suh-lab server build` 후 에러 발생
+**증상**: `@projectops server build` 후 에러 발생
 
 **확인 사항**:
 1. GitHub Actions 로그 확인

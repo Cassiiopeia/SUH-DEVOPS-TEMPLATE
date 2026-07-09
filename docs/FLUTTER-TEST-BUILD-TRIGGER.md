@@ -37,14 +37,14 @@ PR에 다음 댓글 중 하나를 작성합니다:
 
 | 명령어 | 빌드 대상 |
 |--------|----------|
-| `@suh-lab build app` | Android + iOS 모두 |
-| `@suh-lab apk build` | Android만 |
-| `@suh-lab ios build` | iOS만 |
+| `@projectops build app` | Android + iOS 모두 |
+| `@projectops apk build` | Android만 |
+| `@projectops ios build` | iOS만 |
 
 ```
-@suh-lab build app    # 양쪽 모두 빌드
-@suh-lab apk build    # Android만 빌드
-@suh-lab ios build    # iOS만 빌드
+@projectops build app    # 양쪽 모두 빌드
+@projectops apk build    # Android만 빌드
+@projectops ios build    # iOS만 빌드
 ```
 
 ### 이슈에서 빌드 트리거
@@ -69,16 +69,16 @@ feature/20240101_#123_기능명
 
 | 패턴 | 필요한 키워드 | 빌드 대상 |
 |------|--------------|----------|
-| 전체 빌드 | `@suh-lab` + `build` + `app` | Android + iOS |
-| APK만 | `@suh-lab` + `apk` + `build` | Android |
-| iOS만 | `@suh-lab` + `ios` + `build` | iOS |
+| 전체 빌드 | `@projectops` + `build` + `app` | Android + iOS |
+| APK만 | `@projectops` + `apk` + `build` | Android |
+| iOS만 | `@projectops` + `ios` + `build` | iOS |
 
 **예시:**
 ```
-@suh-lab build app                      # Android + iOS 빌드
-@suh-lab apk build                      # Android만 빌드
-@suh-lab ios build                      # iOS만 빌드
-@suh-lab 으로 build 해서 app 테스트해주세요  # Android + iOS 빌드
+@projectops build app                      # Android + iOS 빌드
+@projectops apk build                      # Android만 빌드
+@projectops ios build                      # iOS만 빌드
+@projectops 으로 build 해서 app 테스트해주세요  # Android + iOS 빌드
 ```
 
 ---
@@ -98,9 +98,9 @@ feature/20240101_#123_기능명
 
 | 빌드 타입 | 카운트 기준 댓글 |
 |-----------|-----------------|
-| `build app` | `@suh-lab` + `build app` 포함 댓글 |
-| `apk build` | `@suh-lab` + `apk build` 포함 댓글 |
-| `ios build` | `@suh-lab` + `ios build` 포함 댓글 |
+| `build app` | `@projectops` + `build app` 포함 댓글 |
+| `apk build` | `@projectops` + `apk build` 포함 댓글 |
+| `ios build` | `@projectops` + `ios build` 포함 댓글 |
 
 > **Note**: 트리거 요청 댓글 자체를 카운트하므로, 빌드 실패 여부와 관계없이 정확한 빌드 번호가 생성됩니다.
 
@@ -110,11 +110,11 @@ feature/20240101_#123_기능명
 
 | 실행 순서 | 명령어 | 카운트 기준 | 빌드 번호 |
 |-----------|--------|-------------|-----------|
-| 1 | `@suh-lab apk build` | APK 카운트: 0 | `38700` |
-| 2 | `@suh-lab ios build` | iOS 카운트: 0 | `38700` |
-| 3 | `@suh-lab apk build` | APK 카운트: 1 | `38701` |
-| 4 | `@suh-lab ios build` | iOS 카운트: 1 | `38701` |
-| 5 | `@suh-lab build app` | 앱 카운트: 0 | `38700` |
+| 1 | `@projectops apk build` | APK 카운트: 0 | `38700` |
+| 2 | `@projectops ios build` | iOS 카운트: 0 | `38700` |
+| 3 | `@projectops apk build` | APK 카운트: 1 | `38701` |
+| 4 | `@projectops ios build` | iOS 카운트: 1 | `38701` |
+| 5 | `@projectops build app` | 앱 카운트: 0 | `38700` |
 
 > **Note**: Android와 iOS가 같은 빌드 번호를 가질 수 있지만, 각 플랫폼 내에서는 고유합니다.
 
@@ -131,7 +131,7 @@ feature/20240101_#123_기능명
 
 ```
 1. PR/이슈에 빌드 명령어 댓글 작성
-   (@suh-lab build app / apk build / ios build)
+   (@projectops build app / apk build / ios build)
        ↓
 2. BUILD-TRIGGER 워크플로우 실행
    - 👀 리액션 추가
@@ -256,7 +256,7 @@ TestFlight 앱에서 최신 빌드를 확인하세요.
 
 | 파일 | 용도 |
 |------|------|
-| `PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml` | 댓글 감지 및 빌드 트리거 |
+| `PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml` | 댓글 감지 및 빌드 트리거 |
 | `PROJECT-FLUTTER-ANDROID-TEST-APK.yaml` | Android APK 빌드 |
 | `PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml` | iOS TestFlight 빌드 |
 
@@ -336,7 +336,7 @@ permissions:
 
 ```
 .github/workflows/project-types/flutter/
-├── PROJECT-FLUTTER-SUH-LAB-APP-BUILD-TRIGGER.yaml  # 빌드 트리거
+├── PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml  # 빌드 트리거
 ├── PROJECT-FLUTTER-ANDROID-TEST-APK.yaml           # Android 테스트 빌드
 └── PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml        # iOS 테스트 빌드
 ```

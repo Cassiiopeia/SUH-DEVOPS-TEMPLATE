@@ -56,10 +56,11 @@ new_workdir
 printf '{"dependencies":{"react":"^18.0.0"}}\n' > package.json
 chk "react 판별" "$(classify_package_json package.json)" "react"
 
-echo "=== (8) classify_package_json: next 의존성 → next ==="
+echo "=== (8) classify_package_json: next 의존성 → react (v4.1.0 흡수) ==="
 new_workdir
 printf '{"dependencies":{"next":"14.0.0","react":"^18"}}\n' > package.json
-chk "next 판별(react보다 우선)" "$(classify_package_json package.json)" "next"
+# next는 v4.1.0에서 react로 흡수됨 (sh/ps1/npx 일관 — PROJECT-NEXT-* 삭제)
+chk "next 의존성 → react 흡수" "$(classify_package_json package.json)" "react"
 
 echo "=== (9) classify_package_json: react-native + expo → react-native-expo ==="
 new_workdir
@@ -97,11 +98,11 @@ mkdir -p client
 printf '{"dependencies":{"react":"^18"}}\n' > client/package.json
 chk "서브폴더 react 추천" "$(suggest_types_by_scan)" "react"
 
-echo "=== (15) 서브폴더 next: web/package.json → next 포함 ==="
+echo "=== (15) 서브폴더 next: web/package.json → react 흡수 (v4.1.0) ==="
 new_workdir
 mkdir -p web
 printf '{"dependencies":{"next":"14","react":"^18"}}\n' > web/package.json
-chk "서브폴더 next 추천" "$(suggest_types_by_scan)" "next"
+chk "서브폴더 next → react 흡수" "$(suggest_types_by_scan)" "react"
 
 echo "=== (16) 혼합 모노레포: app/pubspec + client/package(react) + ai/pyproject ==="
 new_workdir

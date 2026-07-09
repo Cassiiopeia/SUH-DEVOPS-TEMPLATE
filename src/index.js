@@ -111,6 +111,10 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
     // 릴리스 배포 브랜치(#456): CLI 플래그 → version.yml 저장값 → 빈 값(미출력, 스킬이 develop 폴백)
     deployBranch: opts.deployBranch || existing?.options?.deployBranch || "",
+    // changelog/code_review 축(#455): 비대화형은 저장값 → 기본값. null이 흘러 provider:"null"로 기록되던 버그 수정.
+    changelogProvider: existing?.options?.changelogProvider ?? "github-ai",
+    changelogBaseUrl: existing?.options?.changelogBaseUrl ?? "",
+    codeReviewCoderabbit: existing?.options?.codeReviewCoderabbit ?? false,
     repoName,
     // 실 resolver 4종 (.sh resolve_token 등가 — spring-app-yml 스텁 제거)
     resolvers: makeResolvers(cwd, repoName, paths),

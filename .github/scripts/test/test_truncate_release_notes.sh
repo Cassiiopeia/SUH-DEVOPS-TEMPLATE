@@ -16,7 +16,7 @@ chk() {
   fi
 }
 clen() { python3 -c "import sys; print(len(open(sys.argv[1], encoding='utf-8').read()))" "$1"; }
-cr() { tr -cd '\r' < "$1" | wc -c; }
+cr() { tr -cd '\r' < "$1" | wc -c | tr -d ' '; }  # BSD wc는 앞에 공백 붙임 → 제거
 ends_ellipsis() { python3 -c "import sys; print('1' if open(sys.argv[1], encoding='utf-8').read().endswith(chr(8230)) else '0')" "$1"; }
 
 echo "=== (a) char 한도 이내 통과 ==="

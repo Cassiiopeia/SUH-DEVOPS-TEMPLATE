@@ -10,7 +10,7 @@
 
 2. **README의 Skills 표가 일부만 나열되고 나머지는 애매하게 처리됨**
    - 실제 skills 폴더에는 **20개**의 Skill이 있지만, README 표에는 10개만 나열됨.
-   - 나머지 10개는 `> 이 외 build, design, design-analyze, figma, ppt, refactor-analyze, testcase, suh-spring-test, init-worktree, review 스킬도 포함`이라는 한 줄로 애매하게 처리되어 있음.
+   - 나머지 10개는 `> 이 외 build, design, design-analyze, figma, ppt, refactor-analyze, testcase, spring-test, init-worktree, review 스킬도 포함`이라는 한 줄로 애매하게 처리되어 있음.
    - 각 Skill이 무엇을 하는지, 언제 쓰는지 알 수 없음.
 
 3. **docs/ 폴더에 Skills 전용 문서가 없음**
@@ -60,7 +60,7 @@ README.md의 문서 테이블에 `[Claude Code Skills 가이드](docs/SKILLS.md)
 
 **분석형 (6개)**: analyze, plan, design-analyze, refactor-analyze, review, troubleshoot
 **구현형 (7개)**: implement, design, refactor, test, figma, build, init-worktree
-**문서·산출물 생성형 (7개)**: document, issue, report, testcase, ppt, suh-spring-test, synology-expose
+**문서·산출물 생성형 (7개)**: document, issue, report, testcase, ppt, spring-test, synology-expose
 
 ## 🙋‍담당자
 

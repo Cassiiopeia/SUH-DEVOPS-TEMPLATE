@@ -1,7 +1,7 @@
 📝 현재 문제점
 ---
 
-- `suh-changelog-deploy` 스킬은 deploy PR 생성까지만 처리하고, PR이 실제로 automerge 됐는지 확인하는 단계가 없습니다.
+- `changelog-deploy` 스킬은 deploy PR 생성까지만 처리하고, PR이 실제로 automerge 됐는지 확인하는 단계가 없습니다.
 - 그래서 배포할 때마다 PR 상태·automerge·deploy 반영 여부를 확인하는 일회용 Python을 `/tmp`에 즉석 생성하게 됩니다 (PR 상태 조회, 워크플로우 run 확인, deploy 브랜치 반영 확인 등).
 - 매 배포마다 같은 로직을 재작성하면서 토큰이 낭비되고, 코드가 흩어져 일관성이 없습니다.
 - 확인 중 `sleep` 명령이 환경에서 차단되어 대기 흐름이 자주 막힙니다.

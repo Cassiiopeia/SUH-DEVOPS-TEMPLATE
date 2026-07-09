@@ -23,8 +23,8 @@
 
 이전 100% 실패하던 호출들 정상화:
 
-- `suh-troubleshoot/SKILL.md` get-output-path: 변수 미정의 (Exit 127) → 정상 동작
-- `suh-review/SKILL.md` get-output-path: 동일 정정
+- `troubleshoot/SKILL.md` get-output-path: 변수 미정의 (Exit 127) → 정상 동작
+- `review/SKILL.md` get-output-path: 동일 정정
 
 ### 다양성·확장성
 

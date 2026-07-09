@@ -25,20 +25,20 @@ suh-github-template skills 시스템을 **3-layer 아키텍처 + skill별 py 분
 
 | SKILL | 변경 내용 |
 |---|---|
-| suh-github | scripts/github_cli.py 신규 + SKILL.md 재작성 |
-| suh-issue | scripts/issue_cli.py 신규 + SKILL.md 재작성 |
-| suh-commit | scripts/commit_cli.py 신규 + SKILL.md 재작성 |
-| suh-report | scripts/report_cli.py 신규 + SKILL.md 재작성 |
-| suh-review | scripts/review_cli.py 신규 + SKILL.md 재작성 |
-| suh-troubleshoot | scripts/troubleshoot_cli.py 신규 + SKILL.md 재작성 |
-| suh-changelog-deploy | scripts/changelog_cli.py 신규 + SKILL.md 재작성 |
-| suh-skill-creator | SKILL.md + templates/python_cli_script.py 새 표준 반영 |
+| github | scripts/github_cli.py 신규 + SKILL.md 재작성 |
+| issue | scripts/issue_cli.py 신규 + SKILL.md 재작성 |
+| commit | scripts/commit_cli.py 신규 + SKILL.md 재작성 |
+| report | scripts/report_cli.py 신규 + SKILL.md 재작성 |
+| review | scripts/review_cli.py 신규 + SKILL.md 재작성 |
+| troubleshoot | scripts/troubleshoot_cli.py 신규 + SKILL.md 재작성 |
+| changelog-deploy | scripts/changelog_cli.py 신규 + SKILL.md 재작성 |
+| skill-creator | SKILL.md + templates/python_cli_script.py 새 표준 반영 |
 
 ### Out-of-scope
 
 - Plan-only 3개 통합 (analyze + design-analyze + refactor-analyze) — 별도 후속 작업
 - 17개 도큐먼트형 SKILL (plan, design, document 등 — py 호출 0건)
-- suh-ssh (이미 자체 scripts/ssh_connect.py 보유, 동작 OK)
+- ssh (이미 자체 scripts/ssh_connect.py 보유, 동작 OK)
 - 외부 CI/CD 워크플로우 변경
 
 ---
@@ -91,39 +91,39 @@ suh-github-template/
 │   │   ├── title.py                      # 제목 정규화
 │   │   ├── issue_number.py               # 이슈 번호 추출
 │   │   └── config.py                     # config.json 로드
-│   └── ssh/                              # suh-ssh 자체 폴더 (unchanged)
+│   └── ssh/                              # ssh 자체 폴더 (unchanged)
 │       └── ssh_connect.py
 │
 ├── skills/
-│   ├── suh-github/
+│   ├── github/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── github_cli.py             # Layer 2
-│   ├── suh-issue/
+│   ├── issue/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── issue_cli.py
-│   ├── suh-commit/
+│   ├── commit/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── commit_cli.py
-│   ├── suh-report/
+│   ├── report/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── report_cli.py
-│   ├── suh-review/
+│   ├── review/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── review_cli.py
-│   ├── suh-troubleshoot/
+│   ├── troubleshoot/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── troubleshoot_cli.py
-│   ├── suh-changelog-deploy/
+│   ├── changelog-deploy/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   │       └── changelog_cli.py
-│   ├── suh-skill-creator/
+│   ├── skill-creator/
 │   │   ├── SKILL.md
 │   │   ├── references/
 │   │   └── templates/
@@ -148,12 +148,12 @@ cd "$PROJECT_ROOT/skills/<skill>/scripts" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" <scope>_cli.py <subcommand> [args]
 ```
 
-예시 (suh-github):
+예시 (github):
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
-cd "$PROJECT_ROOT/skills/suh-github/scripts" || exit 1
+cd "$PROJECT_ROOT/skills/github/scripts" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py get-issue Cassiiopeia SUH-DEVOPS-TEMPLATE 322
 ```
 
@@ -315,7 +315,7 @@ if __name__ == "__main__":
 | 새 섹션 추가 | "MCP-style 4필드 JSON 표준" — 위 6.x 명시 |
 | 새 섹션 추가 | "OS 호환성 — Windows Git Bash + macOS/WSL 양쪽 실측 검증 완료" |
 
-### `skills/suh-skill-creator/templates/python_cli_script.py`
+### `skills/skill-creator/templates/python_cli_script.py`
 
 신규 skill 작성 시 사용하는 py 템플릿. 위 5.2 골격 그대로 + 주석 + 예시 서브커맨드 1개.
 
@@ -361,7 +361,7 @@ if __name__ == "__main__":
 3. **나머지 6개 _cli.py 작성**: issue, commit, report, review, troubleshoot, changelog
 4. **SKILL.md 7개 재작성**: 표준 5줄 호출 패턴 적용
 5. **references/common-rules.md 정정**: §3 제거 + 새 표준 명시
-6. **suh-skill-creator 업데이트**: templates/python_cli_script.py 새 표준 + SKILL.md 보강
+6. **skill-creator 업데이트**: templates/python_cli_script.py 새 표준 + SKILL.md 보강
 7. **scripts/suh_template/ 삭제**
 8. **회귀 검증**: Windows Git Bash + WSL Linux 양쪽 30개 코드블록 실측
 
@@ -382,7 +382,7 @@ if __name__ == "__main__":
 신규 skill에 py 호출 필요 시:
 
 1. `skills/suh-<new>/scripts/<scope>_cli.py` 작성 (Layer 2)
-2. `suh-skill-creator/templates/python_cli_script.py` 골격 그대로 복사 → 서브커맨드만 추가
+2. `skill-creator/templates/python_cli_script.py` 골격 그대로 복사 → 서브커맨드만 추가
 3. 공유 로직 필요하면 `scripts/common/`의 모듈 import — 새로 작성하지 않는다
 4. SKILL.md 코드블록 = self-contained 5줄 그대로 (skill 이름만 치환)
 5. `references/common-rules.md` 변경 0 — 표준이 그대로 적용
@@ -457,7 +457,7 @@ JSON only가 표준. 향후 plain text·yaml·csv 지원 필요 시:
 각 `_cli.py` 옆에 `tests/test_<scope>_cli.py` 추가 가능:
 
 ```
-skills/suh-github/
+skills/github/
 ├── scripts/github_cli.py
 └── tests/test_github_cli.py
 ```

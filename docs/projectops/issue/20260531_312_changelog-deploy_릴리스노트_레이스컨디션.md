@@ -6,7 +6,7 @@
 📝 현재 문제점
 ---
 
-- `suh-changelog-deploy` 스킬로 deploy를 진행하면, 스킬이 작성한 릴리스 노트가 PR 본문에서 사라지고 CodeRabbit Summary 10분 대기로 빠지는 경우가 발생한다.
+- `changelog-deploy` 스킬로 deploy를 진행하면, 스킬이 작성한 릴리스 노트가 PR 본문에서 사라지고 CodeRabbit Summary 10분 대기로 빠지는 경우가 발생한다.
 - 원인은 스킬과 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우 간 실행 순서 충돌이다.
   - 스킬은 deploy PR을 **빈 본문으로 먼저 생성**한 뒤, 커밋을 분석해 릴리스 노트를 나중에 작성한다.
   - 워크플로우는 PR 생성(opened) 즉시 트리거되어 본문을 확인하는데, 이 시점에 본문이 비어 있으면 본문을 초기화한다.
@@ -26,7 +26,7 @@
 ⚙️ 작업 내용
 ---
 
-- `skills/suh-changelog-deploy/SKILL.md` deploy 모드 단계 재배치: 커밋 분석·릴리스 노트 작성을 PR 생성보다 앞으로 이동, PR 생성 시 본문에 릴리스 노트 포함
+- `skills/changelog-deploy/SKILL.md` deploy 모드 단계 재배치: 커밋 분석·릴리스 노트 작성을 PR 생성보다 앞으로 이동, PR 생성 시 본문에 릴리스 노트 포함
 - fix 모드도 동일 원칙 점검 (fix 모드는 기존 PR 닫고 새로 여는 구조라 영향 확인)
 
 🙋‍♂️ 담당자

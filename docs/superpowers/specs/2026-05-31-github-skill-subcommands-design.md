@@ -1,12 +1,12 @@
-# suh-github/suh-issue 즉석 Python 제거 + 확장 설계
+# github/issue 즉석 Python 제거 + 확장 설계
 
 작성일: 2026-05-31
-대상 스킬: `cassiiopeia:suh-github`, `cassiiopeia:suh-issue`
+대상 스킬: `projectops:github`, `projectops:issue`
 설계 표준: `skills/references/mcp-subcommand-rules.md`
 
 ## 문제
 
-`suh-github`/`suh-issue` 스킬이 GitHub 작업 시 `/tmp`에 일회용 Python을 즉석 생성하거나 heredoc 인라인 Python을 쓴다. 원인 3가지:
+`github`/`issue` 스킬이 GitHub 작업 시 `/tmp`에 일회용 Python을 즉석 생성하거나 heredoc 인라인 Python을 쓴다. 원인 3가지:
 
 1. **CLI 없는 영역** — explore(레포 탐색) 5종, secrets(Actions Secret) 2종은 CLI가 아예 없어 agent가 즉석 Python을 만들 수밖에 없다.
 2. **반환 필드 부족** — `get-issue`가 `labels`/`assignees`를 안 줘서 agent가 직접 뽑는다. 여러 이슈를 한 번에 보는 수단이 없어 `/tmp/read_issues.py` 루프를 만든다.
@@ -76,7 +76,7 @@ suh_command get-issues <owner> <repo> 712 707 715
 
 ## 섹션 C: SKILL.md 인라인 Python 전부 교체
 
-### C-1. `suh-github/SKILL.md`
+### C-1. `github/SKILL.md`
 
 heredoc/curl Python 블록을 대응 CLI 호출로 교체:
 
@@ -95,7 +95,7 @@ heredoc/curl Python 블록을 대응 CLI 호출로 교체:
 - 상단에 `references/mcp-subcommand-rules.md` 포인터 추가 (새 작업 시 참조).
 - verdict/next가 있는 커맨드는 행동 라우팅 표 명시.
 
-### C-2. `suh-issue/SKILL.md`
+### C-2. `issue/SKILL.md`
 
 - `cli.py` → `suh_command` 명칭 정정 (이미 rename됨, 문서 잔재).
 - 중복 검색 결과 표시에 확충된 `labels`/`state` 활용.

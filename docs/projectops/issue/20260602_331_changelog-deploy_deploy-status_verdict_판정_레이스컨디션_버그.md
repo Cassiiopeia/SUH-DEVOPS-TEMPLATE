@@ -6,7 +6,7 @@
 📝 현재 문제점
 ---
 
-`suh-changelog-deploy` 스킬로 deploy PR을 생성한 직후 `changelog_cli.py deploy-status`가 `verdict: missing_coderabbit_summary`를 잘못 반환하는 현상이 반복 발생한다. 사용자 관점: "PR 본문이 계속 사라진다".
+`changelog-deploy` 스킬로 deploy PR을 생성한 직후 `changelog_cli.py deploy-status`가 `verdict: missing_coderabbit_summary`를 잘못 반환하는 현상이 반복 발생한다. 사용자 관점: "PR 본문이 계속 사라진다".
 
 ### 재현 흐름 (실측, 2026-06-02 PR #330)
 
@@ -25,7 +25,7 @@
 
 ### 근본 원인 — verdict 판정 로직 결함
 
-`skills/suh-changelog-deploy/scripts/changelog_cli.py:121~136`
+`skills/changelog-deploy/scripts/changelog_cli.py:121~136`
 
 - **결함 1**: `has_summary == False`이면 워크플로우 상태와 무관하게 무조건 `missing_coderabbit_summary` 판정. 워크플로우가 `in_progress` 중이면 본문이 잠깐 비어도 정상 진행 중인데, 같은 verdict로 분류됨
 - **결함 2**: `workflow["status"]`(`in_progress`/`queued`/`completed`) 확인이 없음. `conclusion`만 보는데 in_progress 중에는 conclusion이 `None`이라 어느 분기도 못 잡고 `not has_summary` 분기로 떨어짐
@@ -62,7 +62,7 @@
 
 ### 3. agent 행동 규칙 보강 — `missing_coderabbit_summary` 받았을 때 즉시 update-pr 호출하지 않는다
 
-`skills/suh-changelog-deploy/SKILL.md` 7단계 라우팅 표를 갱신:
+`skills/changelog-deploy/SKILL.md` 7단계 라우팅 표를 갱신:
 
 - `missing_coderabbit_summary` 받으면 **즉시 update-pr 호출하지 않고**, 60초 후 재확인. 두 번 연속 같은 verdict일 때만 fix 모드 안내. 한 번이면 race 가능성을 우선 가정한다.
 
@@ -73,8 +73,8 @@
 ⚙️ 작업 내용
 ---
 
-- `skills/suh-changelog-deploy/scripts/changelog_cli.py:cmd_deploy_status` verdict 판정 분기 재배치 (워크플로우 status 가드)
-- `skills/suh-changelog-deploy/SKILL.md` 7단계 verdict 라우팅 표 갱신 (missing 받으면 즉시 fix 금지, 1회 재확인 후 분기)
+- `skills/changelog-deploy/scripts/changelog_cli.py:cmd_deploy_status` verdict 판정 분기 재배치 (워크플로우 status 가드)
+- `skills/changelog-deploy/SKILL.md` 7단계 verdict 라우팅 표 갱신 (missing 받으면 즉시 fix 금지, 1회 재확인 후 분기)
 - 회귀 시나리오 검증
   - 워크플로우 in_progress 중 has_summary=false → `waiting_for_automerge` 반환되는지
   - 워크플로우 completed/success + has_summary=true → `merged` 또는 `waiting_for_automerge` 반환

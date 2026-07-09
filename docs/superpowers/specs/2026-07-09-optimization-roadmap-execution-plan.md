@@ -91,7 +91,7 @@ Phase 6  전체 회귀 + 통합검증                       ← npm test 전량 
 2. 본체를 `changelog.provider` 읽어 **폴백 사다리**(github-ai→openai→commit / coderabbit 선행 시 맨 앞)로 개편. 기존 4-job(`detect-and-parse`/`fallback-summary`/`update-changelog`/`merge-and-deploy`) 구조에서 생성 부분을 provider 호출로 교체, **파싱·automerge·CHANGELOG는 무수정 재사용**.
 3. github-ai step(`actions/ai-inference@v1` + `permissions: models: read`).
 4. 폴백 발생 시 PR 댓글 알림.
-5. 리네임에 따른 참조 갱신: 스킬(#456과 겹침)·문서·`suh-changelog-deploy`가 부르는 워크플로우명.
+5. 리네임에 따른 참조 갱신: 스킬(#456과 겹침)·문서·`changelog-deploy`가 부르는 워크플로우명.
 
 **TDD / 안전망 (프로덕션 파이프라인이므로 가장 두껍게)**:
 1. **provider 계약 테스트**(신규 `test_provider_contract.sh`): 각 provider 산출 `pr_body.md` → `changelog_manager.py update-from-summary` → `parsed_changes` 스키마 동일 검증. github-ai만 러너 전용이라 `CHANGELOG_TEST_RESPONSE` 주입으로 오프라인 검증.
@@ -178,4 +178,4 @@ Phase 6  전체 회귀 + 통합검증                       ← npm test 전량 
 
 ## 8. 다음 단계
 
-이 실행 계획 검토 후 §6 결정 게이트 확정 → `writing-plans`로 Phase별 상세 구현 계획 작성 → `executing-plans`(또는 각 이슈 브랜치에서 `suh-implement`).
+이 실행 계획 검토 후 §6 결정 게이트 확정 → `writing-plans`로 Phase별 상세 구현 계획 작성 → `executing-plans`(또는 각 이슈 브랜치에서 `implement`).

@@ -13,7 +13,7 @@
 캐시 구조상 업데이트 시 신규 버전 폴더가 생성되므로 기존 설정이 자동 이관되지 않음:
 
 ```
-~/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia/
+~/.claude/plugins/cache/projectops-marketplace/projectops/
   ├── 2.9.18/skills/{skill}/config.json   ← 기존 설정 (API 토큰 등)
   └── 2.9.19/skills/{skill}/              ← 업데이트 후 config.json 없음 → 오류
 ```
@@ -46,7 +46,7 @@
 
 - **OS**: Windows 11
 - **대상 파일**: `template_integrator.ps1` (플러그인 업데이트 섹션, ~line 2356)
-- **캐시 경로**: `~/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia/{version}/skills/`
+- **캐시 경로**: `~/.claude/plugins/cache/projectops-marketplace/projectops/{version}/skills/`
 
 🙋‍♂️ 담당자
 ---

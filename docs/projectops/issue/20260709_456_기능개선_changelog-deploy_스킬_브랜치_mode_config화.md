@@ -1,7 +1,7 @@
 📝 현재 문제점
 ---
 
-- `skills/suh-changelog-deploy/SKILL.md`가 `develop` → `main` 브랜치를 하드코딩하고 있습니다. deploy 브랜치·default 브랜치가 다른 레포에서는 맞지 않습니다.
+- `skills/changelog-deploy/SKILL.md`가 `develop` → `main` 브랜치를 하드코딩하고 있습니다. deploy 브랜치·default 브랜치가 다른 레포에서는 맞지 않습니다.
 - A 이슈에서 도입되는 `changelog.mode`(coderabbit/commit/ai)를 스킬이 알지 못하면, 릴리스 노트를 스킬이 직접 만들어야 하는지 워크플로우에 맡겨도 되는지 판단할 수 없습니다.
 - 브랜치명을 스킬 내부에 하드코딩하는 것은 확장성·재사용성 측면에서 좋지 않습니다.
 
@@ -18,7 +18,7 @@
 ⚙️ 작업 내용
 ---
 
-- `suh-changelog-deploy` 스킬이 version.yml/config.json에서 브랜치·mode를 읽는 로직 설계
+- `changelog-deploy` 스킬이 version.yml/config.json에서 브랜치·mode를 읽는 로직 설계
 - 하드코딩된 `develop`/`main` 참조를 설정 기반으로 치환
 - `changelog.mode`에 따른 릴리스 노트 작성 정책 분기 정의
 - (필요 시) `changelog_cli.py`에 브랜치/mode 조회 서브커맨드 추가

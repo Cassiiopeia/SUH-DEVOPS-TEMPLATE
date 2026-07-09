@@ -1,15 +1,15 @@
 # Self-Review 체크리스트
 
-3 스킬(`suh-plan` / `suh-analyze` / `suh-implement`)이 산출물 제출 전 자체 검토에 공유하는 체크리스트.
+3 스킬(`plan` / `analyze` / `implement`)이 산출물 제출 전 자체 검토에 공유하는 체크리스트.
 각 스킬의 Self-Review Phase는 방금 작성한 파일을 `Read` 도구로 다시 읽고 아래 체크리스트를 적용한다.
 
-## suh-plan 체크리스트
+## plan 체크리스트
 
 - [ ] **HARD-GATE — HOW 침범 없는가?**
   - 파일 경로 + 함수명 + 라인 번호 조합 없음
   - "변경 계획" 표 또는 구현 순서 표 없음
   - Before/After 코드 예시 없음
-  - HOW가 필요하면 "→ `/suh-analyze`에서 구체화" 한 줄로 대체됨
+  - HOW가 필요하면 "→ `/analyze`에서 구체화" 한 줄로 대체됨
 - [ ] **placeholder 없는가?** "TBD" / "TODO" / "추후 결정" / 빈 섹션 없음
 - [ ] **Must/Should/Nice 균형 잡혔는가?** 전부 Must면 우선순위 없음 — 재분류 필요
 - [ ] **가정 섹션에 추측한 내용 명시됐는가?** 사용자에게 물어보지 않은 가정은 모두 `## 7. 가정` (`[ASSUMPTIONS]`) 섹션에 기록
@@ -18,7 +18,7 @@
 
 문제 발견 시 인라인 수정 후 Phase 4로 진행.
 
-## suh-analyze 체크리스트
+## analyze 체크리스트
 
 - [ ] **HARD-GATE — No Placeholders**: "TBD" / "TODO" / "나중에" / "적절히" / "필요 시" / "유사하게" 어디에도 없음
 - [ ] **모든 변경 항목에 파일 경로 + 함수명 + 라인 번호가 있는가?**
@@ -30,7 +30,7 @@
 
 문제 발견 시 인라인 수정 후 Phase 4로 진행.
 
-## suh-implement 체크리스트
+## implement 체크리스트
 
 - [ ] **편집한 모든 파일을 편집 전 1번 이상 Read 했는가?**
 - [ ] **plan에 없는 변경을 사용자 합의 없이 끼워 넣지 않았는가?** (발견은 메모리 보관 → Phase 6 후 별건 보고)

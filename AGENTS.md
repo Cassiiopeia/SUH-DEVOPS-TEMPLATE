@@ -19,18 +19,18 @@ Common routing:
 
 | Request | Use |
 |---------|-----|
-| "이슈 작성", "issue", "GitHub 이슈 만들어줘" | `skills/suh-issue/SKILL.md` |
-| "커밋해줘", "commit" | `skills/suh-commit/SKILL.md` |
-| "분석해줘", "영향 범위 봐줘" | `skills/suh-analyze/SKILL.md` |
-| "계획 세워줘", "plan" | `skills/suh-plan/SKILL.md` |
-| "구현해줘", "수정해줘" | `skills/suh-implement/SKILL.md` |
-| "리뷰해줘" | `skills/suh-review/SKILL.md` |
-| "문제 원인 찾아줘", "디버깅" | `skills/suh-troubleshoot/SKILL.md` |
-| "작업 보고서 작성" | `skills/suh-report/SKILL.md` |
-| "스킬 만들기/개선" | `skills/suh-skill-creator/SKILL.md` |
-| "GitHub 이슈/PR 조회·관리" | `skills/suh-github/SKILL.md` |
-| "배포", "deploy PR" | `skills/suh-changelog-deploy/SKILL.md` |
-| "원격 서버 접속", "SSH" | `skills/suh-ssh/SKILL.md` |
+| "이슈 작성", "issue", "GitHub 이슈 만들어줘" | `skills/issue/SKILL.md` |
+| "커밋해줘", "commit" | `skills/commit/SKILL.md` |
+| "분석해줘", "영향 범위 봐줘" | `skills/analyze/SKILL.md` |
+| "계획 세워줘", "plan" | `skills/plan/SKILL.md` |
+| "구현해줘", "수정해줘" | `skills/implement/SKILL.md` |
+| "리뷰해줘" | `skills/review/SKILL.md` |
+| "문제 원인 찾아줘", "디버깅" | `skills/troubleshoot/SKILL.md` |
+| "작업 보고서 작성" | `skills/report/SKILL.md` |
+| "스킬 만들기/개선" | `skills/skill-creator/SKILL.md` |
+| "GitHub 이슈/PR 조회·관리" | `skills/github/SKILL.md` |
+| "배포", "deploy PR" | `skills/changelog-deploy/SKILL.md` |
+| "원격 서버 접속", "SSH" | `skills/ssh/SKILL.md` |
 
 ## Codex Installation Model
 

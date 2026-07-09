@@ -17,12 +17,12 @@
 
 - 모든 스킬명에 `suh-` prefix를 추가하여 네이밍 충돌 원천 차단
 - 대상: `skills/` 하위 전체 스킬 폴더명 + `SKILL.md` description + `CLAUDE.md` 스킬 라우팅 표
-- `suh-spring-test`는 이미 `suh-` prefix가 있으므로 유지
+- `spring-test`는 이미 `suh-` prefix가 있으므로 유지
 
 ⚙️ 작업 내용
 ---
 
-- `skills/` 하위 24개 폴더명 rename (예: `report` → `suh-report`, `commit` → `suh-commit`)
+- `skills/` 하위 24개 폴더명 rename (예: `report` → `report`, `commit` → `commit`)
 - 각 `SKILL.md`의 name/description 필드 업데이트
 - `CLAUDE.md` 스킬 라우팅 표 및 Skills 목록 전면 업데이트
 - `.claude-plugin/` 매니페스트 스킬명 업데이트

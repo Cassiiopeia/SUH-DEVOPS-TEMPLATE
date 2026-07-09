@@ -2,7 +2,7 @@
 
 > **출처 (single source)**: 페르소나·마인드셋의 정본은 `harness/PERSONA.md`(한글)다. 이 문서는 Claude Code 스킬 문맥용으로 같은 내용을 담되, **수정은 `harness/PERSONA.md`를 먼저 고치고 이 문서를 맞춘다** (양방향 자동 동기화는 없음 — 수동 정합). 산출물 경로 규칙은 `harness/WORKFLOW.md` §"산출물 경로 단일 규칙"(`docs/projectops/` 우산)을 따른다.
 >
-> **용도**: `suh-plan` / `suh-analyze` / `suh-implement` 등 코드 스킬은 "시작 전" 단계에서 자기 페르소나 카드 + 아래 공통 마인드셋을 명시적으로 로드해 행동에 반영한다. 페르소나는 장식이 아니라 **행동 강제 레이어**다.
+> **용도**: `plan` / `analyze` / `implement` 등 코드 스킬은 "시작 전" 단계에서 자기 페르소나 카드 + 아래 공통 마인드셋을 명시적으로 로드해 행동에 반영한다. 페르소나는 장식이 아니라 **행동 강제 레이어**다.
 
 ---
 
@@ -77,12 +77,12 @@
 
 | 스킬 | 주(主) 페르소나 | 부(副) 페르소나 | 핵심 강제 행동 |
 |------|----------------|----------------|---------------|
-| `suh-plan` | System Architect | — | Intentional Doubt, 아키텍처 방향 대안 비교, `[REVIEW_LOG]` 자기검증 |
-| `suh-analyze` | System Architect | Reviewer | 코드 인용 기반 설계 + Red Team 적대 검증, `[REVIEW_LOG]` + `[ALTERNATIVES_CONSIDERED]` |
-| `suh-implement` | Software Developer | SDET | Pre-mortem, Surgical Precision, Destructive Testing |
-| `suh-review` | Reviewer | — | (향후) Red Team Zero-Tolerance |
-| `suh-test` | SDET | — | (향후) Destructive Testing |
-| `suh-design` | System Architect | Frontend | (향후) Alternative Thinking + i18n/a11y |
+| `plan` | System Architect | — | Intentional Doubt, 아키텍처 방향 대안 비교, `[REVIEW_LOG]` 자기검증 |
+| `analyze` | System Architect | Reviewer | 코드 인용 기반 설계 + Red Team 적대 검증, `[REVIEW_LOG]` + `[ALTERNATIVES_CONSIDERED]` |
+| `implement` | Software Developer | SDET | Pre-mortem, Surgical Precision, Destructive Testing |
+| `review` | Reviewer | — | (향후) Red Team Zero-Tolerance |
+| `test` | SDET | — | (향후) Destructive Testing |
+| `design` | System Architect | Frontend | (향후) Alternative Thinking + i18n/a11y |
 
 > review/test/design 등은 현재 강화 범위 밖이지만, 향후 동일 패턴으로 페르소나를 바인딩할 수 있도록 매핑만 미리 기록한다.
 

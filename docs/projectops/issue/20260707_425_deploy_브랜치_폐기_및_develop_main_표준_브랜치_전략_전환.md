@@ -3,7 +3,7 @@
 
 - 현재 템플릿은 main(기본 브랜치)을 일상 개발 브랜치로, deploy 브랜치를 프로덕션 배포 브랜치로 사용하는 비표준 구조입니다.
 - 일반적인 관례(default 브랜치 = 프로덕션, develop = 개발 통합)와 반대라서 템플릿을 처음 접하는 사용자에게 직관적이지 않습니다.
-- deploy 브랜치가 워크플로우 12개 이상(AUTO-CHANGELOG-CONTROL, README-VERSION-UPDATE, PLUGIN-VERSION-SYNC, 타입별 CICD 전부), suh-changelog-deploy 스킬, 문서 전반에 하드코딩되어 있습니다.
+- deploy 브랜치가 워크플로우 12개 이상(AUTO-CHANGELOG-CONTROL, README-VERSION-UPDATE, PLUGIN-VERSION-SYNC, 타입별 CICD 전부), changelog-deploy 스킬, 문서 전반에 하드코딩되어 있습니다.
 - GitHub Actions의 `on:` 트리거는 브랜치명 변수화가 불가능하므로, 구조 자체를 표준으로 재편하는 것이 근본 해결입니다.
 
 🛠️ 해결 방안 / 제안 기능
@@ -22,7 +22,7 @@
 - 워크플로우 트리거 재배치: deploy→main, main→develop (project-types/common 원본과 .github/workflows 루트 복사본 동일 유지)
 - AUTO-CHANGELOG-CONTROL: head=develop 가드 + 머지 전 버전 bump 스텝 추가, 브랜치 참조(default_branch → PR head) 교체
 - VERSION-CONTROL: main push 안전망 가드 추가
-- suh-changelog-deploy 스킬 SKILL.md·changelog_cli.py 브랜치 기준 변경 (deploy → main, main → develop)
+- changelog-deploy 스킬 SKILL.md·changelog_cli.py 브랜치 기준 변경 (deploy → main, main → develop)
 - PROJECT-TEMPLATE-INITIALIZER에 develop 브랜치 자동 생성 추가
 - breaking-changes.json critical 등록, README·CONTRIBUTING·docs·CLAUDE.md 브랜치 규칙 갱신
 - 템플릿 레포 자체 브랜치 재편 (develop 생성, deploy 삭제)

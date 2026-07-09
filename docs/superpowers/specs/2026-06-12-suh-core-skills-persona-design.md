@@ -1,13 +1,13 @@
 # SUH 3종 코어 스킬 페르소나 강화 — 설계 (Design Spec)
 
 작성일: 2026-06-12
-관련 자산: `harness/PERSONA.md`, `harness/WORKFLOW.md`, `skills/suh-plan`, `skills/suh-analyze`, `skills/suh-implement`, `skills/references/`
+관련 자산: `harness/PERSONA.md`, `harness/WORKFLOW.md`, `skills/plan`, `skills/analyze`, `skills/implement`, `skills/references/`
 
 ---
 
 ## 1. 한 줄 요약
 
-PI 에이전트에만 주입되고 Claude Code 스킬에선 죽어있는 harness의 5개 전문가 페르소나와 6대 마인드셋·품질 강제 메커니즘(Devil's Advocate, Stop-and-Think Gate, Anti-Confirmation Bias)을, `suh-plan / suh-analyze / suh-implement` 3종 스킬에 HARD-GATE로 강제 주입해 에이전트가 항상 일관적이고 요구사항에 정확히 맞는 결과를 내도록 구현력을 끌어올린다.
+PI 에이전트에만 주입되고 Claude Code 스킬에선 죽어있는 harness의 5개 전문가 페르소나와 6대 마인드셋·품질 강제 메커니즘(Devil's Advocate, Stop-and-Think Gate, Anti-Confirmation Bias)을, `plan / analyze / implement` 3종 스킬에 HARD-GATE로 강제 주입해 에이전트가 항상 일관적이고 요구사항에 정확히 맞는 결과를 내도록 구현력을 끌어올린다.
 
 ## 2. 배경 / 문제 정의
 
@@ -24,7 +24,7 @@ PI 에이전트에만 주입되고 Claude Code 스킬에선 죽어있는 harness
 
 ## 4. 범위 경계
 
-- **In scope**: `suh-plan` / `suh-analyze` / `suh-implement` 3종 SKILL.md + 공유 references (`personas.md` 신설, `self-review-checklist.md`·`common-rules.md` 강화)
+- **In scope**: `plan` / `analyze` / `implement` 3종 SKILL.md + 공유 references (`personas.md` 신설, `self-review-checklist.md`·`common-rules.md` 강화)
 - **Out of scope**: PI harness 원본(`harness/PERSONA.md`·`WORKFLOW.md`) 수정, 나머지 스킬(review/test 등), 산출물 디렉토리 구조 변경(기존 `docs/suh-template/plan`·`analyze/` 유지)
 
 ---
@@ -48,18 +48,18 @@ skills/
 │   ├── personas.md              [신설] harness/PERSONA.md → 한국어 Claude Code용 재작성, single source
 │   ├── self-review-checklist.md [강화] 3종 모두 Devil's Advocate 게이트 항목 추가
 │   └── common-rules.md          [소폭] 작업 시작 프로토콜에 페르소나 로드 한 줄
-├── suh-plan/SKILL.md            [강화] System Architect 바인딩
-├── suh-analyze/SKILL.md         [강화] System Architect + Reviewer 바인딩
-└── suh-implement/SKILL.md       [강화] Software Developer + SDET 바인딩
+├── plan/SKILL.md            [강화] System Architect 바인딩
+├── analyze/SKILL.md         [강화] System Architect + Reviewer 바인딩
+└── implement/SKILL.md       [강화] Software Developer + SDET 바인딩
 ```
 
 ### 스킬 ↔ 페르소나 매핑
 
 | 스킬 | 주(主) 페르소나 | 부(副) 페르소나 | 핵심 강제 행동 |
 |------|----------------|----------------|---------------|
-| suh-plan | System Architect | — | Intentional Doubt, 아키텍처 방향 대안 비교, `[REVIEW_LOG]` |
-| suh-analyze | System Architect | Reviewer | 코드 인용 + Red Team 적대 검증, `[REVIEW_LOG]` + `[ALTERNATIVES_CONSIDERED]` |
-| suh-implement | Software Developer | SDET | Pre-mortem, Surgical Precision, Destructive Testing |
+| plan | System Architect | — | Intentional Doubt, 아키텍처 방향 대안 비교, `[REVIEW_LOG]` |
+| analyze | System Architect | Reviewer | 코드 인용 + Red Team 적대 검증, `[REVIEW_LOG]` + `[ALTERNATIVES_CONSIDERED]` |
+| implement | Software Developer | SDET | Pre-mortem, Surgical Precision, Destructive Testing |
 
 ---
 
@@ -75,7 +75,7 @@ harness/PERSONA.md(영문 PI 전용)를 한국어 + Claude Code 스킬 문맥으
 - **스킬↔페르소나 매핑 표** (위 §6)
 - 각 스킬이 "시작 전"에서 이 파일의 자기 페르소나 카드를 로드하도록 안내
 
-### 7.2 `suh-plan/SKILL.md` (강화 — System Architect)
+### 7.2 `plan/SKILL.md` (강화 — System Architect)
 
 1. **"시작 전"에 페르소나 로드** — `references/personas.md`의 System Architect 카드 + 공통 마인드셋.
 2. **Phase 1 질문에 Intentional Doubt 강제** — 사용자 지시를 액면 그대로 받지 말고 숨은 의도·누락 제약·모호함 1개 이상 파고든다. (기존 §8 미해결 질문과 연결)
@@ -86,7 +86,7 @@ harness/PERSONA.md(영문 PI 전용)를 한국어 + Claude Code 스킬 문맥으
 5. **Fast-Track 예외** — 단순 작업이면 `[REVIEW_LOG]`를 "리스크 없음 — 단순 작업" 한 줄로 갈음.
 6. **불변**: HOW 침범 HARD-GATE, WHAT 경계, 산출 경로.
 
-### 7.3 `suh-analyze/SKILL.md` (강화 — Architect + Reviewer)
+### 7.3 `analyze/SKILL.md` (강화 — Architect + Reviewer)
 
 1. **"시작 전" 이중 페르소나 로드** — Architect(HOW 설계) + Reviewer(자기 계획 공격).
 2. **Phase 1 정찰에 Pre-mortem 강제** — "이 계획이 미래에 깨진다면 원인은?" 호출자 영향·동시성·하위호환 능동 탐색.
@@ -97,7 +97,7 @@ harness/PERSONA.md(영문 PI 전용)를 한국어 + Claude Code 스킬 문맥으
 4. **Phase 3 Self-Review에 Stop-and-Think Gate** — `[REVIEW_LOG]` + `[ALTERNATIVES_CONSIDERED]` 둘 다 없으면 제출 불가.
 5. **불변**: No Placeholders HARD-GATE, 파일+함수+라인 인용, Before/After 코드.
 
-### 7.4 `suh-implement/SKILL.md` (강화 — Developer + SDET)
+### 7.4 `implement/SKILL.md` (강화 — Developer + SDET)
 
 1. **"시작 전" 이중 페르소나 로드** — Developer(Phase 2 구현) + SDET(Phase 3 검증).
 2. **Phase 2에 Surgical Precision 강제** — 필요/관련 부분만 외과적 수정, 무관 블록 일괄 변경 금지.
@@ -126,9 +126,9 @@ harness/PERSONA.md(영문 PI 전용)를 한국어 + Claude Code 스킬 문맥으
 | `references/personas.md` | 신설 | 5 페르소나 + 6 마인드셋 single source (한국어) |
 | `references/self-review-checklist.md` | 강화 | 3종 모두 Devil's Advocate 게이트 |
 | `references/common-rules.md` | 소폭 | 페르소나 로드 프로토콜 |
-| `suh-plan/SKILL.md` | 강화 | Architect 의심·`[REVIEW_LOG]`·`[ASSUMPTIONS]` |
-| `suh-analyze/SKILL.md` | 강화 | Reviewer 적대검증·`[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]` |
-| `suh-implement/SKILL.md` | 강화 | SDET 파괴적 검증·Surgical Precision |
+| `plan/SKILL.md` | 강화 | Architect 의심·`[REVIEW_LOG]`·`[ASSUMPTIONS]` |
+| `analyze/SKILL.md` | 강화 | Reviewer 적대검증·`[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]` |
+| `implement/SKILL.md` | 강화 | SDET 파괴적 검증·Surgical Precision |
 
 ## 9. 위험 & 완화
 
@@ -140,9 +140,9 @@ harness/PERSONA.md(영문 PI 전용)를 한국어 + Claude Code 스킬 문맥으
 
 - [ ] personas.md에 5 페르소나 + 6 마인드셋 + 매핑표 존재
 - [ ] 3종 SKILL.md 각각 "시작 전"에 페르소나 로드 지시 존재
-- [ ] suh-plan 템플릿에 `[REVIEW_LOG]`·`[ASSUMPTIONS]`, Self-Review에 게이트 존재
-- [ ] suh-analyze 템플릿에 `[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]`, Self-Review에 게이트 존재
-- [ ] suh-implement Phase 3 SDET 파괴적 검증, Phase 5 Devil's Advocate 존재
+- [ ] plan 템플릿에 `[REVIEW_LOG]`·`[ASSUMPTIONS]`, Self-Review에 게이트 존재
+- [ ] analyze 템플릿에 `[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]`, Self-Review에 게이트 존재
+- [ ] implement Phase 3 SDET 파괴적 검증, Phase 5 Devil's Advocate 존재
 - [ ] self-review-checklist 3종 모두 Devil's Advocate 항목 존재
 - [ ] 각 게이트에 Fast-Track 예외 명시
 - [ ] PI harness 원본 미변경 (git diff로 확인)

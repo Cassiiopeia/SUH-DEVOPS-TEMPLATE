@@ -6,7 +6,7 @@
 📝 현재 문제점
 ---
 
-- `suh-changelog-deploy` 스킬은 deploy 모드 5단계에서 릴리스 노트 파일을 작성한 직후 6단계 PR 생성으로 즉시 진행한다.
+- `changelog-deploy` 스킬은 deploy 모드 5단계에서 릴리스 노트 파일을 작성한 직후 6단계 PR 생성으로 즉시 진행한다.
 - 사용자가 PR이 생성되기 전 릴리스 노트 본문을 검토할 시점이 전혀 없다.
 - 결과적으로 의도와 다른 본문으로 PR이 생성돼도 사용자가 개입할 수 없고, `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우가 automerge를 진행해 운영 배포까지 흘러간다.
 - fix 모드(4단계 → 5단계)도 동일한 구조라 같은 문제가 발생한다.
@@ -25,7 +25,7 @@
 ⚙️ 작업 내용
 ---
 
-- **SKILL.md (`skills/suh-changelog-deploy/SKILL.md`)**
+- **SKILL.md (`skills/changelog-deploy/SKILL.md`)**
   - 핵심 원칙 섹션: "릴리스 노트 본문은 PR 생성 전 사용자에게 보여준다 (자동 모드로 명시 설정된 경우 제외)" 원칙 추가
   - 시작 전 단계: 현재 레포·전체 기준의 자동/수동 모드 값을 config에서 추출해 agent가 기억
   - deploy 5.5단계 신규

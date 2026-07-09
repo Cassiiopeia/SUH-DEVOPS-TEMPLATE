@@ -1,11 +1,11 @@
 # deploy-status 검증 서브커맨드 설계
 
 작성일: 2026-05-31
-대상 스킬: `cassiiopeia:suh-changelog-deploy`
+대상 스킬: `projectops:changelog-deploy`
 
 ## 문제
 
-`suh-changelog-deploy` 스킬은 deploy PR 생성(6단계)에서 끝나고, **PR이 실제로 automerge 됐는지 확인하는 단계가 없다.** 그래서 agent가 매번 `/tmp`에 일회용 Python(`check_automerge.py`, `verify_deploy.py`, `watch_pr740.py`, `diagnose_pr740.py`)을 즉석 생성해 상태를 조회한다 — 매 배포마다 수천 토큰 낭비, 코드 중복, `sleep` 차단 충돌.
+`changelog-deploy` 스킬은 deploy PR 생성(6단계)에서 끝나고, **PR이 실제로 automerge 됐는지 확인하는 단계가 없다.** 그래서 agent가 매번 `/tmp`에 일회용 Python(`check_automerge.py`, `verify_deploy.py`, `watch_pr740.py`, `diagnose_pr740.py`)을 즉석 생성해 상태를 조회한다 — 매 배포마다 수천 토큰 낭비, 코드 중복, `sleep` 차단 충돌.
 
 ## 목표
 

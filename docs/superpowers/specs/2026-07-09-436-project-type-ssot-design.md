@@ -42,7 +42,7 @@ project_types: ["spring", "react"]   # 첫 항목이 primary
 
 ### 유지 (의도적으로 변경하지 않음)
 - **`.github/scripts/changelog_manager.py`** — env 기반(PROJECT_TYPE/PROJECT_TYPES)이라 무수정. CHANGELOG.json의 `project_type`(primary) 필드는 **생성 산출물 스키마**로 유지 (소비자 호환)
-- **`skills/suh-changelog-deploy/scripts/changelog_cli.py`의 단수 폴백** — 이 스킬은 v3/v4 템플릿을 쓰는 **타 레포**(RomRom 등)에서도 실행되는 크로스버전 도구라 legacy 읽기 폴백 유지
+- **`skills/changelog-deploy/scripts/changelog_cli.py`의 단수 폴백** — 이 스킬은 v3/v4 템플릿을 쓰는 **타 레포**(RomRom 등)에서도 실행되는 크로스버전 도구라 legacy 읽기 폴백 유지
 - **Flutter 워크플로우의 `project_type` output** — `env.PROJECT_TYPE`(워크플로우 내 하드코딩 "flutter") 배관이지 version.yml 단수 키가 아님
 - 과거 이력 문서(CHANGELOG.json 히스토리, 옛 스펙/리포트/이슈 md)
 

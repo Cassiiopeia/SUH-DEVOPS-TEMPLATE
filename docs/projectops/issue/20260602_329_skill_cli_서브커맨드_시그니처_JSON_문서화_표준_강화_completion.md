@@ -20,4 +20,4 @@ agent가 응답을 보고 즉시 self-correct 가능.
 
 ### 후속 작업 (별도 이슈 권장)
 - SKILL.md ↔ CLI 매칭 화이트리스트(`EXPECTED_MISSING`)에 남은 항목 보강.
-  특히 `suh-issue`의 `normalize-title`, `create-branch-name`, `get-commit-template` 호출예 추가.
+  특히 `issue`의 `normalize-title`, `create-branch-name`, `get-commit-template` 호출예 추가.

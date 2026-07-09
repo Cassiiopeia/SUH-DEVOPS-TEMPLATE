@@ -428,7 +428,7 @@ PLUGIN_ROOT=$(cat ~/.claude/plugins/installed.json 2>/dev/null \
 echo "PLUGIN_ROOT=$PLUGIN_ROOT"
 ```
 
-Expected: 공백이 아닌 cassiiopeia plugin 경로 (예: `C:/Users/USER/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia/3.0.18`).
+Expected: 공백이 아닌 cassiiopeia plugin 경로 (예: `C:/Users/USER/.claude/plugins/cache/projectops-marketplace/projectops/3.0.18`).
 
 `installed.json`이 다른 구조거나 cassiiopeia가 설치 안 된 환경이면 빈 출력 가능 — 이 경우 skill에 fallback 경로(L108) 있으니 문제 아님.
 

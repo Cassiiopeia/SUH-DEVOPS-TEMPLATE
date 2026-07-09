@@ -866,7 +866,7 @@
 - SUH-DEVOPS-TEMPLATE 버전 관리 : docs : v3.0.82 릴리즈 문서 업데이트 (PR #330)
 - _cli.py 서브커맨드 시그니처·JSON·문서화 표준 강화 : docs : 이슈 로컬 사본 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/329
 - template_integrator 단일 선택 메뉴 인터랙티브 UI : docs : 이슈·구현 보고서 로컬 사본 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/326
-- suh-plan/analyze/implement 재설계 : docs : 구현 보고서 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/323
+- plan/analyze/implement 재설계 : docs : 구현 보고서 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/323
 - skill 내부 py 실행 구조 MCP-style 표준화 및 OS 호환성 강건화 : docs : 작업완료 댓글·PR 본문 로컬 사본 추가 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/322
 - changelog-deploy 릴리스 노트 사용자 승인 게이트 + 자동화 옵션 : feat : deploy 5.5단계·fix 4.5단계 신규로 PR 생성 전 본문 표시 후 사용자 승인 받음, config로 자동/수동 모드 토글(글로벌+레포별 오버라이드), 첫 실행 시 자연어 자동화 제안 https://github.com/Cassiiopeia/SUH-DEVOPS-TEMPLATE/issues/328
 - 멀티 프로젝트 타입 구현 계획서 추가 : docs : #302 17개 task plan

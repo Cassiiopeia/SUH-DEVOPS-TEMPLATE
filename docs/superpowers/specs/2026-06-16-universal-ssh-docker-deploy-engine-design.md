@@ -235,7 +235,7 @@ synology 언급 6곳 정리:
 - `| **Synology 배포** | Docker 기반 NAS 무중단 배포 |` → `| **SSH+Docker 배포** | SSH 접속 서버에 Docker 무중단 배포 (Synology·AWS EC2 등) |`
 - 타입별 표 `Synology Docker` → `SSH+Docker 배포` / `Nexus`는 유지.
 - 가이드 링크는 7.1 개명에 맞춰 갱신.
-- ⚠️ **건드리지 않는 것**: `suh-synology-expose`(별개 스킬명), `suh-ssh` 설명의 "시놀로지 NAS" 예시(실용 예시) — 이번 범위 밖.
+- ⚠️ **건드리지 않는 것**: `synology-expose`(별개 스킬명), `ssh` 설명의 "시놀로지 NAS" 예시(실용 예시) — 이번 범위 밖.
 
 ---
 

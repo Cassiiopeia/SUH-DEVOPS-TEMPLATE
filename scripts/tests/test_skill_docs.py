@@ -39,9 +39,9 @@ def test_skill_docs_do_not_teach_inline_python_workarounds():
 def test_github_skill_docs_use_suh_command_instead_of_direct_curl_recipes():
     """GitHub-facing skills should not document direct curl API recipes."""
     github_docs = [
-        ROOT / "skills" / "suh-github" / "SKILL.md",
-        ROOT / "skills" / "suh-issue" / "SKILL.md",
-        ROOT / "skills" / "suh-changelog-deploy" / "SKILL.md",
+        ROOT / "skills" / "github" / "SKILL.md",
+        ROOT / "skills" / "issue" / "SKILL.md",
+        ROOT / "skills" / "changelog-deploy" / "SKILL.md",
     ]
     failures = []
     for path in github_docs:
@@ -80,7 +80,7 @@ def test_issue_cli_does_not_expose_get_next_seq():
 
     SKILL.md 4단계는 TMP1 직접 사용 절차이므로 CLI 노출은 agent 오추론을 유도한다.
     """
-    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    cli_path = ROOT / "skills" / "issue" / "scripts" / "issue_cli.py"
     text = cli_path.read_text(encoding="utf-8")
     assert "add_parser(\"get-next-seq\"" not in text, \
         "issue_cli.py에 get-next-seq 서브커맨드가 남아있다 (이슈 #329)"
@@ -93,7 +93,7 @@ def test_issue_cli_bad_args_emits_json(tmp_path):
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    cli_path = ROOT / "skills" / "issue" / "scripts" / "issue_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -111,7 +111,7 @@ def test_commit_cli_bad_args_emits_json():
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-commit" / "scripts" / "commit_cli.py"
+    cli_path = ROOT / "skills" / "commit" / "scripts" / "commit_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -129,7 +129,7 @@ def test_report_cli_bad_args_emits_json():
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-report" / "scripts" / "report_cli.py"
+    cli_path = ROOT / "skills" / "report" / "scripts" / "report_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -147,7 +147,7 @@ def test_review_cli_bad_args_emits_json():
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-review" / "scripts" / "review_cli.py"
+    cli_path = ROOT / "skills" / "review" / "scripts" / "review_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -165,7 +165,7 @@ def test_troubleshoot_cli_bad_args_emits_json():
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-troubleshoot" / "scripts" / "troubleshoot_cli.py"
+    cli_path = ROOT / "skills" / "troubleshoot" / "scripts" / "troubleshoot_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -183,7 +183,7 @@ def test_github_cli_bad_args_emits_json():
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-github" / "scripts" / "github_cli.py"
+    cli_path = ROOT / "skills" / "github" / "scripts" / "github_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -201,7 +201,7 @@ def test_changelog_cli_bad_args_emits_json():
     import subprocess
     import os
     import json
-    cli_path = ROOT / "skills" / "suh-changelog-deploy" / "scripts" / "changelog_cli.py"
+    cli_path = ROOT / "skills" / "changelog-deploy" / "scripts" / "changelog_cli.py"
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
@@ -224,8 +224,8 @@ def test_mcp_rules_document_json_argparse_standard():
 
 
 def test_plan_skill_does_not_reference_removed_get_next_seq_subcommand():
-    """suh-plan/SKILL.md는 issue_cli의 get-next-seq를 참조하면 안 된다 (이슈 #329)."""
-    path = ROOT / "skills" / "suh-plan" / "SKILL.md"
+    """plan/SKILL.md는 issue_cli의 get-next-seq를 참조하면 안 된다 (이슈 #329)."""
+    path = ROOT / "skills" / "plan" / "SKILL.md"
     text = path.read_text(encoding="utf-8")
     assert "issue_cli.py 가 `get-next-seq`" not in text
     assert "`get-next-seq`·`normalize-title` 보유" not in text

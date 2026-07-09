@@ -52,7 +52,7 @@
 - 상세 지도: `docs/superpowers/specs/2026-07-09-optimization-roadmap.md`
 - 상세 설계: `docs/superpowers/specs/2026-07-09-release-changelog-provider-design.md`
 - 순서: **A(이 이슈) → B·C(병렬) → D**. 마법사 질문 UI 상세는 C(#457), 스킬 연동은 B(#456)
-- 로컬 AI(개발자 머신)는 러너가 못 닿으므로 `suh-changelog-deploy` 스킬(로컬) 담당으로 분리
+- 로컬 AI(개발자 머신)는 러너가 못 닿으므로 `changelog-deploy` 스킬(로컬) 담당으로 분리
 
 🙋‍♂️ 담당자
 ---

@@ -32,7 +32,7 @@
 | `suh-project-utility` | 실제 레포명 | 외부 레포 |
 | `suhsaechan` / `me.suhsaechan` | GitHub 유저명·groupId·홈 경로 | 실제 계정·좌표 |
 
-> `suh-spring-test` 폴더는 `spring-test`로 리네임하되, 그 SKILL.md **본문의 `me.suhsaechan:suh-logger`는 보존**한다. (폴더명과 본문 의존성명을 구분 치환.)
+> `spring-test` 폴더는 `spring-test`로 리네임하되, 그 SKILL.md **본문의 `me.suhsaechan:suh-logger`는 보존**한다. (폴더명과 본문 의존성명을 구분 치환.)
 
 ## 3. config 경로 이주 마이그레이션 (핵심 안전장치)
 
@@ -83,7 +83,7 @@ def config_path() -> Path:
 
 - **`cassiiopeia`(소문자)** = 플러그인/네임스페이스명 → **치환 O** (`projectops`). 6개 매니페스트 + 6개 src/core/ide 어댑터 + JS 테스트.
 - **`Cassiiopeia`(대문자)** = 실제 GitHub 조직명 → **보존** (`Cassiiopeia/projectops` repo URL·author).
-- 커맨드 접두사 `/cassiiopeia:suh-issue`는 폴더명이 아니라 **플러그인명**에서 파생 → 플러그인명 치환 + 폴더 리네임 둘 다 필요.
+- 커맨드 접두사 `/projectops:issue`는 폴더명이 아니라 **플러그인명**에서 파생 → 플러그인명 치환 + 폴더 리네임 둘 다 필요.
 
 ## 8. docs/suh-template 산출물 디렉토리
 
@@ -92,7 +92,7 @@ def config_path() -> Path:
 
 ## 9. 방출 코드 보존 (조사 확정 — 치환 시 사용자 빌드 파손)
 
-- `skills/suh-spring-test/SKILL.md`의 `me.suhsaechan:suh-logger`, `import static me.suhsaechan.suhlogger.util.SuhLogger.*` → **폴더는 spring-test로 rename하되 본문 이 라인들은 절대 보존**.
+- `skills/spring-test/SKILL.md`의 `me.suhsaechan:suh-logger`, `import static me.suhsaechan.suhlogger.util.SuhLogger.*` → **폴더는 spring-test로 rename하되 본문 이 라인들은 절대 보존**.
 - `*.suhsaechan.kr` 도메인(PR-preview·AI base_url 예시), `suh-project-utility`(레포명), `kr.suhsaechan.*` bundle id → 보존.
 - **일괄 sed 금지**: `suh-` prefix가 스킬명·로거·레포명·도메인에 공존 → **화이트리스트(25개 스킬명) 기반 정확 치환**만. negative match로 보존 목록 회피.
 

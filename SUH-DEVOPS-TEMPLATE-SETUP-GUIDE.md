@@ -61,7 +61,7 @@ template_integrator로 통합 시 자동 안내되지만, 수동으로도 설치
 
 | IDE | 설치 방법 | 사용 예시 |
 |-----|----------|----------|
-| **Claude Code** | 플러그인 마켓플레이스 (CLI) | `/cassiiopeia:suh-analyze`, `/cassiiopeia:suh-review` |
+| **Claude Code** | 플러그인 마켓플레이스 (CLI) | `/projectops:analyze`, `/projectops:review` |
 | **Cursor** | `.cursor/skills/` 폴더 복사 | Skills 패널에서 선택 |
 | **Gemini CLI** | `gemini extensions install` | extension 명령 |
 | **Codex CLI** | `codex plugin marketplace add` | `/plugins`에서 확인 |

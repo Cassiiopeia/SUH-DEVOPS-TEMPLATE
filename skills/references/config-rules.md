@@ -43,7 +43,7 @@ echo "$HOME"
 
 > ⚠️ **config.json은 절대 탐색하지 않는다.** 경로는 `{HOME}/.suh-template/config/config.json` **한 곳으로 고정**이다. Read tool로 이 경로를 **바로** 읽는다. `ls`·`find`·glob으로 찾지 마라.
 >
-> **특히 플러그인 캐시(`~/.claude/plugins/cache/...`)를 뒤지지 마라.** 각 스킬의 SKILL.md는 *스크립트*(`*_cli.py`) 위치를 찾을 때 `ls ~/.claude/plugins/cache/*/cassiiopeia/*/skills/.../scripts` 패턴을 쓴다 — 이건 **스크립트 전용**이며 config.json은 그 캐시 안에 **없다.** 그 `ls` 패턴을 config 찾기에 전이시키면 엉뚱한 파일을 잡거나 "config 없음"으로 오판해 이미 등록된 PAT를 사용자에게 다시 묻게 된다 (실제 발생한 사고). **스크립트는 캐시에서 ls로, config는 홈의 고정 경로에서 Read로 — 두 경로를 절대 섞지 않는다.**
+> **특히 플러그인 캐시(`~/.claude/plugins/cache/...`)를 뒤지지 마라.** 각 스킬의 SKILL.md는 *스크립트*(`*_cli.py`) 위치를 찾을 때 `ls ~/.claude/plugins/cache/*/projectops/*/skills/.../scripts` 패턴을 쓴다 — 이건 **스크립트 전용**이며 config.json은 그 캐시 안에 **없다.** 그 `ls` 패턴을 config 찾기에 전이시키면 엉뚱한 파일을 잡거나 "config 없음"으로 오판해 이미 등록된 PAT를 사용자에게 다시 묻게 된다 (실제 발생한 사고). **스크립트는 캐시에서 ls로, config는 홈의 고정 경로에서 Read로 — 두 경로를 절대 섞지 않는다.**
 
 agent는 Read tool로 `{HOME}/.suh-template/config/config.json`을 읽는다.
 (Search·find로 탐색하지 않는다 — 경로가 고정이므로 탐색이 필요 없고, 탐색하면 플러그인 캐시 등 엉뚱한 파일을 잡을 수 있다)
@@ -166,10 +166,10 @@ agent가 Write tool로 `{HOME}/.suh-template/config/config.json`에 저장한다
 
 | 필드 | 필수 | 설명 |
 |------|------|------|
-| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 (글로벌). suh-issue가 이슈 생성 시 자동 적용한다. 빈 문자열이면 담당자 없이 생성. 누락 시 첫 이슈에서 1회 질문 후 저장 |
+| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 (글로벌). issue가 이슈 생성 시 자동 적용한다. 빈 문자열이면 담당자 없이 생성. 누락 시 첫 이슈에서 1회 질문 후 저장 |
 | `global_pat` | ✅ | 전체 공용 GitHub PAT (repo + workflow 권한) |
-| `commit.auto_approve` | — | suh-commit 스킬의 커밋 메시지 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제안 메시지 표시 후 즉시 커밋. 누락 시 `false`(수동 승인) |
-| `issue.auto_approve` | — | suh-issue 스킬의 이슈 등록 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제목·라벨·로컬 파일 경로 표시 후 즉시 GitHub 등록. **중복 검사(2-1, 4-1단계)는 항상 실행** — 자동 모드라도 open 동일 이슈 발견 시 중단. 누락 시 `false` |
+| `commit.auto_approve` | — | commit 스킬의 커밋 메시지 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제안 메시지 표시 후 즉시 커밋. 누락 시 `false`(수동 승인) |
+| `issue.auto_approve` | — | issue 스킬의 이슈 등록 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제목·라벨·로컬 파일 경로 표시 후 즉시 GitHub 등록. **중복 검사(2-1, 4-1단계)는 항상 실행** — 자동 모드라도 open 동일 이슈 발견 시 중단. 누락 시 `false` |
 | `changelog_deploy.auto_approve` | — | changelog-deploy 스킬의 릴리스 노트 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 본문 표시만 하고 즉시 PR 생성. 누락 시 `false` |
 | `repos` | ✅ | 사용할 저장소 목록 |
 | `repos[].name` | ✅ | 프로젝트 식별 이름 |

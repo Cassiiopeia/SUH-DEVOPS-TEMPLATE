@@ -29,15 +29,15 @@
 - `scripts/common/paths.py` — `get_next_seq`에 `strict` 인자 추가.
 - `scripts/tests/test_skill_docs.py` — argparse 에러 JSON 강제 / get-next-seq 부재 회귀 추가.
 - `skills/references/mcp-subcommand-rules.md` — §7 "SKILL.md 호출예 필수", §8 "argparse 실패도 JSON" 절 추가.
-- `skills/suh-issue/scripts/issue_cli.py` — `JSONArgumentParser`로 교체, `get-next-seq` 서브커맨드 제거, 누락 서브커맨드 docstring 정비.
-- `skills/suh-commit/scripts/commit_cli.py` — `JSONArgumentParser`로 교체.
-- `skills/suh-report/scripts/report_cli.py` — `JSONArgumentParser`로 교체.
-- `skills/suh-review/scripts/review_cli.py` — `JSONArgumentParser`로 교체.
-- `skills/suh-troubleshoot/scripts/troubleshoot_cli.py` — `JSONArgumentParser`로 교체.
-- `skills/suh-github/scripts/github_cli.py` — `JSONArgumentParser`로 교체.
-- `skills/suh-changelog-deploy/scripts/changelog_cli.py` — `JSONArgumentParser`로 교체.
-- `skills/suh-issue/SKILL.md` — 4단계 `TMP1` 절차에 `get-next-seq` 미사용 명시.
-- `skills/suh-plan/SKILL.md` — 107행 `get-next-seq` 언급 정정 (issue_cli에서 제거됨).
+- `skills/issue/scripts/issue_cli.py` — `JSONArgumentParser`로 교체, `get-next-seq` 서브커맨드 제거, 누락 서브커맨드 docstring 정비.
+- `skills/commit/scripts/commit_cli.py` — `JSONArgumentParser`로 교체.
+- `skills/report/scripts/report_cli.py` — `JSONArgumentParser`로 교체.
+- `skills/review/scripts/review_cli.py` — `JSONArgumentParser`로 교체.
+- `skills/troubleshoot/scripts/troubleshoot_cli.py` — `JSONArgumentParser`로 교체.
+- `skills/github/scripts/github_cli.py` — `JSONArgumentParser`로 교체.
+- `skills/changelog-deploy/scripts/changelog_cli.py` — `JSONArgumentParser`로 교체.
+- `skills/issue/SKILL.md` — 4단계 `TMP1` 절차에 `get-next-seq` 미사용 명시.
+- `skills/plan/SKILL.md` — 107행 `get-next-seq` 언급 정정 (issue_cli에서 제거됨).
 
 **Out of scope (별도 작업):** SKILL.md 누락 호출예 전체 보강은 본 plan에서 다루지 않음. 회귀 테스트만 추가하여 향후 SKILL.md 추가 시 매칭 강제. 누락 호출예는 후속 issue로 분리.
 
@@ -362,9 +362,9 @@ EOF
 ### Task 3: `issue_cli.py`에서 `get-next-seq` 제거 + `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-issue/scripts/issue_cli.py`
+- Modify: `skills/issue/scripts/issue_cli.py`
 
-`get-next-seq`는 사용처 0건이고 `suh-issue/SKILL.md` 4단계 절차 (`TMP1, TMP2` 직접 사용)와 충돌한다. CLI 표면에서 제거하면 agent가 잘못 호출할 표면 자체가 사라진다. 함수 `paths.get_next_seq`는 다른 CLI(report/review/troubleshoot)가 내부적으로 쓰므로 유지.
+`get-next-seq`는 사용처 0건이고 `issue/SKILL.md` 4단계 절차 (`TMP1, TMP2` 직접 사용)와 충돌한다. CLI 표면에서 제거하면 agent가 잘못 호출할 표면 자체가 사라진다. 함수 `paths.get_next_seq`는 다른 CLI(report/review/troubleshoot)가 내부적으로 쓰므로 유지.
 
 - [ ] **Step 1: 회귀 테스트 작성 — `get-next-seq` 부재 + bad_args JSON 출력**
 
@@ -376,7 +376,7 @@ def test_issue_cli_does_not_expose_get_next_seq():
 
     SKILL.md 4단계는 TMP1 직접 사용 절차이므로 CLI 노출은 agent 오추론을 유도한다.
     """
-    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    cli_path = ROOT / "skills" / "issue" / "scripts" / "issue_cli.py"
     text = cli_path.read_text(encoding="utf-8")
     assert "add_parser(\"get-next-seq\"" not in text, \
         "issue_cli.py에 get-next-seq 서브커맨드가 남아있다 (이슈 #329)"
@@ -387,7 +387,7 @@ def test_issue_cli_does_not_expose_get_next_seq():
 def test_issue_cli_bad_args_emits_json(tmp_path):
     """issue_cli.py가 잘못된 인자를 받아도 stdout에 JSON을 emit해야 한다."""
     import subprocess
-    cli_path = ROOT / "skills" / "suh-issue" / "scripts" / "issue_cli.py"
+    cli_path = ROOT / "skills" / "issue" / "scripts" / "issue_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -430,7 +430,7 @@ Expected: 두 테스트 모두 FAIL — `get-next-seq` 아직 존재 + argparse 
 4. `build_parser` 시그니처와 본문에서 `get-next-seq` 부분(133–135행) 삭제, `argparse.ArgumentParser` → `JSONArgumentParser`:
    ```python
    def build_parser() -> JSONArgumentParser:
-       parser = JSONArgumentParser(prog="issue_cli", description="suh-issue skill CLI")
+       parser = JSONArgumentParser(prog="issue_cli", description="issue skill CLI")
        sub = parser.add_subparsers(dest="command", required=True)
 
        p_ci = sub.add_parser("create-issue", help="이슈 생성")
@@ -476,7 +476,7 @@ Expected: PASS.
 기존 issue_cli 동작 회귀 확인 — 정상 호출이 깨지지 않았는지:
 
 ```bash
-cd "D:/0-suh/project/suh-github-template/skills/suh-issue/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/issue/scripts"
 PYTHONIOENCODING=utf-8 python issue_cli.py --help
 ```
 Expected: 도움말 정상 출력. `get-next-seq` 항목 사라짐.
@@ -484,7 +484,7 @@ Expected: 도움말 정상 출력. `get-next-seq` 항목 사라짐.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-issue/scripts/issue_cli.py scripts/tests/test_skill_docs.py
+git add skills/issue/scripts/issue_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 issue_cli get-next-seq 제거 + JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -505,7 +505,7 @@ EOF
 ### Task 4: `commit_cli.py`에 `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-commit/scripts/commit_cli.py`
+- Modify: `skills/commit/scripts/commit_cli.py`
 
 - [ ] **Step 1: 회귀 테스트 추가**
 
@@ -514,7 +514,7 @@ EOF
 ```python
 def test_commit_cli_bad_args_emits_json():
     import subprocess, json
-    cli_path = ROOT / "skills" / "suh-commit" / "scripts" / "commit_cli.py"
+    cli_path = ROOT / "skills" / "commit" / "scripts" / "commit_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -555,7 +555,7 @@ Expected: FAIL.
 Run:
 ```bash
 python -m pytest scripts/tests/test_skill_docs.py::test_commit_cli_bad_args_emits_json -v
-cd "D:/0-suh/project/suh-github-template/skills/suh-commit/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/commit/scripts"
 PYTHONIOENCODING=utf-8 python commit_cli.py --help
 ```
 Expected: 테스트 PASS, `--help` 정상 출력.
@@ -563,7 +563,7 @@ Expected: 테스트 PASS, `--help` 정상 출력.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-commit/scripts/commit_cli.py scripts/tests/test_skill_docs.py
+git add skills/commit/scripts/commit_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 commit_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -581,14 +581,14 @@ EOF
 ### Task 5: `report_cli.py`에 `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-report/scripts/report_cli.py`
+- Modify: `skills/report/scripts/report_cli.py`
 
 - [ ] **Step 1: 회귀 테스트 추가**
 
 ```python
 def test_report_cli_bad_args_emits_json():
     import subprocess, json
-    cli_path = ROOT / "skills" / "suh-report" / "scripts" / "report_cli.py"
+    cli_path = ROOT / "skills" / "report" / "scripts" / "report_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -627,7 +627,7 @@ Expected: FAIL.
 Run:
 ```bash
 python -m pytest scripts/tests/test_skill_docs.py::test_report_cli_bad_args_emits_json -v
-cd "D:/0-suh/project/suh-github-template/skills/suh-report/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/report/scripts"
 PYTHONIOENCODING=utf-8 python report_cli.py --help
 ```
 Expected: PASS, `--help` 정상.
@@ -635,7 +635,7 @@ Expected: PASS, `--help` 정상.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-report/scripts/report_cli.py scripts/tests/test_skill_docs.py
+git add skills/report/scripts/report_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 report_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -653,14 +653,14 @@ EOF
 ### Task 6: `review_cli.py`에 `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-review/scripts/review_cli.py`
+- Modify: `skills/review/scripts/review_cli.py`
 
 - [ ] **Step 1: 회귀 테스트 추가**
 
 ```python
 def test_review_cli_bad_args_emits_json():
     import subprocess, json
-    cli_path = ROOT / "skills" / "suh-review" / "scripts" / "review_cli.py"
+    cli_path = ROOT / "skills" / "review" / "scripts" / "review_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -688,7 +688,7 @@ Expected: FAIL.
 Run:
 ```bash
 python -m pytest scripts/tests/test_skill_docs.py::test_review_cli_bad_args_emits_json -v
-cd "D:/0-suh/project/suh-github-template/skills/suh-review/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/review/scripts"
 PYTHONIOENCODING=utf-8 python review_cli.py --help
 ```
 Expected: PASS.
@@ -696,7 +696,7 @@ Expected: PASS.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-review/scripts/review_cli.py scripts/tests/test_skill_docs.py
+git add skills/review/scripts/review_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 review_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -712,14 +712,14 @@ EOF
 ### Task 7: `troubleshoot_cli.py`에 `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-troubleshoot/scripts/troubleshoot_cli.py`
+- Modify: `skills/troubleshoot/scripts/troubleshoot_cli.py`
 
 - [ ] **Step 1: 회귀 테스트 추가**
 
 ```python
 def test_troubleshoot_cli_bad_args_emits_json():
     import subprocess, json
-    cli_path = ROOT / "skills" / "suh-troubleshoot" / "scripts" / "troubleshoot_cli.py"
+    cli_path = ROOT / "skills" / "troubleshoot" / "scripts" / "troubleshoot_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -747,7 +747,7 @@ Task 4 Step 3과 동일 패턴 적용.
 Run:
 ```bash
 python -m pytest scripts/tests/test_skill_docs.py::test_troubleshoot_cli_bad_args_emits_json -v
-cd "D:/0-suh/project/suh-github-template/skills/suh-troubleshoot/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/troubleshoot/scripts"
 PYTHONIOENCODING=utf-8 python troubleshoot_cli.py --help
 ```
 Expected: PASS.
@@ -755,7 +755,7 @@ Expected: PASS.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-troubleshoot/scripts/troubleshoot_cli.py scripts/tests/test_skill_docs.py
+git add skills/troubleshoot/scripts/troubleshoot_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 troubleshoot_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -771,14 +771,14 @@ EOF
 ### Task 8: `github_cli.py`에 `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-github/scripts/github_cli.py`
+- Modify: `skills/github/scripts/github_cli.py`
 
 - [ ] **Step 1: 회귀 테스트 추가**
 
 ```python
 def test_github_cli_bad_args_emits_json():
     import subprocess, json
-    cli_path = ROOT / "skills" / "suh-github" / "scripts" / "github_cli.py"
+    cli_path = ROOT / "skills" / "github" / "scripts" / "github_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -806,7 +806,7 @@ Task 4 Step 3과 동일 패턴 적용.
 Run:
 ```bash
 python -m pytest scripts/tests/test_skill_docs.py::test_github_cli_bad_args_emits_json -v
-cd "D:/0-suh/project/suh-github-template/skills/suh-github/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/github/scripts"
 PYTHONIOENCODING=utf-8 python github_cli.py --help
 ```
 Expected: PASS.
@@ -814,7 +814,7 @@ Expected: PASS.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-github/scripts/github_cli.py scripts/tests/test_skill_docs.py
+git add skills/github/scripts/github_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 github_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -830,14 +830,14 @@ EOF
 ### Task 9: `changelog_cli.py`에 `JSONArgumentParser` 적용
 
 **Files:**
-- Modify: `skills/suh-changelog-deploy/scripts/changelog_cli.py`
+- Modify: `skills/changelog-deploy/scripts/changelog_cli.py`
 
 - [ ] **Step 1: 회귀 테스트 추가**
 
 ```python
 def test_changelog_cli_bad_args_emits_json():
     import subprocess, json
-    cli_path = ROOT / "skills" / "suh-changelog-deploy" / "scripts" / "changelog_cli.py"
+    cli_path = ROOT / "skills" / "changelog-deploy" / "scripts" / "changelog_cli.py"
     proc = subprocess.run(
         [sys.executable, str(cli_path), "nonexistent-sub"],
         capture_output=True, text=True, encoding="utf-8",
@@ -865,7 +865,7 @@ Task 4 Step 3과 동일 패턴 적용.
 Run:
 ```bash
 python -m pytest scripts/tests/test_skill_docs.py::test_changelog_cli_bad_args_emits_json -v
-cd "D:/0-suh/project/suh-github-template/skills/suh-changelog-deploy/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/changelog-deploy/scripts"
 PYTHONIOENCODING=utf-8 python changelog_cli.py --help
 ```
 Expected: PASS.
@@ -873,7 +873,7 @@ Expected: PASS.
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add skills/suh-changelog-deploy/scripts/changelog_cli.py scripts/tests/test_skill_docs.py
+git add skills/changelog-deploy/scripts/changelog_cli.py scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 changelog_cli JSONArgumentParser 적용 : feat : CLI 표준 강화 #329
 
@@ -911,19 +911,19 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 CLI_TO_SKILL = {
-    "suh-issue/scripts/issue_cli.py": ["suh-issue/SKILL.md"],
-    "suh-commit/scripts/commit_cli.py": ["suh-commit/SKILL.md"],
-    "suh-report/scripts/report_cli.py": ["suh-report/SKILL.md"],
-    "suh-review/scripts/review_cli.py": ["suh-review/SKILL.md"],
-    "suh-troubleshoot/scripts/troubleshoot_cli.py": ["suh-troubleshoot/SKILL.md"],
-    "suh-github/scripts/github_cli.py": ["suh-github/SKILL.md"],
-    "suh-changelog-deploy/scripts/changelog_cli.py": ["suh-changelog-deploy/SKILL.md"],
+    "issue/scripts/issue_cli.py": ["issue/SKILL.md"],
+    "commit/scripts/commit_cli.py": ["commit/SKILL.md"],
+    "report/scripts/report_cli.py": ["report/SKILL.md"],
+    "review/scripts/review_cli.py": ["review/SKILL.md"],
+    "troubleshoot/scripts/troubleshoot_cli.py": ["troubleshoot/SKILL.md"],
+    "github/scripts/github_cli.py": ["github/SKILL.md"],
+    "changelog-deploy/scripts/changelog_cli.py": ["changelog-deploy/SKILL.md"],
 }
 
 
 # 현재 SKILL.md에 호출예가 없는 서브커맨드 — 후속 작업으로 보강 시 셋에서 제거한다.
 EXPECTED_MISSING = {
-    # ("suh-issue/scripts/issue_cli.py", "normalize-title"),  # 예: 보강 전까지 화이트리스트
+    # ("issue/scripts/issue_cli.py", "normalize-title"),  # 예: 보강 전까지 화이트리스트
 }
 
 
@@ -980,9 +980,9 @@ Step 2 출력에서 누락된 모든 `(cli_rel, name)` 쌍을 `EXPECTED_MISSING`
 
 ```python
 EXPECTED_MISSING = {
-    ("suh-issue/scripts/issue_cli.py", "normalize-title"),
-    ("suh-issue/scripts/issue_cli.py", "create-branch-name"),
-    ("suh-issue/scripts/issue_cli.py", "get-commit-template"),
+    ("issue/scripts/issue_cli.py", "normalize-title"),
+    ("issue/scripts/issue_cli.py", "create-branch-name"),
+    ("issue/scripts/issue_cli.py", "get-commit-template"),
     # ... Step 2 출력에서 본 모든 항목 등록
 }
 ```
@@ -1023,11 +1023,11 @@ EOF
 ### Task 11: SKILL.md / references 문서 정정
 
 **Files:**
-- Modify: `skills/suh-issue/SKILL.md`
-- Modify: `skills/suh-plan/SKILL.md`
+- Modify: `skills/issue/SKILL.md`
+- Modify: `skills/plan/SKILL.md`
 - Modify: `skills/references/mcp-subcommand-rules.md`
 
-- [ ] **Step 1: `suh-issue/SKILL.md` 4단계 정정**
+- [ ] **Step 1: `issue/SKILL.md` 4단계 정정**
 
 기존 4단계의 임시 번호 사용 부분을 다음 한 줄로 강화 (190행 근처, `이슈 번호는 GitHub 등록 전이므로 임시로 \`TMP1\`, \`TMP2\`...` 행에 이어서):
 
@@ -1042,7 +1042,7 @@ EOF
 - **`issue_cli.py`의 `get-next-seq` 서브커맨드를 호출하지 않는다.** 이슈 #329로 CLI에서 제거됨 — 임시 번호는 agent가 직접 생성한다.
 ```
 
-- [ ] **Step 2: `suh-plan/SKILL.md` 107행 정정**
+- [ ] **Step 2: `plan/SKILL.md` 107행 정정**
 
 기존:
 ```
@@ -1122,8 +1122,8 @@ def test_mcp_rules_document_json_argparse_standard():
 
 
 def test_plan_skill_does_not_reference_removed_get_next_seq_subcommand():
-    """suh-plan/SKILL.md는 issue_cli의 get-next-seq를 참조하면 안 된다 (이슈 #329)."""
-    path = ROOT / "skills" / "suh-plan" / "SKILL.md"
+    """plan/SKILL.md는 issue_cli의 get-next-seq를 참조하면 안 된다 (이슈 #329)."""
+    path = ROOT / "skills" / "plan" / "SKILL.md"
     text = path.read_text(encoding="utf-8")
     assert "issue_cli.py 가 `get-next-seq`" not in text
     assert "`get-next-seq`·`normalize-title` 보유" not in text
@@ -1141,12 +1141,12 @@ Expected: 전부 PASS.
 - [ ] **Step 6: 커밋**
 
 ```bash
-git add skills/suh-issue/SKILL.md skills/suh-plan/SKILL.md skills/references/mcp-subcommand-rules.md scripts/tests/test_skill_docs.py
+git add skills/issue/SKILL.md skills/plan/SKILL.md skills/references/mcp-subcommand-rules.md scripts/tests/test_skill_docs.py
 git commit -m "$(cat <<'EOF'
 SKILL.md/references 문서 정정 + JSONArgumentParser 표준 명시 : docs : CLI 표준 강화 #329
 
-- suh-issue/SKILL.md 4단계: get-next-seq 호출 금지 명시
-- suh-plan/SKILL.md: issue_cli의 get-next-seq 참조 제거
+- issue/SKILL.md 4단계: get-next-seq 호출 금지 명시
+- plan/SKILL.md: issue_cli의 get-next-seq 참조 제거
 - mcp-subcommand-rules.md §7: SKILL.md 호출예 필수 규칙 추가
 - mcp-subcommand-rules.md §8: JSONArgumentParser 사용 규칙 신규
 - test_skill_docs.py: 정합성 회귀 테스트 추가
@@ -1171,7 +1171,7 @@ EOF
 
 Run:
 ```bash
-cd "D:/0-suh/project/suh-github-template/skills/suh-issue/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/issue/scripts"
 PYTHONIOENCODING=utf-8 python issue_cli.py get-next-seq "/some/project/root" "20260602"
 ```
 
@@ -1191,7 +1191,7 @@ Expected stdout:
 
 Run:
 ```bash
-cd "D:/0-suh/project/suh-github-template/skills/suh-issue/scripts"
+cd "D:/0-suh/project/suh-github-template/skills/issue/scripts"
 PYTHONIOENCODING=utf-8 python issue_cli.py normalize-title "테스트 제목 정규화"
 ```
 
@@ -1233,7 +1233,7 @@ agent가 응답을 보고 즉시 self-correct 가능.
 
 ### 후속 작업 (별도 이슈 권장)
 - SKILL.md ↔ CLI 매칭 화이트리스트(`EXPECTED_MISSING`)에 남은 항목 보강.
-  특히 `suh-issue`의 `normalize-title`, `create-branch-name`, `get-commit-template` 호출예 추가.
+  특히 `issue`의 `normalize-title`, `create-branch-name`, `get-commit-template` 호출예 추가.
 ```
 
 - [ ] **Step 5: 커밋**

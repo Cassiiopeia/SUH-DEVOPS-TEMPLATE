@@ -1,7 +1,7 @@
 # Skill Auto-Approve Unified Gate Design
 
 작성일: 2026-06-02
-대상 스킬: `suh-commit`, `suh-issue`, `suh-changelog-deploy`
+대상 스킬: `commit`, `issue`, `changelog-deploy`
 
 ## 1. 배경
 
@@ -9,9 +9,9 @@
 
 | 스킬 | 게이트 위치 | 토글 키 | 현재 상태 |
 |------|------------|---------|----------|
-| suh-commit | 5단계 (4지선다) | `commit.auto_approve` | 막 추가됨 |
-| suh-issue | 4단계 (4지선다) + 4-1 (중복 재검사) | 없음 | 토글 부재 |
-| suh-changelog-deploy | 5.5단계 (본문 표시 후 승인) | `changelog_deploy.auto_approve_release_notes` | 적용됨 |
+| commit | 5단계 (4지선다) | `commit.auto_approve` | 막 추가됨 |
+| issue | 4단계 (4지선다) + 4-1 (중복 재검사) | 없음 | 토글 부재 |
+| changelog-deploy | 5.5단계 (본문 표시 후 승인) | `changelog_deploy.auto_approve_release_notes` | 적용됨 |
 
 매번 사용자 확인이 떠서 같은 레포 반복 작업 시 마찰. 이미 changelog-deploy는 토글이 있지만 키 이름이 다르고, issue는 토글 자체가 없다.
 
@@ -142,9 +142,9 @@
 |------|----------|
 | `skills/references/config-rules.md` | §7 commit/issue/changelog_deploy 키 통일. 구 키 명시 break 안내. 공통 해석 규칙 1개로 통합 |
 | `skills/config.json.example` | 3 스킬 `auto_approve` 예시 통일 |
-| `skills/suh-commit/SKILL.md` | A/B/C 분기 (이미 추가됨) 다듬기 |
-| `skills/suh-issue/SKILL.md` | 시작 전 §자동 승인 판정 + 4단계에 A/B/C 분기 삽입 |
-| `skills/suh-changelog-deploy/SKILL.md` | `auto_approve_release_notes` → `auto_approve` rename |
+| `skills/commit/SKILL.md` | A/B/C 분기 (이미 추가됨) 다듬기 |
+| `skills/issue/SKILL.md` | 시작 전 §자동 승인 판정 + 4단계에 A/B/C 분기 삽입 |
+| `skills/changelog-deploy/SKILL.md` | `auto_approve_release_notes` → `auto_approve` rename |
 
 ## 9. 비목표
 

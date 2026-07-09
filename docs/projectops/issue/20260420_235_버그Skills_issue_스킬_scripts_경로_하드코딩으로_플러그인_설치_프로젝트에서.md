@@ -41,7 +41,7 @@ PYTHONPATH="$PROJECT_ROOT/scripts" $PYTHON -m suh_template.cli config-get issue 
 올바른 동작:
 ```bash
 # 플러그인 캐시 경로를 PYTHONPATH로 사용해야 함
-SCRIPTS_PATH="/Users/suhsaechan/.claude/plugins/cache/cassiiopeia-marketplace/cassiiopeia/{version}/scripts"
+SCRIPTS_PATH="/Users/suhsaechan/.claude/plugins/cache/projectops-marketplace/projectops/{version}/scripts"
 PYTHONPATH="$SCRIPTS_PATH" $PYTHON -m suh_template.cli config-get issue github_pat
 ```
 

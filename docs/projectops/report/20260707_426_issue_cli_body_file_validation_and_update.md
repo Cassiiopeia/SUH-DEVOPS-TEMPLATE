@@ -30,12 +30,12 @@ flowchart TD
 ## 변경 사항
 
 ### CLI 제어 도구 강화
-*   `skills/suh-issue/scripts/issue_cli.py`:
+*   `skills/issue/scripts/issue_cli.py`:
     *   `cmd_create_issue` 핸들러 내에서 `args.body_file` 존재 여부의 3-way 검증을 강화하여, 부재 시 `"code": "body_file_not_found"` JSON 및 실패 코드(1)를 반환하도록 수정했습니다.
     *   이슈 생성 성공 응답 메타데이터에 `"body_length": len(body)` 를 보완해 AI가 업로드 성공 크기를 비교 검증할 수 있도록 지원합니다.
     *   `update-issue` 명령어 파서에 `--body-file` 옵션을 신설하고, 파일 내용을 정밀 읽기하여 `update_issue(..., body=body)` API에 올바르게 연동했습니다.
 
-*   `skills/suh-github/scripts/github_cli.py`:
+*   `skills/github/scripts/github_cli.py`:
     *   `issue_cli`와 정합성을 완벽하게 대조하여 `update-issue` 명령어에 `--body-file` 옵션을 동일하게 추가하고, 사후에 독자적으로 본문을 안전하게 갱신 및 복구할 수 있도록 기능을 강화했습니다.
 
 ### TDD 검증 및 단위 테스트 구현

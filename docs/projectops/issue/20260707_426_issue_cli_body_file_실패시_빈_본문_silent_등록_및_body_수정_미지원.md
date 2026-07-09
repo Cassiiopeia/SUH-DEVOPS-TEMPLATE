@@ -1,7 +1,7 @@
 🗒️ 설명
 ---
 
-- suh-issue의 `issue_cli.py` create-issue가 body_file 경로를 열지 못하면 에러 대신 **빈 본문("")으로 이슈를 등록**합니다 (silent fallback). 실측: 이슈 #425가 빈 본문으로 등록됐습니다.
+- issue의 `issue_cli.py` create-issue가 body_file 경로를 열지 못하면 에러 대신 **빈 본문("")으로 이슈를 등록**합니다 (silent fallback). 실측: 이슈 #425가 빈 본문으로 등록됐습니다.
 - 원인 경로: Windows Git Bash에서 한글 포함 파일 경로가 네이티브 Python argv로 전달되며 깨져 `Path.exists()`가 false가 됨 → "" 등록. CLI는 성공 JSON을 반환하므로 agent가 실패를 감지할 수 없습니다.
 - 복구 수단도 없습니다: `issue_cli.py` update-issue와 `github_cli.py` update-issue 모두 body 수정을 지원하지 않습니다 (title/state/labels/assignees만).
 
@@ -15,7 +15,7 @@
 📸 참고 자료
 ---
 
-- `skills/suh-issue/scripts/issue_cli.py:33` — `body = Path(args.body_file).read_text(...) if Path(args.body_file).exists() else ""`
+- `skills/issue/scripts/issue_cli.py:33` — `body = Path(args.body_file).read_text(...) if Path(args.body_file).exists() else ""`
 - 실측 사례: #425 빈 본문 등록 → PowerShell Invoke-RestMethod PATCH로 수동 복구
 - 함께 발견: 레포명 변경(projectops) 후 구 이름으로 Search API 호출 시 422 반환 (REST와 달리 검색의 repo 한정자는 리다이렉트가 해결되지 않음) — config의 레포명 갱신 필요
 

@@ -92,9 +92,9 @@ README-VERSION-UPDATE · PLUGIN-VERSION-SYNC · CICD 배포
 
 ## 8. 스킬 · CLI 변경
 
-- `skills/suh-changelog-deploy/SKILL.md` 전면 개정 (deploy 브랜치 언급 약 80곳): 흐름 = "develop push → PR develop→main". `git log origin/deploy..HEAD` → `origin/main..HEAD`, 커밋 분석 base `origin/deploy..origin/main` → `origin/main..origin/develop`, create-pr `head=develop, base=main`, deploy-status `--base main`. 스킬이 릴리스 노트를 본문에 담아 PR을 만드는 구조(레이스 방지)는 유지.
-- `skills/suh-changelog-deploy/scripts/changelog_cli.py`: `deploy-status --base` 기본값 `deploy`→`main`, `create-pr` 기본 head/base 교체.
-- `skills/references/config-rules.md`(9곳)·`common-rules.md`(2곳)·`mcp-subcommand-rules.md`(3곳)·`skills/suh-github/SKILL.md`(5곳)의 deploy 브랜치 서술 갱신.
+- `skills/changelog-deploy/SKILL.md` 전면 개정 (deploy 브랜치 언급 약 80곳): 흐름 = "develop push → PR develop→main". `git log origin/deploy..HEAD` → `origin/main..HEAD`, 커밋 분석 base `origin/deploy..origin/main` → `origin/main..origin/develop`, create-pr `head=develop, base=main`, deploy-status `--base main`. 스킬이 릴리스 노트를 본문에 담아 PR을 만드는 구조(레이스 방지)는 유지.
+- `skills/changelog-deploy/scripts/changelog_cli.py`: `deploy-status --base` 기본값 `deploy`→`main`, `create-pr` 기본 head/base 교체.
+- `skills/references/config-rules.md`(9곳)·`common-rules.md`(2곳)·`mcp-subcommand-rules.md`(3곳)·`skills/github/SKILL.md`(5곳)의 deploy 브랜치 서술 갱신.
 - 이 레포 `CLAUDE.md`: "main에서 직접 작업" 규칙 → "develop에서 직접 작업, 릴리스는 develop→main PR"로 개정. 브랜치 기반 트리거 표 갱신.
 
 ## 9. 초기화·통합·호환성

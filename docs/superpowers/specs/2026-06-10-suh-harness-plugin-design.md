@@ -209,7 +209,7 @@ cassiiopeia와 동일하게 `claude plugin list --json`에서 suh-harness의 sco
 ```
 [ Claude Code 플러그인 관리 ]
 
-  cassiiopeia — DevOps 자동화 스킬 모음. /suh-analyze, /suh-implement, /suh-issue 등
+  cassiiopeia — DevOps 자동화 스킬 모음. /analyze, /implement, /issue 등
                 23+ 슬래시 커맨드를 추가합니다.
   (메뉴: update / reinstall / delete / skip)
 

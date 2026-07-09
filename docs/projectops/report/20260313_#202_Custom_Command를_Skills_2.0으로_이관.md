@@ -27,7 +27,7 @@
 - `.claude/skills/refactor/SKILL.md`: 리팩토링 실행 (Before/After)
 - `.claude/skills/refactor-analyze/SKILL.md`: 리팩토링 분석 (코드 수정 없음)
 - `.claude/skills/figma/SKILL.md`: Figma → 반응형 코드 변환
-- `.claude/skills/suh-spring-test/SKILL.md`: Spring Boot 테스트 템플릿 생성
+- `.claude/skills/spring-test/SKILL.md`: Spring Boot 테스트 템플릿 생성
 - `.claude/skills/document/SKILL.md`: 기술 문서화
 - `.claude/skills/report/SKILL.md`: 구현 보고서 생성
 - `.claude/skills/ppt/SKILL.md`: 기술 발표 자료 작성

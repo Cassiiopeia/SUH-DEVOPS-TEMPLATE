@@ -6,7 +6,7 @@
 📝 현재 문제점
 ---
 
-`suh-changelog-deploy` 스킬과 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우가 **같은 자원(PR body)을 동시 수정**하는 구조라 race가 본질적으로 해결되지 않는다.
+`changelog-deploy` 스킬과 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우가 **같은 자원(PR body)을 동시 수정**하는 구조라 race가 본질적으로 해결되지 않는다.
 
 - 스킬: PR을 본문에 `Summary by CodeRabbit` 포함해 생성 (`create-pr` body_file 전달)
 - 워크플로우 step 2: PR opened 트리거 직후 body 조회 → Summary 있으면 보존, 없으면 초기화
@@ -26,14 +26,14 @@
 
 ### 변경
 
-1. `skills/suh-changelog-deploy/scripts/changelog_cli.py` `create-pr`
+1. `skills/changelog-deploy/scripts/changelog_cli.py` `create-pr`
    - PR 생성 직후 라벨 `release-notes:ready` 부여
 2. `.github/workflows/PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml`
    - step 2(PR 본문 초기화) 가장 먼저 PR 라벨 조회
    - `release-notes:ready` 라벨이 있으면 본문 검사·초기화 step 자체를 skip + `already_found=true`로 설정
    - 라벨이 없는 PR(수동 생성·다른 도구가 만든 PR)에 한해서만 기존 본문 초기화 로직 적용
 3. `.github/sync-issue-labels.yml`(혹은 라벨 동기화 워크플로우)에 `release-notes:ready` 라벨 등록
-4. `skills/suh-changelog-deploy/SKILL.md` 6단계 본문에 라벨 부여 절차 명시
+4. `skills/changelog-deploy/SKILL.md` 6단계 본문에 라벨 부여 절차 명시
 
 ### 효과
 
@@ -49,12 +49,12 @@
 ⚙️ 작업 내용
 ---
 
-- `skills/suh-changelog-deploy/scripts/changelog_cli.py:cmd_create_pr` — PR 생성 후 라벨 부여 호출 추가
+- `skills/changelog-deploy/scripts/changelog_cli.py:cmd_create_pr` — PR 생성 후 라벨 부여 호출 추가
 - `scripts/common/gh_client.py` — `add_pr_labels(owner, repo, pr_num, labels[])` 헬퍼 추가 (없으면)
 - `.github/workflows/PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml` step 2 — 라벨 가드 분기 추가
 - `.github/workflows/project-types/common/PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml` — 동일하게 수정
 - `.github/labels/*.yml`(라벨 동기화 파일) — `release-notes:ready` 라벨 정의 추가
-- `skills/suh-changelog-deploy/SKILL.md` 6단계 — 라벨 부여 절차 명시
+- `skills/changelog-deploy/SKILL.md` 6단계 — 라벨 부여 절차 명시
 - 회귀 검증
   - 스킬로 deploy PR 만들면 본문 보존되는지
   - 수동으로 본문 없는 PR 만들면 기존대로 초기화되는지

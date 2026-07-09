@@ -54,7 +54,7 @@ git pull origin main
 
 1. **설계 문서 확인**: `docs/superpowers/specs/2026-07-07-projectops-npx-migration-design.md`
 2. **분석 단계(analyze) 실행**:
-   - `suh-analyze` 스킬을 실행하여 **기존 Bash/PowerShell 함수 약 130개를 Node.js 모듈로 1:1 대응시키는 "함수 매핑 설계서"**를 먼저 작성합니다.
+   - `analyze` 스킬을 실행하여 **기존 Bash/PowerShell 함수 약 130개를 Node.js 모듈로 1:1 대응시키는 "함수 매핑 설계서"**를 먼저 작성합니다.
    - 이 매핑을 통해 중복 로직을 제거하고, 크로스 플랫폼 호환성(Windows, macOS, Linux)을 검증할 모듈 구조를 확립합니다.
 3. **단계적 구현**:
    - version ➡️ workflows ➡️ full ➡️ skills ➡️ revert 순으로 가볍고 독립적인 모드부터 단계적으로 포팅을 시작합니다.

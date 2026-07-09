@@ -4,7 +4,7 @@
 
 **Goal:** `cassiiopeia` 플러그인의 모든 스킬명에 `suh-` prefix를 추가해 타 플러그인(somansa-tools 등)과의 네이밍 충돌을 원천 차단한다.
 
-**Architecture:** `skills/` 하위 폴더명 rename → 각 `SKILL.md` name 필드 수정 → SKILL.md 내부 cross-reference(`/commit`, `/report` 등) 수정 → `CLAUDE.md` 스킬 라우팅 표 수정 → `README.md` 스킬 목록 수정 순서로 진행한다. `suh-spring-test`는 이미 prefix 있으므로 제외.
+**Architecture:** `skills/` 하위 폴더명 rename → 각 `SKILL.md` name 필드 수정 → SKILL.md 내부 cross-reference(`/commit`, `/report` 등) 수정 → `CLAUDE.md` 스킬 라우팅 표 수정 → `README.md` 스킬 목록 수정 순서로 진행한다. `spring-test`는 이미 prefix 있으므로 제외.
 
 **Tech Stack:** bash (git mv), sed-style Edit tool, Glob/Grep
 
@@ -15,30 +15,30 @@
 ### 폴더 rename (23개)
 | 현재 | 변경 후 |
 |------|---------|
-| `skills/analyze/` | `skills/suh-analyze/` |
-| `skills/build/` | `skills/suh-build/` |
-| `skills/changelog-deploy/` | `skills/suh-changelog-deploy/` |
-| `skills/commit/` | `skills/suh-commit/` |
-| `skills/design/` | `skills/suh-design/` |
-| `skills/design-analyze/` | `skills/suh-design-analyze/` |
-| `skills/document/` | `skills/suh-document/` |
-| `skills/figma/` | `skills/suh-figma/` |
-| `skills/github/` | `skills/suh-github/` |
-| `skills/implement/` | `skills/suh-implement/` |
-| `skills/init-worktree/` | `skills/suh-init-worktree/` |
-| `skills/issue/` | `skills/suh-issue/` |
-| `skills/plan/` | `skills/suh-plan/` |
-| `skills/ppt/` | `skills/suh-ppt/` |
-| `skills/refactor/` | `skills/suh-refactor/` |
-| `skills/refactor-analyze/` | `skills/suh-refactor-analyze/` |
-| `skills/report/` | `skills/suh-report/` |
-| `skills/review/` | `skills/suh-review/` |
-| `skills/skill-creator/` | `skills/suh-skill-creator/` |
-| `skills/ssh/` | `skills/suh-ssh/` |
-| `skills/synology-expose/` | `skills/suh-synology-expose/` |
-| `skills/test/` | `skills/suh-test/` |
-| `skills/testcase/` | `skills/suh-testcase/` |
-| `skills/troubleshoot/` | `skills/suh-troubleshoot/` |
+| `skills/analyze/` | `skills/analyze/` |
+| `skills/build/` | `skills/build/` |
+| `skills/changelog-deploy/` | `skills/changelog-deploy/` |
+| `skills/commit/` | `skills/commit/` |
+| `skills/design/` | `skills/design/` |
+| `skills/design-analyze/` | `skills/design-analyze/` |
+| `skills/document/` | `skills/document/` |
+| `skills/figma/` | `skills/figma/` |
+| `skills/github/` | `skills/github/` |
+| `skills/implement/` | `skills/implement/` |
+| `skills/init-worktree/` | `skills/init-worktree/` |
+| `skills/issue/` | `skills/issue/` |
+| `skills/plan/` | `skills/plan/` |
+| `skills/ppt/` | `skills/ppt/` |
+| `skills/refactor/` | `skills/refactor/` |
+| `skills/refactor-analyze/` | `skills/refactor-analyze/` |
+| `skills/report/` | `skills/report/` |
+| `skills/review/` | `skills/review/` |
+| `skills/skill-creator/` | `skills/skill-creator/` |
+| `skills/ssh/` | `skills/ssh/` |
+| `skills/synology-expose/` | `skills/synology-expose/` |
+| `skills/test/` | `skills/test/` |
+| `skills/testcase/` | `skills/testcase/` |
+| `skills/troubleshoot/` | `skills/troubleshoot/` |
 
 ### SKILL.md 수정 (name 필드 + description + 내부 cross-reference)
 - `skills/suh-*/SKILL.md` 전체 (rename 후 경로)
@@ -52,36 +52,36 @@
 ### Task 1: 스킬 폴더 rename (git mv)
 
 **Files:**
-- Rename: `skills/analyze/` → `skills/suh-analyze/` (외 22개)
+- Rename: `skills/analyze/` → `skills/analyze/` (외 22개)
 
 - [ ] **Step 1: git mv로 전체 폴더 rename**
 
 ```bash
 cd "D:\0-suh\project\suh-github-template"
-git mv skills/analyze skills/suh-analyze
-git mv skills/build skills/suh-build
-git mv skills/changelog-deploy skills/suh-changelog-deploy
-git mv skills/commit skills/suh-commit
-git mv skills/design skills/suh-design
-git mv skills/design-analyze skills/suh-design-analyze
-git mv skills/document skills/suh-document
-git mv skills/figma skills/suh-figma
-git mv skills/github skills/suh-github
-git mv skills/implement skills/suh-implement
-git mv skills/init-worktree skills/suh-init-worktree
-git mv skills/issue skills/suh-issue
-git mv skills/plan skills/suh-plan
-git mv skills/ppt skills/suh-ppt
-git mv skills/refactor skills/suh-refactor
-git mv skills/refactor-analyze skills/suh-refactor-analyze
-git mv skills/report skills/suh-report
-git mv skills/review skills/suh-review
-git mv skills/skill-creator skills/suh-skill-creator
-git mv skills/ssh skills/suh-ssh
-git mv skills/synology-expose skills/suh-synology-expose
-git mv skills/test skills/suh-test
-git mv skills/testcase skills/suh-testcase
-git mv skills/troubleshoot skills/suh-troubleshoot
+git mv skills/analyze skills/analyze
+git mv skills/build skills/build
+git mv skills/changelog-deploy skills/changelog-deploy
+git mv skills/commit skills/commit
+git mv skills/design skills/design
+git mv skills/design-analyze skills/design-analyze
+git mv skills/document skills/document
+git mv skills/figma skills/figma
+git mv skills/github skills/github
+git mv skills/implement skills/implement
+git mv skills/init-worktree skills/init-worktree
+git mv skills/issue skills/issue
+git mv skills/plan skills/plan
+git mv skills/ppt skills/ppt
+git mv skills/refactor skills/refactor
+git mv skills/refactor-analyze skills/refactor-analyze
+git mv skills/report skills/report
+git mv skills/review skills/review
+git mv skills/skill-creator skills/skill-creator
+git mv skills/ssh skills/ssh
+git mv skills/synology-expose skills/synology-expose
+git mv skills/test skills/test
+git mv skills/testcase skills/testcase
+git mv skills/troubleshoot skills/troubleshoot
 ```
 
 - [ ] **Step 2: rename 결과 확인**
@@ -90,7 +90,7 @@ git mv skills/troubleshoot skills/suh-troubleshoot
 ls skills/
 ```
 
-Expected: `suh-analyze  suh-build  suh-changelog-deploy  suh-commit  suh-design  suh-design-analyze  suh-document  suh-figma  suh-github  suh-implement  suh-init-worktree  suh-issue  suh-plan  suh-ppt  suh-refactor  suh-refactor-analyze  suh-report  suh-review  suh-skill-creator  suh-spring-test  suh-ssh  suh-synology-expose  suh-test  suh-testcase  suh-troubleshoot  config.json.example  references`
+Expected: `analyze  build  changelog-deploy  commit  design  design-analyze  document  figma  github  implement  init-worktree  issue  plan  ppt  refactor  refactor-analyze  report  review  skill-creator  spring-test  ssh  synology-expose  test  testcase  troubleshoot  config.json.example  references`
 
 ---
 
@@ -105,30 +105,30 @@ Edit tool로 각 파일 수정. 변경 목록:
 
 | 파일 | 변경 전 | 변경 후 |
 |------|---------|---------|
-| `skills/suh-analyze/SKILL.md` | `name: analyze` | `name: suh-analyze` |
-| `skills/suh-build/SKILL.md` | `name: build` | `name: suh-build` |
-| `skills/suh-changelog-deploy/SKILL.md` | `name: changelog-deploy` | `name: suh-changelog-deploy` |
-| `skills/suh-commit/SKILL.md` | `name: commit` | `name: suh-commit` |
-| `skills/suh-design/SKILL.md` | `name: design` | `name: suh-design` |
-| `skills/suh-design-analyze/SKILL.md` | `name: design-analyze` | `name: suh-design-analyze` |
-| `skills/suh-document/SKILL.md` | `name: document` | `name: suh-document` |
-| `skills/suh-figma/SKILL.md` | `name: figma` | `name: suh-figma` |
-| `skills/suh-github/SKILL.md` | `name: github` | `name: suh-github` |
-| `skills/suh-implement/SKILL.md` | `name: implement` | `name: suh-implement` |
-| `skills/suh-init-worktree/SKILL.md` | `name: init-worktree` | `name: suh-init-worktree` |
-| `skills/suh-issue/SKILL.md` | `name: issue` | `name: suh-issue` |
-| `skills/suh-plan/SKILL.md` | `name: plan` | `name: suh-plan` |
-| `skills/suh-ppt/SKILL.md` | `name: ppt` | `name: suh-ppt` |
-| `skills/suh-refactor/SKILL.md` | `name: refactor` | `name: suh-refactor` |
-| `skills/suh-refactor-analyze/SKILL.md` | `name: refactor-analyze` | `name: suh-refactor-analyze` |
-| `skills/suh-report/SKILL.md` | `name: report` | `name: suh-report` |
-| `skills/suh-review/SKILL.md` | `name: review` | `name: suh-review` |
-| `skills/suh-skill-creator/SKILL.md` | `name: skill-creator` | `name: suh-skill-creator` |
-| `skills/suh-ssh/SKILL.md` | `name: ssh` | `name: suh-ssh` |
-| `skills/suh-synology-expose/SKILL.md` | `name: synology-expose` | `name: suh-synology-expose` |
-| `skills/suh-test/SKILL.md` | `name: test` | `name: suh-test` |
-| `skills/suh-testcase/SKILL.md` | `name: testcase` | `name: suh-testcase` |
-| `skills/suh-troubleshoot/SKILL.md` | `name: troubleshoot` | `name: suh-troubleshoot` |
+| `skills/analyze/SKILL.md` | `name: analyze` | `name: analyze` |
+| `skills/build/SKILL.md` | `name: build` | `name: build` |
+| `skills/changelog-deploy/SKILL.md` | `name: changelog-deploy` | `name: changelog-deploy` |
+| `skills/commit/SKILL.md` | `name: commit` | `name: commit` |
+| `skills/design/SKILL.md` | `name: design` | `name: design` |
+| `skills/design-analyze/SKILL.md` | `name: design-analyze` | `name: design-analyze` |
+| `skills/document/SKILL.md` | `name: document` | `name: document` |
+| `skills/figma/SKILL.md` | `name: figma` | `name: figma` |
+| `skills/github/SKILL.md` | `name: github` | `name: github` |
+| `skills/implement/SKILL.md` | `name: implement` | `name: implement` |
+| `skills/init-worktree/SKILL.md` | `name: init-worktree` | `name: init-worktree` |
+| `skills/issue/SKILL.md` | `name: issue` | `name: issue` |
+| `skills/plan/SKILL.md` | `name: plan` | `name: plan` |
+| `skills/ppt/SKILL.md` | `name: ppt` | `name: ppt` |
+| `skills/refactor/SKILL.md` | `name: refactor` | `name: refactor` |
+| `skills/refactor-analyze/SKILL.md` | `name: refactor-analyze` | `name: refactor-analyze` |
+| `skills/report/SKILL.md` | `name: report` | `name: report` |
+| `skills/review/SKILL.md` | `name: review` | `name: review` |
+| `skills/skill-creator/SKILL.md` | `name: skill-creator` | `name: skill-creator` |
+| `skills/ssh/SKILL.md` | `name: ssh` | `name: ssh` |
+| `skills/synology-expose/SKILL.md` | `name: synology-expose` | `name: synology-expose` |
+| `skills/test/SKILL.md` | `name: test` | `name: test` |
+| `skills/testcase/SKILL.md` | `name: testcase` | `name: testcase` |
+| `skills/troubleshoot/SKILL.md` | `name: troubleshoot` | `name: troubleshoot` |
 
 - [ ] **Step 2: description 필드 내 `/스킬명` 호출 예시 업데이트**
 
@@ -137,7 +137,7 @@ Edit tool로 각 파일 수정. 변경 목록:
 예시 (analyze):
 ```
 변경 전: "/analyze 호출 시 사용."
-변경 후: "/suh-analyze 호출 시 사용."
+변경 후: "/analyze 호출 시 사용."
 ```
 
 ---
@@ -148,22 +148,22 @@ Edit tool로 각 파일 수정. 변경 목록:
 - Modify: `skills/suh-*/SKILL.md` (내부에서 `/다른스킬` 참조하는 부분)
 
 cross-reference 패턴 (SKILL.md 본문 내):
-- `/implement` → `/suh-implement`
-- `/review` → `/suh-review`
-- `/test` → `/suh-test`
-- `/commit` → `/suh-commit`
-- `/issue` → `/suh-issue`
-- `/analyze` → `/suh-analyze`
-- `/plan` → `/suh-plan`
-- `/design` → `/suh-design`
-- `/design-analyze` → `/suh-design-analyze`
-- `/refactor` → `/suh-refactor`
-- `/refactor-analyze` → `/suh-refactor-analyze`
-- `/report` → `/suh-report`
-- `/github` → `/suh-github`
-- `/init-worktree` → `/suh-init-worktree`
-- `/changelog-deploy` → `/suh-changelog-deploy`
-- `/skill-creator` → `/suh-skill-creator`
+- `/implement` → `/implement`
+- `/review` → `/review`
+- `/test` → `/test`
+- `/commit` → `/commit`
+- `/issue` → `/issue`
+- `/analyze` → `/analyze`
+- `/plan` → `/plan`
+- `/design` → `/design`
+- `/design-analyze` → `/design-analyze`
+- `/refactor` → `/refactor`
+- `/refactor-analyze` → `/refactor-analyze`
+- `/report` → `/report`
+- `/github` → `/github`
+- `/init-worktree` → `/init-worktree`
+- `/changelog-deploy` → `/changelog-deploy`
+- `/skill-creator` → `/skill-creator`
 
 **주의**: `/issue` 패턴 교체 시 URL 경로(`/issues/`)나 `docs/suh-template/issue/` 등 다른 문맥의 `/issue`를 건드리지 않도록 주의. 정확히 슬래시커맨드 패턴(`/스킬명` 뒤에 공백·줄바꿈·마침표·괄호가 오는 것)만 교체.
 
@@ -196,38 +196,38 @@ grep -rn "→ \`/implement\`\|→ \`/review\`\|→ \`/test\`\|/commit\b\|/analyz
 
 변경 후:
 ```
-| **PR 생성, PR 올려줘, ...** | **`cassiiopeia:suh-github` ← 최우선 트리거** |
-| 코드 분석, 현황 파악 | `cassiiopeia:suh-analyze` |
+| **PR 생성, PR 올려줘, ...** | **`projectops:github` ← 최우선 트리거** |
+| 코드 분석, 현황 파악 | `projectops:analyze` |
 ...
 ```
 
 전체 교체 대상 (14개):
-- `cassiiopeia:github` → `cassiiopeia:suh-github`
-- `cassiiopeia:analyze` → `cassiiopeia:suh-analyze`
-- `cassiiopeia:troubleshoot` → `cassiiopeia:suh-troubleshoot`
-- `cassiiopeia:plan` → `cassiiopeia:suh-plan`
-- `cassiiopeia:implement` → `cassiiopeia:suh-implement`
-- `cassiiopeia:review` → `cassiiopeia:suh-review`
-- `cassiiopeia:issue` → `cassiiopeia:suh-issue`
-- `cassiiopeia:commit` → `cassiiopeia:suh-commit`
-- `cassiiopeia:changelog-deploy` → `cassiiopeia:suh-changelog-deploy`
-- `cassiiopeia:report` → `cassiiopeia:suh-report`
-- `cassiiopeia:ssh` → `cassiiopeia:suh-ssh`
+- `cassiiopeia:github` → `projectops:github`
+- `cassiiopeia:analyze` → `projectops:analyze`
+- `cassiiopeia:troubleshoot` → `projectops:troubleshoot`
+- `cassiiopeia:plan` → `projectops:plan`
+- `cassiiopeia:implement` → `projectops:implement`
+- `cassiiopeia:review` → `projectops:review`
+- `cassiiopeia:issue` → `projectops:issue`
+- `cassiiopeia:commit` → `projectops:commit`
+- `cassiiopeia:changelog-deploy` → `projectops:changelog-deploy`
+- `cassiiopeia:report` → `projectops:report`
+- `cassiiopeia:ssh` → `projectops:ssh`
 - `cassiiopeia:brainstorming` (없음 — superpowers 유지)
-- `cassiiopeia:synology-expose` → `cassiiopeia:suh-synology-expose`
-- `cassiiopeia:init-worktree` → `cassiiopeia:suh-init-worktree`
+- `cassiiopeia:synology-expose` → `projectops:synology-expose`
+- `cassiiopeia:init-worktree` → `projectops:init-worktree`
 
 - [ ] **Step 2: Skills 목록 표 업데이트 (`## Skills` 섹션)**
 
 ```
-| `analyze` | ... | → | `suh-analyze` | ... |
-| `plan` | ... | → | `suh-plan` | ... |
+| `analyze` | ... | → | `analyze` | ... |
+| `plan` | ... | → | `plan` | ... |
 ...
 ```
 
 - [ ] **Step 3: 알려진 문제 섹션의 `cassiiopeia:github` 참조 업데이트**
 
-`## 알려진 스킬 동작 문제` 섹션에서 `cassiiopeia:github` → `cassiiopeia:suh-github` 교체.
+`## 알려진 스킬 동작 문제` 섹션에서 `cassiiopeia:github` → `projectops:github` 교체.
 
 ---
 
@@ -240,8 +240,8 @@ grep -rn "→ \`/implement\`\|→ \`/review\`\|→ \`/test\`\|/commit\b\|/analyz
 
 mermaid 다이어그램 내:
 ```
-"/cassiiopeia:issue\n..." → "/cassiiopeia:suh-issue\n..."
-"/cassiiopeia:init-worktree\n..." → "/cassiiopeia:suh-init-worktree\n..."
+"/cassiiopeia:issue\n..." → "/projectops:issue\n..."
+"/cassiiopeia:init-worktree\n..." → "/projectops:init-worktree\n..."
 ...
 ```
 
@@ -258,8 +258,8 @@ mermaid 다이어그램 내:
 
 변경 후:
 ```markdown
-| `/cassiiopeia:suh-issue` | 설명 한 줄 → GitHub 이슈 템플릿 자동 작성 + 등록 |
-| `/cassiiopeia:suh-commit` | ... |
+| `/projectops:issue` | 설명 한 줄 → GitHub 이슈 템플릿 자동 작성 + 등록 |
+| `/projectops:commit` | ... |
 ...
 ```
 

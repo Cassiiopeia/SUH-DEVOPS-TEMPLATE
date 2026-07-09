@@ -1,14 +1,14 @@
-# suh-changelog-deploy 앱 심사 인지(App-Release Awareness) 설계
+# changelog-deploy 앱 심사 인지(App-Release Awareness) 설계
 
 - 날짜: 2026-06-20
-- 대상 스킬: `skills/suh-changelog-deploy`
+- 대상 스킬: `skills/changelog-deploy`
 - 관련 경험: RomRom-FE에서 iOS App Store 심사 자동 제출(deliver)을 켠 뒤, `deploy`의 의미가 "내부 배포"에서 "사용자 대면 출시"로 바뀌어 릴리스 노트가 곧 심사 제출물이 된 사례
 
 ---
 
 ## 1. 배경 / 문제
 
-`suh-changelog-deploy`는 모든 레포를 **동일하게** 취급한다. 하지만 실제로는 레포 성격에 따라 릴리스 노트의 무게가 다르다.
+`changelog-deploy`는 모든 레포를 **동일하게** 취급한다. 하지만 실제로는 레포 성격에 따라 릴리스 노트의 무게가 다르다.
 
 - **백엔드 레포**(spring/python): deploy = 서버 반영. 릴리스 노트가 사용자에게 직접 노출되지 않는다. → 지금처럼 가볍게 처리해도 됨.
 - **앱 레포**(flutter 등) + **스토어 심사 워크플로우**(PLAYSTORE/TESTFLIGHT/APPSTORE): deploy = 앱스토어/플레이스토어 심사 제출. 릴리스 노트가 **그대로 스토어 "이번 업데이트" 출시노트**가 되어 심사에 들어간다. 특히 심사 자동 제출이 켜지면 CICD·내부 개선·테스트 문구가 실수로 들어가면 즉시 심사로 간다.
@@ -37,7 +37,7 @@
 
 ## 4. py 서브커맨드: `detect-release-context`
 
-`skills/suh-changelog-deploy/scripts/changelog_cli.py`에 서브커맨드 추가.
+`skills/changelog-deploy/scripts/changelog_cli.py`에 서브커맨드 추가.
 
 ### 입력
 
@@ -171,12 +171,12 @@ deploy 모드 1단계(커밋 상태 확인)와 4단계(커밋 분석) 사이, **
 
 | 파일 | 변경 |
 |------|------|
-| `skills/suh-changelog-deploy/scripts/changelog_cli.py` | `detect-release-context` 서브커맨드 추가 (argparse + 신호 수집 + JSON) |
-| `skills/suh-changelog-deploy/SKILL.md` | 1.5단계(릴리스 컨텍스트 인지) 추가, 5단계 원칙 보강, 5.5/fix 4.5단계에 심사 경고 배너 결합, [시작 전 §3]에 `app_release` 판정 추가 |
+| `skills/changelog-deploy/scripts/changelog_cli.py` | `detect-release-context` 서브커맨드 추가 (argparse + 신호 수집 + JSON) |
+| `skills/changelog-deploy/SKILL.md` | 1.5단계(릴리스 컨텍스트 인지) 추가, 5단계 원칙 보강, 5.5/fix 4.5단계에 심사 경고 배너 결합, [시작 전 §3]에 `app_release` 판정 추가 |
 | `skills/config.json.example` | `changelog_deploy`에 `app_release` 예시 키 추가 |
 | `skills/references/config-rules.md` | `changelog_deploy` 스키마에 `app_release` 문서화 |
 
-> ⚠️ 이 스킬 파일들은 **마켓플레이스 전용**이라 사용자 프로젝트로 흘러가지 않는다(`skills/`는 `plugin_items_to_remove`/`cleanup_template_files` 대상). 따라서 template_integrator·initializer는 수정 불필요. py 수정 후 `skills/suh-changelog-deploy/scripts/` 테스트로 단독 검증.
+> ⚠️ 이 스킬 파일들은 **마켓플레이스 전용**이라 사용자 프로젝트로 흘러가지 않는다(`skills/`는 `plugin_items_to_remove`/`cleanup_template_files` 대상). 따라서 template_integrator·initializer는 수정 불필요. py 수정 후 `skills/changelog-deploy/scripts/` 테스트로 단독 검증.
 
 ## 10. 테스트 계획
 

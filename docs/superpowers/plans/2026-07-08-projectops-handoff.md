@@ -86,7 +86,7 @@
 
 ```bash
 # skill scripts 경로 (Bash stateless — 매 블록 앞에 재선언)
-SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/cassiiopeia/*/skills/suh-changelog-deploy/scripts 2>/dev/null | sort -V | tail -1)
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/changelog-deploy/scripts 2>/dev/null | sort -V | tail -1)
 PYTHON="/c/Users/USER/AppData/Local/Programs/Python/Python313/python"
 
 # 배포 상태 확인

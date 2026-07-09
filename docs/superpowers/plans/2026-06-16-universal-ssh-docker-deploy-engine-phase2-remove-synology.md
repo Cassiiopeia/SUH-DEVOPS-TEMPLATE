@@ -729,7 +729,7 @@ git mv docs/SYNOLOGY-DEPLOYMENT-GUIDE.md docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md
 - L197 `Synology Docker, Nexus` → `SSH+Docker 배포, Nexus`
 - L202 `Synology Docker` → `SSH+Docker 배포`
 - L257 가이드 링크·라벨 갱신
-- **건드리지 않음**: L187 `suh-synology-expose`(별개 스킬명), L188 `suh-ssh` 설명의 "시놀로지 NAS" 예시.
+- **건드리지 않음**: L187 `synology-expose`(별개 스킬명), L188 `ssh` 설명의 "시놀로지 NAS" 예시.
 
 - [ ] **Step 3: CLAUDE.md 갱신**
 
@@ -743,7 +743,7 @@ git mv docs/SYNOLOGY-DEPLOYMENT-GUIDE.md docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md
 Run:
 ```bash
 grep -rniE "synology|시놀로지" . --include="*.sh" --include="*.ps1" --include="*.md" --include="*.yaml" --include="*.yml" --include="*.json" \
-  | grep -vE "suh-synology-expose|suh-ssh|예:|/volume1|specs/2026-06-16|plans/2026-06-16|breaking-changes.json|SSH-DOCKER" | grep -v "/.git/"
+  | grep -vE "synology-expose|ssh|예:|/volume1|specs/2026-06-16|plans/2026-06-16|breaking-changes.json|SSH-DOCKER" | grep -v "/.git/"
 ```
 Expected: 의도적 예외(스킬명, 실용 예시, spec/plan 문서, breaking-changes 이력) 외 0건. 남으면 검토 후 정리.
 

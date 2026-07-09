@@ -1,10 +1,10 @@
 🗒️ 설명
 ---
 
-`suh-changelog-deploy` 스킬이 deploy PR을 만들 때 릴리스 노트를 임시파일에 쓰고, PR 본문에 넣은 뒤 삭제한다. 그런데 **만드는 경로와 지우는 경로가 달라** 임시파일이 레포에 계속 남는다.
+`changelog-deploy` 스킬이 deploy PR을 만들 때 릴리스 노트를 임시파일에 쓰고, PR 본문에 넣은 뒤 삭제한다. 그런데 **만드는 경로와 지우는 경로가 달라** 임시파일이 레포에 계속 남는다.
 
 - **만들기**: 릴리스 노트를 레포 내부 `scripts/_release_notes.md`(git이 추적하는 폴더)에 작성
-- **지우기**: `skills/suh-changelog-deploy/scripts`로 이동한 상태에서 `rm -f _release_notes.md` 실행 → 실제로는 다른 폴더의 파일을 지우려다 헛발질
+- **지우기**: `skills/changelog-deploy/scripts`로 이동한 상태에서 `rm -f _release_notes.md` 실행 → 실제로는 다른 폴더의 파일을 지우려다 헛발질
 - `rm -f`의 `-f` 옵션 때문에 "파일 없음" 에러도 나지 않고 조용히 통과
 - 결과: `scripts/_release_notes.md`가 레포에 untracked로 남아 `git status`를 오염시키고, deploy를 돌릴 때마다 누적된다
 
@@ -13,7 +13,7 @@
 🔄 재현 방법
 ---
 
-1. `suh-changelog-deploy` 스킬로 deploy를 실행한다
+1. `changelog-deploy` 스킬로 deploy를 실행한다
 2. PR이 생성된 뒤 `git status`를 확인한다
 3. `scripts/_release_notes.md`가 untracked 파일로 남아 있는 것을 확인 (이전 작업의 릴리스 노트 내용이 그대로 들어 있음)
 
@@ -37,7 +37,7 @@ $ git status --short
 ---
 
 - **OS**: Windows (Git Bash) / macOS 공통
-- **대상 스킬**: `suh-changelog-deploy` (`SKILL.md`, `scripts/changelog_cli.py`)
+- **대상 스킬**: `changelog-deploy` (`SKILL.md`, `scripts/changelog_cli.py`)
 
 🙋‍♂️ 담당자
 ---

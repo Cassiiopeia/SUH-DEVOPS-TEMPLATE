@@ -455,7 +455,7 @@ npmjs.com → 프로필 → Access Tokens → Generate New Token → **Granular 
 
 - [ ] **Step 2: GitHub Actions Secret 등록**
 
-사용자가 토큰 값을 제공하면 suh-github 스킬(secrets 서브커맨드)로 `NPM_TOKEN` 등록, 또는 사용자가 직접: 레포 Settings → Secrets and variables → Actions → New repository secret → Name `NPM_TOKEN`
+사용자가 토큰 값을 제공하면 github 스킬(secrets 서브커맨드)로 `NPM_TOKEN` 등록, 또는 사용자가 직접: 레포 Settings → Secrets and variables → Actions → New repository secret → Name `NPM_TOKEN`
 
 - [ ] **Step 3 (사용자 승인 후): push**
 

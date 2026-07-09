@@ -1,12 +1,12 @@
 # QA 테스트케이스 — changelog-deploy 릴리스 노트 레이스컨디션
 
 대상 이슈: #312
-대상 파일: `skills/suh-changelog-deploy/SKILL.md`
+대상 파일: `skills/changelog-deploy/SKILL.md`
 
 ## TC-01: 신규 deploy PR 생성 시 릴리스 노트 본문 포함
 
 - **전제**: open된 deploy PR이 없는 상태, main에 deploy 미반영 커밋 존재
-- **절차**: `/suh-changelog-deploy` 실행 → push → 커밋 분석 → 릴리스 노트 작성 → PR 생성
+- **절차**: `/changelog-deploy` 실행 → push → 커밋 분석 → 릴리스 노트 작성 → PR 생성
 - **기대 결과**: 생성된 deploy PR의 본문에 `## Summary by CodeRabbit` 과 `## 릴리스 노트` 가 처음부터 포함되어 있다
 - **확인 방법**: PR 생성 직후 본문 조회 시 릴리스 노트가 존재
 
@@ -27,7 +27,7 @@
 ## TC-04: 기존 open PR 재사용 (update-pr 경로)
 
 - **전제**: 이미 open된 deploy PR이 존재
-- **절차**: `/suh-changelog-deploy` 재실행
+- **절차**: `/changelog-deploy` 재실행
 - **기대 결과**: 새 PR을 만들지 않고 기존 PR 번호 재사용, `update-pr`로 본문만 갱신
 - **확인 방법**: 출력에 `기존 deploy PR #NNN 재사용 → 본문 업데이트`, PR 개수 증가 없음
 

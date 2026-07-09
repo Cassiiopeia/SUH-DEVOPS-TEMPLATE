@@ -58,11 +58,11 @@ flowchart TD
 ### 템플릿 제어 및 CLI 스킬 개정 (Task 5, 6)
 - `.github/workflows/PROJECT-TEMPLATE-INITIALIZER.yaml` & `.github/scripts/template_initializer.sh`:
   - 신규 프로젝트 템플릿 생성 시 자동으로 일상 개발 통합 공간인 `develop` 브랜치를 원격에 자동 구성하는 스텝 추가 및 주석 보정.
-- `skills/suh-changelog-deploy/scripts/changelog_cli.py` & `skills/suh-changelog-deploy/SKILL.md`:
+- `skills/changelog-deploy/scripts/changelog_cli.py` & `skills/changelog-deploy/SKILL.md`:
   - 배포 도구 및 릴리스 생성 CLI 명령이 기본적으로 `develop` ➔ `main` 구도를 향하도록 `--base` 파라미터 기본값 및 사용 가이드라인 전면 개편.
 
 ### 문서 및 참조 정합화 (Task 7, 8, 9, 10, 11)
-- `CLAUDE.md`, `common-rules.md`, `skills/suh-github/SKILL.md`:
+- `CLAUDE.md`, `common-rules.md`, `skills/github/SKILL.md`:
   - 에이전트 및 사용자가 준수해야 할 작업 브랜치 규칙(기본 작업 브랜치: `develop`, 프로덕션: `main`) 및 경고 기준 재확정. 워크플로우 상태 표 업데이트.
 - `.github/config/breaking-changes.json`:
   - 브랜치 전면 개편에 대한 수동 마이그레이션 가이드라인을 포함한 `critical` 변경 사항을 `3.0.186` 버전 키 기준으로 등록.

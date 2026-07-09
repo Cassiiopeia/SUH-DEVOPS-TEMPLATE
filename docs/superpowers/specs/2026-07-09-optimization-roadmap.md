@@ -101,7 +101,7 @@ AUTO-CHANGELOG-CONTROL.yaml (본체 — provider를 몰라도 됨)
 ### commit provider 품질 (AI 없이 가능한 최선)
 - 커밋 prefix로 분류 (feat/fix/refactor/docs/etc)
 - **정제 강화**: 이슈번호·GitHub URL·파일 경로·기술 prefix 제거, 중복 항목 병합
-- 각 항목 끝에 "더 정확한 노트는 `/suh-changelog-deploy` 스킬로" 안내 (로컬 Claude가 예쁜 노트 담당)
+- 각 항목 끝에 "더 정확한 노트는 `/changelog-deploy` 스킬로" 안내 (로컬 Claude가 예쁜 노트 담당)
 
 ### 왜 확장적인가
 - 새 provider 추가 = **파일 하나** + mode 값 하나. 워크플로우 본체·파싱 로직 무수정.
@@ -111,7 +111,7 @@ AUTO-CHANGELOG-CONTROL.yaml (본체 — provider를 몰라도 됨)
 ### AI provider 방향 (미래, 지금은 자리만)
 - 워크플로우는 GitHub 러너에서 도므로 **사용자 PC의 local AI에는 못 닿는다.**
 - 따라서 워크플로우 provider는 API 방식(Claude/OpenAI, secret 키)만 가능.
-- local AI로 예쁜 노트를 원하면 그건 이미 로컬 Claude를 쓰는 `suh-changelog-deploy` 스킬의 몫 → 역할 분리.
+- local AI로 예쁜 노트를 원하면 그건 이미 로컬 Claude를 쓰는 `changelog-deploy` 스킬의 몫 → 역할 분리.
 
 ### 연관 파일
 - `.github/workflows/PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml` (본체)
@@ -125,7 +125,7 @@ AUTO-CHANGELOG-CONTROL.yaml (본체 — provider를 몰라도 됨)
 ## B. changelog-deploy 스킬 브랜치·mode config화 (2순위)
 
 ### 문제
-`skills/suh-changelog-deploy/SKILL.md`가 `develop`→`main`을 하드코딩. deploy 브랜치·default 브랜치가 다른 레포에서 안 맞는다. A에서 생긴 `changelog.mode`도 스킬이 알아야 자동/수동 흐름을 맞출 수 있다.
+`skills/changelog-deploy/SKILL.md`가 `develop`→`main`을 하드코딩. deploy 브랜치·default 브랜치가 다른 레포에서 안 맞는다. A에서 생긴 `changelog.mode`도 스킬이 알아야 자동/수동 흐름을 맞출 수 있다.
 
 ### 방향 (미확정 — B 이슈에서 상세 설계)
 - 브랜치 정보의 SSOT는 **version.yml**(`metadata.template.default_branch` 이미 존재) + deploy 브랜치 개념 추가 검토.
@@ -158,5 +158,5 @@ npx만 지원하기로 확정. 두 스크립트를 폐기한다. 단, **npx가 A
 ## 다음 액션
 
 1. 이 로드맵을 사용자가 검토.
-2. A~D를 GitHub 이슈 4개로 등록 (의존성·순서 명시). → `/suh-issue` 스킬 사용.
+2. A~D를 GitHub 이슈 4개로 등록 (의존성·순서 명시). → `/issue` 스킬 사용.
 3. 1순위 **A**부터 상세 설계(별도 spec) → 구현.

@@ -1,8 +1,8 @@
-# suh-plan·analyze·implement 3종 스킬 페르소나 시스템 강화
+# plan·analyze·implement 3종 스킬 페르소나 시스템 강화
 
 ## 개요
 
-PI(harness) 에이전트 전용 시스템 프롬프트에만 주입되고 Claude Code 스킬 실행 시에는 죽어 있던 5개 전문가 페르소나와 6대 마인드셋을 `skills/references/personas.md`로 한국어 single source화하여 신설하고, 이를 `suh-plan`·`suh-analyze`·`suh-implement` 3종 코어 스킬에 바인딩했다. 동시에 Devil's Advocate(악마의 변호인)와 Stop-and-Think Gate(멈춤-사고 게이트)를 각 스킬 산출물의 `[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]` 블록 + self-review 체크리스트에 HARD-GATE로 주입해, 매 실행마다 들쭉날쭉하던 산출물 품질을 "의심 → 대안 → 적대적 자기검증" 루프로 일관되게 강제한다. 단순 작업에는 Fast-Track 예외(harness Rule 8)를 두어 의식의 무게를 지우지 않는다.
+PI(harness) 에이전트 전용 시스템 프롬프트에만 주입되고 Claude Code 스킬 실행 시에는 죽어 있던 5개 전문가 페르소나와 6대 마인드셋을 `skills/references/personas.md`로 한국어 single source화하여 신설하고, 이를 `plan`·`analyze`·`implement` 3종 코어 스킬에 바인딩했다. 동시에 Devil's Advocate(악마의 변호인)와 Stop-and-Think Gate(멈춤-사고 게이트)를 각 스킬 산출물의 `[REVIEW_LOG]`·`[ALTERNATIVES_CONSIDERED]` 블록 + self-review 체크리스트에 HARD-GATE로 주입해, 매 실행마다 들쭉날쭉하던 산출물 품질을 "의심 → 대안 → 적대적 자기검증" 루프로 일관되게 강제한다. 단순 작업에는 Fast-Track 예외(harness Rule 8)를 두어 의식의 무게를 지우지 않는다.
 
 ## 변경 사항
 
@@ -13,9 +13,9 @@ PI(harness) 에이전트 전용 시스템 프롬프트에만 주입되고 Claude
 - `docs/superpowers/specs/2026-06-12-suh-core-skills-persona-design.md`: 한 줄 요약·배경·DoD·범위 경계·승인 결정사항·아키텍처·컴포넌트별 상세 설계·변경 요약·위험&완화·검증 방법을 담은 설계 spec 신설.
 
 ### 강화 — 3종 스킬 SKILL.md
-- `skills/suh-plan/SKILL.md`: "시작 전"에 System Architect 페르소나 로드 지시 추가. Phase 1 질문에 Intentional Doubt(숨은 의도·누락 제약 1개 이상 파고듦) 강제. `## 7. 가정`을 `[ASSUMPTIONS]`로 명시하고, `## 10. [REVIEW_LOG] — Architect 자기검증`(리스크·놓친 시나리오·아키텍처 방향 대안) 신설. 대안은 아키텍처 방향 수준까지만 허용(파일/함수 단위 금지). 흔한 실수 표에 게이트 위반 항목 2개 추가.
-- `skills/suh-analyze/SKILL.md`: "시작 전"에 System Architect(주) + Reviewer(부) 이중 페르소나 로드. Phase 1 정찰 체크리스트에 Pre-mortem 항목 추가. `## 4. 위험 & 완화`를 `[RISK]`(Red Team edge case)로 강화. `## 7. [REVIEW_LOG] — Reviewer 적대적 검증`과 `## 8. [ALTERNATIVES_CONSIDERED]`(기각한 HOW 대안 + 기각 이유) 신설. §5 검증 방법에 파괴적 검증 항목 추가. 흔한 실수 표에 게이트 위반 항목 2개 추가.
-- `skills/suh-implement/SKILL.md`: "시작 전"에 Software Developer(주) + SDET(부) 이중 페르소나 로드. Phase 2 편집을 Surgical Precision(관련 부분만 외과적 수정) + Pre-mortem으로 강화. Phase 3 검증을 SDET Destructive Testing("성공 증명"이 아니라 "실패의 반증")으로 격상. Phase 5 산출물 메모리에 `[REVIEW_LOG]`(파괴적 검증 결과) 항목 추가. 흔한 실수 표에 게이트 위반 항목 2개 추가.
+- `skills/plan/SKILL.md`: "시작 전"에 System Architect 페르소나 로드 지시 추가. Phase 1 질문에 Intentional Doubt(숨은 의도·누락 제약 1개 이상 파고듦) 강제. `## 7. 가정`을 `[ASSUMPTIONS]`로 명시하고, `## 10. [REVIEW_LOG] — Architect 자기검증`(리스크·놓친 시나리오·아키텍처 방향 대안) 신설. 대안은 아키텍처 방향 수준까지만 허용(파일/함수 단위 금지). 흔한 실수 표에 게이트 위반 항목 2개 추가.
+- `skills/analyze/SKILL.md`: "시작 전"에 System Architect(주) + Reviewer(부) 이중 페르소나 로드. Phase 1 정찰 체크리스트에 Pre-mortem 항목 추가. `## 4. 위험 & 완화`를 `[RISK]`(Red Team edge case)로 강화. `## 7. [REVIEW_LOG] — Reviewer 적대적 검증`과 `## 8. [ALTERNATIVES_CONSIDERED]`(기각한 HOW 대안 + 기각 이유) 신설. §5 검증 방법에 파괴적 검증 항목 추가. 흔한 실수 표에 게이트 위반 항목 2개 추가.
+- `skills/implement/SKILL.md`: "시작 전"에 Software Developer(주) + SDET(부) 이중 페르소나 로드. Phase 2 편집을 Surgical Precision(관련 부분만 외과적 수정) + Pre-mortem으로 강화. Phase 3 검증을 SDET Destructive Testing("성공 증명"이 아니라 "실패의 반증")으로 격상. Phase 5 산출물 메모리에 `[REVIEW_LOG]`(파괴적 검증 결과) 항목 추가. 흔한 실수 표에 게이트 위반 항목 2개 추가.
 
 ### 강화 — 공유 references
 - `skills/references/self-review-checklist.md`: plan·analyze·implement 3종 체크리스트 각각에 HARD-GATE — Devil's Advocate 항목 1줄씩 추가(plan: `[REVIEW_LOG]`, analyze: `[REVIEW_LOG]` + `[ALTERNATIVES_CONSIDERED]`, implement: SDET 파괴적 검증). `## 7. 가정`을 `[ASSUMPTIONS]`로 표기 정합.
@@ -39,9 +39,9 @@ flowchart TD
     A[코드 스킬 시작] --> B[common-rules 작업 시작 프로토콜<br/>0단계: 페르소나 로드]
     B --> C[personas.md에서<br/>공통 마인드셋 6종 + 자기 페르소나 카드 장착]
     C --> D{어떤 스킬인가}
-    D -->|suh-plan| E[Architect<br/>Intentional Doubt·아키텍처 방향 대안]
-    D -->|suh-analyze| F[Architect → Reviewer 전환<br/>코드 인용 HOW + Red Team 적대 검증]
-    D -->|suh-implement| G[Developer → SDET 전환<br/>Surgical Precision + Destructive Testing]
+    D -->|plan| E[Architect<br/>Intentional Doubt·아키텍처 방향 대안]
+    D -->|analyze| F[Architect → Reviewer 전환<br/>코드 인용 HOW + Red Team 적대 검증]
+    D -->|implement| G[Developer → SDET 전환<br/>Surgical Precision + Destructive Testing]
     E --> H[산출물에 REVIEW_LOG·ASSUMPTIONS 작성]
     F --> I[산출물에 REVIEW_LOG·ALTERNATIVES_CONSIDERED 작성]
     G --> J[메모리에 REVIEW_LOG 보관<br/>파괴적 검증 결과]

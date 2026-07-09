@@ -6,10 +6,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
-if str(ROOT / "skills/suh-issue/scripts") not in sys.path:
-    sys.path.insert(0, str(ROOT / "skills/suh-issue/scripts"))
-if str(ROOT / "skills/suh-github/scripts") not in sys.path:
-    sys.path.insert(0, str(ROOT / "skills/suh-github/scripts"))
+if str(ROOT / "skills/issue/scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "skills/issue/scripts"))
+if str(ROOT / "skills/github/scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "skills/github/scripts"))
 
 from common.cli_parser import run_cli  # noqa: E402
 from issue_cli import build_parser as build_issue_parser  # noqa: E402

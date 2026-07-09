@@ -2,19 +2,19 @@
 
 ## 개요
 
-`suh-changelog-deploy` 스킬이 작성한 릴리스 노트가 deploy PR 본문에서 사라지고 CodeRabbit Summary 10분 대기로 빠지던 문제를 해결했다. 스킬과 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우 간 실행 순서 충돌이 원인이었으며, 워크플로우는 건드리지 않고 스킬의 단계 순서만 재배치해 근본 해결했다.
+`changelog-deploy` 스킬이 작성한 릴리스 노트가 deploy PR 본문에서 사라지고 CodeRabbit Summary 10분 대기로 빠지던 문제를 해결했다. 스킬과 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우 간 실행 순서 충돌이 원인이었으며, 워크플로우는 건드리지 않고 스킬의 단계 순서만 재배치해 근본 해결했다.
 
 ## 변경 사항
 
 ### deploy 모드 단계 재배치
-- `skills/suh-changelog-deploy/SKILL.md`: 기존 `PR 생성(빈 본문) → 커밋 분석 → 릴리스 노트 작성 → 본문 업데이트` 순서를 `커밋 분석(4단계) → 릴리스 노트 작성(5단계) → 릴리스 노트 본문 담아 PR 생성(6단계)` 순으로 변경
+- `skills/changelog-deploy/SKILL.md`: 기존 `PR 생성(빈 본문) → 커밋 분석 → 릴리스 노트 작성 → 본문 업데이트` 순서를 `커밋 분석(4단계) → 릴리스 노트 작성(5단계) → 릴리스 노트 본문 담아 PR 생성(6단계)` 순으로 변경
 - 기존 open PR이 있으면 재사용해 `update-pr`로 본문 갱신, 없으면 `create-pr`의 `body_file` 인자에 릴리스 노트 파일을 넘겨 본문 포함 PR 생성
 
 ### fix 모드 단계 재배치
-- `skills/suh-changelog-deploy/SKILL.md`: fix 모드도 동일 원칙 적용. `커밋 분석(fix 3단계) → 릴리스 노트 작성(fix 4단계) → 본문 담아 PR 생성(fix 5단계)` 순으로 변경
+- `skills/changelog-deploy/SKILL.md`: fix 모드도 동일 원칙 적용. `커밋 분석(fix 3단계) → 릴리스 노트 작성(fix 4단계) → 본문 담아 PR 생성(fix 5단계)` 순으로 변경
 
 ### 레이스컨디션 방지 안내 추가
-- `skills/suh-changelog-deploy/SKILL.md`: 3단계 직후와 주의사항 섹션에 "PR 생성을 맨 마지막에 둔다"는 원칙과 그 이유를 명시
+- `skills/changelog-deploy/SKILL.md`: 3단계 직후와 주의사항 섹션에 "PR 생성을 맨 마지막에 둔다"는 원칙과 그 이유를 명시
 
 ## 주요 구현 내용
 

@@ -2,7 +2,7 @@
 
 ## 배경
 
-현재 `suh-changelog-deploy` 스킬은 5단계에서 릴리스 노트 파일을 작성한 직후 곧바로 6단계 PR 생성으로 진행한다. 사용자가 본문 내용을 검토할 기회 없이 자동으로 PR이 생성되므로, 다음 문제가 발생한다.
+현재 `changelog-deploy` 스킬은 5단계에서 릴리스 노트 파일을 작성한 직후 곧바로 6단계 PR 생성으로 진행한다. 사용자가 본문 내용을 검토할 기회 없이 자동으로 PR이 생성되므로, 다음 문제가 발생한다.
 
 - 릴리스 노트가 사용자의 의도와 다르게 작성돼도 사용자가 개입할 시점이 없다.
 - 잘못된 본문으로 PR이 생성되면 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL` 워크플로우가 automerge를 진행해 운영 배포까지 그대로 흘러간다.
@@ -86,7 +86,7 @@ SKILL.md 상단의 "핵심 원칙"에 한 줄 추가한다.
 
 | 파일 | 변경 |
 |------|------|
-| `skills/suh-changelog-deploy/SKILL.md` | 핵심 원칙 한 줄 + deploy 5.5단계 + fix 4.5단계 |
+| `skills/changelog-deploy/SKILL.md` | 핵심 원칙 한 줄 + deploy 5.5단계 + fix 4.5단계 |
 | `skills/config.json.example` | github 글로벌·repos[] 양쪽에 `changelog_deploy` 블록 예시 |
 | `skills/references/config-rules.md` §7 github 섹션 | `changelog_deploy` 필드 표 + 해석 우선순위 추가 |
 

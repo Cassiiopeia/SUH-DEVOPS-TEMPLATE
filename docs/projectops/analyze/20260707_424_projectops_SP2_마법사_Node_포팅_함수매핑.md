@@ -520,7 +520,7 @@ await main(process.argv.slice(2));
 
 구현 방식을 선택하세요:
 
-**1. Subagent-Driven (권장)** — `/suh-implement` 호출 시 태스크별 서브에이전트 + Self-Review 자동 진행
+**1. Subagent-Driven (권장)** — `/implement` 호출 시 태스크별 서브에이전트 + Self-Review 자동 진행
 **2. Inline** — 현재 세션에서 순차 실행
 
 병렬 태스크 있음: Task 2·3·4·5(T1 후), Task 7(독립) → Subagent-Driven 선택 시 병렬 dispatch 가능.

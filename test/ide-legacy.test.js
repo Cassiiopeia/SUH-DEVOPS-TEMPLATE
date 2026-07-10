@@ -138,3 +138,19 @@ test("codex migrateLegacy: 옛 SUH-DEVOPS-TEMPLATE native 폴더 제거 + market
     assert.ok(calls.some((c) => c.includes("marketplace remove SUH-DEVOPS-TEMPLATE")), "옛 마켓 remove 호출");
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+// ── Task 4: gemini 어댑터 레거시 정리 ──
+test("gemini migrateLegacy: 옛 extension uninstall 호출", () => {
+  const home = mkdtempSync(join(tmpdir(), "gm-"));
+  try {
+    const calls = [];
+    const io = {
+      calls, logs: [],
+      which: (c) => (c === "gemini" ? "/usr/bin/gemini" : null),
+      run: (c, a = []) => { calls.push([c, ...a].join(" ")); return { code: 0, stdout: "", stderr: "" }; },
+      home: () => home, log: () => {},
+    };
+    adapterById("gemini").apply(io);
+    assert.ok(calls.some((c) => c.includes("extensions uninstall SUH-DEVOPS-TEMPLATE")), "옛 extension uninstall");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});

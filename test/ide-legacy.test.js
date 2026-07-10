@@ -119,3 +119,22 @@ test("claude migrateLegacy: 옛것 없으면 정리 명령 미호출", () => {
     assert.ok(!io.calls.some((c) => c.includes("uninstall cassiiopeia")), "불필요한 uninstall 없음");
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+// ── Task 3: codex 어댑터 레거시 정리 ──
+test("codex migrateLegacy: 옛 SUH-DEVOPS-TEMPLATE native 폴더 제거 + marketplace remove", () => {
+  const home = mkdtempSync(join(tmpdir(), "cdx-"));
+  try {
+    mkdirSync(join(home, ".agents/skills/SUH-DEVOPS-TEMPLATE"), { recursive: true });
+    writeFileSync(join(home, ".agents/skills/SUH-DEVOPS-TEMPLATE/x.md"), "x");
+    const calls = [];
+    const io = {
+      calls, logs: [],
+      which: (c) => (c === "codex" ? "/usr/bin/codex" : null),
+      run: (c, a = []) => { calls.push([c, ...a].join(" ")); return { code: 0, stdout: "", stderr: "" }; },
+      home: () => home, log: () => {},
+    };
+    adapterById("codex").apply(io);
+    assert.equal(existsSync(join(home, ".agents/skills/SUH-DEVOPS-TEMPLATE")), false, "옛 native 폴더 제거됨");
+    assert.ok(calls.some((c) => c.includes("marketplace remove SUH-DEVOPS-TEMPLATE")), "옛 마켓 remove 호출");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});

@@ -3,9 +3,12 @@
 // marketplace 등록/업그레이드가 주 경로. native ~/.agents/skills/projectops 심링크는 감지·제거에 사용.
 import { join } from "node:path";
 import { existsSync, lstatSync, rmSync } from "node:fs";
+import { migrateConfigRoot } from "../legacy.js";
 
 const MARKETPLACE = "Cassiiopeia/projectops";
 const PLUGIN = "projectops";
+const LEGACY_NATIVES = ["SUH-DEVOPS-TEMPLATE"];
+const LEGACY_MARKETPLACES = ["SUH-DEVOPS-TEMPLATE"];
 
 function nativeTarget(io) { return join(io.home(), ".agents/skills/projectops"); }
 
@@ -19,6 +22,8 @@ function detect(io) {
 
 function apply(io) {
   if (!io.which("codex")) { io.log(manualHint()); return false; }
+  migrateLegacy(io);
+  migrateConfigRoot(io);
   io.log("Codex plugin marketplace 등록 중...");
   const add = io.run("codex", ["plugin", "marketplace", "add", MARKETPLACE]);
   io.log(add.code === 0 ? "  Codex marketplace 등록 완료" : "  Codex marketplace 이미 등록되어 있거나 등록 생략");
@@ -40,6 +45,17 @@ function remove(io) {
 }
 
 function manualHint() { return `  💡 Codex CLI: codex plugin marketplace add ${MARKETPLACE}`; }
+
+// 옛 native skills 폴더/심링크 + 옛 marketplace 정리. 실패 무해.
+function migrateLegacy(io) {
+  for (const name of LEGACY_NATIVES) {
+    const old = join(io.home(), ".agents/skills", name);
+    if (existsSync(old) || isSymlink(old)) {
+      try { rmSync(old, { recursive: true, force: true }); io.log(`  레거시 Codex skills 정리: ${name}`); } catch { /* 무시 */ }
+    }
+  }
+  if (io.which("codex")) for (const mp of LEGACY_MARKETPLACES) io.run("codex", ["plugin", "marketplace", "remove", mp]);
+}
 
 function isSymlink(p) { try { return lstatSync(p).isSymbolicLink(); } catch { return false; } }
 

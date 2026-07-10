@@ -26,16 +26,11 @@ claude plugin install projectops@projectops-marketplace --scope user
 
 ### Cursor
 
-`template_integrator`의 `skills` 모드를 사용하면 `skills/`가 Cursor용 경로로 복사됩니다.
+`npx projectops`의 `skills` 모드를 사용하면 `skills/`가 Cursor용 경로로 복사됩니다.
 
 ```bash
-# macOS / Linux
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode skills
-```
-
-```powershell
-# Windows PowerShell
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;iex $wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")
+# macOS / Linux / Windows 공통
+npx projectops --mode skills
 ```
 
 대화형 메뉴에서 `Agent Skill 설치`를 선택한 뒤 Cursor scope를 고르면 됩니다.
@@ -71,7 +66,7 @@ codex plugin marketplace add Cassiiopeia/projectops
 마법사 설치:
 
 ```bash
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") --mode skills
+npx projectops --mode skills
 ```
 
 마법사는 Codex marketplace를 등록합니다. 등록 후 `/plugins`에서 `projectops` 항목을 확인하세요.

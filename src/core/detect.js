@@ -60,3 +60,19 @@ export function markerForType(type) {
 export function extraMarkers(type) {
   return { python: ["setup.py", "requirements.txt"], spring: ["build.gradle.kts", "pom.xml"] }[type] || [];
 }
+
+// 확장자 빈도 스캔 추천 (.sh suggest_types_by_scan 2단계 등가, #458 npx 이식).
+// 마커가 전혀 없을 때(=basic 폴백)만 쓰는 2차 추천. files = 프루닝된 상대경로 목록.
+// 임계: dart≥1→flutter, java+kt+gradle≥3→spring, tsx+jsx≥3→react, py≥3→python,
+//       아무것도 없고 ts+js≥3→node. 반환은 메뉴 정의 순서로 정렬.
+export function suggestTypesByExtScan(files) {
+  const count = (re) => files.filter((f) => re.test(f)).length;
+  const found = new Set();
+  if (count(/\.dart$/) >= 1) found.add("flutter");
+  if (count(/\.java$/) + count(/\.kt$/) + count(/\.gradle$/) >= 3) found.add("spring");
+  if (count(/\.tsx$/) + count(/\.jsx$/) >= 3) found.add("react");
+  if (count(/\.py$/) >= 3) found.add("python");
+  if (found.size === 0 && count(/\.ts$/) + count(/\.js$/) >= 3) found.add("node");
+  const order = ["spring", "flutter", "react", "react-native", "react-native-expo", "node", "python"];
+  return order.filter((t) => found.has(t));
+}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classifyPackageText, classifyPackageJson, detectTypesFromMarkers, detectVersionFromFiles } from "../src/core/detect.js";
+import { classifyPackageText, classifyPackageJson, detectTypesFromMarkers, detectVersionFromFiles, suggestTypesByExtScan } from "../src/core/detect.js";
 
 test("classifyPackageText (raw grep 등가)", () => {
   assert.equal(classifyPackageText('{"dependencies":{"react-native":"1","expo":"1"}}'), "react-native-expo");
@@ -41,4 +41,50 @@ test("detectVersion order: gradle before pubspec", () => {
 
 test("detectVersion fallback 0.0.1", () => {
   assert.equal(detectVersionFromFiles({ read: () => null, readJson: () => null, hasJq: false }), "0.0.1");
+});
+
+// ── 확장자 빈도 스캔 추천 (.sh suggest_types_by_scan 등가 — #458 npx 이식) ──
+// 구 test_integrator_suggest.sh 케이스 (1)~(6)을 승계한다.
+
+test("extScan: .py 4개 → python 추천", () => {
+  assert.deepEqual(suggestTypesByExtScan(["m1.py", "m2.py", "m3.py", "m4.py"]), ["python"]);
+});
+
+test("extScan: .py 2개(임계 미만) → 추천 없음", () => {
+  assert.deepEqual(suggestTypesByExtScan(["a.py", "b.py"]), []);
+});
+
+test("extScan: .dart 1개 → flutter 추천 (임계 1)", () => {
+  assert.deepEqual(suggestTypesByExtScan(["main.dart"]), ["flutter"]);
+});
+
+test("extScan: .tsx 3개 → react 추천", () => {
+  assert.deepEqual(suggestTypesByExtScan(["c1.tsx", "c2.tsx", "c3.tsx"]), ["react"]);
+});
+
+test("extScan: .js 3개(다른 타입 없음) → node fallback", () => {
+  assert.deepEqual(suggestTypesByExtScan(["s1.js", "s2.js", "s3.js"]), ["node"]);
+});
+
+test("extScan: 다른 타입 있으면 node 미추천 + 메뉴 순서 정렬", () => {
+  assert.deepEqual(
+    suggestTypesByExtScan(["a.py", "b.py", "c.py", "x.js", "y.js", "z.js", "A.java", "B.kt", "b.gradle"]),
+    ["spring", "python"],
+  );
+});
+
+test("listScanFiles: node_modules 등 vendor 폴더 프루닝 (.sh 케이스 6 승계)", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { listScanFiles } = await import("../src/core/detect-fs.js");
+  const tmp = mkdtempSync(join(tmpdir(), "scan-"));
+  try {
+    mkdirSync(join(tmp, "node_modules/pkg"), { recursive: true });
+    for (const i of [1, 2, 3, 4]) writeFileSync(join(tmp, `node_modules/pkg/m${i}.py`), "x");
+    writeFileSync(join(tmp, "app.py"), "x");
+    const files = listScanFiles(tmp);
+    assert.deepEqual(files, ["app.py"]); // vendor 안 .py는 목록에 없음 → 추천 임계 미달
+    assert.deepEqual(suggestTypesByExtScan(files), []);
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 });

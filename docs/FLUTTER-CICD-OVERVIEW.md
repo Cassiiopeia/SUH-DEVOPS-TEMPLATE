@@ -153,9 +153,8 @@ open .github/util/flutter/playstore-wizard/playstore-wizard.html
 ### 3단계: 워크플로우 설치
 
 ```bash
-# template_integrator로 Flutter 워크플로우 설치
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") \
-  --mode workflows --type flutter
+# npx 마법사로 Flutter 워크플로우 설치
+npx projectops --mode workflows --type flutter
 ```
 
 ### 4단계: 테스트 빌드 실행

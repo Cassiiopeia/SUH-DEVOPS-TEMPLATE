@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
-import { detectTypesFromMarkers, detectVersionFromFiles } from "./detect.js";
+import { detectTypesFromMarkers, detectVersionFromFiles, suggestTypesByExtScan } from "./detect.js";
 import { parseExisting } from "./version-yml.js";
 
 const hasFile = (root) => (rel) => existsSync(join(root, rel));
@@ -17,14 +17,44 @@ function gitOut(root, args) {
   } catch { return ""; }
 }
 
+// 확장자 스캔용 파일 목록 (.sh suggest_types_by_scan find 등가 — depth≤3, vendor 폴더 프루닝).
+const SCAN_PRUNE = new Set([
+  "node_modules", ".git", "build", "dist", ".dart_tool",
+  "android", "ios", ".gradle", "venv", ".venv", "__pycache__",
+]);
+export function listScanFiles(root, maxDepth = 3) {
+  const files = [];
+  const walk = (rel, depth) => {
+    if (depth > maxDepth) return;
+    let entries;
+    try { entries = readdirSync(join(root, rel), { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (!SCAN_PRUNE.has(e.name)) walk(childRel, depth + 1);
+      } else {
+        files.push(childRel);
+      }
+    }
+  };
+  walk("", 1);
+  return files;
+}
+
 // 타입 감지 — version.yml의 project_types 최우선(source of truth), 없으면 마커 스캔.
+// 마커도 전혀 없으면(basic 폴백) 확장자 빈도 스캔으로 2차 추천 (.sh suggest_types_by_scan 등가, #458).
 export function detectTypes(root) {
   const vy = join(root, "version.yml");
   if (existsSync(vy)) {
     const { types } = parseExisting(readFileSync(vy, "utf8"));
     if (types.length) return types; // basic 포함, 명시돼 있으면 그대로
   }
-  return detectTypesFromMarkers({ has: hasFile(root), read: readFile(root) });
+  const byMarkers = detectTypesFromMarkers({ has: hasFile(root), read: readFile(root) });
+  if (byMarkers.length === 1 && byMarkers[0] === "basic") {
+    const scanned = suggestTypesByExtScan(listScanFiles(root));
+    if (scanned.length) return scanned; // 추천값 — 마법사 확인/수정 루프에서 사용자가 확정
+  }
+  return byMarkers;
 }
 
 // 버전 감지 — .sh detect_version 순서. jq 유무는 command 존재로 판정.

@@ -68,8 +68,8 @@ projectops/
 ├── docs/                        # 상세 문서
 ├── version.yml
 ├── CHANGELOG.md / CHANGELOG.json
-├── template_integrator.sh
-└── template_integrator.ps1
+├── template_integrator.sh   # EOF shim (#458 — npx 안내만)
+└── template_integrator.ps1  # EOF shim (#458 — npx 안내만)
 ```
 
 ---
@@ -195,11 +195,22 @@ python3 .github/scripts/changelog_manager.py generate-md
 python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output release_notes.txt
 ```
 
-### template_integrator.sh / .ps1
-기존 프로젝트에 템플릿 기능을 추가하는 원격 실행 스크립트. 신규 통합 / 업데이트 / 되돌리기 모드 지원.
-배포/publish 축(#439)을 `--deploy docker-ssh|vercel|none` + `--publish nexus,npm,github-packages`(csv)로 정한다(.ps1은 `-Deploy` / `-Publish`). Secret 백업은 `--secret-backup`(.ps1 `-SecretBackup`).
-선택 값은 `version.yml`의 `metadata.template.options.deploy` / `.publish`(배열) / `.secret_backup`에 저장.
-구 플래그 `--nexus` / `--npm-publish`는 deprecated alias(1 minor 유지 — `--publish nexus`/`--publish npm`으로 해석).
+### changelog_providers/ (릴리스 노트 생성 사다리 — 전부 .py, #455)
+`RELEASE-CHANGELOG` 워크플로우의 fallback-summary job이 `ladder.py`를 호출한다.
+version.yml `options.changelog.provider`에 따라 **선택 provider → `github_ai.py` → `commit.py`(안전망)** 순으로 폴백하며, 폴백 발생 시 PR 댓글로 알린다.
+
+| provider | 스크립트 | 비고 |
+|---|---|---|
+| `github-ai` (신규 설치 기본) | `github_ai.py` | GitHub Models API — job `permissions: models: read` + GITHUB_TOKEN만으로 동작 (API 키 불필요) |
+| `openai`/`gemini`/`claude`/`ollama` | `openai_compatible.py` | OpenAI 호환. `MODEL_API_KEY` secret 필요 (ollama는 `changelog.base_url`) |
+| `commit` | `commit.py` | 커밋 분석 — AI·네트워크 무의존 최후 보루 |
+| `coderabbit` (미설정 시 기본 — 기존 동작 보존) | 워크플로우 Job 1 폴링 | 무응답 시 사다리(github-ai → commit)로 폴백 |
+
+테스트: `python -m pytest .github/scripts/test/test_changelog_providers.py`. npx 복사 엔진(`src/core/copy/simple.js`)이 5종(.py)을 사용자 프로젝트에 복사한다.
+
+### template_integrator.sh / .ps1 — ⚠️ 지원 종료 (EOF, #458)
+**두 스크립트는 v4.3.0에서 안내용 shim으로 교체되었다.** 실행하면 `npx projectops` 안내만 출력하고 종료한다(파일 직접 실행 시 exit 1). 다음 minor에서 파일 자체를 제거할 예정.
+통합/업데이트/스킬 설치는 전부 **`npx projectops`** 한 경로다. 배포/publish 축·secret 백업 등 모든 옵션은 npx 마법사가 질문하며, 선택 값은 `version.yml`의 `metadata.template.options.*`에 동일하게 저장된다.
 
 **초기화/통합 시 복사되지 않는 템플릿 전용 파일**:
 ```
@@ -215,111 +226,29 @@ package.json, harness/         # pi 패키지 매니페스트 + Persona Harness
 
 이 레포는 **두 정체성**을 동시에 가진다 — 이 점이 일반 레포와 다른 핵심이다.
 
-1. **템플릿 레포**: GitHub "Use this template"로 새 프로젝트를 만들면 `.github/scripts/template_initializer.sh`가 마켓플레이스/템플릿 전용 파일을 **삭제**한다.
-2. **마법사 배포원**: `template_integrator.sh` / `.ps1`이 기존 프로젝트에 템플릿을 통합할 때 그 파일들을 **복사 대상에서 제외**한다.
+1. **템플릿 레포**: GitHub "Use this template"로 새 프로젝트를 만들면 `.github/scripts/template_initializer.py`(.sh는 위임 shim)가 마켓플레이스/템플릿 전용 파일을 **삭제**한다.
+2. **마법사 배포원**: `npx projectops`(src/)가 기존 프로젝트에 템플릿을 통합할 때 그 파일들을 **복사 대상에서 제외**한다 (`src/core/exclusions.js`).
 
-따라서 레포 루트에 새 파일/폴더를 추가했는데 그게 **이 레포에서만 의미 있고 사용자 프로젝트로 흘러가면 안 되는 것**(플러그인 매니페스트, skill, pi 패키지 파일, 내부 문서 등)이라면, **아래 3곳(+필요 시 4번째)을 반드시 함께 수정**한다. 한 곳만 고치면 새 프로젝트가 오염되거나 마법사가 불필요한 파일을 복사한다 — 실제로 자주 빠뜨리는 함정이다.
+따라서 레포 루트에 새 파일/폴더를 추가했는데 그게 **이 레포에서만 의미 있고 사용자 프로젝트로 흘러가면 안 되는 것**(플러그인 매니페스트, skill, pi 패키지 파일, 내부 문서 등)이라면, **아래 2곳(+필요 시 3번째)을 반드시 함께 수정**한다. 한 곳만 고치면 새 프로젝트가 오염되거나 마법사가 불필요한 파일을 복사한다 — 실제로 자주 빠뜨리는 함정이다.
 
 | # | 파일 | 수정할 위치 | 동작 |
 |---|------|------------|------|
-| 1 | `.github/scripts/template_initializer.sh` | `cleanup_template_files()` 함수 | `[ -f / -d ]` 가드 + `rm -f / -rf` 한 블록 추가 (**삭제**) |
-| 2 | `template_integrator.sh` | `plugin_items_to_remove=( ... )` 배열 | 파일/폴더명 추가 (**복사 제외**) |
-| 3 | `template_integrator.ps1` | `$pluginItemsToRemove = @( ... )` 배열 | 파일/폴더명 추가 (**복사 제외**) |
-| 4 | `.github/workflows/PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml` | 버전 동기화 step + `git add` | 버전 필드가 있는 매니페스트(`package.json` 등)면 동기화 step 추가 |
+| 1 | `.github/scripts/template_initializer.py` | 삭제 목록 튜플 배열 (`template_integrator.sh` 항목 근처) | `("파일명", "설명")` 항목 추가 (**삭제**) |
+| 2 | `src/core/exclusions.js` | `DOCS_TO_REMOVE` 등 제외 배열 | 파일/폴더명 추가 (**복사 제외**) |
+| 3 | `.github/workflows/PROJECT-TEMPLATE-PLUGIN-VERSION-SYNC.yaml` | 버전 동기화 step + `git add` | 버전 필드가 있는 매니페스트(`package.json` 등)면 동기화 step 추가 |
 
-> **체크 순서**: 새 루트 파일 추가 → "이게 사용자 프로젝트에도 필요한가?" 자문 → **아니오면 위 1·2·3을 모두 수정**. 버전을 `version.yml`과 맞춰야 하는 매니페스트면 4번도 추가. 수정 후 `bash -n template_integrator.sh`, PowerShell 파서로 `.ps1`, `bash -n .github/scripts/template_initializer.sh`를 각각 돌려 문법을 확인한다.
+> (구 `template_integrator.sh`/`.ps1`의 `plugin_items_to_remove` 배열은 #458 EOF로 사라졌다 — 이제 npx `exclusions.js`가 유일한 복사 제외 지점이다.)
+>
+> **체크 순서**: 새 루트 파일 추가 → "이게 사용자 프로젝트에도 필요한가?" 자문 → **아니오면 위 1·2를 모두 수정**. 버전을 `version.yml`과 맞춰야 하는 매니페스트면 3번도 추가. 수정 후 `python -m py_compile .github/scripts/template_initializer.py`와 `npm test`로 확인한다.
 >
 > **반대로**, 추가한 게 사용자 프로젝트에도 같이 가야 하는 공통 자산(워크플로우·스크립트·설정)이라면 위 목록에 넣지 않는다 — 제외하면 통합 대상 프로젝트가 그 기능을 못 받는다.
-
-#### macOS에서 template_integrator 검증하는 법 (실측 정리)
-
-> Mac에는 `pwsh`가 기본 설치되어 있지 않다. `.ps1`은 **Docker로 실제 PowerShell을 돌려** 검증한다. `.sh`는 `expect`로 실제 TTY 동작까지 검증한다. 문법 통과(`bash -n`)만으로는 ESC·메뉴·`set -e` 종료 같은 런타임 버그를 못 잡는다 — 반드시 실제 키 입력을 주입해 동작을 본다.
-
-**1) `.ps1` 구문 검증 — Docker + 실제 PowerShell 파서 (가장 신뢰도 높음)**
-
-```bash
-# PowerShell 이미지는 amd64 전용. ARM Mac에서도 --platform linux/amd64로 돌린다(QEMU).
-docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work mcr.microsoft.com/powershell:latest \
-  pwsh -NoProfile -Command '$t=$null;$e=$null;[System.Management.Automation.Language.Parser]::ParseFile("/work/template_integrator.ps1",[ref]$t,[ref]$e)|Out-Null; if($e -and $e.Count){"ERRORS:"+$e.Count}else{"PS1_PARSE_OK"}'
-```
-
-- `Parser::ParseFile`은 **실행 없이** 전체 구문을 검사한다(안전). `PS1_PARSE_OK`면 문법 통과.
-- 출력이 파이프(`| grep` 등)에서 사라지면 `> /tmp/out.txt 2>&1` 로 파일에 받아서 읽는다. (Docker stdout 버퍼링 이슈)
-
-**2) `.ps1` 동작 검증 — 함수만 떼어내 입력 주입 (AST 통째 로드 금지)**
-
-- ⚠️ **하지 말 것**: 스크립트 전체를 `Invoke-Expression` 으로 AST 로드 → ARM Mac의 QEMU 에뮬레이션에서 `AccessViolationException`(메모리 폴트)로 죽는다. 실측 확인됨.
-- ✅ **할 것**: 검증할 함수 본문만 `sed -n 'START,ENDp'` 로 잘라 최소 하네스에 붙이고, `Invoke-ChooseMenu`·`Read-UserInput`·`Read-Host` 등 입력 함수를 **배열 주입 스텁**으로 덮어쓴다. `Print-*`·`Detect-*`·외부접근 함수도 스텁.
-- ⚠️ **QEMU 변종 크래시 (실측)**: 함수를 `function`으로 정의 후 **호출**하면 QEMU가 `assertion failed [block != nullptr]: BasicBlock requested for unrecognized address`로 죽을 수 있다(try-catch·trap도 못 잡는 네이티브 폴트). 이건 **PS 코드 버그가 아니라 QEMU JIT 한계**다. 구별법: ① `Parser::ParseFile`로 구문은 `PS1_PARSE_OK` 통과하는지 ② **함수 본문을 `function` 래핑 없이 인라인으로** 같은 입력에 돌려 정상 동작하는지 확인 → 둘 다 OK면 로직은 정상, QEMU만 못 돌린 것이다. 실제 Windows/Linux PowerShell에선 정상 동작한다.
-
-```bash
-# 예: Edit-ProjectInfo(1256~1342행)만 추출해 입력 시퀀스 주입
-{ cat <<'PS'
-$ErrorActionPreference="Stop"
-$script:ProjectVersion='0.0.187'; $script:ProjectTypes=@('spring')
-function Print-Success{param($m)Write-Host "OK: $m"}; function Print-Info{param($m)Write-Host "INFO: $m"}
-function Print-Error{param($m)Write-Host "ERR: $m"}; function Print-QuestionHeader{param($a,$b)}
-function Show-ProjectTypeMenu{''}; function Resolve-ProjectPaths{}
-$script:__in=@(); $script:__i=0
-function Invoke-ChooseMenu{param($Prompt,$Options,$DefaultIndex,[switch]$Multi,$Preselect) $v=$script:__in[$script:__i];$script:__i++;return $v}
-function Read-UserInput{param($Prompt,$DefaultValue="") $v=$script:__in[$script:__i];$script:__i++;return $v}
-PS
-sed -n '1256,1342p' template_integrator.ps1
-cat <<'PS'
-$script:__in=@('version','9.9.9','done'); $script:__i=0   # 메뉴→버전입력→done
-Edit-ProjectInfo
-Write-Host "RESULT Version=$($script:ProjectVersion)"        # 기대: 9.9.9
-PS
-} > /tmp/ps_min.ps1
-docker run --rm --platform linux/amd64 -v /tmp:/tmp -w /tmp mcr.microsoft.com/powershell:latest pwsh -NoProfile -File /tmp/ps_min.ps1
-```
-
-- 핵심: **PowerShell의 `$ErrorActionPreference="Stop"`은 `throw`(예외)에만 작동한다.** 함수가 `return $false`/비-0을 줘도 안 죽는다 — sh의 `set -e`와 정반대. 그래서 ps1은 return 기반 흐름이 안전하다.
-
-**3) `.sh` 동작 검증 — `expect`로 실제 TTY + ESC 키 주입 (Mac 기본 제공)**
-
-- `.sh`의 메뉴/`safe_read`는 `/dev/tty`를 직접 읽으므로 **pty가 필요**하다. 단순 stdin 파이프로는 ESC·화살표가 검증 안 된다 → `expect` 사용.
-- 스크립트는 끝에서 `[ "${BASH_SOURCE[0]}" = "${0}" ] && main` 가드가 있어 **`source` 하면 main이 안 돈다.** 이를 이용해 함수만 로드하고 감지 함수를 스텁으로 덮어 특정 화면만 격리 실행한다.
-
-```bash
-# 하네스: 실제 스크립트를 source(main 미실행) + 감지 함수 스텁 + 검증할 함수 직접 호출
-cat > /tmp/h.sh <<'SH'
-source "$PWD/template_integrator.sh"
-TTY_AVAILABLE=true; FORCE_MODE=false
-PROJECT_TYPES=(spring); PROJECT_TYPE=spring; VERSION="0.0.187"; DETECTED_BRANCH="main"
-detect_project_types(){ echo "spring"; }; detect_version(){ echo "0.0.187"; }
-detect_default_branch(){ echo "main"; }; resolve_project_paths(){ :; }; show_project_type_menu(){ echo ""; }
-detect_and_confirm_project
-echo "<<END VERSION=$VERSION>>"
-SH
-# expect로 ESC(\033)·숫자·Enter 주입. send "\033" = ESC, send "2\r" = 2 입력
-expect <<'EXP'
-set timeout 8
-spawn bash -c "cd '$env(PWD)' && bash /tmp/h.sh"
-expect "이 정보가 맞습니까?"
-send "2\r"; expect "어떤 항목을 수정"
-send "2\r"; expect "새 버전을 입력"
-after 200; send "\033"                 ;# ESC → '뒤로' 가는지 검증
-expect { "돌아갑니다" {puts ">>>PASS"} "<<END" {puts ">>>FAIL_exited"} }
-EXP
-```
-
-- ESC 직후엔 `after 200`(ms) 정도 텀을 줘야 터미널 시퀀스가 안 깨진다.
-- `expect`가 `spawn id ... not open` = 프로세스가 **종료됨**(= ESC가 의도와 달리 마법사를 끝냄). 정상이면 다음 화면 텍스트가 다시 떠야 한다.
-
-**자주 나오는 함정 (실측)**
-- `set -e` 환경의 sh에서 `var=$(menu_fn)` 단독 라인은 ESC(비-0 반환) 시 **함수 전체가 즉시 종료**된다. 반드시 `var=$(menu_fn) || rc=$?` 또는 `|| true`로 종료코드를 흡수한다. ("ESC 눌렀더니 마법사가 통째로 꺼짐" 버그의 주원인.)
-- `var=$(cmd); rc=$?` 처럼 `;`로 이어 같은 줄에 두면 `set -e` 안전(마지막 명령 `rc=$?`가 성공).
-- 임시 하네스/`.exp` 파일은 검증 후 반드시 정리한다(`rm -f /tmp/h.sh /tmp/ps_min.ps1` 등).
-
----
 
 #### ⚠️ macOS는 bash 3.2 + BSD 도구다 — `.sh` 작성·검증 시 절대 잊지 말 것 (agent 필독, 실측)
 
 > **핵심: 윈도우(`.ps1`·Git Bash)에서 잘 돌아도 macOS에서 깨질 수 있다.** macOS 기본 `/bin/bash`는 라이선스 문제로 **3.2.57(2007년)에 박제**돼 있고, 기본 grep/sed도 **BSD 계열**이다. `.sh`는 항상 **`/bin/bash`(3.2) + BSD 도구**로 검증한다. "윈도우에서만 테스트했다"가 실제 사용자(macOS) 버그를 통째로 놓치게 한 주원인이다. (실측: 이슈 #415·#418 — 윈도우 정상, macOS만 깨짐.)
 
 **bash 3.2에서 못 쓰는 것 (4+ 전용 → macOS에서 조용히 오작동)**
-- **연관배열 `declare -A` 금지.** bash 3.2는 미지원 → 모든 문자열 키가 **인덱스 0으로 뭉개져** "키가 1개만 남는" 버그가 된다(실측 #418: @wizard env 키가 6개인데 1개만 수집). 동적 key-value가 필요하면 스크립트에 이미 있는 **`_kv_set`/`_kv_get`/`_kv_has`/`_kv_clear` 헬퍼**(eval 동적변수 + 16진 키 인코딩, 3.2/4 공용)를 쓴다.
+- **연관배열 `declare -A` 금지.** bash 3.2는 미지원 → 모든 문자열 키가 **인덱스 0으로 뭉개져** "키가 1개만 남는" 버그가 된다(실측 #418: @wizard env 키가 6개인데 1개만 수집). 동적 key-value가 필요하면 eval 동적변수 + 16진 키 인코딩 헬퍼(구 integrator의 `_kv_*` 패턴, 3.2/4 공용)를 쓴다.
 - **`declare -g` 금지.** bash 3.2에서 `invalid option`. 최상위 레벨이면 어차피 전역이니 `-g` 없이 선언한다.
 - `mapfile`/`readarray`, `${var,,}`/`${var^^}`(대소문자), `&>>`도 4+ 전용 → 사용 금지.
 
@@ -331,7 +260,7 @@ EXP
 **`set -e` + 함수 끝 종료코드 (메뉴 아닌 일반 함수도 해당)**
 - 위 "var=$(menu_fn)" 함정의 일반화: **함수의 마지막 명령이 비-0이면**, 그 함수가 호출부의 마지막 명령일 때 `set -e`가 스크립트를 통째로 죽인다. `[ -d x ] || return`(폴더 없으면 1 전파), `[ cond ] && cmd`(조건 거짓이면 1), `command -v foo && ...`(미설치면 1), `cp ... && ...`(실패면 1) 모두 위험. → early return은 `return 0` 명시, 끝줄 `조건 && 명령`은 `{ ...; } || true`로 감싼다. (실측 #415: Nexus/Secret 메뉴·interactive_mode·codex 제거·config cp 등 5곳.)
 
-**검증 방법**: `bash -n`(문법)만으론 부족하다. **반드시 `/bin/bash`(3.2)로 실제 실행**한다. 함수만 떼어 `source` 후 호출하거나, `--force --mode full --type spring,flutter,react,python`로 전체 통합이 **종료코드 0으로 완주**하는지 본다. `which bash`가 brew bash(`/opt/homebrew/bin/bash`, 4+)를 가리키면 `/bin/bash`로 명시 실행해 3.2를 강제한다.
+**검증 방법**: `bash -n`(문법)만으론 부족하다. **반드시 `/bin/bash`(3.2)로 실제 실행**한다. 함수만 떼어 `source` 후 호출해 실제 입력으로 **종료코드 0 완주**를 확인한다. `which bash`가 brew bash(`/opt/homebrew/bin/bash`, 4+)를 가리키면 `/bin/bash`로 명시 실행해 3.2를 강제한다.
 
 ---
 

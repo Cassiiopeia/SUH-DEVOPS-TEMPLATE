@@ -526,7 +526,7 @@ Error: 404 page not found
 
 ---
 
-## template_integrator 연동
+## npx projectops 마법사 연동
 
 ### 배포 워크플로우는 기본 포함
 
@@ -535,11 +535,8 @@ SSH+Docker 배포 워크플로우(SIMPLE-CICD, NONSTOP-*, PR-PREVIEW)는 해당 
 > **예외 — Nexus 라이브러리 프로젝트**: `--nexus`(라이브러리 publish)로 통합하는 Spring 프로젝트는 서버에 배포하지 않으므로, 위 서버 배포 워크플로우가 **자동으로 제외**됩니다. (Spring 원본에서 이 워크플로우들은 `spring/server-deploy/` 폴더로 묶여 있고, Nexus 프로젝트일 때 폴더째 건너뜁니다.)
 
 ```bash
-# Linux/macOS
-bash <(curl -fsSL https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh)
-
-# Windows PowerShell
-$wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]::Create($wc.DownloadString("https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.ps1")))
+# macOS / Linux / Windows 공통
+npx projectops
 ```
 
 ### 선택 워크플로우 (Nexus / Secret 백업)
@@ -553,12 +550,8 @@ $wc=New-Object Net.WebClient;$wc.Encoding=[Text.Encoding]::UTF8;& ([scriptblock]
 # 권장 — npx (OS 공통, 옵션 동일)
 npx projectops --nexus --secret-backup
 
-# 대안 — 스크립트 직접 실행
-# Linux/macOS — 둘 다 포함
-bash <(curl -fsSL .../template_integrator.sh) --nexus --secret-backup
-
-# Windows PowerShell
-... -Nexus -SecretBackup
+# 비대화형 — 둘 다 포함
+npx projectops --publish nexus --secret-backup
 ```
 
 옵션 없이 실행하면, 해당 폴더가 있을 경우 대화형으로 질문이 표시됩니다:

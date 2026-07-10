@@ -20,6 +20,16 @@ test("copyScripts 2개 복사", () => {
   } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
 });
 
+test("copyScripts changelog provider 사다리(.py) 복사 (#455)", () => {
+  const tmp = fresh("cp-tmp-"); const tgt = fresh("cp-tgt-");
+  try {
+    const providers = ["_common.py", "ladder.py", "commit.py", "github_ai.py", "openai_compatible.py"];
+    for (const p of providers) writeText(join(tmp, ".github/scripts/changelog_providers", p), "# py\n");
+    assert.equal(copyScripts(tmp, tgt), providers.length);
+    for (const p of providers) assert.ok(exists(join(tgt, ".github/scripts/changelog_providers", p)), `누락: ${p}`);
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});
+
 test("copyIssueTemplates + PR", () => {
   const tmp = fresh("ci-tmp-"); const tgt = fresh("ci-tgt-");
   try {

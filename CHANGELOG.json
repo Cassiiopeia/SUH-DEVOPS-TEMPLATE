@@ -1,14 +1,49 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-10T02:32:48Z",
-    "currentVersion": "4.2.7",
+    "lastUpdated": "2026-07-10T16:46:22Z",
+    "currentVersion": "4.2.8",
     "projectType": "basic",
-    "totalReleases": 192,
+    "totalReleases": 193,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.8",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-10",
+      "pr_number": 469,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * CodeRabbit 없이도 릴리스 노트가 자동 생성됩니다 (GitHub AI 기본, API 키 불필요)\n  * 릴리스 노트 생성 방식을 선택할 수 있습니다 (GitHub AI / OpenAI 호환 / 커밋 분석)\n  * 생성 실패 시 다음 방식으로 자동 전환되고 PR 댓글로 알려드립니다\n  * 마커 파일이 없는 프로젝트도 소스 파일을 분석해 타입을 추천합니다\n\n* **버그 수정**\n  * Windows에서 일부 스크립트가 실행되지 않던 문제를 해결했습니다\n\n* **개선**\n  * 템플릿 통합이 npx 한 가지 경로로 통일되었습니다 (구 통합 스크립트는 지원 종료)\n  * 릴리스 노트 생성 로직이 모든 운영체제에서 동일하게 동작하도록 개선되었습니다",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "CodeRabbit 없이도 릴리스 노트가 자동 생성됩니다 (GitHub AI 기본, API 키 불필요)",
+            "릴리스 노트 생성 방식을 선택할 수 있습니다 (GitHub AI / OpenAI 호환 / 커밋 분석)",
+            "생성 실패 시 다음 방식으로 자동 전환되고 PR 댓글로 알려드립니다",
+            "마커 파일이 없는 프로젝트도 소스 파일을 분석해 타입을 추천합니다"
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Windows에서 일부 스크립트가 실행되지 않던 문제를 해결했습니다"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "템플릿 통합이 npx 한 가지 경로로 통일되었습니다 (구 통합 스크립트는 지원 종료)",
+            "릴리스 노트 생성 로직이 모든 운영체제에서 동일하게 동작하도록 개선되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.7",
       "project_type": "basic",

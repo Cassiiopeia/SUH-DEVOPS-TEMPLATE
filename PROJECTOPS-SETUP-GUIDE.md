@@ -57,7 +57,7 @@ git checkout main
 
 ## 🛠️ IDE 도구 (Skills) 설치 (선택)
 
-template_integrator로 통합 시 자동 안내되지만, 수동으로도 설치할 수 있습니다.
+npx projectops로 통합 시 자동 안내되지만, 수동으로도 설치할 수 있습니다.
 
 | IDE | 설치 방법 | 사용 예시 |
 |-----|----------|----------|
@@ -76,7 +76,7 @@ claude plugin install projectops@projectops-marketplace --scope user
 
 ### Cursor
 
-template_integrator 실행 시 Cursor 설치를 선택하면 자동으로 `skills/` → `.cursor/skills/`로 복사됩니다.
+`npx projectops` 실행 시 Cursor 설치를 선택하면 자동으로 `skills/` → `.cursor/skills/`로 복사됩니다.
 
 ---
 
@@ -115,10 +115,10 @@ template_integrator 실행 시 Cursor 설치를 선택하면 자동으로 `skill
 
 ```bash
 # 대화형 모드 (권장)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
+npx projectops
 
 # 비대화형 모드 (Spring Boot 전체 통합 예시)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh") \
+npx projectops \
   --mode full --type spring --version 1.0.0 --force
 ```
 
@@ -321,7 +321,7 @@ remote: Permission to ... denied to github-actions[bot]
 
 ```bash
 # 원격 스크립트로 타입 변경 
-bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main/template_integrator.sh")
+npx projectops
 ```
 
 ### 고급 기능 활용

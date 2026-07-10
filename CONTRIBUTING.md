@@ -457,7 +457,7 @@ git pull upstream develop
 git branch -d feature/new-feature
 ```
 
-> 릴리스는 `develop → main` Pull Request로만 진행합니다 (`/projectops:changelog-deploy`). 버전 확정, AI 체인지로그 생성, automerge가 이 PR에서 자동 처리됩니다.
+> 릴리스는 `develop → main` Pull Request로만 진행합니다 (`/pro-changelog-deploy`). 버전 확정, AI 체인지로그 생성, automerge가 이 PR에서 자동 처리됩니다.
 
 ---
 

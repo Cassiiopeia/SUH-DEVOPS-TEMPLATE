@@ -179,7 +179,7 @@ git log origin/develop..HEAD --oneline 2>/dev/null
 - `git status --short` 결과에 미커밋 변경사항이 있으면 **즉시 멈추고** 안내:
   ```
   커밋되지 않은 변경사항이 있습니다. 먼저 커밋 후 다시 실행해주세요.
-  /projectops:commit 으로 커밋할 수 있습니다.
+  /pro-commit 으로 커밋할 수 있습니다.
   ```
 - `git log origin/main..HEAD` 결과가 비어 있으면 → `git log origin/develop..HEAD` 결과도 확인
 - **두 결과 모두 비어 있을 때만** "deploy할 커밋이 없습니다" 안내 후 종료

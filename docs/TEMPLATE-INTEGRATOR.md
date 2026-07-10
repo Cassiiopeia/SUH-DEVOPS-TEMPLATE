@@ -395,7 +395,7 @@ claude plugin marketplace add Cassiiopeia/projectops
 claude plugin install projectops@projectops-marketplace --scope user
 ```
 
-설치 후 `/projectops:analyze`, `/projectops:review` 등으로 사용합니다.
+설치 후 `/pro-analyze`, `/pro-review` 등으로 사용합니다.
 
 ### Cursor IDE Skills 설치
 

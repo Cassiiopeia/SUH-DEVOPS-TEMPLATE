@@ -195,6 +195,19 @@ python3 .github/scripts/changelog_manager.py generate-md
 python3 .github/scripts/changelog_manager.py export --version 1.2.3 --output release_notes.txt
 ```
 
+### changelog_providers/ (릴리스 노트 생성 사다리 — 전부 .py, #455)
+`RELEASE-CHANGELOG` 워크플로우의 fallback-summary job이 `ladder.py`를 호출한다.
+version.yml `options.changelog.provider`에 따라 **선택 provider → `github_ai.py` → `commit.py`(안전망)** 순으로 폴백하며, 폴백 발생 시 PR 댓글로 알린다.
+
+| provider | 스크립트 | 비고 |
+|---|---|---|
+| `github-ai` (신규 설치 기본) | `github_ai.py` | GitHub Models API — job `permissions: models: read` + GITHUB_TOKEN만으로 동작 (API 키 불필요) |
+| `openai`/`gemini`/`claude`/`ollama` | `openai_compatible.py` | OpenAI 호환. `MODEL_API_KEY` secret 필요 (ollama는 `changelog.base_url`) |
+| `commit` | `commit.py` | 커밋 분석 — AI·네트워크 무의존 최후 보루 |
+| `coderabbit` (미설정 시 기본 — 기존 동작 보존) | 워크플로우 Job 1 폴링 | 무응답 시 사다리(github-ai → commit)로 폴백 |
+
+테스트: `python -m pytest .github/scripts/test/test_changelog_providers.py`. npx 복사 엔진(`src/core/copy/simple.js`)이 5종(.py)을 사용자 프로젝트에 복사한다.
+
 ### template_integrator.sh / .ps1
 기존 프로젝트에 템플릿 기능을 추가하는 원격 실행 스크립트. 신규 통합 / 업데이트 / 되돌리기 모드 지원.
 배포/publish 축(#439)을 `--deploy docker-ssh|vercel|none` + `--publish nexus,npm,github-packages`(csv)로 정한다(.ps1은 `-Deploy` / `-Publish`). Secret 백업은 `--secret-backup`(.ps1 `-SecretBackup`).

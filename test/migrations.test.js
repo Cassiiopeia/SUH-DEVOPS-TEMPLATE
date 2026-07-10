@@ -1,0 +1,130 @@
+// 레거시 마이그레이션 (#470) — registry 정합성 + detect/apply/티어 정책 검증.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { MIGRATIONS } from "../src/core/migrations/registry.js";
+import { detectMigrations, applySafeMigrations, runMigrations } from "../src/core/migrations/index.js";
+
+const ROOT = process.cwd();
+
+function fresh() { return mkdtempSync(join(tmpdir(), "mig-")); }
+function wfDir(root) { const d = join(root, ".github", "workflows"); mkdirSync(d, { recursive: true }); return d; }
+
+// ── registry 정합성 ───────────────────────────────────────────────────
+
+test("registry: id 중복 없음", () => {
+  const ids = MIGRATIONS.map((m) => m.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test("registry: 현행 배포 세트와 파일명이 절대 겹치지 않는다 (살아있는 워크플로우 오살 방지)", () => {
+  // 현행 배포 세트 = 루트 + project-types 전체 (TEMPLATE-* 레포 전용 포함 — 보수적으로 전부)
+  const shipped = new Set();
+  const collect = (dir) => {
+    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      if (e.isDirectory()) collect(`${dir}/${e.name}`);
+      else if (/\.ya?ml$/.test(e.name)) shipped.add(e.name);
+    }
+  };
+  collect(".github/workflows");
+  const collisions = MIGRATIONS.filter((m) => m.category === "workflow" && shipped.has(m.file));
+  assert.deepEqual(collisions.map((m) => m.file), [],
+    `레지스트리에 현행 배포 파일이 들어있음(오살 위험): ${collisions.map((m) => m.file).join(", ")}`);
+});
+
+test("registry: 모든 항목이 필수 필드와 유효한 tier/category를 가진다", () => {
+  for (const m of MIGRATIONS) {
+    assert.ok(m.id && m.file && m.reason, `필드 누락: ${m.id || m.file}`);
+    assert.ok(["safe", "confirm"].includes(m.tier), `tier 오류: ${m.id}`);
+    assert.ok(["workflow", "root-file"].includes(m.category), `category 오류: ${m.id}`);
+    assert.ok(!m.file.includes("*"), `글롭 금지 위반: ${m.id}`); // 정확명 매칭 원칙
+  }
+});
+
+// ── detect ────────────────────────────────────────────────────────────
+
+test("detect: 구 워크플로우는 safe, 배포 계열은 confirm으로 분류", () => {
+  const root = fresh();
+  try {
+    const d = wfDir(root);
+    writeFileSync(join(d, "PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml"), "name: old\n");
+    writeFileSync(join(d, "PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml"), "name: syno\n");
+    writeFileSync(join(d, "ROMROM-ANDROID-CICD.yaml"), "name: custom\n"); // 사용자 커스텀
+    const { safe, confirm } = detectMigrations(root);
+    assert.deepEqual(safe.map((e) => e.file), ["PROJECT-COMMON-AUTO-CHANGELOG-CONTROL.yaml"]);
+    assert.deepEqual(confirm.map((e) => e.file), ["PROJECT-SPRING-SYNOLOGY-SIMPLE-CICD.yaml"]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("detect: contentMarker — 범용 파일명은 내용 마커 있어야 템플릿 소유 판정", () => {
+  const root = fresh();
+  try {
+    writeFileSync(join(root, "SETUP-GUIDE.md"), "# 우리 팀 자체 셋업 가이드\n");
+    assert.equal(detectMigrations(root).safe.length, 0, "사용자 문서를 오탐");
+    writeFileSync(join(root, "SETUP-GUIDE.md"), "# SUH-DEVOPS-TEMPLATE 셋업\n");
+    assert.deepEqual(detectMigrations(root).safe.map((e) => e.id), ["root-setup-guide-v1"]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── apply ─────────────────────────────────────────────────────────────
+
+test("apply: 워크플로우는 .bak 무해화(기존 .bak 덮어씀), root-file은 삭제, 멱등", () => {
+  const root = fresh();
+  try {
+    const d = wfDir(root);
+    const wf = join(d, "PROJECT-VERSION-CONTROL.yaml");
+    writeFileSync(wf, "name: old\n");
+    writeFileSync(`${wf}.bak`, "stale bak\n"); // 기존 .bak 충돌 케이스
+    writeFileSync(join(root, "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md"), "# guide\n");
+
+    const { safe } = detectMigrations(root);
+    const results = applySafeMigrations(root, safe);
+    assert.ok(results.every((r) => r.action !== "error"), JSON.stringify(results));
+    assert.ok(!existsSync(wf), "구 워크플로우가 남아있음");
+    assert.ok(existsSync(`${wf}.bak`), ".bak 미생성");
+    assert.ok(!existsSync(join(root, "SUH-DEVOPS-TEMPLATE-SETUP-GUIDE.md")), "구 가이드 미삭제");
+
+    // 멱등 — 재감지 0건
+    assert.equal(detectMigrations(root).safe.length, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── runMigrations (티어 정책) ─────────────────────────────────────────
+
+test("runMigrations: 비대화형(askYesNo 없음)은 safe 자동 적용, confirm은 불변", async () => {
+  const root = fresh();
+  try {
+    const d = wfDir(root);
+    writeFileSync(join(d, "PROJECT-README-VERSION-UPDATE.yaml"), "old\n");
+    writeFileSync(join(d, "PROJECT-SPRING-CICD.yaml"), "deploy\n"); // confirm 티어
+    const logs = [];
+    const { applied, confirmPending } = await runMigrations({ targetRoot: root, log: (m) => logs.push(m) });
+    assert.equal(applied.length, 1);
+    assert.ok(!existsSync(join(d, "PROJECT-README-VERSION-UPDATE.yaml")));
+    assert.ok(existsSync(join(d, "PROJECT-SPRING-CICD.yaml")), "confirm 티어를 건드림!");
+    assert.equal(confirmPending.length, 1);
+    assert.ok(logs.some((l) => l.includes("자동으로 건드리지 않습니다")));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("runMigrations: 대화형에서 아니오 선택 시 아무것도 적용하지 않음", async () => {
+  const root = fresh();
+  try {
+    const d = wfDir(root);
+    writeFileSync(join(d, "PROJECT-VERSION-CONTROL.yaml"), "old\n");
+    const { applied } = await runMigrations({ targetRoot: root, askYesNo: async () => false, log: () => {} });
+    assert.equal(applied.length, 0);
+    assert.ok(existsSync(join(d, "PROJECT-VERSION-CONTROL.yaml")));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("runMigrations: 감지 0건이면 조용히 통과 (신규 통합 no-op)", async () => {
+  const root = fresh();
+  try {
+    const logs = [];
+    const { applied, confirmPending } = await runMigrations({ targetRoot: root, log: (m) => logs.push(m) });
+    assert.equal(applied.length + confirmPending.length + logs.length, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

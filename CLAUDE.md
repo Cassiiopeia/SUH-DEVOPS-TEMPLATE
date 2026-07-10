@@ -149,6 +149,8 @@ snake_case.sh / snake_case.py
 > 서버 배포 워크플로우(SIMPLE/NONSTOP-*/PR-PREVIEW)는 `server-deploy/`로 묶여 **`deploy=docker-ssh`일 때만 포함**된다(`vercel`/`none`이면 폴더째 제외). publish 워크플로우는 `<type>/publish/<target>/`에 있고 **선택된 publish 타겟 집합**으로 복사가 결정된다(타입은 파일 위치일 뿐 게이트 아님).
 >
 > **확장 규칙(agent 필독)**: 새 "서버 배포" 워크플로우는 `spring/server-deploy/`에 파일만 넣는다(deploy≠docker-ssh면 자동 제외). 새 publish 타겟은 `<type>/publish/<target>/`에 넣고 마법사 질문 목록에 값을 추가한다. 타입 비종속 배포 타겟(Vercel 등)은 `common/deploy/<target>/`에 넣는다.
+>
+> **⚠️ 워크플로우를 리네임/삭제할 때 (agent 필독, #470)**: 구 이름을 `src/core/migrations/registry.js`에 반드시 추가한다 — 마법사 업데이트가 기존 통합 레포의 구 파일을 자동 무해화(.bak)하는 유일한 경로다(레거시 마이그레이션은 전부 이 레지스트리 한 곳에서 관리). tier는 `safe`(순수 리네임 — 공존 시 중복 실행 실해) / `confirm`(배포 파이프라인일 수 있음 — 자동 조치 없이 안내만) 중 실해 기준으로 고른다. `test/migrations.test.js`가 레지스트리와 현행 배포 세트의 충돌(살아있는 워크플로우 오살)을 자동 검증한다.
 
 #### 공통 — 배포 타겟 / Secret 백업
 | 파일명 | 기능 | 위치 | 조건 |

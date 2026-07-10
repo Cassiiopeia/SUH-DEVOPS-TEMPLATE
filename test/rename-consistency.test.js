@@ -59,12 +59,12 @@ test("skills/ 아래 suh- 폴더가 0개다", () => {
   assert.deepEqual(dirs, [], `잔존 suh- 스킬 폴더: ${dirs.join(", ")}`);
 });
 
-test("25개 중립 스킬 폴더가 모두 존재한다", () => {
+test("25개 pro- 스킬 폴더가 모두 존재한다", () => {
   const expected = [
-    "analyze", "build", "changelog-deploy", "commit", "design", "design-analyze",
-    "document", "figma", "github", "implement", "init-worktree", "issue", "plan",
-    "ppt", "refactor", "refactor-analyze", "report", "review", "skill-creator",
-    "spring-test", "ssh", "synology-expose", "test", "testcase", "troubleshoot",
+    "pro-analyze", "pro-build", "pro-changelog-deploy", "pro-commit", "pro-design", "pro-design-analyze",
+    "pro-document", "pro-figma", "pro-github", "pro-implement", "pro-init-worktree", "pro-issue", "pro-plan",
+    "pro-ppt", "pro-refactor", "pro-refactor-analyze", "pro-report", "pro-review", "pro-skill-creator",
+    "pro-spring-test", "pro-ssh", "pro-synology-expose", "pro-test", "pro-testcase", "pro-troubleshoot",
   ];
   for (const s of expected) {
     assert.ok(existsSync(join(ROOT, "skills", s, "SKILL.md")), `누락: skills/${s}/SKILL.md`);
@@ -92,8 +92,8 @@ test("@suh-lab 트리거 잔재가 없다(외부 봇 서명 Guide by SUH-LAB은 
 
 // ── 보존 대상(치환 금지)이 살아있는지 — 과잉 치환 회귀 방지 ──
 
-test("보존: suh-logger Maven 의존성이 spring-test SKILL에 남아있다", () => {
-  const hits = findFiles("me.suhsaechan:suh-logger", ["skills/spring-test/"]);
+test("보존: suh-logger Maven 의존성이 pro-spring-test SKILL에 남아있다", () => {
+  const hits = findFiles("me.suhsaechan:suh-logger", ["skills/pro-spring-test/"]);
   assert.ok(hits.length > 0, "me.suhsaechan:suh-logger가 사라짐(과잉 치환)");
 });
 

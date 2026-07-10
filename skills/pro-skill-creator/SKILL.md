@@ -324,7 +324,7 @@ Phase 번호는 선형이지만 **고집스러운 절차는 아니다**. Phase 3
 1. **공유 도메인 로직 점검**: 필요한 함수가 `scripts/common/`에 이미 있나? (`gh_client`, `config`, `paths`, `title` 등). 있으면 import 재사용. 새로 작성하지 않는다.
 2. **skill 전용 cli 작성**: `templates/python_cli_script.py` 골격을 복사.
    ```bash
-   cp skills/skill-creator/templates/python_cli_script.py skills/suh-<new>/scripts/<scope>_cli.py
+   cp skills/pro-skill-creator/templates/python_cli_script.py skills/suh-<new>/scripts/<scope>_cli.py
    ```
 3. **prog + 서브커맨드 교체**: 골격의 `<scope>_cli` 부분과 `cmd_example`을 실제 도메인으로 교체.
 4. **공유 로직은 import**: `from common.<module> import ...` 형태. Layer 1 재작성 금지.

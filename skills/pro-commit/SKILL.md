@@ -96,13 +96,13 @@ OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
 REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
 ```
 
-**이슈 조회는 인라인 Python으로 하지 않는다.** `skills/commit/scripts/commit_cli.py`의 `get-issue` 서브커맨드로 이슈 정보를 가져온다. PAT는 commit_cli가 config.json에서 자동 로드하므로 직접 추출할 필요가 없다(환경변수가 있으면 우선 사용).
+**이슈 조회는 인라인 Python으로 하지 않는다.** `skills/pro-commit/scripts/commit_cli.py`의 `get-issue` 서브커맨드로 이슈 정보를 가져온다. PAT는 commit_cli가 config.json에서 자동 로드하므로 직접 추출할 필요가 없다(환경변수가 있으면 우선 사용).
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
-SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/commit/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/commit/scripts"; cd "$SCRIPTS" || exit 1
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/pro-commit/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/pro-commit/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" commit_cli.py get-issue {owner} {repo} {추출된 이슈번호}
 ```
 

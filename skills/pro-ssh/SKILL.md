@@ -104,10 +104,10 @@ if ($LASTEXITCODE -ne 0) { & $PYTHON -m pip install paramiko }
 # 플러그인 설치 경로에서 스크립트 찾기 ($PYTHON은 위 "Python 실행 경로 확인" 단계에서 검출됨)
 PLUGIN_ROOT=$(cat ~/.claude/plugins/installed.json 2>/dev/null \
   | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); print(d.get('projectops',{}).get('path',''))" 2>/dev/null)
-SCRIPT_PATH="${PLUGIN_ROOT}/skills/ssh/scripts/ssh_connect.py"
+SCRIPT_PATH="${PLUGIN_ROOT}/skills/pro-ssh/scripts/ssh_connect.py"
 
 # 없으면 로컬 경로 시도
-[ ! -f "$SCRIPT_PATH" ] && SCRIPT_PATH="$(git rev-parse --show-toplevel)/skills/ssh/scripts/ssh_connect.py"
+[ ! -f "$SCRIPT_PATH" ] && SCRIPT_PATH="$(git rev-parse --show-toplevel)/skills/pro-ssh/scripts/ssh_connect.py"
 ```
 
 **비밀번호 인증 (auth=password):**

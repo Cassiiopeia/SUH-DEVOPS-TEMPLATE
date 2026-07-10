@@ -142,13 +142,13 @@ GitHub 댓글은 mermaid 블록을 렌더링하므로 흐름도가 그대로 표
 
 2. **repo 확인**: `git remote get-url origin`에서 `owner`/`repo` 추출, 실패 시 config의 `repos`에서 `default: true`인 repo 사용.
 
-3. **댓글 포스팅** — 인라인 Python 작성 금지. `skills/report/scripts/report_cli.py`의 `add-comment` 서브커맨드를 호출한다. 보고서 본문은 이미 저장된 `.md` 파일을 `body_file`로 그대로 전달하므로 한국어·이모지·줄바꿈·mermaid 블록이 안전하게 보존된다. **PAT는 report_cli가 config.json에서 자동 로드하므로 `GITHUB_PAT=`는 생략 가능**하다(환경변수가 있으면 우선 사용).
+3. **댓글 포스팅** — 인라인 Python 작성 금지. `skills/pro-report/scripts/report_cli.py`의 `add-comment` 서브커맨드를 호출한다. 보고서 본문은 이미 저장된 `.md` 파일을 `body_file`로 그대로 전달하므로 한국어·이모지·줄바꿈·mermaid 블록이 안전하게 보존된다. **PAT는 report_cli가 config.json에서 자동 로드하므로 `GITHUB_PAT=`는 생략 가능**하다(환경변수가 있으면 우선 사용).
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 [ -z "$PYTHON" ] && { echo "Python not found"; exit 1; }
-SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/report/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/report/scripts"; cd "$SCRIPTS" || exit 1
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/pro-report/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/pro-report/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" report_cli.py add-comment {owner} {repo} {이슈번호} "{보고서 .md 파일 절대경로}"
 ```
 

@@ -154,3 +154,25 @@ test("gemini migrateLegacy: 옛 extension uninstall 호출", () => {
     assert.ok(calls.some((c) => c.includes("extensions uninstall SUH-DEVOPS-TEMPLATE")), "옛 extension uninstall");
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+// ── Task 5: pi 어댑터 레거시 정리 ──
+test("pi migrateLegacy: 신·구 clone 공존 시 옛 SUH-DEVOPS-TEMPLATE 제거 + settings loader 정리", () => {
+  const home = mkdtempSync(join(tmpdir(), "pi-"));
+  try {
+    const base = join(home, ".pi/agent/git/github.com/Cassiiopeia");
+    mkdirSync(join(base, "SUH-DEVOPS-TEMPLATE/harness"), { recursive: true });
+    writeFileSync(join(base, "SUH-DEVOPS-TEMPLATE/harness/harness-loader.ts"), "x");
+    mkdirSync(join(base, "projectops/harness"), { recursive: true });
+    writeFileSync(join(base, "projectops/harness/harness-loader.ts"), "y");
+    mkdirSync(join(home, ".pi/agent"), { recursive: true });
+    const oldLoader = join(base, "SUH-DEVOPS-TEMPLATE/harness/harness-loader.ts");
+    writeFileSync(join(home, ".pi/agent/settings.json"), JSON.stringify({ extensions: [oldLoader, "other"] }));
+    // pi list가 projectops를 리턴 → piInstalled=true → update 경로. run은 항상 성공.
+    const io = { which: (c) => (c === "pi" ? "/usr/bin/pi" : null), run: () => ({ code: 0, stdout: "projectops", stderr: "" }), home: () => home, log: () => {} };
+    adapterById("pi").apply(io);
+    assert.equal(existsSync(join(base, "SUH-DEVOPS-TEMPLATE")), false, "옛 clone 제거됨");
+    const settings = JSON.parse(readFileSync(join(home, ".pi/agent/settings.json"), "utf8"));
+    assert.ok(!settings.extensions.includes(oldLoader), "settings에서 옛 loader 제거");
+    assert.ok(settings.extensions.includes("other"), "무관 항목 보존");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});

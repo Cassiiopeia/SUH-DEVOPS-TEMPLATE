@@ -135,7 +135,15 @@ create-pr "$OWNER" "$REPO" "$TITLE" "$NOTES_FILE" "$HEAD_BRANCH" "$BASE_BRANCH"
 | `skills/pro-changelog-deploy/SKILL.md` | [시작 전]에 브랜치·provider 판정 절 추가(§2·3), 5단계에 provider 분기표(§4), 6단계 하드코딩→변수(§5), [핵심 원칙]에 "사용자 config 미수정" 명문화 |
 | `skills/config.json.example` | `changelog_deploy`에 `head_branch`/`base_branch`/`provider` 예시 추가 |
 | `skills/references/config-rules.md` | §7 changelog_deploy 스키마에 3키 문서화 |
-| (스크립트) | **변경 없음** — `create-pr`·`detect-release-context`가 이미 브랜치·provider를 지원. skill 지시만 정합화 |
+| `skills/pro-changelog-deploy/scripts/changelog_cli.py` | `deploy-status --base` 하드코딩(`default="main"`) 제거 → SKILL.md가 확정한 base를 항상 넘기도록 지시 정합. detect-release-context는 변경 없음(version.yml 폴백 계층으로 유지) |
+| `skills/pro-changelog-deploy/scripts/tests/` | 브랜치·provider 파싱 회귀 테스트 추가(§8) |
+
+### 6-1. 스크립트 실측 검증 결과 (사용자 확정 범위: 스크립트까지)
+
+- ✅ `_read_release_branches`(changelog_cli.py:328)가 version.yml `deploy_branch`/`default_branch`/`provider`를 정규식으로 읽고 폴백(develop/main/coderabbit) 처리 — **정상 동작 확인**.
+- ✅ `detect-release-context`가 `branches.{head,base,provider}` 반환 — **실측 확인**(이 레포는 version.yml에 키 없어 폴백값 반환).
+- ⚠️ `deploy-status`의 `--base` 인자가 `default="main"` 하드코딩(changelog_cli.py:437). SKILL.md 7단계가 `--base`를 안 넘기면 항상 main으로 조회 → 비표준 base 레포에서 오판. **SKILL.md가 `--base "$BASE_BRANCH"`를 항상 명시**하도록 정합(스크립트 기본값은 하위호환 위해 유지).
+- **config 계층**: detect-release-context는 version.yml만 본다(로컬 파일 스캔, PAT 불필요 원칙 유지). **config 우선 → version.yml 폴백 순서는 SKILL.md(agent)가 처리**한다 — agent가 config를 Read해 값이 있으면 그걸 쓰고, 없으면 detect-release-context의 version.yml 폴백값을 쓴다. 스크립트에 config 읽기를 넣지 않는다(관심사 분리: 스크립트=로컬 파일 사실, agent=config·판단).
 
 ## 7. 사용자 상호작용 원칙 (사용자 확정 — 설계 관통)
 

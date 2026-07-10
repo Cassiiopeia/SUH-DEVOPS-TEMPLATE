@@ -361,6 +361,18 @@ git log origin/main..origin/develop --pretty=format:"%s" | grep -v "\[skip ci\]"
 
 ### 5단계: 릴리스 노트 작성
 
+#### provider별 본문 생성 분기 ([시작 전 §5]에서 확정한 `PROVIDER` 사용)
+
+| PROVIDER | 이 단계 행동 | 5.5단계 |
+|----------|-------------|---------|
+| `coderabbit` | skill이 릴리스 노트를 **선제 작성**(아래 절차) | 정상 진입 |
+| `github-ai` / `openai` | `coderabbit`과 동일하게 **선제 작성** | 정상 진입 |
+| `commit` | 사용자에게 **한 번 묻는다**: "릴리스 노트를 제가 다듬어 드릴까요, 아니면 커밋 내역 자동 생성에 맡길까요?" → **다듬기** 선택 시 선제 작성, **맡기기** 선택 시 릴리스 노트 파일을 만들지 않고 6단계로(빈 본문 PR — 워크플로우 fallback job이 커밋 분석으로 채움) | 다듬기=진입 / 맡기기=건너뜀 |
+
+> **왜 provider 무관하게 선제 작성이 안전한가**: 워크플로우(`PROJECT-COMMON-RELEASE-CHANGELOG.yaml`)는 "skill이 미리 `Summary by CodeRabbit`을 본문에 넣었으면(`already_found`) provider 무관하게 그대로 존중"한다. 따라서 skill이 선제 작성하면 CodeRabbit 폴링·fallback 없이 그 본문을 바로 파싱한다 → 경합 없음. 유일한 예외가 `commit` "맡기기" — 이때만 skill이 손 떼고 워크플로우 fallback job에 위임한다.
+
+아래 "릴리스 노트 작성 원칙"은 **선제 작성하는 경우**(coderabbit/github-ai/openai, 또는 commit에서 다듬기 선택)에만 수행한다.
+
 > **⚠️ AGENT 필독: 노트 파일을 만든 뒤 반드시 6단계(PR 생성)를 실행한다. PR 생성 없이 끝내지 않는다.**
 
 **릴리스 노트 작성 원칙 — 앱스토어 업데이트 노트처럼 쓴다**:
@@ -422,6 +434,8 @@ git log origin/main..origin/develop --pretty=format:"%s" | grep -v "\[skip ci\]"
 이 파일이 완성되면 **곧바로 6단계로 가지 않고 5.5단계(사용자 승인 게이트)부터 거친다.**
 
 ### 5.5단계: 사용자 승인 게이트
+
+> **commit provider + "맡기기" 선택 시**: 5단계에서 릴리스 노트 파일을 만들지 않았으므로 이 5.5단계를 **건너뛰고** 바로 6단계로 간다(빈 본문 PR 생성 → 워크플로우 fallback job이 채움). 아래 승인 게이트는 릴리스 노트를 선제 작성한 경우에만 적용된다.
 
 > **🔔 심사 경고 배너 (앱 심사 레포 전용)**: [1.5단계]에서 `APP_RELEASE == true`로 확정된 경우, 아래 A/B 어느 분기든 **릴리스 노트 본문 위에 배너 한 줄을 먼저 출력**한다 (자동 모드여도 배너는 표시). `APP_RELEASE != true`면 배너를 출력하지 않는다.
 >

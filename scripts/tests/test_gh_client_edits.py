@@ -1,0 +1,99 @@
+# scripts/tests/test_gh_client_edits.py
+"""pro-issue 통합(#464)으로 gh_client에 추가된 편집 함수의 요청 조립 검증.
+
+_request를 mock해 (method, url, body)가 GitHub API 스펙대로 만들어지는지 본다.
+- 댓글 수정/삭제: issues/comments/{id} (issue_number 없음)
+- 라벨 제거: URL에 quote된 이름 (한글)
+- 담당자 remove: DELETE + body
+- PR merge: merge_method 등 payload
+"""
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
+
+from common import gh_client  # noqa: E402
+
+
+def _capture(monkeypatch, return_value):
+    """_request 호출 인자를 캡처하고 return_value를 돌려준다."""
+    calls = []
+
+    def _fake(method, url, data, pat, raw=False):
+        calls.append({"method": method, "url": url, "data": data})
+        return return_value
+    monkeypatch.setattr(gh_client, "_request", _fake)
+    return calls
+
+
+def test_update_comment_uses_comment_id_path(monkeypatch):
+    calls = _capture(monkeypatch, {"id": 9, "html_url": "u"})
+    gh_client.update_comment("o", "r", 9, "새 본문", "pat")
+    c = calls[0]
+    assert c["method"] == "PATCH"
+    assert c["url"].endswith("/repos/o/r/issues/comments/9")  # issue_number 없음
+    assert c["data"] == {"body": "새 본문"}
+
+
+def test_delete_comment_no_body(monkeypatch):
+    calls = _capture(monkeypatch, {})
+    gh_client.delete_comment("o", "r", 9, "pat")
+    c = calls[0]
+    assert c["method"] == "DELETE"
+    assert c["url"].endswith("/issues/comments/9")
+    assert c["data"] is None  # 삭제는 body 없음
+
+
+def test_remove_issue_label_encodes_korean(monkeypatch):
+    calls = _capture(monkeypatch, [{"name": "작업중"}])
+    result = gh_client.remove_issue_label("o", "r", 5, "작업 전", "pat")
+    c = calls[0]
+    assert c["method"] == "DELETE"
+    # 공백·한글이 URL 인코딩되어야 한다
+    assert "/issues/5/labels/" in c["url"]
+    assert "%EC%9E%91%EC%97%85" in c["url"]  # '작업' UTF-8 %-encoding
+    assert "%20" in c["url"] or "작업 전" not in c["url"]  # 공백 인코딩
+    assert result["labels"] == ["작업중"]
+
+
+def test_set_issue_labels_filters_unknown(monkeypatch):
+    monkeypatch.setattr(gh_client, "list_labels", lambda o, r, pat: ["작업중", "긴급"])
+    calls = _capture(monkeypatch, [{"name": "작업중"}])
+    gh_client.set_issue_labels("o", "r", 5, ["작업중", "없는것"], "pat")
+    c = calls[0]
+    assert c["method"] == "PUT"
+    assert c["data"] == {"labels": ["작업중"]}  # 없는것 필터됨
+
+
+def test_add_assignees_returns_applied(monkeypatch):
+    calls = _capture(monkeypatch, {"number": 5, "html_url": "u",
+                                   "assignees": [{"login": "alice"}]})
+    result = gh_client.add_assignees("o", "r", 5, ["alice", "bob"], "pat")
+    c = calls[0]
+    assert c["method"] == "POST"
+    assert c["url"].endswith("/issues/5/assignees")
+    assert c["data"] == {"assignees": ["alice", "bob"]}
+    assert result["assignees"] == ["alice"]  # 실제 반영된 것만
+
+
+def test_remove_assignees_delete_with_body(monkeypatch):
+    calls = _capture(monkeypatch, {"number": 5, "html_url": "u", "assignees": []})
+    gh_client.remove_assignees("o", "r", 5, ["alice"], "pat")
+    c = calls[0]
+    assert c["method"] == "DELETE"
+    assert c["data"] == {"assignees": ["alice"]}  # DELETE인데 body 있음
+
+
+def test_merge_pull_request_payload(monkeypatch):
+    calls = _capture(monkeypatch, {"sha": "abc", "merged": True, "message": "ok"})
+    result = gh_client.merge_pull_request("o", "r", 12, "pat",
+                                          merge_method="squash", commit_title="T")
+    c = calls[0]
+    assert c["method"] == "PUT"
+    assert c["url"].endswith("/pulls/12/merge")
+    assert c["data"]["merge_method"] == "squash"
+    assert c["data"]["commit_title"] == "T"
+    assert "commit_message" not in c["data"]  # None은 payload에서 제외
+    assert result["merged"] is True

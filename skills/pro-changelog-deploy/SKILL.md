@@ -86,7 +86,7 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 1. `Read` 도구로 config 파일을 읽는다. **이 고정 경로 한 곳만 본다 — `ls`·glob으로 탐색하거나 플러그인 캐시(`~/.claude/plugins/cache/...`, 스크립트 전용)를 뒤지지 마라. config는 캐시 안에 없다.**
    - Windows: `C:\Users\<사용자>\.projectops\config\config.json`
    - macOS/Linux: `~/.projectops/config/config.json`
-   - 파일이 없으면 → "❌ PAT 없음. /issue 스킬로 config를 먼저 등록하세요." 안내 후 종료.
+   - 파일이 없으면 → "❌ PAT 없음. `/pro-github`로 config(PAT)를 먼저 등록하세요." 안내 후 종료.
 2. `github` 섹션에서 PAT 선택:
    - `repos[]` 중 `repo == 위에서 구한 REPO` 이고 `pat`이 non-null이면 그 값 사용
    - 아니면 `global_pat` 사용

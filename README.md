@@ -20,17 +20,17 @@
 이 프로젝트는 두 축으로 개발 워크플로우를 자동화합니다.
 
 **① GitHub Actions** — main 푸시 한 번으로 버전 관리, 체인지로그, CI/CD 배포까지 자동 처리  
-**② Agent Skills** — `/issue`, `/commit`, `/report` 등 AI가 이슈 작성부터 커밋 메시지, 구현 보고서까지 대신 생성
+**② Agent Skills** — `/github`, `/commit`, `/report` 등 AI가 이슈 작성부터 커밋 메시지, 구현 보고서까지 대신 생성
 
 | 기존 방식 | Projectops |
 |----------|---------------------|
 | 버전 수동 관리, 태그 직접 생성 | 릴리스(develop→main PR) 시 patch 버전 자동 증가 + 태그 생성 |
 | 체인지로그 직접 작성 (30분+) | CodeRabbit AI가 PR마다 자동 생성 |
 | CI/CD 처음부터 설정 | 프로젝트 타입별 워크플로우 즉시 구성 |
-| 이슈 매번 형식 맞춰 작성 (5분+) | `/pro-issue` 한 번에 표준 템플릿 생성 |
+| 이슈 매번 형식 맞춰 작성 (5분+) | `/pro-github` 한 번에 표준 템플릿 생성 + 등록 |
 | 커밋 메시지 이슈 URL 수동 복사 | `/pro-commit` 이슈 컨텍스트 기반 자동 완성 |
 | PR 설명/보고서 직접 작성 | `/pro-report` git diff 분석 후 자동 생성 |
-| 코드 리뷰·분석 매번 프롬프트 입력 | 25종 Skills로 일관된 결과, 매번 재입력 불필요 |
+| 코드 리뷰·분석 매번 프롬프트 입력 | 24종 Skills로 일관된 결과, 매번 재입력 불필요 |
 
 ---
 
@@ -40,7 +40,7 @@ Agent Skills가 개발 사이클 전체를 커버합니다.
 
 ```mermaid
 flowchart TD
-    A([작업 시작]) --> B["/pro-issue\n이슈 등록 + GitHub 자동 생성"]
+    A([작업 시작]) --> B["/pro-github\n이슈 등록 + GitHub 자동 생성"]
     B --> C["/pro-init-worktree\nworktree + 민감파일 자동 복사"]
     C --> D{작업 유형}
 
@@ -154,7 +154,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 
 | 기능 | 설명 | 문서 |
 |------|------|------|
-| **Agent Skills** | Claude Code, Cursor, Gemini CLI, Codex CLI에서 쓰는 25종 AI DevOps Skills | [상세](docs/SKILLS.md) |
+| **Agent Skills** | Claude Code, Cursor, Gemini CLI, Codex CLI에서 쓰는 24종 AI DevOps Skills | [상세](docs/SKILLS.md) |
 | **버전 자동화** | 릴리스(develop→main PR) 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
 | **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | 댓글 한 줄로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
@@ -165,18 +165,17 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/Cassiiopeia/projectops/main
 
 ---
 
-## Agent Skills (25종)
+## Agent Skills (24종)
 
 ### 🔄 개발 사이클 자동화
 
 | 스킬 | 용도 |
 |------|------|
-| `/pro-issue` | 설명 한 줄 → GitHub 이슈 템플릿 자동 작성 + 등록 |
 | `/pro-init-worktree` | Git worktree 생성 + 민감 파일 자동 복사 |
 | `/pro-commit` | 이슈 컨텍스트 기반 커밋 메시지 자동 완성 (superpowers 준수) |
 | `/pro-report` | git diff 분석 → 구현 보고서 생성 + GitHub 댓글 자동 포스팅 |
 | `/pro-changelog-deploy` | develop push → main 릴리스 PR 생성 + 릴리스 노트 작성 + automerge |
-| `/pro-github` | GitHub 이슈/PR/댓글 독립 조회 및 관리 |
+| `/pro-github` | GitHub 전반: 이슈 생성(설명 한 줄 → 템플릿 작성+등록)/조회/수정/댓글/라벨/담당자, PR 생성/머지/조회, 레포 탐색, Actions/Secret 관리 |
 
 ### 📊 분석형 (코드 수정 없음)
 
@@ -271,7 +270,7 @@ Settings → Actions → General
 
 | 문서 | 설명 |
 |------|------|
-| [Agent Skills 가이드](docs/SKILLS.md) | 25종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
+| [Agent Skills 가이드](docs/SKILLS.md) | 24종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
 | [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 기존 프로젝트에 템플릿 통합 |
 | [버전 관리](docs/VERSION-CONTROL.md) | version.yml, 자동 버전 증가 |
 | [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | CodeRabbit 연동, AI 문서화 |

@@ -95,7 +95,7 @@ PAT 추출은 매번 즉흥 코드로 짜지 말고 아래 두 경로 중 하나
   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
   PAT=$(PYTHONIOENCODING=utf-8 "$PYTHON" -c "import sys; sys.path.insert(0, '$PROJECT_ROOT/scripts'); from common.config import get_github_pat; print(get_github_pat('{owner}', '{repo}') or '')")
-  # PAT가 빈 문자열이면 config 없음 → /issue 스킬로 등록 안내
+  # PAT가 빈 문자열이면 config 없음 → 이 문서 §2~5 절차로 대화형 등록 안내
   ```
 
   `get_github_pat`은 위 우선순위(repo별 `pat` → `global_pat`)를 그대로 구현하므로
@@ -166,10 +166,10 @@ agent가 Write tool로 `{HOME}/.projectops/config/config.json`에 저장한다.
 
 | 필드 | 필수 | 설명 |
 |------|------|------|
-| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 (글로벌). issue가 이슈 생성 시 자동 적용한다. 빈 문자열이면 담당자 없이 생성. 누락 시 첫 이슈에서 1회 질문 후 저장 |
+| `default_assignee` | ✅ | 이슈 기본 담당자 GitHub 사용자명 (글로벌). `pro-github`가 이슈 생성 시 자동 적용한다. 빈 문자열이면 담당자 없이 생성. 누락 시 첫 이슈에서 1회 질문 후 저장 |
 | `global_pat` | ✅ | 전체 공용 GitHub PAT (repo + workflow 권한) |
 | `commit.auto_approve` | — | commit 스킬의 커밋 메시지 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제안 메시지 표시 후 즉시 커밋. 누락 시 `false`(수동 승인) |
-| `issue.auto_approve` | — | issue 스킬의 이슈 등록 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제목·라벨·로컬 파일 경로 표시 후 즉시 GitHub 등록. **중복 검사(2-1, 4-1단계)는 항상 실행** — 자동 모드라도 open 동일 이슈 발견 시 중단. 누락 시 `false` |
+| `issue.auto_approve` | — | `pro-github` 이슈 생성의 이슈 등록 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 제목·라벨·로컬 파일 경로 표시 후 즉시 GitHub 등록. **중복 검사(2-1, 4-1단계)는 항상 실행** — 자동 모드라도 open 동일 이슈 발견 시 중단. 누락 시 `false`. (키 이름은 하위 호환을 위해 `issue.*` 유지 — pro-issue 통합 후에도 동일 키) |
 | `changelog_deploy.auto_approve` | — | changelog-deploy 스킬의 릴리스 노트 사용자 승인 게이트 자동 통과 여부 (글로벌 기본값). `true`면 본문 표시만 하고 즉시 PR 생성. 누락 시 `false` |
 | `repos` | ✅ | 사용할 저장소 목록 |
 | `repos[].name` | ✅ | 프로젝트 식별 이름 |

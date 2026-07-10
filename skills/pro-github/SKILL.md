@@ -1,11 +1,13 @@
 ---
 name: pro-github
-description: "GitHub Mode - 독립적인 GitHub 제어 스킬. 이슈 조회/수정/댓글, PR 생성/조회/릴리스노트, 레포 탐색, GitHub Actions Secret 관리를 수행한다. PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 바꿔줘, '/github', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘, secret 업데이트해줘, Actions secret 등록해줘, 환경변수 secret 올려줘, BACKEND_ENV_FILE 업데이트 등을 언급하면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
+description: "GitHub Mode - 독립적인 GitHub 제어 스킬. GitHub로 하는 모든 이슈/PR 작업을 단독으로 수행한다. 이슈 생성(작성+등록), 이슈 조회/수정/검색/닫기/열기, 댓글 추가/수정/삭제, 라벨 추가/제거/교체, 담당자 추가/제거, PR 생성/조회/수정/머지/닫기, PR 릴리스노트, 레포 탐색, GitHub Actions 로그, Actions Secret 관리. 이슈 만들어줘, 이슈 올려줘, 이슈 등록, 버그 리포트, 기능 요청 이슈, QA 요청 이슈, 디자인 요청 이슈, PR 생성, PR 올려줘, PR 머지해줘, 이슈 댓글, 댓글 달아줘, 댓글 수정, 댓글 삭제, 이슈 확인해줘, 이슈 닫아줘, 이슈 수정해줘, 라벨 추가/바꿔줘/빼줘, 담당자 추가해줘, '/github', '/issue', 내 레포 보여줘, 레포 목록 탐색해줘, README 가져와줘, {레포명} 정보 봐줘, Org 레포 탐색해줘, secret 업데이트해줘, Actions secret 등록해줘, 환경변수 secret 올려줘, BACKEND_ENV_FILE 업데이트 등 GitHub 이슈/PR/레포/Actions/Secret 관련 요청이면 반드시 이 skill을 사용한다. 다른 스킬보다 먼저 트리거되어야 한다."
 ---
 
 # GitHub Mode
 
-독립적인 GitHub 제어 스킬이다. 다른 스킬 없이 단독으로 GitHub 작업을 수행한다.
+독립적인 GitHub 제어 스킬이다. 다른 스킬 없이 단독으로 GitHub의 이슈/PR/레포/Actions/Secret 작업을 전부 수행한다.
+
+> **이슈 "생성"(새 이슈 작성+등록)** 요청이면 — "이슈 만들어줘", "버그 리포트 올려줘", "기능 요청 이슈" 등 — 먼저 `references/issue-creation.md`의 워크플로우(템플릿 작성 → 중복검사 → 로컬 md 저장 → 승인 게이트 → 등록 → 브랜치명 계산)를 따른다. 그 외 조회/수정/댓글/라벨/담당자/PR 작업은 아래 서브커맨드 호출법을 따른다.
 
 ## 시작 전
 
@@ -28,7 +30,7 @@ GitHub API 호출은 재사용 스크립트 `skills/pro-github/scripts/github_cl
 
 - SKILL.md에 긴 Python heredoc, 임시 Python 파일, curl 파이프 Python, 일회용 Python 생성 금지
 - 출력 JSON의 `ok`/`code`/`summary`/`next`를 보고 다음 행동을 판단
-- config 파일이 없으면 → `/issue` 스킬로 PAT를 먼저 등록하도록 안내한다 (config는 모든 GitHub 스킬이 공유한다).
+- config 파일이 없으면 → `references/config-rules.md §2~5`의 절차로 PAT와 repos를 대화형으로 수집해 `{HOME}/.projectops/config/config.json`에 저장한다 (config는 모든 GitHub 스킬이 공유한다).
 
 **Repo 자동 감지**:
 
@@ -75,6 +77,47 @@ PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py get-issues {owner} {repo} 712 707
 
 일부 이슈가 404여도 해당 항목만 `{number,error,code}`로 들어오며 전체 조회는 계속된다.
 
+이슈 목록을 조회하려면 `list-issues`:
+
+```bash
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py list-issues {owner} {repo} --state open
+# --state open|closed|all (기본 open)
+```
+
+출력 JSON: `{"count":N,"issues":[{number,title,url,state}]}`. label/assignee로 좁히려면 결과에서 agent가 직접 필터링한다.
+
+### 이슈 생성
+
+새 이슈를 **작성부터 등록까지** 하려면 반드시 `references/issue-creation.md`의 전체 워크플로우(타입 판단 → 템플릿 작성 → 중복검사 → 로컬 md 저장 → 승인 게이트 → 담당자 결정 → 등록 → 브랜치명 계산)를 따른다. 아래는 등록 단계에서 쓰는 서브커맨드다:
+
+```bash
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py create-issue {owner} {repo} "{제목}" "{본문 .md 절대경로}" "{라벨 csv}" --assignees "{담당자}"
+```
+
+출력 JSON: `{"number":...,"url":...,"title":...,"assignees":[...]}`. 존재하지 않는 라벨은 자동 필터링된다. `assignee_warning`이 있으면 이슈는 정상 생성된 것이므로 그 경고만 자연어로 전달한다.
+
+### 이슈 상태 변경 (닫기 / 다시 열기)
+
+```bash
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py close-issue {owner} {repo} {번호}
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py reopen-issue {owner} {repo} {번호}
+```
+
+출력 JSON: `{"number":...,"url":...,"title":...}`. 사용자가 명시적으로 요청할 때만 상태를 변경한다.
+
+### 이슈 헬퍼 (제목 정규화 / 브랜치명 / 커밋 템플릿)
+
+이슈 생성 워크플로우와 `/pro-commit`이 쓰는 순수 계산 헬퍼다 (API 호출 없음):
+
+```bash
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py normalize-title "❗[버그] 한글 제목!"
+# → {"normalized":"버그_한글_제목", ...}
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py create-branch-name "이슈 제목" 235 --date 20260710
+# → {"branch":"20260710_#235_이슈_제목", ...}
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py get-commit-template "이슈 제목" "https://github.com/o/r/issues/235"
+# → {"template":"이슈 제목 : feat : {설명} https://...", ...}
+```
+
 ### 이슈 수정
 
 제목, 상태(open/closed), 라벨, 담당자 변경 가능.
@@ -100,6 +143,57 @@ PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) ||
 SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/pro-github/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/pro-github/scripts"; cd "$SCRIPTS" || exit 1
 PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py add-comment {owner} {repo} {이슈번호} "{댓글 본문 파일 경로}"
 ```
+
+### 댓글 목록 / 수정 / 삭제
+
+댓글 수정·삭제는 이슈 번호가 아니라 **댓글 ID(comment_id)** 로 지정한다 (이슈·PR 공용). 댓글 ID는 `list-comments`나 이전 `add-comment` 응답의 `id`에서 얻는다.
+
+```bash
+# 댓글 목록 (id 확인용)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py list-comments {owner} {repo} {이슈번호}
+
+# 댓글 본문 수정 (본문은 파일로 전달 — 한글·줄바꿈 보존)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py edit-comment {owner} {repo} {comment_id} "{새 본문 파일 경로}"
+
+# 댓글 삭제
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py delete-comment {owner} {repo} {comment_id}
+```
+
+`list-comments`는 `{count,comments:[{author,body,created_at}]}`를 반환한다(현재 API 응답에 id가 필요하면 `add-comment`/`edit-comment` 응답의 `id`를 재사용). `edit-comment`는 `{id,url}`, `delete-comment`는 `{comment_id,status:"deleted"}`.
+
+### 라벨 (추가 / 제거 / 전체 교체)
+
+라벨은 세 가지로 나뉜다. 기존 라벨을 유지하며 다루려면 `add-labels`/`remove-label`을, 통째로 갈아끼우려면 `set-labels`를 쓴다.
+
+```bash
+# 레포에 정의된 라벨 목록
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py list-labels {owner} {repo}
+
+# 기존 라벨 유지하며 추가 (csv)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py add-labels {owner} {repo} {이슈번호} "작업중,긴급"
+
+# 라벨 하나만 제거 (나머지 유지, 없으면 멱등 처리)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py remove-label {owner} {repo} {이슈번호} "작업전"
+
+# 라벨 전체 교체 (빈 문자열이면 전부 제거)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py set-labels {owner} {repo} {이슈번호} "작업완료"
+```
+
+`add-labels`는 레포에 없는 라벨은 무시하고 `label_warning`으로 알린다. `remove-label`은 이슈에 그 라벨이 원래 없으면 `code:"label_not_present"`(변경 없음)를 반환한다. 한글 라벨(`작업중` 등)도 URL 인코딩되어 정상 처리된다. 사용자가 명시적으로 요청할 때만 라벨을 변경한다.
+
+### 담당자 (추가 / 제거)
+
+담당자도 기존을 유지하며 다룬다. 전체 교체가 필요하면 `update-issue --assignees`(전체 교체)를 쓴다.
+
+```bash
+# 기존 담당자 유지하며 추가 (csv, 최대 10명)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py add-assignees {owner} {repo} {이슈번호} "Cassiiopeia"
+
+# 지정한 담당자만 제거 (나머지 유지)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py remove-assignees {owner} {repo} {이슈번호} "Cassiiopeia"
+```
+
+출력 JSON: `{"number":...,"url":...,"assignees":[...]}`. 권한 없는/협업자 아닌 유저는 GitHub이 조용히 누락시키므로 `add-assignees`는 `assignee_warning`으로 알린다.
 
 ### PR 생성
 
@@ -150,6 +244,27 @@ SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/pro-github/scripts
 PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py list-prs {owner} {repo} --state open
 # 닫힌 PR 포함: --state closed 또는 --state all
 ```
+
+### PR 상세 / 댓글 / 상태 / 머지
+
+PR 상세(머지 가능 여부 포함), PR 댓글 추가, PR 닫기·열기, PR 머지를 지원한다. `get-pr`는 `verdict`(mergeable/blocked/computing/merged/closed)를 반환하니 머지 전 상태 확인에 쓴다.
+
+```bash
+# PR 상세 (mergeable_state 등) — verdict로 머지 가능 판단
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py get-pr {owner} {repo} {PR번호}
+
+# PR에 댓글 추가 (본문 파일)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py add-pr-comment {owner} {repo} {PR번호} "{댓글 본문 파일}"
+
+# PR 닫기 / 다시 열기
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py close-pr {owner} {repo} {PR번호}
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py reopen-pr {owner} {repo} {PR번호}
+
+# PR 머지 (merge|squash|rebase, 기본 merge)
+PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py merge-pr {owner} {repo} {PR번호} --method squash --title "머지 제목"
+```
+
+`get-pr`의 `verdict`가 `computing`(mergeable_state 계산 전)이면 잠시 후 재조회한다. `merge-pr` 실패 시 `verdict`로 원인을 구분한다: `not_mergeable`(405: 충돌·체크 실패·드래프트), `sha_mismatch`(409), `method_not_allowed`(422: rebase 불허). **PR 머지·닫기는 파괴적 작업이므로 사용자가 명시적으로 요청할 때만 실행한다.**
 
 ### PR 릴리스 노트 업데이트 (CodeRabbit 폴백)
 
@@ -390,7 +505,7 @@ SECRET_VALUE="{secret_value}" PYTHONIOENCODING=utf-8 "$PYTHON" github_cli.py sec
 
 | 오류 코드 | 의미 | 대응 |
 |-----------|------|------|
-| `missing_pat` | GITHUB_PAT 미설정 | `/issue` 스킬로 PAT 등록 안내 |
+| `missing_pat` | GITHUB_PAT 미설정 | `references/config-rules.md §2~5`로 PAT를 config에 등록하도록 안내 |
 | `github_api_401` | PAT 인증 실패 | PAT 갱신 안내 |
 | `github_api_403` | 권한 없음 (private 레포 등) | 접근 불가 안내, 나머지 진행 |
 | `github_api_404` | 이슈/PR/레포/README 없음 | 해당 항목 "없음"으로 표시, 나머지 진행 |

@@ -11,36 +11,31 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 CLI_TO_SKILL = {
-    "issue/scripts/issue_cli.py": ["issue/SKILL.md"],
-    "commit/scripts/commit_cli.py": ["commit/SKILL.md"],
-    "report/scripts/report_cli.py": ["report/SKILL.md"],
-    "review/scripts/review_cli.py": ["review/SKILL.md"],
-    "troubleshoot/scripts/troubleshoot_cli.py": ["troubleshoot/SKILL.md"],
-    "github/scripts/github_cli.py": ["github/SKILL.md"],
-    "changelog-deploy/scripts/changelog_cli.py": ["changelog-deploy/SKILL.md"],
+    "pro-commit/scripts/commit_cli.py": ["pro-commit/SKILL.md"],
+    "pro-report/scripts/report_cli.py": ["pro-report/SKILL.md"],
+    "pro-review/scripts/review_cli.py": ["pro-review/SKILL.md"],
+    "pro-troubleshoot/scripts/troubleshoot_cli.py": ["pro-troubleshoot/SKILL.md"],
+    # pro-github는 이슈 생성 워크플로우를 references/issue-creation.md로 분리했으므로 함께 본다.
+    "pro-github/scripts/github_cli.py": [
+        "pro-github/SKILL.md",
+        "references/issue-creation.md",
+    ],
+    "pro-changelog-deploy/scripts/changelog_cli.py": ["pro-changelog-deploy/SKILL.md"],
 }
 
 
 # 현재 SKILL.md에 호출예가 없는 서브커맨드 — 후속 작업으로 보강 시 셋에서 제거한다.
 EXPECTED_MISSING = {
     # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("issue/scripts/issue_cli.py", "normalize-title"),
+    ("pro-commit/scripts/commit_cli.py", "get-issue-number"),
     # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("issue/scripts/issue_cli.py", "create-branch-name"),
+    ("pro-commit/scripts/commit_cli.py", "normalize-title"),
     # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("issue/scripts/issue_cli.py", "get-commit-template"),
+    ("pro-commit/scripts/commit_cli.py", "get-commit-template"),
     # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("commit/scripts/commit_cli.py", "get-issue-number"),
+    ("pro-report/scripts/report_cli.py", "get-output-path"),
     # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("commit/scripts/commit_cli.py", "normalize-title"),
-    # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("commit/scripts/commit_cli.py", "get-commit-template"),
-    # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("report/scripts/report_cli.py", "get-output-path"),
-    # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("github/scripts/github_cli.py", "search-issues"),
-    # TODO #329 후속: SKILL.md에 호출예 추가 후 제거
-    ("changelog-deploy/scripts/changelog_cli.py", "list-prs"),
+    ("pro-changelog-deploy/scripts/changelog_cli.py", "list-prs"),
 }
 
 

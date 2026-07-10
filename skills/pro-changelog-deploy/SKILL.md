@@ -137,6 +137,78 @@ echo "PROJECT_ROOT=$PROJECT_ROOT"; echo "PYTHON=$PYTHON"; echo "OWNER=$OWNER"; e
 
 > 글로벌 기본값(`github.changelog_deploy.app_release`)은 두지 않는다 — 앱 심사 여부는 레포마다 다르므로 **레포별로만** 기억한다.
 
+### 5) 릴리스 브랜치·provider 판정 — config 우선, version.yml 폴백, 없으면 1회 판정
+
+릴리스 PR의 head/base 브랜치와 릴리스 노트 생성 방식(provider)을 확정한다.
+**사용자는 config를 직접 손대지 않는다 — 값이 없어 애매할 때만 자연어로 묻고, 답을 config에 기록한다.**
+
+**우선순위 (위→아래, 먼저 발견되는 값 채택):**
+
+1. config `github.repos[]` 중 `owner == OWNER && repo == REPO`인 항목의 `changelog_deploy.{head_branch, base_branch, provider}`
+2. config `github.changelog_deploy.{head_branch, base_branch, provider}` (글로벌)
+3. **최초 판정** — 1·2에 값이 없으면 `detect-release-context`(version.yml 폴백)로 자동 추론하고, 애매하면 사용자에게 물은 뒤 config에 기록
+
+1 또는 2에서 세 값을 모두 얻었으면 그대로 쓰고 **묻지 않는다**. 기억할 값:
+
+- `HEAD_BRANCH` — 릴리스 PR head(소스). 폴백 `develop`.
+- `BASE_BRANCH` — 릴리스 PR base(프로덕션). 폴백 `main`.
+- `PROVIDER` — `coderabbit`|`commit`|`github-ai`|`openai`. 폴백 `coderabbit`.
+- `BRANCH_CONFIG_HAS_KEY` — boolean. 우선순위 1·2에서 세 값을 모두 찾았으면 `true`, 아니면 `false`(최초 판정 케이스).
+
+**`BRANCH_CONFIG_HAS_KEY == false`(최초 판정)일 때만** 아래를 수행한다.
+
+먼저 `detect-release-context`로 version.yml 신호를 읽는다:
+
+```bash
+# ⚠️ Bash stateless — PROJECT_ROOT·PYTHON을 [시작 전]에서 구한 실제 값으로 채운다.
+PROJECT_ROOT="..."; PYTHON="..."
+SCRIPTS=$(ls -d ~/.claude/plugins/cache/*/projectops/*/skills/pro-changelog-deploy/scripts 2>/dev/null | sort -V | tail -1); [ -z "$SCRIPTS" ] && SCRIPTS="$PROJECT_ROOT/skills/pro-changelog-deploy/scripts"
+PYTHONIOENCODING=utf-8 "$PYTHON" "$SCRIPTS/changelog_cli.py" detect-release-context --project-root "$PROJECT_ROOT"
+```
+
+반환 JSON의 `branches.{head,base,provider}`를 초기 후보로 삼는다.
+
+**브랜치 확정:**
+- version.yml에서 `deploy_branch`/`default_branch`를 읽었으면(폴백이 아닌 실제 값) 그대로 확정.
+- 폴백(develop/main)이고 실제 원격에 `develop`이 있으며 default가 `main`이면 → 표준 구조로 조용히 확정.
+- 그 외(develop 없음/default가 main 아님 등 애매) → 사용자에게 자연어로 묻는다:
+  ```
+  이 저장소의 릴리스는 어느 브랜치에서 어느 브랜치로 진행하나요?
+  (예: 개발 브랜치에서 배포 브랜치로)
+  1. develop → main (표준)
+  2. 직접 알려주기 (예: "release 브랜치에서 production 브랜치로")
+  ```
+  응답에서 head/base를 확정.
+
+**provider 확정:**
+- `branches.provider`가 폴백(`coderabbit`)이 아닌 실제 값이면 그대로 확정.
+- 폴백이고 레포 루트에 `.coderabbit.yaml`이 있으면 → `coderabbit`으로 조용히 확정.
+- 폴백이고 `.coderabbit.yaml`도 없으면 → 사용자에게 묻는다:
+  ```
+  릴리스 노트를 어떻게 만들까요?
+  1. CodeRabbit(AI 리뷰 봇)이 요약을 달아줍니다 (이 레포에 CodeRabbit 사용 시)
+  2. 커밋 내역을 분석해 자동 생성합니다 (외부 봇 없이 항상 동작)
+  ```
+  → 1이면 `coderabbit`, 2면 `commit`.
+
+`.coderabbit.yaml` 존재 확인:
+```bash
+PROJECT_ROOT="..."
+[ -f "$PROJECT_ROOT/.coderabbit.yaml" ] && echo "coderabbit_config=yes" || echo "coderabbit_config=no"
+```
+
+**config 기록 (config-rules.md §4 규칙 — 전체 Read 후 해당 키만 Write):**
+확정한 `head_branch`/`base_branch`/`provider`를, `github.repos[]`에 현 OWNER/REPO 매칭 항목이 있으면 그 항목의 `changelog_deploy`에, 없으면 `github.changelog_deploy`(글로벌)에 Write한다. PAT·다른 repos 항목·기존 `auto_approve`/`app_release`를 절대 날리지 않는다.
+
+기록 후 사용자에게 자연어로만 안내(키·경로 노출 금지):
+```
+✅ 이 저장소 릴리스 방식을 기억했습니다 ({HEAD_BRANCH} → {BASE_BRANCH}, {provider 자연어}).
+   바꾸고 싶으면 "배포 브랜치 바꿔줘" 또는 "릴리스 노트 방식 바꿔줘"라고 말씀해주세요.
+```
+(provider 자연어: coderabbit→"CodeRabbit 요약", commit→"커밋 분석", github-ai/openai→"AI 생성")
+
+> **재설정 발화 처리**: 사용자가 이후 "배포 브랜치 바꿔줘"/"릴리스 노트 방식 바꿔줘"라고 하면, 위 질문을 다시 하고 config의 해당 키를 갱신한다(config-rules.md §4 규칙 준수).
+
 ## 사용자 입력
 
 $ARGUMENTS

@@ -1,7 +1,10 @@
 // Gemini CLI 어댑터 (.sh _manage_gemini_extension / _remove_gemini_section 등가).
 // extension install/update/uninstall. 마켓플레이스 대신 git URL 확장.
+import { migrateConfigRoot } from "../legacy.js";
+
 const EXT = "projectops";
 const URL = "https://github.com/Cassiiopeia/projectops";
+const LEGACY_EXTS = ["SUH-DEVOPS-TEMPLATE"];
 
 function detect(io) {
   if (!io.which("gemini")) return { installed: false, version: null, cliMissing: true, note: "CLI 없음" };
@@ -11,6 +14,8 @@ function detect(io) {
 
 function apply(io) {
   if (!io.which("gemini")) { io.log(manualHint()); return false; }
+  migrateLegacy(io);
+  migrateConfigRoot(io);
   io.log("Gemini CLI extension 업데이트 중...");
   if (io.run("gemini", ["extensions", "update", EXT]).code === 0) { io.log("  Gemini CLI extension 업데이트 완료"); return true; }
   io.log("Gemini CLI extension 설치 중...");
@@ -27,6 +32,11 @@ function remove(io) {
 }
 
 function manualHint() { return `  💡 Gemini CLI: gemini extensions install ${URL}`; }
+
+// 옛 이름 extension 정리. 없으면 실패 무시.
+function migrateLegacy(io) {
+  for (const e of LEGACY_EXTS) io.run("gemini", ["extensions", "uninstall", e]);
+}
 
 export const geminiAdapter = {
   id: "gemini", label: "Gemini CLI", order: 30,

@@ -1,6 +1,7 @@
 // PI 패키지 어댑터 (.sh _manage_pi_section / _remove_pi_section 등가).
 // pi install/update/remove. skill은 복사되지 않고 pi가 startup마다 스캔 → 설치 검증은 'pi list'.
-import { PI_PACKAGE_URL, piInstalled, harnessEnabled, harnessRemove } from "./pi-common.js";
+import { PI_PACKAGE_URL, piInstalled, harnessEnabled, harnessRemove, migratePiLegacy } from "./pi-common.js";
+import { migrateConfigRoot } from "../legacy.js";
 
 function detect(io) {
   if (!io.which("pi")) return { installed: false, version: null, cliMissing: true, note: "CLI 없음" };
@@ -9,6 +10,8 @@ function detect(io) {
 
 function apply(io) {
   if (!io.which("pi")) { io.log(manualHint()); return false; }
+  migratePiLegacy(io);
+  migrateConfigRoot(io);
   if (piInstalled(io)) {
     io.log("PI 패키지 업데이트 중...");
     if (io.run("pi", ["update", PI_PACKAGE_URL]).code !== 0) io.run("pi", ["install", PI_PACKAGE_URL]);

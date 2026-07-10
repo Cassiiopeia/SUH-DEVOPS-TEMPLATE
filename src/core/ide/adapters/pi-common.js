@@ -2,7 +2,7 @@
 // .sh: PI_PACKAGE_URL / _pi_is_installed / _pi_clone_dir / _pi_harness_loader_path /
 //      _pi_settings_path / _pi_harness_enabled 등가.
 import { join } from "node:path";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 
 export const PI_PACKAGE_URL = "https://github.com/Cassiiopeia/projectops";
 
@@ -60,4 +60,25 @@ export function harnessRemove(io) {
     writeFileSync(settings, JSON.stringify(s, null, 2));
   }
   return { ok: true };
+}
+
+// 신·구 clone 공존 시 옛 SUH-DEVOPS-TEMPLATE clone 제거 + settings.json에서 그 loader 경로 제거.
+// 공존일 때만 정리(옛것만 있으면 pi install이 신규를 만들 때까지 그대로 둔다). 실패 무해.
+export function migratePiLegacy(io) {
+  const base = join(io.home(), ".pi/agent/git/github.com/Cassiiopeia");
+  const oldDir = join(base, "SUH-DEVOPS-TEMPLATE");
+  const newDir = join(base, "projectops");
+  if (!(existsSync(oldDir) && existsSync(newDir))) return;
+  const oldLoader = join(oldDir, "harness/harness-loader.ts");
+  const settings = piSettingsPath(io);
+  if (existsSync(settings)) {
+    try {
+      const s = JSON.parse(readFileSync(settings, "utf8"));
+      if (Array.isArray(s.extensions)) {
+        s.extensions = s.extensions.filter((e) => e && e !== oldLoader);
+        writeFileSync(settings, JSON.stringify(s, null, 2));
+      }
+    } catch { /* 무시 */ }
+  }
+  try { rmSync(oldDir, { recursive: true, force: true }); io.log("  레거시 PI clone 정리: SUH-DEVOPS-TEMPLATE"); } catch { /* 무시 */ }
 }

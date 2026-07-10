@@ -4,9 +4,12 @@
 import { join } from "node:path";
 import { existsSync, readdirSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { compareCacheName } from "../util.js";
+import { migrateConfigRoot } from "../legacy.js";
 
 const MARKETPLACE = "Cassiiopeia/projectops";
 const PLUGIN = "projectops@projectops-marketplace";
+const LEGACY_PLUGINS = ["cassiiopeia@cassiiopeia-marketplace", "cassiiopeia"];
+const LEGACY_MARKETPLACES = ["cassiiopeia-marketplace"];
 
 function detect(io) {
   if (!io.which("claude")) return { installed: false, version: null, cliMissing: true, note: "CLI 없음" };
@@ -26,8 +29,32 @@ function detect(io) {
 function apply(io, ctx = {}) {
   const st = detect(io);
   if (st.cliMissing) { io.log(manualHint(io)); return false; }
-  if (st.installed) return update(io, st.scope);
+  migrateLegacy(io);          // 옛 cassiiopeia 플러그인/마켓 정리
+  migrateConfigRoot(io);      // 공용 config 루트 이관
+  const st2 = detect(io);     // 정리 후 재감지
+  if (st2.installed) return update(io, st2.scope);
   return install(io, "user");
+}
+
+// 옛 이름(cassiiopeia) 플러그인·마켓 정리. 조용히, 로그만. 실패 무해(없으면 no-op).
+function migrateLegacy(io) {
+  const r = io.run("claude", ["plugin", "list", "--json"]);
+  let list = [];
+  try { const arr = JSON.parse(r.stdout || "[]"); list = Array.isArray(arr) ? arr : (arr.plugins || []); } catch { /* 무시 */ }
+  for (const legacy of LEGACY_PLUGINS) {
+    const hit = list.find((p) => {
+      const name = String(p.name || p.id || "");
+      return name === legacy || name.startsWith(legacy + "@");
+    });
+    if (hit) {
+      const scope = hit.scope || "user";
+      io.log(`  레거시 플러그인 정리: ${legacy} (scope: ${scope})`);
+      io.run("claude", ["plugin", "uninstall", legacy, "--scope", scope]);
+    }
+  }
+  for (const mp of LEGACY_MARKETPLACES) {
+    io.run("claude", ["plugin", "marketplace", "remove", mp]); // 없으면 no-op
+  }
 }
 
 function install(io, scope = "user") {

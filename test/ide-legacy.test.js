@@ -82,3 +82,40 @@ test("migrateConfigRoot: 소스 없으면 no-source", () => {
     assert.equal(migrateConfigRoot(io).reason, "no-source");
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+// ── Task 2: claude 어댑터 레거시 정리 ──
+// claude용 stubIo — home을 임시폴더로 두어 config 이관이 실제 fs에 안전하게 no-op.
+function claudeIo({ present = { claude: 1 }, listJson = "[]", home } = {}) {
+  const calls = [], logs = [];
+  return {
+    calls, logs,
+    which: (c) => (present[c] ? `/usr/bin/${c}` : null),
+    run: (c, a = []) => {
+      const key = [c, ...a].join(" "); calls.push(key);
+      if (key.includes("plugin list")) return { code: 0, stdout: listJson, stderr: "" };
+      return { code: 0, stdout: "", stderr: "" };
+    },
+    home: () => home || mkdtempSync(join(tmpdir(), "clh-")), log: (m) => logs.push(m),
+  };
+}
+
+test("claude migrateLegacy: 옛 cassiiopeia 플러그인 감지 시 uninstall+marketplace remove", () => {
+  const home = mkdtempSync(join(tmpdir(), "clm-"));
+  try {
+    const listJson = JSON.stringify([{ name: "cassiiopeia@cassiiopeia-marketplace", scope: "user", version: "4.2.3" }]);
+    const io = claudeIo({ listJson, home });
+    adapterById("claude").apply(io);
+    assert.ok(io.calls.some((c) => c.includes("plugin uninstall cassiiopeia@cassiiopeia-marketplace")), "옛 플러그인 uninstall 호출");
+    assert.ok(io.calls.some((c) => c.includes("marketplace remove cassiiopeia-marketplace")), "옛 마켓 remove 호출");
+    assert.ok(io.calls.some((c) => c.includes("plugin install projectops@projectops-marketplace")), "정리 후 신규 install");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test("claude migrateLegacy: 옛것 없으면 정리 명령 미호출", () => {
+  const home = mkdtempSync(join(tmpdir(), "cln-"));
+  try {
+    const io = claudeIo({ listJson: "[]", home });
+    adapterById("claude").apply(io);
+    assert.ok(!io.calls.some((c) => c.includes("uninstall cassiiopeia")), "불필요한 uninstall 없음");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});

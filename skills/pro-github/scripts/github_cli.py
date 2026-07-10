@@ -30,9 +30,13 @@ from common.config import get_github_pat  # noqa: E402
 from common.cli_parser import JSONArgumentParser, run_cli  # noqa: E402
 from common.gh_client import (  # noqa: E402
     GitHubAPIError, PyNaClMissingError,
-    get_issue, get_issue_comments, update_issue, create_issue,
-    add_comment, list_pulls, update_pull_request, create_pull_request,
-    search_issues, list_labels,
+    get_issue, get_issue_comments, update_issue, create_issue, list_issues,
+    add_comment, update_comment, delete_comment,
+    list_labels, add_issue_labels, remove_issue_label, set_issue_labels,
+    add_assignees, remove_assignees,
+    list_pulls, update_pull_request, create_pull_request,
+    get_pull_detail, merge_pull_request,
+    search_issues,
     get_user_type, list_repos, get_repo_detail, get_readme, get_languages, list_commits,
     list_secrets, set_secret,
     get_run, get_job_log, list_failed_runs, resolve_pr_runs, resolve_branch_runs,
@@ -87,13 +91,58 @@ def cmd_get_issues(args) -> int:
     })
 
 
+def cmd_create_issue(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    body_path = Path(args.body_file)
+    if not body_path.exists():
+        return emit({
+            "ok": False,
+            "code": "body_file_not_found",
+            "error": f"본문 파일이 존재하지 않습니다: {args.body_file}",
+            "path_attempted": str(body_path.resolve()),
+        })
+    body = body_path.read_text(encoding="utf-8")
+    labels = [l.strip() for l in args.labels.split(",") if l.strip()] if args.labels else []
+    assignees = [a.strip() for a in args.assignees.split(",") if a.strip()] if args.assignees else []
+    try:
+        result = create_issue(args.owner, args.repo, args.title, body, labels, pat, assignees)
+        applied = result.get("assignees", [])
+        missing = [a for a in assignees if a not in applied]
+        out = {**result, "summary": f"이슈 #{result.get('number')} 생성 완료", "body_length": len(body)}
+        if missing:
+            out["assignee_warning"] = (
+                f"담당자 지정 일부 실패: {', '.join(missing)} (레포 협업자/권한 확인 필요). 이슈는 정상 생성됨."
+            )
+        return emit(out)
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_list_issues(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        issues = list_issues(args.owner, args.repo, pat, state=args.state)
+        # label/assignee 필터는 API 재호출 없이 여기서 후처리 (list_issues에 필드 있음)
+        return emit({
+            "count": len(issues),
+            "issues": issues,
+            "summary": f"{args.owner}/{args.repo} 이슈 {len(issues)}개 ({args.state})",
+        })
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
 def cmd_update_issue(args) -> int:
     pat = get_github_pat(args.owner, args.repo)
     if not pat:
         return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
     labels = [l.strip() for l in args.labels.split(",") if l.strip()] if args.labels else None
     assignees = [a.strip() for a in args.assignees.split(",") if a.strip()] if args.assignees else None
-    
+
     body = None
     if args.body_file:
         body_path = Path(args.body_file)
@@ -105,13 +154,35 @@ def cmd_update_issue(args) -> int:
                 "path_attempted": str(body_path.resolve())
             })
         body = body_path.read_text(encoding="utf-8")
-        
+
     try:
         result = update_issue(
             args.owner, args.repo, args.number, pat,
             title=args.title, body=body, state=args.state, labels=labels, assignees=assignees,
         )
         return emit({**result, "summary": f"#{args.number} 수정 완료"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_close_issue(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = update_issue(args.owner, args.repo, args.number, pat, state="closed")
+        return emit({**result, "summary": f"#{args.number} 닫음"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_reopen_issue(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = update_issue(args.owner, args.repo, args.number, pat, state="open")
+        return emit({**result, "summary": f"#{args.number} 다시 열음"})
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
@@ -127,6 +198,137 @@ def cmd_add_comment(args) -> int:
     try:
         result = add_comment(args.owner, args.repo, args.number, body, pat)
         return emit({**result, "summary": f"#{args.number}에 댓글 추가 완료"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_list_comments(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        comments = get_issue_comments(args.owner, args.repo, args.number, pat)
+        return emit({
+            "count": len(comments),
+            "comments": comments,
+            "summary": f"#{args.number} 댓글 {len(comments)}개",
+        })
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_edit_comment(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    body_path = Path(args.body_file)
+    if not body_path.exists():
+        return emit({"ok": False, "code": "body_file_not_found", "error": f"{args.body_file} 없음"})
+    body = body_path.read_text(encoding="utf-8")
+    try:
+        result = update_comment(args.owner, args.repo, args.comment_id, body, pat)
+        return emit({**result, "summary": f"댓글 {args.comment_id} 수정 완료"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_delete_comment(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = delete_comment(args.owner, args.repo, args.comment_id, pat)
+        return emit({**result, "summary": f"댓글 {args.comment_id} 삭제 완료"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_list_labels(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        labels = list_labels(args.owner, args.repo, pat)
+        return emit({
+            "count": len(labels),
+            "labels": labels,
+            "summary": f"{args.owner}/{args.repo} 라벨 {len(labels)}개",
+        })
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_add_labels(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    labels = [l.strip() for l in args.labels.split(",") if l.strip()]
+    try:
+        applied = add_issue_labels(args.owner, args.repo, args.number, labels, pat)
+        missing = [l for l in labels if l not in applied]
+        out = {"labels": applied, "summary": f"#{args.number} 라벨 추가 (현재 {len(applied)}개)"}
+        if missing:
+            out["label_warning"] = f"레포에 없어 무시된 라벨: {', '.join(missing)}"
+        return emit(out)
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_remove_label(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = remove_issue_label(args.owner, args.repo, args.number, args.label, pat)
+        return emit({**result, "summary": f"#{args.number}에서 라벨 '{args.label}' 제거"})
+    except GitHubAPIError as e:
+        # 이슈에 그 라벨이 원래 없으면 404 — 멱등 처리 (이미 없는 상태)
+        if e.status_code == 404:
+            return emit({
+                "labels": None,
+                "code": "label_not_present",
+                "summary": f"#{args.number}에 라벨 '{args.label}'이(가) 이미 없음 (변경 없음)",
+            })
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_set_labels(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    labels = [l.strip() for l in args.labels.split(",") if l.strip()] if args.labels else []
+    try:
+        result = set_issue_labels(args.owner, args.repo, args.number, labels, pat)
+        return emit({**result, "summary": f"#{args.number} 라벨 전체 교체 (현재 {len(result['labels'])}개)"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_add_assignees(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    assignees = [a.strip() for a in args.assignees.split(",") if a.strip()]
+    try:
+        result = add_assignees(args.owner, args.repo, args.number, assignees, pat)
+        applied = result.get("assignees", [])
+        missing = [a for a in assignees if a not in applied]
+        out = {**result, "summary": f"#{args.number} 담당자 추가 (현재 {len(applied)}명)"}
+        if missing:
+            out["assignee_warning"] = f"권한/협업자 아님으로 누락된 담당자: {', '.join(missing)}"
+        return emit(out)
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_remove_assignees(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    assignees = [a.strip() for a in args.assignees.split(",") if a.strip()]
+    try:
+        result = remove_assignees(args.owner, args.repo, args.number, assignees, pat)
+        return emit({**result, "summary": f"#{args.number} 담당자 제거 (현재 {len(result.get('assignees', []))}명)"})
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
@@ -181,6 +383,99 @@ def cmd_update_pr(args) -> int:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
 
 
+def cmd_get_pr(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        pr = get_pull_detail(args.owner, args.repo, args.number, pat)
+        # mergeable_state가 아직 계산 전이면 unknown/None — agent가 재조회 판단
+        state = pr.get("mergeable_state")
+        if pr.get("merged"):
+            verdict = "merged"
+        elif pr.get("state") == "closed":
+            verdict = "closed"
+        elif state in (None, "unknown"):
+            verdict = "computing"
+        elif state in ("clean", "unstable", "has_hooks"):
+            verdict = "mergeable"
+        else:  # dirty, blocked, behind, draft
+            verdict = "blocked"
+        return emit({
+            "pr": pr,
+            "verdict": verdict,
+            "summary": f"PR #{args.number} {pr.get('state')} / mergeable_state={state} → {verdict}",
+        })
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_add_pr_comment(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    body_path = Path(args.body_file)
+    if not body_path.exists():
+        return emit({"ok": False, "code": "body_file_not_found", "error": f"{args.body_file} 없음"})
+    body = body_path.read_text(encoding="utf-8")
+    try:
+        # PR도 GitHub API에선 issue이므로 issues/{n}/comments로 댓글 추가
+        result = add_comment(args.owner, args.repo, args.number, body, pat)
+        return emit({**result, "summary": f"PR #{args.number}에 댓글 추가 완료"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_close_pr(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = update_pull_request(args.owner, args.repo, args.number, pat, state="closed")
+        return emit({**result, "summary": f"PR #{args.number} 닫음"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_reopen_pr(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = update_pull_request(args.owner, args.repo, args.number, pat, state="open")
+        return emit({**result, "summary": f"PR #{args.number} 다시 열음"})
+    except GitHubAPIError as e:
+        return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_merge_pr(args) -> int:
+    pat = get_github_pat(args.owner, args.repo)
+    if not pat:
+        return emit({"ok": False, "code": "missing_pat", "error": "PAT 없음"})
+    try:
+        result = merge_pull_request(
+            args.owner, args.repo, args.number, pat,
+            merge_method=args.method, commit_title=args.title, commit_message=args.message,
+        )
+        return emit({
+            **result,
+            "verdict": "merged" if result.get("merged") else "not_merged",
+            "summary": f"PR #{args.number} 머지 완료 ({args.method})",
+        })
+    except GitHubAPIError as e:
+        # 405: 머지 불가(충돌/체크 실패/드래프트), 409: sha 불일치, 422: rebase 불허
+        verdict = {405: "not_mergeable", 409: "sha_mismatch", 422: "method_not_allowed"}.get(
+            e.status_code, "error"
+        )
+        return emit({
+            "ok": False,
+            "code": f"github_api_{e.status_code}",
+            "verdict": verdict,
+            "error": str(e),
+            "summary": f"PR #{args.number} 머지 실패: {verdict}",
+        })
+
+
 def cmd_search_issues(args) -> int:
     pat = get_github_pat(args.owner, args.repo)
     if not pat:
@@ -195,6 +490,24 @@ def cmd_search_issues(args) -> int:
         })
     except GitHubAPIError as e:
         return emit({"ok": False, "code": f"github_api_{e.status_code}", "error": str(e)})
+
+
+def cmd_normalize_title(args) -> int:
+    from common.title import normalize
+    result = normalize(" ".join(args.title))
+    return emit({"normalized": result, "summary": result})
+
+
+def cmd_create_branch_name(args) -> int:
+    from common.gh_branch import create_branch_name
+    name = create_branch_name(args.issue_title, args.issue_number, args.date)
+    return emit({"branch": name, "summary": name})
+
+
+def cmd_get_commit_template(args) -> int:
+    from common.gh_branch import get_commit_template
+    template = get_commit_template(args.issue_title, args.issue_url)
+    return emit({"template": template, "summary": template})
 
 
 def cmd_explore(args) -> int:
@@ -351,6 +664,21 @@ def build_parser() -> JSONArgumentParser:
     p_gis.add_argument("numbers", nargs="+")
     p_gis.set_defaults(func=cmd_get_issues)
 
+    p_cri = sub.add_parser("create-issue", help="이슈 생성")
+    p_cri.add_argument("owner")
+    p_cri.add_argument("repo")
+    p_cri.add_argument("title")
+    p_cri.add_argument("body_file")
+    p_cri.add_argument("labels", help="csv")
+    p_cri.add_argument("--assignees", help="담당자 csv")
+    p_cri.set_defaults(func=cmd_create_issue)
+
+    p_lis = sub.add_parser("list-issues", help="이슈 목록")
+    p_lis.add_argument("owner")
+    p_lis.add_argument("repo")
+    p_lis.add_argument("--state", choices=["open", "closed", "all"], default="open")
+    p_lis.set_defaults(func=cmd_list_issues)
+
     p_ui = sub.add_parser("update-issue", help="이슈 수정")
     p_ui.add_argument("owner")
     p_ui.add_argument("repo")
@@ -362,12 +690,83 @@ def build_parser() -> JSONArgumentParser:
     p_ui.add_argument("--body-file", help="본문 파일 경로")
     p_ui.set_defaults(func=cmd_update_issue)
 
+    p_cli = sub.add_parser("close-issue", help="이슈 닫기")
+    p_cli.add_argument("owner")
+    p_cli.add_argument("repo")
+    p_cli.add_argument("number", type=int)
+    p_cli.set_defaults(func=cmd_close_issue)
+
+    p_roi = sub.add_parser("reopen-issue", help="이슈 다시 열기")
+    p_roi.add_argument("owner")
+    p_roi.add_argument("repo")
+    p_roi.add_argument("number", type=int)
+    p_roi.set_defaults(func=cmd_reopen_issue)
+
     p_ac = sub.add_parser("add-comment", help="이슈 댓글 추가")
     p_ac.add_argument("owner")
     p_ac.add_argument("repo")
     p_ac.add_argument("number", type=int)
     p_ac.add_argument("body_file")
     p_ac.set_defaults(func=cmd_add_comment)
+
+    p_lc = sub.add_parser("list-comments", help="이슈/PR 댓글 목록")
+    p_lc.add_argument("owner")
+    p_lc.add_argument("repo")
+    p_lc.add_argument("number", type=int)
+    p_lc.set_defaults(func=cmd_list_comments)
+
+    p_ec = sub.add_parser("edit-comment", help="댓글 수정")
+    p_ec.add_argument("owner")
+    p_ec.add_argument("repo")
+    p_ec.add_argument("comment_id", type=int)
+    p_ec.add_argument("body_file")
+    p_ec.set_defaults(func=cmd_edit_comment)
+
+    p_dc = sub.add_parser("delete-comment", help="댓글 삭제")
+    p_dc.add_argument("owner")
+    p_dc.add_argument("repo")
+    p_dc.add_argument("comment_id", type=int)
+    p_dc.set_defaults(func=cmd_delete_comment)
+
+    p_ll = sub.add_parser("list-labels", help="레포 라벨 목록")
+    p_ll.add_argument("owner")
+    p_ll.add_argument("repo")
+    p_ll.set_defaults(func=cmd_list_labels)
+
+    p_al = sub.add_parser("add-labels", help="이슈에 라벨 추가 (기존 유지)")
+    p_al.add_argument("owner")
+    p_al.add_argument("repo")
+    p_al.add_argument("number", type=int)
+    p_al.add_argument("labels", help="csv")
+    p_al.set_defaults(func=cmd_add_labels)
+
+    p_rl = sub.add_parser("remove-label", help="이슈에서 라벨 하나 제거")
+    p_rl.add_argument("owner")
+    p_rl.add_argument("repo")
+    p_rl.add_argument("number", type=int)
+    p_rl.add_argument("label")
+    p_rl.set_defaults(func=cmd_remove_label)
+
+    p_sl = sub.add_parser("set-labels", help="이슈 라벨 전체 교체")
+    p_sl.add_argument("owner")
+    p_sl.add_argument("repo")
+    p_sl.add_argument("number", type=int)
+    p_sl.add_argument("labels", help="csv (빈 값이면 전부 제거)", nargs="?", default="")
+    p_sl.set_defaults(func=cmd_set_labels)
+
+    p_aa = sub.add_parser("add-assignees", help="이슈 담당자 추가 (기존 유지)")
+    p_aa.add_argument("owner")
+    p_aa.add_argument("repo")
+    p_aa.add_argument("number", type=int)
+    p_aa.add_argument("assignees", help="csv")
+    p_aa.set_defaults(func=cmd_add_assignees)
+
+    p_ra = sub.add_parser("remove-assignees", help="이슈 담당자 일부 제거")
+    p_ra.add_argument("owner")
+    p_ra.add_argument("repo")
+    p_ra.add_argument("number", type=int)
+    p_ra.add_argument("assignees", help="csv")
+    p_ra.set_defaults(func=cmd_remove_assignees)
 
     p_cp = sub.add_parser("create-pr", help="PR 생성")
     p_cp.add_argument("owner")
@@ -393,11 +792,60 @@ def build_parser() -> JSONArgumentParser:
     p_up.add_argument("--state", choices=["open", "closed"])
     p_up.set_defaults(func=cmd_update_pr)
 
+    p_gpr = sub.add_parser("get-pr", help="PR 상세 (mergeable_state 등)")
+    p_gpr.add_argument("owner")
+    p_gpr.add_argument("repo")
+    p_gpr.add_argument("number", type=int)
+    p_gpr.set_defaults(func=cmd_get_pr)
+
+    p_apc = sub.add_parser("add-pr-comment", help="PR에 댓글 추가")
+    p_apc.add_argument("owner")
+    p_apc.add_argument("repo")
+    p_apc.add_argument("number", type=int)
+    p_apc.add_argument("body_file")
+    p_apc.set_defaults(func=cmd_add_pr_comment)
+
+    p_clp = sub.add_parser("close-pr", help="PR 닫기")
+    p_clp.add_argument("owner")
+    p_clp.add_argument("repo")
+    p_clp.add_argument("number", type=int)
+    p_clp.set_defaults(func=cmd_close_pr)
+
+    p_rop = sub.add_parser("reopen-pr", help="PR 다시 열기")
+    p_rop.add_argument("owner")
+    p_rop.add_argument("repo")
+    p_rop.add_argument("number", type=int)
+    p_rop.set_defaults(func=cmd_reopen_pr)
+
+    p_mp = sub.add_parser("merge-pr", help="PR 머지")
+    p_mp.add_argument("owner")
+    p_mp.add_argument("repo")
+    p_mp.add_argument("number", type=int)
+    p_mp.add_argument("--method", choices=["merge", "squash", "rebase"], default="merge")
+    p_mp.add_argument("--title", help="머지 커밋 제목")
+    p_mp.add_argument("--message", help="머지 커밋 본문")
+    p_mp.set_defaults(func=cmd_merge_pr)
+
     p_si = sub.add_parser("search-issues", help="이슈 검색")
     p_si.add_argument("owner")
     p_si.add_argument("repo")
     p_si.add_argument("keywords", nargs="+")
     p_si.set_defaults(func=cmd_search_issues)
+
+    p_nt = sub.add_parser("normalize-title", help="제목 정규화")
+    p_nt.add_argument("title", nargs="+")
+    p_nt.set_defaults(func=cmd_normalize_title)
+
+    p_cbn = sub.add_parser("create-branch-name", help="브랜치명 생성")
+    p_cbn.add_argument("issue_title")
+    p_cbn.add_argument("issue_number", type=int)
+    p_cbn.add_argument("--date", help="YYYYMMDD")
+    p_cbn.set_defaults(func=cmd_create_branch_name)
+
+    p_gct = sub.add_parser("get-commit-template", help="커밋 메시지 템플릿")
+    p_gct.add_argument("issue_title")
+    p_gct.add_argument("issue_url")
+    p_gct.set_defaults(func=cmd_get_commit_template)
 
     p_ex = sub.add_parser("explore", help="레포 탐색 (list-repos|repo-detail|readme|languages|commits)")
     p_ex.add_argument("sub", choices=["list-repos", "repo-detail", "readme", "languages", "commits"])

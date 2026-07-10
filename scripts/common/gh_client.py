@@ -110,6 +110,45 @@ def add_issue_labels(owner: str, repo: str, issue_number: int, labels: list[str]
     return [item["name"] for item in items]
 
 
+def remove_issue_label(
+    owner: str, repo: str, issue_number: int, name: str, pat: str,
+) -> dict:
+    """이슈에서 라벨 하나만 제거한다 (나머지 라벨은 유지).
+
+    라벨명은 URL 경로에 들어가므로 반드시 인코딩한다 (한글 라벨 `작업중` 등).
+    이슈에 그 라벨이 없으면 404가 나므로 호출자가 멱등 처리한다.
+    반환: 제거 후 이슈에 남은 라벨 이름 리스트.
+    """
+    enc = urllib.parse.quote(name, safe="")
+    items = _request(
+        "DELETE",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/labels/{enc}",
+        None,
+        pat,
+    )
+    return {"labels": [item["name"] for item in items]}
+
+
+def set_issue_labels(
+    owner: str, repo: str, issue_number: int, labels: list[str], pat: str,
+) -> dict:
+    """이슈의 라벨을 통째로 교체한다 (기존 라벨 전부 제거 후 새 배열 적용).
+
+    빈 배열이면 모든 라벨을 제거한다. 존재하지 않는 라벨은 사전 필터링해 422를 방지한다.
+    반환: 교체 후 이슈에 붙은 라벨 이름 리스트.
+    """
+    if labels:
+        existing = set(list_labels(owner, repo, pat))
+        labels = [l for l in labels if l in existing]
+    items = _request(
+        "PUT",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/labels",
+        {"labels": labels},
+        pat,
+    )
+    return {"labels": [item["name"] for item in items]}
+
+
 def create_issue(
     owner: str, repo: str, title: str, body: str,
     labels: list[str], pat: str, assignees: list[str] | None = None,
@@ -155,10 +194,54 @@ def update_issue(
     return {"number": data["number"], "url": data["html_url"], "title": data["title"]}
 
 
+def add_assignees(
+    owner: str, repo: str, issue_number: int, assignees: list[str], pat: str,
+) -> dict:
+    """이슈에 담당자를 추가한다 (기존 담당자 유지). 최대 10명.
+
+    권한 없는/존재하지 않는 유저는 GitHub이 조용히 누락시키므로,
+    응답의 실제 담당자 목록을 반환해 호출자가 요청 대비 확인할 수 있게 한다.
+    """
+    data = _request(
+        "POST",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/assignees",
+        {"assignees": assignees},
+        pat,
+    )
+    return {
+        "number": data["number"],
+        "url": data["html_url"],
+        "assignees": [u["login"] for u in data.get("assignees", [])],
+    }
+
+
+def remove_assignees(
+    owner: str, repo: str, issue_number: int, assignees: list[str], pat: str,
+) -> dict:
+    """이슈에서 지정한 담당자만 제거한다 (나머지 담당자 유지).
+
+    이 DELETE는 body가 필요하다. 지정 목록에 없는 담당자는 그대로 남는다.
+    """
+    data = _request(
+        "DELETE",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/assignees",
+        {"assignees": assignees},
+        pat,
+    )
+    return {
+        "number": data["number"],
+        "url": data["html_url"],
+        "assignees": [u["login"] for u in data.get("assignees", [])],
+    }
+
+
 def add_comment(
     owner: str, repo: str, issue_number: int, body: str, pat: str,
 ) -> dict:
-    """이슈에 댓글을 추가하고 {id, url}을 반환한다."""
+    """이슈/PR에 댓글을 추가하고 {id, url}을 반환한다.
+
+    PR도 GitHub API에서는 issue로 다뤄지므로 PR 번호로도 호출 가능하다.
+    """
     data = _request(
         "POST",
         f"{_API_BASE}/repos/{owner}/{repo}/issues/{issue_number}/comments",
@@ -166,6 +249,35 @@ def add_comment(
         pat,
     )
     return {"id": data["id"], "url": data["html_url"]}
+
+
+def update_comment(
+    owner: str, repo: str, comment_id: int, body: str, pat: str,
+) -> dict:
+    """이슈/PR 댓글 하나의 본문을 수정하고 {id, url}을 반환한다.
+
+    엔드포인트가 issue_number 없이 comment_id만 쓴다 (issue·PR 공용).
+    """
+    data = _request(
+        "PATCH",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/comments/{comment_id}",
+        {"body": body},
+        pat,
+    )
+    return {"id": data["id"], "url": data["html_url"]}
+
+
+def delete_comment(
+    owner: str, repo: str, comment_id: int, pat: str,
+) -> dict:
+    """이슈/PR 댓글 하나를 삭제한다. 204(빈 본문) 응답이므로 파싱하지 않는다."""
+    _request(
+        "DELETE",
+        f"{_API_BASE}/repos/{owner}/{repo}/issues/comments/{comment_id}",
+        None,
+        pat,
+    )
+    return {"comment_id": comment_id, "status": "deleted"}
 
 
 def get_issue(owner: str, repo: str, issue_number: int, pat: str) -> dict:
@@ -438,6 +550,38 @@ def create_pull_request(
         pat,
     )
     return {"number": data["number"], "url": data["html_url"]}
+
+
+def merge_pull_request(
+    owner: str, repo: str, pr_number: int, pat: str,
+    merge_method: str = "merge", commit_title: str | None = None,
+    commit_message: str | None = None, sha: str | None = None,
+) -> dict:
+    """PR을 머지한다.
+
+    merge_method: merge(기본) / squash / rebase.
+    머지 불가(405)·sha 불일치(409)·rebase 불허(422)는 GitHubAPIError로 올라오므로
+    호출자(CLI 레이어)가 status_code로 verdict를 판정한다.
+    반환: {sha, merged, message}.
+    """
+    payload: dict = {"merge_method": merge_method}
+    if commit_title is not None:
+        payload["commit_title"] = commit_title
+    if commit_message is not None:
+        payload["commit_message"] = commit_message
+    if sha is not None:
+        payload["sha"] = sha
+    data = _request(
+        "PUT",
+        f"{_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}/merge",
+        payload,
+        pat,
+    )
+    return {
+        "sha": data.get("sha"),
+        "merged": data.get("merged", False),
+        "message": data.get("message"),
+    }
 
 
 def get_pull_detail(owner: str, repo: str, pr_number: int, pat: str) -> dict:

@@ -19,18 +19,17 @@ Common routing:
 
 | Request | Use |
 |---------|-----|
-| "이슈 작성", "issue", "GitHub 이슈 만들어줘" | `skills/issue/SKILL.md` |
-| "커밋해줘", "commit" | `skills/commit/SKILL.md` |
-| "분석해줘", "영향 범위 봐줘" | `skills/analyze/SKILL.md` |
-| "계획 세워줘", "plan" | `skills/plan/SKILL.md` |
-| "구현해줘", "수정해줘" | `skills/implement/SKILL.md` |
-| "리뷰해줘" | `skills/review/SKILL.md` |
-| "문제 원인 찾아줘", "디버깅" | `skills/troubleshoot/SKILL.md` |
-| "작업 보고서 작성" | `skills/report/SKILL.md` |
-| "스킬 만들기/개선" | `skills/skill-creator/SKILL.md` |
-| "GitHub 이슈/PR 조회·관리" | `skills/github/SKILL.md` |
-| "배포", "deploy PR" | `skills/changelog-deploy/SKILL.md` |
-| "원격 서버 접속", "SSH" | `skills/ssh/SKILL.md` |
+| "커밋해줘", "commit" | `skills/pro-commit/SKILL.md` |
+| "분석해줘", "영향 범위 봐줘" | `skills/pro-analyze/SKILL.md` |
+| "계획 세워줘", "plan" | `skills/pro-plan/SKILL.md` |
+| "구현해줘", "수정해줘" | `skills/pro-implement/SKILL.md` |
+| "리뷰해줘" | `skills/pro-review/SKILL.md` |
+| "문제 원인 찾아줘", "디버깅" | `skills/pro-troubleshoot/SKILL.md` |
+| "작업 보고서 작성" | `skills/pro-report/SKILL.md` |
+| "스킬 만들기/개선" | `skills/pro-skill-creator/SKILL.md` |
+| "이슈 작성", "issue", "GitHub 이슈 만들어줘", "GitHub 이슈/PR 조회·관리" | `skills/pro-github/SKILL.md` |
+| "배포", "deploy PR" | `skills/pro-changelog-deploy/SKILL.md` |
+| "원격 서버 접속", "SSH" | `skills/pro-ssh/SKILL.md` |
 
 ## Codex Installation Model
 

@@ -431,9 +431,8 @@ claude plugin install projectops@projectops-marketplace --scope user
 | `ppt` | 프레젠테이션 |
 | `spring-test` | Spring 테스트 생성 |
 | `init-worktree` | Git worktree 생성 |
-| `issue` | 이슈 작성 + GitHub 등록 |
 | `commit` | 이슈 기반 커밋 자동화 |
-| `github` | GitHub 이슈/PR 조회·관리·Actions Secret 업데이트 |
+| `github` | GitHub 전반: 이슈 생성/조회/수정/댓글/라벨/담당자, PR 생성/머지/조회, 레포 탐색, Actions 로그, Secret 관리 (이슈 작성+등록 포함) |
 | `report` | 구현 보고서 생성 |
 | `changelog-deploy` | develop push → main으로 릴리스 PR(deploy PR) → 버전 확정 + automerge / automerge 실패 시 재트리거 |
 | `synology-expose` | 시놀로지 서비스 외부 노출 가이드 |
@@ -548,7 +547,7 @@ skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 
 | 스킬 | config 섹션 키 | 비고 |
 |------|--------------|------|
-| `issue`, `commit`, `github`, `changelog-deploy`, `report` | `github` | PAT + repos 공유 |
+| `commit`, `github`, `changelog-deploy`, `report` | `github` | PAT + repos 공유 (이슈 생성 승인/담당자 설정 `issue.*` 키 포함) |
 | `synology-expose` | `synology-expose` | NAS 인스턴스 정보 |
 | `ssh` | `ssh` | SSH 서버 접속 정보 |
 
@@ -567,17 +566,16 @@ skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 
 | skill | cli 파일 | 주요 서브커맨드 |
 |---|---|---|
-| github | `skills/github/scripts/github_cli.py` | get-issue, get-issues, update-issue, create-pr, list-prs, update-pr, search-issues, add-comment, explore, secrets |
-| issue | `skills/issue/scripts/issue_cli.py` | create-issue, search-issues, update-issue, get-next-seq, normalize-title, create-branch-name, get-commit-template |
-| commit | `skills/commit/scripts/commit_cli.py` | get-issue-number, get-issue, normalize-title, get-commit-template |
-| report | `skills/report/scripts/report_cli.py` | get-output-path, add-comment |
-| review | `skills/review/scripts/review_cli.py` | get-output-path |
-| troubleshoot | `skills/troubleshoot/scripts/troubleshoot_cli.py` | get-output-path |
-| changelog-deploy | `skills/changelog-deploy/scripts/changelog_cli.py` | actions, deploy-status, list-prs, update-pr, create-pr |
+| github | `skills/pro-github/scripts/github_cli.py` | create-issue, get-issue, get-issues, list-issues, update-issue, close-issue, reopen-issue, search-issues, add-comment, list-comments, edit-comment, delete-comment, list-labels, add-labels, remove-label, set-labels, add-assignees, remove-assignees, create-pr, list-prs, update-pr, get-pr, add-pr-comment, close-pr, reopen-pr, merge-pr, normalize-title, create-branch-name, get-commit-template, explore, secrets, actions |
+| commit | `skills/pro-commit/scripts/commit_cli.py` | get-issue-number, get-issue, normalize-title, get-commit-template |
+| report | `skills/pro-report/scripts/report_cli.py` | get-output-path, add-comment |
+| review | `skills/pro-review/scripts/review_cli.py` | get-output-path |
+| troubleshoot | `skills/pro-troubleshoot/scripts/troubleshoot_cli.py` | get-output-path |
+| changelog-deploy | `skills/pro-changelog-deploy/scripts/changelog_cli.py` | actions, deploy-status, list-prs, update-pr, create-pr |
 
 공유 도메인 로직은 `scripts/common/`에 있다 (gh_client, config, paths, title, issue_number, gh_branch, manifest, emit, bootstrap).
 
-> GitHub API 호출은 각 skill의 `<scope>_cli.py` 서브커맨드 우선. 새 동작이 필요하면 `skills/references/mcp-subcommand-rules.md` 기준으로 `common/gh_client` 헬퍼 + cli 서브커맨드 + 테스트를 추가한다. 신규 skill에 py 필요하면 `skills/skill-creator/templates/python_cli_script.py` 골격을 복사.
+> GitHub API 호출은 각 skill의 `<scope>_cli.py` 서브커맨드 우선. 새 동작이 필요하면 `skills/references/mcp-subcommand-rules.md` 기준으로 `common/gh_client` 헬퍼 + cli 서브커맨드 + 테스트를 추가한다. 신규 skill에 py 필요하면 `skills/pro-skill-creator/templates/python_cli_script.py` 골격을 복사.
 
 ### Agent 주의사항
 
@@ -585,7 +583,7 @@ skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 |------|------|
 | config 없음 | 대화형 수집 — 억지 추론 금지 |
 | repo owner/repo 불명확 | `git remote get-url origin` 추출 → 실패 시 config `github_repos` 참조 |
-| GitHub API 401 | PAT 만료 안내 + `/issue` 스킬에서 재등록 유도 |
+| GitHub API 401 | PAT 만료 안내 + `/pro-github`에서 재등록 유도 (`references/config-rules.md §2~5`) |
 | `gh` CLI 사용 시도 | 금지 — curl로 대체 |
 | 공통 워크플로우 수정 | `project-types/common/`과 `.github/workflows/` 루트 **두 곳 동일하게** 유지 |
 | GitHub 댓글에 마크다운 표 | `array.join('\n')` 패턴 사용 (template literal 들여쓰기 시 표 깨짐) |
@@ -621,12 +619,12 @@ skill_id를 키로 각 스킬의 설정을 네임스페이스로 분리한다.
 
 | 요청 유형 | 호출 스킬 |
 |----------|----------|
-| **PR 생성, PR 올려줘, 이슈 댓글, 댓글 달아줘, 이슈 확인, 이슈 닫기, PR 조회, GitHub API** | **`pro-github` ← 최우선 트리거** |
+| **이슈 만들어줘, 이슈 등록, 버그 리포트, PR 생성, PR 올려줘, PR 머지, 이슈 댓글, 댓글 달아줘/수정/삭제, 이슈 확인, 이슈 닫기, 라벨 추가/제거, 담당자 추가, PR 조회, GitHub API** | **`pro-github` ← 최우선 트리거** |
 | 코드 분석, 현황 파악 | `pro-analyze` |
 | 버그, 오류, 원인 파악 | `pro-troubleshoot` |
 | 새 기능 설계 | `pro-plan` → `pro-implement` |
 | 코드 리뷰 | `pro-review` |
-| 이슈 작성 | `pro-issue` |
+| 이슈 작성 / 이슈 생성 | `pro-github` (이슈 생성 워크플로우 흡수) |
 | 커밋 | `pro-commit` |
 | 배포 / automerge 실패 재트리거 | `pro-changelog-deploy` |
 | 보고서 | `pro-report` |

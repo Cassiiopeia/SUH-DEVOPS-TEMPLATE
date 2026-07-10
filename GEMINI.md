@@ -19,17 +19,16 @@ Common routing:
 
 | User intent | Skill |
 |-------------|-------|
-| Create or register a GitHub issue | `skills/issue/SKILL.md` |
-| Commit staged work | `skills/commit/SKILL.md` |
-| Analyze code without editing | `skills/analyze/SKILL.md` |
-| Create an implementation plan | `skills/plan/SKILL.md` |
-| Implement a planned change | `skills/implement/SKILL.md` |
-| Review code or changes | `skills/review/SKILL.md` |
-| Debug failures | `skills/troubleshoot/SKILL.md` |
-| Generate implementation reports | `skills/report/SKILL.md` |
-| Create or improve skills | `skills/skill-creator/SKILL.md` |
-| Query or manage GitHub issues/PRs | `skills/github/SKILL.md` |
-| Deploy (main push → deploy PR) | `skills/changelog-deploy/SKILL.md` |
+| Commit staged work | `skills/pro-commit/SKILL.md` |
+| Analyze code without editing | `skills/pro-analyze/SKILL.md` |
+| Create an implementation plan | `skills/pro-plan/SKILL.md` |
+| Implement a planned change | `skills/pro-implement/SKILL.md` |
+| Review code or changes | `skills/pro-review/SKILL.md` |
+| Debug failures | `skills/pro-troubleshoot/SKILL.md` |
+| Generate implementation reports | `skills/pro-report/SKILL.md` |
+| Create or improve skills | `skills/pro-skill-creator/SKILL.md` |
+| Create or register a GitHub issue, query or manage GitHub issues/PRs | `skills/pro-github/SKILL.md` |
+| Deploy (main push → deploy PR) | `skills/pro-changelog-deploy/SKILL.md` |
 
 ## Repository Safety
 

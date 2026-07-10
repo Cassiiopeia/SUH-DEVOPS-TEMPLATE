@@ -64,10 +64,11 @@ test("skills/ 아래 suh- 폴더가 0개다", () => {
   assert.deepEqual(dirs, [], `잔존 suh- 스킬 폴더: ${dirs.join(", ")}`);
 });
 
-test("25개 pro- 스킬 폴더가 모두 존재한다", () => {
+test("24개 pro- 스킬 폴더가 모두 존재한다", () => {
+  // pro-issue는 #467에서 pro-github로 통합·삭제됨 (25종→24종)
   const expected = [
     "pro-analyze", "pro-build", "pro-changelog-deploy", "pro-commit", "pro-design", "pro-design-analyze",
-    "pro-document", "pro-figma", "pro-github", "pro-implement", "pro-init-worktree", "pro-issue", "pro-plan",
+    "pro-document", "pro-figma", "pro-github", "pro-implement", "pro-init-worktree", "pro-plan",
     "pro-ppt", "pro-refactor", "pro-refactor-analyze", "pro-report", "pro-review", "pro-skill-creator",
     "pro-spring-test", "pro-ssh", "pro-synology-expose", "pro-test", "pro-testcase", "pro-troubleshoot",
   ];

@@ -5,7 +5,7 @@ deploy PR 자동화 + Actions/CodeRabbit 상태 종합.
 서브커맨드: actions, deploy-status, list-prs, update-pr, create-pr, detect-release-context
 
 사용법:
-    cd skills/changelog-deploy/scripts
+    cd skills/pro-changelog-deploy/scripts
     python changelog_cli.py <subcommand> [args]
 """
 from __future__ import annotations

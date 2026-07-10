@@ -5,7 +5,7 @@
 서브커맨드: get-output-path, add-comment
 
 사용법:
-    cd skills/report/scripts
+    cd skills/pro-report/scripts
     python report_cli.py <subcommand> [args]
 """
 from __future__ import annotations

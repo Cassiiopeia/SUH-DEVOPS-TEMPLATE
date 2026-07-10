@@ -5,7 +5,7 @@
 서브커맨드: get-issue-number, get-issue, normalize-title, get-commit-template
 
 사용법:
-    cd skills/commit/scripts
+    cd skills/pro-commit/scripts
     python commit_cli.py <subcommand> [args]
 """
 from __future__ import annotations

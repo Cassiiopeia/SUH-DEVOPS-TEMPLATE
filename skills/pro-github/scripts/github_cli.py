@@ -6,7 +6,7 @@ GitHub API 직접 호출 도구.
            update-pr, search-issues, add-comment, explore, secrets
 
 사용법:
-    cd skills/github/scripts
+    cd skills/pro-github/scripts
     python github_cli.py <subcommand> [args]
 
 출력 형식: 모든 서브커맨드는 stdout으로 MCP-style JSON 출력.

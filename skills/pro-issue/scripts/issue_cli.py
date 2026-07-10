@@ -6,7 +6,7 @@
            create-branch-name, get-commit-template, update-issue
 
 사용법:
-    cd skills/issue/scripts
+    cd skills/pro-issue/scripts
     python issue_cli.py <subcommand> [args]
 """
 from __future__ import annotations

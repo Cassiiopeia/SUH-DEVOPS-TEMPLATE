@@ -21,6 +21,11 @@ const EXCLUDE_PREFIX = ["docs/superpowers/", "docs/projectops/"];
 const EXCLUDE_EXACT = [
   "CHANGELOG.md", "CHANGELOG.json", ".github/config/breaking-changes.json",
   "test/rename-consistency.test.js",
+  // 레거시 자동 마이그레이션 로직 — 구 플러그인/config 이름(cassiiopeia)을 감지·정리하려면
+  // 그 문자열을 반드시 리터럴로 참조해야 한다(#459 방침: 감지·마이그레이션 로직은 구 이름 보존).
+  "src/core/ide/legacy.js",
+  "src/core/ide/adapters/claude.js",
+  "src/core/ide/adapters/cursor.js",
 ];
 
 function isExcluded(path) {

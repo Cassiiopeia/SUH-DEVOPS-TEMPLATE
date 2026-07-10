@@ -79,8 +79,8 @@ test("cursor: skills/ 복사 + meta.json 기록", () => {
     assert.equal(meta.version, "9.9.9");
     // detect가 설치 인식
     assert.equal(adapterById("cursor").detect(io).installed, true);
-    // remove
-    assert.equal(adapterById("cursor").remove(io), true);
+    // remove (선별 삭제 — 소스 폴더명 기준. 이 테스트 폴더엔 analyze+meta만 있어 폴더가 비고 제거됨)
+    assert.equal(adapterById("cursor").remove(io, { sourceSkillsDir: src }), true);
     assert.equal(existsSync(join(home, ".cursor/skills")), false);
   } finally { rmSync(home, { recursive: true, force: true }); rmSync(src, { recursive: true, force: true }); }
 });

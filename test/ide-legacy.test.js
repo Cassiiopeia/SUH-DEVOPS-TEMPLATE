@@ -176,3 +176,39 @@ test("pi migrateLegacy: 신·구 clone 공존 시 옛 SUH-DEVOPS-TEMPLATE 제거
     assert.ok(settings.extensions.includes("other"), "무관 항목 보존");
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
+
+// ── Task 6: cursor 선별 삭제 + remove 버그 수정 ──
+test("cursor migrateLegacy: 옛 이름/버전 meta면 projectops 소유만 선별 삭제 (somansa-tools 보존)", () => {
+  const home = mkdtempSync(join(tmpdir(), "cur-"));
+  const src = mkdtempSync(join(tmpdir(), "csrc-"));
+  try {
+    mkdirSync(join(src, "pro-analyze"), { recursive: true }); writeFileSync(join(src, "pro-analyze/SKILL.md"), "x");
+    mkdirSync(join(src, "references"), { recursive: true }); writeFileSync(join(src, "references/r.md"), "x");
+    const skills = join(home, ".cursor/skills");
+    for (const d of ["suh-analyze", "gitlab", "pro-analyze", "references"]) { mkdirSync(join(skills, d), { recursive: true }); writeFileSync(join(skills, d, "f.md"), "x"); }
+    writeFileSync(join(skills, "cursor-skills-meta.json"), JSON.stringify({ name: "cassiiopeia", version: "4.2.3" }));
+    const io = { which: () => null, run: () => ({ code: 0, stdout: "", stderr: "" }), home: () => home, log: () => {} };
+    adapterById("cursor").apply(io, { sourceSkillsDir: src, templateVersion: "9.9.9" });
+    assert.equal(existsSync(join(skills, "suh-analyze")), false, "옛 suh-* 제거");
+    assert.equal(existsSync(join(skills, "gitlab")), true, "somansa-tools gitlab 보존");
+    assert.equal(existsSync(join(skills, "pro-analyze")), true, "신규 pro-analyze 재설치");
+    const meta = JSON.parse(readFileSync(join(skills, "cursor-skills-meta.json"), "utf8"));
+    assert.equal(meta.name, "projectops"); assert.equal(meta.version, "9.9.9");
+  } finally { rmSync(home, { recursive: true, force: true }); rmSync(src, { recursive: true, force: true }); }
+});
+
+test("cursor remove: projectops 소유만 삭제하고 somansa-tools 보존", () => {
+  const home = mkdtempSync(join(tmpdir(), "curr-"));
+  const src = mkdtempSync(join(tmpdir(), "csrc2-"));
+  try {
+    mkdirSync(join(src, "pro-analyze"), { recursive: true }); writeFileSync(join(src, "pro-analyze/SKILL.md"), "x");
+    const skills = join(home, ".cursor/skills");
+    for (const d of ["pro-analyze", "gitlab"]) { mkdirSync(join(skills, d), { recursive: true }); writeFileSync(join(skills, d, "f.md"), "x"); }
+    writeFileSync(join(skills, "cursor-skills-meta.json"), JSON.stringify({ name: "projectops", version: "9.9.9" }));
+    const io = { which: () => null, run: () => ({ code: 0, stdout: "", stderr: "" }), home: () => home, log: () => {} };
+    adapterById("cursor").remove(io, { sourceSkillsDir: src });
+    assert.equal(existsSync(join(skills, "pro-analyze")), false, "pro-* 제거");
+    assert.equal(existsSync(join(skills, "gitlab")), true, "somansa-tools 보존");
+    assert.equal(existsSync(join(skills, "cursor-skills-meta.json")), false, "meta 제거");
+  } finally { rmSync(home, { recursive: true, force: true }); rmSync(src, { recursive: true, force: true }); }
+});

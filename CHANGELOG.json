@@ -1,14 +1,48 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-10T00:41:44Z",
-    "currentVersion": "4.2.5",
+    "lastUpdated": "2026-07-10T01:38:59Z",
+    "currentVersion": "4.2.6",
     "projectType": "basic",
-    "totalReleases": 190,
+    "totalReleases": 191,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.6",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-10",
+      "pr_number": 465,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 설치나 업데이트 시 예전 버전의 흔적을 자동으로 정리합니다.\n  * 예전에 저장한 설정이 새 위치로 자동으로 옮겨집니다.\n  * 여러 편집기 환경에서 정리가 한 번에 이뤄집니다.\n\n* **버그 수정**\n  * 정리 과정에서 다른 도구의 항목까지 지워지던 문제를 해결했습니다.\n\n* **개선**\n  * 예전 설정을 다시 등록할 필요 없이 그대로 이어서 쓸 수 있습니다.\n  * 정리 후 필요한 기능이 곧바로 다시 준비됩니다.",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "설치나 업데이트 시 예전 버전의 흔적을 자동으로 정리합니다.",
+            "예전에 저장한 설정이 새 위치로 자동으로 옮겨집니다.",
+            "여러 편집기 환경에서 정리가 한 번에 이뤄집니다."
+          ]
+        },
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "정리 과정에서 다른 도구의 항목까지 지워지던 문제를 해결했습니다."
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "예전 설정을 다시 등록할 필요 없이 그대로 이어서 쓸 수 있습니다.",
+            "정리 후 필요한 기능이 곧바로 다시 준비됩니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.5",
       "project_type": "basic",

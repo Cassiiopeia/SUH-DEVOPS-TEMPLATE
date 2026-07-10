@@ -9,7 +9,8 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
 COMMIT_SH="$HERE/../changelog_providers/commit.sh"
 MANAGER="$ROOT/.github/scripts/changelog_manager.py"
-PYTHON=$(command -v python3 || command -v python)
+# Windows python3 스텁(실행 불가 alias) 회피 — 실행 검증 포함 탐지 (CLAUDE.md OS 호환 표준)
+PYTHON=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 
 FAIL=0
 TMP=$(mktemp -d)

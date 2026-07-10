@@ -17,7 +17,8 @@ if [ -z "$REPO" ] || [ -z "$PR" ] || [ -z "$TOKEN" ]; then
 fi
 
 API="https://api.github.com/repos/$REPO"
-PYBIN=$(command -v python3 || command -v python || true)
+# Windows python3 스텁(실행 불가 alias) 회피 — 실행 검증 포함 탐지 (CLAUDE.md OS 호환 표준)
+PYBIN=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 
 # summary 요청
 curl -s -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \

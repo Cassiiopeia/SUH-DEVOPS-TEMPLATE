@@ -17,7 +17,8 @@ case "$NAME" in
 esac
 
 RANGE="${COMMIT_RANGE:-origin/main..HEAD}"
-PYBIN=$(command -v python3 || command -v python || true)
+# Windows python3 스텁(실행 불가 alias) 회피 — 실행 검증 포함 탐지 (CLAUDE.md OS 호환 표준)
+PYBIN=$(for _py in python3 python; do _path=$(command -v "$_py" 2>/dev/null) || continue; "$_path" -c "import sys; sys.exit(0)" 2>/dev/null && echo "$_path" && break; done)
 
 # 커밋 수집 (chore/ci/build/test prefix는 입력에서 제외 → 토큰 절약)
 COMMITS=$(git log "$RANGE" --pretty=format:"%s" 2>/dev/null | grep -vE "\[skip ci\]|^(chore|ci|build|test):" || true)

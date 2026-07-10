@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
-_CLI_PATH = _ROOT / "skills" / "changelog-deploy" / "scripts" / "changelog_cli.py"
+_CLI_PATH = _ROOT / "skills" / "pro-changelog-deploy" / "scripts" / "changelog_cli.py"
 _spec = importlib.util.spec_from_file_location("changelog_cli", _CLI_PATH)
 changelog_cli = importlib.util.module_from_spec(_spec)
 sys.modules["changelog_cli"] = changelog_cli

@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 # 이 파일: <root>/scripts/tests/ → parents[2] == <root>
-# changelog_cli.py: <root>/skills/changelog-deploy/scripts/changelog_cli.py
+# changelog_cli.py: <root>/skills/pro-changelog-deploy/scripts/changelog_cli.py
 _ROOT = Path(__file__).resolve().parents[2]
-_CLI_PATH = _ROOT / "skills" / "changelog-deploy" / "scripts" / "changelog_cli.py"
+_CLI_PATH = _ROOT / "skills" / "pro-changelog-deploy" / "scripts" / "changelog_cli.py"
 _spec = importlib.util.spec_from_file_location("changelog_cli", _CLI_PATH)
 changelog_cli = importlib.util.module_from_spec(_spec)
 sys.modules["changelog_cli"] = changelog_cli

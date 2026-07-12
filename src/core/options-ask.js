@@ -24,7 +24,7 @@ export async function ensureDeployBranch({ targetRoot = ".", deployBranch = "", 
     say(`ℹ️ '${deployBranch}' 브랜치가 원격에는 있고 로컬에 없습니다 — 필요 시 'git switch ${deployBranch}'로 가져오세요.`);
     return { created: false, pushed: false };
   }
-  say(`⚠️ 배포 브랜치 '${deployBranch}'가 없습니다 — 릴리스 파이프라인(${deployBranch}→${defaultBranch || "기본 브랜치"} PR)이 동작하려면 필요합니다.`);
+  say(`⚠️ 개발(릴리스 소스) 브랜치 '${deployBranch}'가 없습니다 — 릴리스(${deployBranch}→${defaultBranch || "기본 브랜치"} PR)가 동작하려면 필요합니다.`);
   const mk = await io.confirm({ message: `${defaultBranch || "현재"} 브랜치에서 '${deployBranch}' 브랜치를 만들까요?`, initialValue: true });
   if (mk !== true) {
     say(`→ 건너뜁니다. 나중에 직접: git checkout -b ${deployBranch} && git push -u origin ${deployBranch}`);
@@ -35,7 +35,8 @@ export async function ensureDeployBranch({ targetRoot = ".", deployBranch = "", 
     return { created: false, pushed: false };
   }
   say(`✅ 로컬 브랜치 '${deployBranch}' 생성 완료 (checkout은 하지 않았습니다)`);
-  const up = await io.confirm({ message: "원격(origin)에도 push할까요?", initialValue: true });
+  // #481 — push 질문에 브랜치명 명시 ("어느 브랜치를 push하는지" 불명확 방지)
+  const up = await io.confirm({ message: `원격(origin)에 '${deployBranch}' 브랜치도 push할까요?`, initialValue: true });
   if (up !== true) return { created: true, pushed: false };
   if (pushBranch(targetRoot, deployBranch)) {
     say(`✅ origin/${deployBranch} push 완료`);
@@ -241,18 +242,21 @@ export async function askAllOptionalWorkflows({
     changelogBaseUrl = "";
   }
 
-  // ── deploy_branch: 릴리스 PR의 head 브랜치 (#456 — default_branch와 별개) ──
-  //    대부분 develop→main 릴리스 구조라 기본값 develop. 다른 head를 쓰는 레포를 위해 물어본다.
+  // ── 릴리스 소스(개발) 브랜치 (#456 필드 deploy_branch — 이름과 달리 "개발 브랜치"다, #482) ──
+  //    이 값은 릴리스 PR(개발→기본)의 head, 즉 개발한 걸 모아 기본 브랜치로 올리는 브랜치다.
+  //    "배포 브랜치"가 아니다 — 배포가 도는 곳은 기본 브랜치(default) 쪽 개념. #482 참조.
   if (ask("release-branch") || deployBranch === null) {
     if (force || !tty || typeof io.text !== "function") {
       deployBranch = deployBranch ?? "develop";
     } else {
+      const base = defaultBranch || "main"; // git으로 감지된 기본 브랜치 (#481 동적 안내)
       say("");
-      say("🌿 릴리스 배포 브랜치(릴리스 PR의 head)는 무엇인가요?");
-      say("   develop→main 릴리스 구조면 develop 그대로 두세요. 배포 브랜치가 따로면 그 이름을 적어주세요.");
-      const ans = await io.text({ message: "배포 브랜치", initialValue: deployBranch ?? "develop" });
+      say("🌿 개발한 코드를 모아서 배포로 올리는 '개발 브랜치'는 무엇인가요?");
+      say(`   감지된 기본(배포) 브랜치는 '${base}'입니다. 개발은 보통 그 앞단 브랜치(예: develop)에서 모아 올립니다.`);
+      say("   특별한 이유가 없으면 develop 그대로 두세요.");
+      const ans = await io.text({ message: "개발(릴리스 소스) 브랜치", initialValue: deployBranch ?? "develop" });
       deployBranch = (typeof ans === "string" && !isCancel(ans) && ans.trim()) ? ans.trim() : (deployBranch ?? "develop");
-      say(`배포 브랜치: ${deployBranch}`);
+      say(`개발(릴리스 소스) 브랜치: ${deployBranch}`);
       // 브랜치 존재 확인 + 생성 제안 (#477) — 없으면 릴리스 파이프라인이 조용히 놀게 된다
       await ensureDeployBranch({ targetRoot, deployBranch, defaultBranch, io, say });
     }

@@ -96,18 +96,24 @@ test("branchStatus/createBranch: 로컬 생성 및 감지 (원격 없음 → rem
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("ensureDeployBranch: 없으면 확인 후 생성 (push 거절 경로)", async () => {
+test("ensureDeployBranch: 없으면 확인 후 생성 (push 거절 경로) + push 질문에 브랜치명 명시(#481)", async () => {
   const root = gitRepo();
   try {
     const answers = [true, false]; // 생성 yes, push no
+    const prompts = [];
     const logs = [];
     const r = await ensureDeployBranch({
       targetRoot: root, deployBranch: "develop", defaultBranch: "main",
-      io: { confirm: async () => answers.shift() }, say: (m) => logs.push(m),
+      io: { confirm: async ({ message }) => { prompts.push(message); return answers.shift(); } },
+      say: (m) => logs.push(m),
     });
     assert.equal(r.created, true);
     assert.equal(r.pushed, false);
     assert.equal(branchStatus(root, "develop").local, true);
+    // #481 — push 질문이 어느 브랜치인지 명시
+    assert.ok(prompts.some((p) => p.includes("'develop'") && p.includes("push")), `push 질문에 브랜치명 없음: ${JSON.stringify(prompts)}`);
+    // #482 — 안내에서 "배포 브랜치" 대신 "개발" 표현 사용
+    assert.ok(logs.some((l) => l.includes("개발") && l.includes("develop")), "개발 브랜치 표현 없음");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

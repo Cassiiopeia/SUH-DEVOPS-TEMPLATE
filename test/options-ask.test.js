@@ -74,10 +74,10 @@ metadata:
 
 // io 스텁 — confirm(Secret/CodeRabbit) + select(deploy/changelog) + multiselect(publish) + text(ollama base_url) 응답 시퀀스
 function stubIo({ confirms = [], selects = [], multiselects = [], texts = [] } = {}) {
-  const calls = { confirm: [], select: [], multiselect: [], text: [] };
+  const calls = { confirm: [], select: [], multiselect: [], text: [], logs: [] };
   return {
     calls,
-    log: () => {},
+    log: (m) => calls.logs.push(m),
     confirm: async (a) => { calls.confirm.push(a.message); return confirms.shift(); },
     select: async (a) => { calls.select.push(a.message); return selects.shift(); },
     multiselect: async (a) => { calls.multiselect.push(a.message); return multiselects.shift(); },
@@ -382,4 +382,157 @@ test("parseTemplateOptions: 신 secret_backup 키가 있으면 synology 무시 (
 test("parseTemplateOptions: synology:false는 승계 안 함 (null 유지)", () => {
   const y = 'metadata:\n  template:\n    options:\n      synology: false\n';
   assert.equal(parseTemplateOptions(y).secretBackup, null);
+});
+
+// ── #483: scope로 한 축만 재질문 (수정 메뉴 격리) ──────────────────────────
+
+test("askAllOptionalWorkflows: scope=[deploy]면 deploy만 재질문, 나머지는 current 유지", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    // deploy select 1회만 응답 — 다른 축은 물으면 안 됨(스텁이 빈 응답이면 undefined로 깨질 것)
+    const io = stubIo({ selects: ["vercel"] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["deploy"],
+      current: {
+        deploy: "docker-ssh", publish: ["nexus"], secretBackup: true,
+        codeReviewCoderabbit: true, changelogProvider: "commit", changelogBaseUrl: "", deployBranch: "release",
+      },
+    });
+    assert.equal(r.deploy, "vercel", "deploy만 새 값");
+    assert.deepEqual(r.publish, ["nexus"], "publish 유지");
+    assert.equal(r.secretBackup, true, "secret 유지");
+    assert.equal(r.codeReviewCoderabbit, true, "code-review 유지");
+    assert.equal(r.changelogProvider, "commit", "changelog 유지");
+    assert.equal(r.deployBranch, "release", "브랜치 유지");
+    assert.equal(io.calls.select.length, 1, "deploy select 한 번만");
+    assert.equal(io.calls.multiselect.length, 0, "publish 안 물음");
+    assert.equal(io.calls.confirm.length, 0, "code-review/secret 안 물음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: scope=[code-review]면 CodeRabbit만 재질문", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ confirms: [true] }); // code-review confirm 1회
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["code-review"],
+      current: {
+        deploy: "docker-ssh", publish: [], secretBackup: false,
+        codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop",
+      },
+    });
+    assert.equal(r.codeReviewCoderabbit, true, "code-review 새 값");
+    assert.equal(r.deploy, "docker-ssh", "deploy 유지");
+    assert.equal(io.calls.select.length, 0, "deploy/changelog 안 물음");
+    assert.equal(io.calls.confirm.length, 1, "code-review confirm 한 번만");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: scope=null(기본)이면 forceAsk 시 전 축 재질문 (기존 동작 보존)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ selects: ["none", "github-ai"], multiselects: [[]], confirms: [false, false] });
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io, forceAsk: true,
+      current: { deploy: "docker-ssh", publish: [], secretBackup: false, codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.equal(io.calls.select.length, 2, "deploy+changelog 둘 다 물음(전 축)");
+    assert.equal(io.calls.multiselect.length, 1, "publish도 물음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+// ── #481: 질문 안내 문구 (publish 명시 스킵 · CodeRabbit grant access · changelog 폴백) ──
+
+test("askAllOptionalWorkflows: CodeRabbit '사용' 시 grant access 후속 안내 출력 (#481)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ confirms: [true] }); // code-review only
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["code-review"],
+      current: { deploy: "docker-ssh", publish: [], secretBackup: false, codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.ok(io.calls.logs.some((l) => l.includes("coderabbit.ai")), "coderabbit.ai 안내 없음");
+    assert.ok(io.calls.logs.some((l) => l.includes("grant access") || l.includes("접근 권한")), "grant access 안내 없음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: CodeRabbit '미사용' 시 후속 안내 없음 (#481)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ confirms: [false] });
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["code-review"],
+      current: { deploy: "docker-ssh", publish: [], secretBackup: false, codeReviewCoderabbit: true, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.ok(!io.calls.logs.some((l) => l.includes("grant access") || l.includes("접근 권한")), "미사용인데 안내가 나옴");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: changelog 질문에 자동 폴백 안내 출력 (#481)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ selects: ["openai"] });
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["changelog"],
+      current: { deploy: "docker-ssh", publish: [], secretBackup: false, codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.ok(io.calls.logs.some((l) => l.includes("폴백")), "폴백 안내 없음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: publish 선택 없음 → '배포 안 함' 명시 로그 (#481)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ multiselects: [[]] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["publish"],
+      current: { deploy: "docker-ssh", publish: null, secretBackup: false, codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.deepEqual(r.publish, []);
+    assert.ok(io.calls.logs.some((l) => l.includes("라이브러리 배포") && l.includes("안 함")), "배포 안 함 명시 없음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+// ── #480: deploy/publish 두 축 먼저 갈라 묻기 ──────────────────────────────
+
+test("askAllOptionalWorkflows: 두 축 다 물을 때 큰 그림 안내 출력 + deploy 선택지에 라이브러리/CI 문구 없음 (#480)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    // 초기 통합 경로 (current 미설정 → deploy·publish 둘 다 물음)
+    const io = stubIo({ selects: ["docker-ssh", "github-ai"], multiselects: [[]], confirms: [false], texts: ["develop"] });
+    await askAllOptionalWorkflows({ tempDir, types: ["spring"], targetRoot: target, tty: true, io });
+    // 큰 그림 안내
+    assert.ok(io.calls.logs.some((l) => l.includes("두 가지") && l.includes("독립")), "두 축 안내 없음");
+    assert.ok(io.calls.logs.some((l) => l.includes("실행물")), "실행물 표현 없음");
+    // deploy 선택 라벨에서 '라이브러리/CI 전용' 제거 확인 (select message로 검증)
+    assert.ok(io.calls.select.some((m) => m.includes("실행물 배포 방식")), "deploy 질문 문구 미갱신");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: 한 축만 수정(scope)이면 큰 그림 안내 생략 (#480)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ selects: ["vercel"] });
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["deploy"],
+      current: { deploy: "docker-ssh", publish: ["nexus"], secretBackup: true, codeReviewCoderabbit: true, changelogProvider: "commit", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.ok(!io.calls.logs.some((l) => l.includes("두 가지") && l.includes("독립")), "한 축 수정인데 큰 그림 안내가 나옴");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });

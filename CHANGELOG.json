@@ -1,14 +1,43 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-12T07:37:37Z",
-    "currentVersion": "4.2.12",
+    "lastUpdated": "2026-07-12T08:47:43Z",
+    "currentVersion": "4.2.13",
     "projectType": "basic",
-    "totalReleases": 197,
+    "totalReleases": 198,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.13",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-12",
+      "pr_number": 484,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 통합 설정에서 한 항목만 수정해도 전체를 다시 묻던 문제 해결\n\n* **개선**\n  * 서버 배포와 라이브러리 배포를 먼저 명확히 구분해 안내합니다\n  * 라이브러리 배포를 안 할 때 선택이 더 분명해졌습니다\n  * 코드 리뷰를 켜면 실제 연동에 필요한 추가 설정을 안내합니다\n  * 릴리스 노트 생성 방식이 실패해도 자동 대체됨을 알려줍니다\n  * 개발 브랜치 설정 안내 문구가 이해하기 쉬워졌습니다",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "통합 설정에서 한 항목만 수정해도 전체를 다시 묻던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "서버 배포와 라이브러리 배포를 먼저 명확히 구분해 안내합니다",
+            "라이브러리 배포를 안 할 때 선택이 더 분명해졌습니다",
+            "코드 리뷰를 켜면 실제 연동에 필요한 추가 설정을 안내합니다",
+            "릴리스 노트 생성 방식이 실패해도 자동 대체됨을 알려줍니다",
+            "개발 브랜치 설정 안내 문구가 이해하기 쉬워졌습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.12",
       "project_type": "basic",

@@ -24,7 +24,7 @@ export async function ensureDeployBranch({ targetRoot = ".", deployBranch = "", 
     say(`ℹ️ '${deployBranch}' 브랜치가 원격에는 있고 로컬에 없습니다 — 필요 시 'git switch ${deployBranch}'로 가져오세요.`);
     return { created: false, pushed: false };
   }
-  say(`⚠️ 배포 브랜치 '${deployBranch}'가 없습니다 — 릴리스 파이프라인(${deployBranch}→${defaultBranch || "기본 브랜치"} PR)이 동작하려면 필요합니다.`);
+  say(`⚠️ 개발(릴리스 소스) 브랜치 '${deployBranch}'가 없습니다 — 릴리스(${deployBranch}→${defaultBranch || "기본 브랜치"} PR)가 동작하려면 필요합니다.`);
   const mk = await io.confirm({ message: `${defaultBranch || "현재"} 브랜치에서 '${deployBranch}' 브랜치를 만들까요?`, initialValue: true });
   if (mk !== true) {
     say(`→ 건너뜁니다. 나중에 직접: git checkout -b ${deployBranch} && git push -u origin ${deployBranch}`);
@@ -35,7 +35,8 @@ export async function ensureDeployBranch({ targetRoot = ".", deployBranch = "", 
     return { created: false, pushed: false };
   }
   say(`✅ 로컬 브랜치 '${deployBranch}' 생성 완료 (checkout은 하지 않았습니다)`);
-  const up = await io.confirm({ message: "원격(origin)에도 push할까요?", initialValue: true });
+  // #481 — push 질문에 브랜치명 명시 ("어느 브랜치를 push하는지" 불명확 방지)
+  const up = await io.confirm({ message: `원격(origin)에 '${deployBranch}' 브랜치도 push할까요?`, initialValue: true });
   if (up !== true) return { created: true, pushed: false };
   if (pushBranch(targetRoot, deployBranch)) {
     say(`✅ origin/${deployBranch} push 완료`);
@@ -85,15 +86,23 @@ async function askOptionalWorkflow({ dir, icon, short, desc, current, force, tty
   return include;
 }
 
+// 옵션 질문의 축 키 (#483 수정 스코프 단위) — 수정 메뉴가 이 단위로 한 축만 재질문한다.
+export const OPTION_AXES = ["deploy", "publish", "code-review", "changelog", "release-branch", "secret"];
+
 // 배포/publish 축 + Secret 백업을 순서대로 질문 (.sh ask_all_optional_workflows 등가).
 // tempDir: 템플릿 다운로드 루트 — project-types는 {tempDir}/.github/workflows/project-types
 // current: { deploy: string|null, publish: string[]|null, secretBackup: bool|null } — CLI 명시값
-// 반환: { deploy: string, publish: string[], secretBackup: bool }
+// scope: null이면 전 축(초기 통합·전체 재질문). Set/배열이면 그 축만 forceAsk 대상 (#483 수정 메뉴 격리).
+//        스코프 밖 축은 forceAsk여도 current/저장값을 그대로 유지하고 다시 묻지 않는다.
+// 반환: { deploy, publish, secretBackup, codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch }
 export async function askAllOptionalWorkflows({
   tempDir, types = [], current = {}, targetRoot = ".",
-  force = false, tty = true, io = {}, forceAsk = false, defaultBranch = "",
+  force = false, tty = true, io = {}, forceAsk = false, defaultBranch = "", scope = null,
 }) {
   const say = io.log || ((m) => process.stderr.write(`${m}\n`));
+  // 축별 재질문 여부: 전역 forceAsk이고, scope가 없거나 그 축을 포함할 때만 강제 질문.
+  const scopeSet = scope == null ? null : new Set(scope);
+  const ask = (axis) => forceAsk && (scopeSet === null || scopeSet.has(axis));
   let deploy = current.deploy ?? null;
   let publish = current.publish ?? null;
   let secretBackup = current.secretBackup ?? null;
@@ -139,36 +148,47 @@ export async function askAllOptionalWorkflows({
     if (deploy === null) deploy = "none";
     if (publish === null) publish = [];
   } else {
-    if (forceAsk || deploy === null) {
+    const willAskDeploy = ask("deploy") || deploy === null;
+    const willAskPublish = ask("publish") || publish === null;
+    // #480 — deploy·publish는 서로 다른 두 축이다. 둘 다 물을 참이면 먼저 큰 그림을 한 번 안내한다.
+    // (수정 메뉴로 한 축만 고칠 때는 맥락이 이미 명확하므로 생략)
+    if (willAskDeploy && willAskPublish && tty && typeof io.select === "function") {
+      say("");
+      say("🧭 배포는 두 가지가 따로 있습니다 — 서로 독립이라 각각 답하시면 됩니다:");
+      say("   1) 실행물 배포 — 서버/호스팅에 올려 돌리는 것 (Docker, Vercel …)");
+      say("   2) 라이브러리 배포(publish) — 남이 가져다 쓰게 레지스트리에 내는 것 (Nexus, npm …)");
+      say("   먼저 (1) 실행물 배포부터 물어보고, 이어서 (2) 라이브러리 배포를 물어봅니다.");
+    }
+    if (willAskDeploy) {
       if (force || !tty || typeof io.select !== "function") {
         deploy = deploy ?? "docker-ssh";
       } else {
         say("");
-        say("🚀 이 프로젝트를 어디에 배포하나요?");
-        say("   서버·호스팅에 올릴 계획이 있으면 고르고, 지금 없으면 '배포 안 함'으로 두면 됩니다.");
+        say("🚀 (1) 실행물(서버/앱)을 어디에 올리나요?");
+        say("   서버·호스팅에 올릴 계획이 있으면 고르고, 없으면 '서버에 올리지 않음'으로 두세요.");
         const ans = await io.select({
-          message: "배포 방식을 선택하세요",
+          message: "실행물 배포 방식을 선택하세요",
           options: [
             { value: "docker-ssh", label: "Docker + SSH 서버 배포 (기본)" },
             { value: "vercel", label: "Vercel" },
-            { value: "none", label: "배포하지 않음 (라이브러리/CI 전용)" },
+            { value: "none", label: "서버에 올리지 않음 (빌드 검증만 · 라이브러리는 다음에서 선택)" },
           ],
         });
         deploy = (!isCancel(ans) && DEPLOY_TARGETS.includes(ans)) ? ans : (deploy ?? "docker-ssh");
-        say(`배포 방식: ${deploy}`);
+        say(`실행물 배포: ${deploy}`);
       }
     }
 
     // ── ③ publish 타겟 (다중 선택) ──
-    if (forceAsk || publish === null) {
+    if (willAskPublish) {
       if (force || !tty || typeof io.multiselect !== "function") {
         publish = publish ?? [];
       } else {
         say("");
-        say("📦 라이브러리로 배포(publish)할 계획이 있나요?");
-        say("   사내 Nexus·npmjs·GitHub Packages 중 해당되는 걸 고르세요. 없으면 그냥 Enter.");
+        say("📦 (2) 이 프로젝트를 남이 가져다 쓰는 라이브러리로도 배포(publish)하나요?");
+        say("   (1) 실행물 배포와 별개입니다. 해당되는 걸 고르고, 라이브러리 배포를 안 하면 아무것도 고르지 말고 Enter.");
         const ans = await io.multiselect({
-          message: "publish 타겟을 선택하세요 (Space 토글, Enter 확정)",
+          message: "라이브러리 배포 타겟 (없으면 선택 없이 Enter = 배포 안 함)",
           options: [
             { value: "nexus", label: "사내 Maven(Nexus) 라이브러리 배포" },
             { value: "npm", label: "공개 npmjs 패키지 배포 (NPM_TOKEN)" },
@@ -180,13 +200,13 @@ export async function askAllOptionalWorkflows({
         publish = (!isCancel(ans) && Array.isArray(ans))
           ? ans.filter((t) => PUBLISH_TARGETS.includes(t))
           : (publish ?? []);
-        say(`Publish 타겟: ${publish.join(",") || "없음"}`);
+        say(publish.length ? `라이브러리 배포: ${publish.join(", ")}` : "라이브러리 배포: 안 함");
       }
     }
   }
 
   // ── code_review: CodeRabbit AI 코드 리뷰 (changelog와 무관 — #455) ──
-  if (forceAsk || codeReviewCoderabbit === null) {
+  if (ask("code-review") || codeReviewCoderabbit === null) {
     if (force || !tty || typeof io.confirm !== "function") {
       codeReviewCoderabbit = codeReviewCoderabbit ?? false;
     } else {
@@ -195,24 +215,33 @@ export async function askAllOptionalWorkflows({
       const ans = await io.confirm({ message: "CodeRabbit AI 코드 리뷰 사용", initialValue: false });
       codeReviewCoderabbit = (ans === true && !isCancel(ans));
       say(`CodeRabbit 코드 리뷰: ${codeReviewCoderabbit ? "사용" : "미사용"}`);
+      // #481 — "사용"만으로는 안 붙는다. 앱 설치 + 레포 접근 권한이 있어야 실제로 리뷰가 달린다.
+      if (codeReviewCoderabbit) {
+        say("   ⚠️ 실제로 리뷰가 붙으려면 추가 설정이 필요합니다:");
+        say("      1) https://coderabbit.ai 접속 → GitHub으로 로그인");
+        say("      2) CodeRabbit GitHub 앱 설치 → 이 저장소에 접근 권한(grant access) 부여");
+        say("      (이 단계를 안 하면 워크플로우는 켜져도 PR에 리뷰 댓글이 달리지 않습니다)");
+      }
     }
   }
 
   // ── changelog: 릴리스 노트 생성기 (기본 커서 = github-ai — #455) ──
-  if (forceAsk || changelogProvider === null) {
+  if (ask("changelog") || changelogProvider === null) {
     if (force || !tty || typeof io.select !== "function") {
       changelogProvider = changelogProvider ?? "github-ai";
     } else {
       say("");
-      say("📝 릴리스 노트(changelog)는 뭘로 만들까요?");
+      say("📝 릴리스 노트(changelog)는 1순위로 뭘로 만들까요?");
       say("   GitHub AI는 설정 없이 바로 됩니다. 나머지는 나중에 GitHub Secret 등록이 필요할 수 있어요.");
+      // #481 — 하나만 골라야 하는 게 아니다. 고른 게 실패하면 자동 폴백하므로 안심하고 고르라고 안내.
+      say("   ✅ 고른 방식이 실패해도 자동으로 GitHub AI → 커밋 분석 순으로 폴백하니 릴리스 노트는 항상 생성됩니다.");
       const ans = await io.select({
-        message: "changelog 생성기를 선택하세요",
+        message: "1순위 changelog 생성기를 선택하세요 (실패 시 자동 폴백)",
         options: [
           { value: "github-ai", label: "GitHub AI (추천 · 설정 불필요)" },
           { value: "coderabbit", label: "CodeRabbit" },
           { value: "openai", label: "OpenAI 호환 API (키 등록 필요)" },
-          { value: "commit", label: "커밋 분석만 (AI 없음)" },
+          { value: "commit", label: "커밋 분석만 (AI 없음 · 최후 안전망)" },
         ],
       });
       changelogProvider = (!isCancel(ans) && CHANGELOG_PROVIDERS.includes(ans)) ? ans : (changelogProvider ?? "github-ai");
@@ -221,7 +250,7 @@ export async function askAllOptionalWorkflows({
   }
 
   // ollama 선택 시에만 base_url 질문 (나머지 provider는 preset base_url 자동 — #455)
-  if (changelogProvider === "ollama" && (forceAsk || changelogBaseUrl === null || changelogBaseUrl === "")) {
+  if (changelogProvider === "ollama" && (ask("changelog") || changelogBaseUrl === null || changelogBaseUrl === "")) {
     if (force || !tty || typeof io.text !== "function") {
       changelogBaseUrl = changelogBaseUrl ?? "";
     } else {
@@ -233,18 +262,21 @@ export async function askAllOptionalWorkflows({
     changelogBaseUrl = "";
   }
 
-  // ── deploy_branch: 릴리스 PR의 head 브랜치 (#456 — default_branch와 별개) ──
-  //    대부분 develop→main 릴리스 구조라 기본값 develop. 다른 head를 쓰는 레포를 위해 물어본다.
-  if (forceAsk || deployBranch === null) {
+  // ── 릴리스 소스(개발) 브랜치 (#456 필드 deploy_branch — 이름과 달리 "개발 브랜치"다, #482) ──
+  //    이 값은 릴리스 PR(개발→기본)의 head, 즉 개발한 걸 모아 기본 브랜치로 올리는 브랜치다.
+  //    "배포 브랜치"가 아니다 — 배포가 도는 곳은 기본 브랜치(default) 쪽 개념. #482 참조.
+  if (ask("release-branch") || deployBranch === null) {
     if (force || !tty || typeof io.text !== "function") {
       deployBranch = deployBranch ?? "develop";
     } else {
+      const base = defaultBranch || "main"; // git으로 감지된 기본 브랜치 (#481 동적 안내)
       say("");
-      say("🌿 릴리스 배포 브랜치(릴리스 PR의 head)는 무엇인가요?");
-      say("   develop→main 릴리스 구조면 develop 그대로 두세요. 배포 브랜치가 따로면 그 이름을 적어주세요.");
-      const ans = await io.text({ message: "배포 브랜치", initialValue: deployBranch ?? "develop" });
+      say("🌿 개발한 코드를 모아서 배포로 올리는 '개발 브랜치'는 무엇인가요?");
+      say(`   감지된 기본(배포) 브랜치는 '${base}'입니다. 개발은 보통 그 앞단 브랜치(예: develop)에서 모아 올립니다.`);
+      say("   특별한 이유가 없으면 develop 그대로 두세요.");
+      const ans = await io.text({ message: "개발(릴리스 소스) 브랜치", initialValue: deployBranch ?? "develop" });
       deployBranch = (typeof ans === "string" && !isCancel(ans) && ans.trim()) ? ans.trim() : (deployBranch ?? "develop");
-      say(`배포 브랜치: ${deployBranch}`);
+      say(`개발(릴리스 소스) 브랜치: ${deployBranch}`);
       // 브랜치 존재 확인 + 생성 제안 (#477) — 없으면 릴리스 파이프라인이 조용히 놀게 된다
       await ensureDeployBranch({ targetRoot, deployBranch, defaultBranch, io, say });
     }
@@ -256,7 +288,7 @@ export async function askAllOptionalWorkflows({
   secretBackup = await askOptionalWorkflow({
     dir: join(ptDir, "common", "secret-backup"), icon: "🔐", short: "Secret 서버 백업",
     desc: "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다.",
-    current: secretBackup, force, tty, io, forceAsk, say,
+    current: secretBackup, force, tty, io, forceAsk: ask("secret"), say,
   });
 
   return {

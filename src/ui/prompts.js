@@ -39,7 +39,12 @@ export async function editMenu({ showOptional = false } = {}) {
     { value: "branch", label: "기본 브랜치" },
   ];
   if (showOptional) {
-    options.push({ value: "deploy-publish", label: "배포/Publish 방식" });
+    // #483 — 항목별 격리: 한 축만 골라 그 축만 재질문한다 (통짜 "배포/Publish 방식" 분해)
+    options.push({ value: "deploy", label: "배포 방식 (서버 실행물)" });
+    options.push({ value: "publish", label: "라이브러리 배포(publish) 타겟" });
+    options.push({ value: "code-review", label: "CodeRabbit 코드 리뷰" });
+    options.push({ value: "changelog", label: "릴리스 노트(changelog) 생성기" });
+    options.push({ value: "release-branch", label: "릴리스 소스(개발) 브랜치" });
     options.push({ value: "secret", label: "Secret 백업 포함 여부" });
   }
   options.push({ value: "done", label: "모두 맞음, 계속" });

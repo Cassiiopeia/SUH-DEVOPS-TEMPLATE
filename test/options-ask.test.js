@@ -505,3 +505,34 @@ test("askAllOptionalWorkflows: publish 선택 없음 → '배포 안 함' 명시
     assert.ok(io.calls.logs.some((l) => l.includes("라이브러리 배포") && l.includes("안 함")), "배포 안 함 명시 없음");
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });
+
+// ── #480: deploy/publish 두 축 먼저 갈라 묻기 ──────────────────────────────
+
+test("askAllOptionalWorkflows: 두 축 다 물을 때 큰 그림 안내 출력 + deploy 선택지에 라이브러리/CI 문구 없음 (#480)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    // 초기 통합 경로 (current 미설정 → deploy·publish 둘 다 물음)
+    const io = stubIo({ selects: ["docker-ssh", "github-ai"], multiselects: [[]], confirms: [false], texts: ["develop"] });
+    await askAllOptionalWorkflows({ tempDir, types: ["spring"], targetRoot: target, tty: true, io });
+    // 큰 그림 안내
+    assert.ok(io.calls.logs.some((l) => l.includes("두 가지") && l.includes("독립")), "두 축 안내 없음");
+    assert.ok(io.calls.logs.some((l) => l.includes("실행물")), "실행물 표현 없음");
+    // deploy 선택 라벨에서 '라이브러리/CI 전용' 제거 확인 (select message로 검증)
+    assert.ok(io.calls.select.some((m) => m.includes("실행물 배포 방식")), "deploy 질문 문구 미갱신");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: 한 축만 수정(scope)이면 큰 그림 안내 생략 (#480)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ selects: ["vercel"] });
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["deploy"],
+      current: { deploy: "docker-ssh", publish: ["nexus"], secretBackup: true, codeReviewCoderabbit: true, changelogProvider: "commit", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.ok(!io.calls.logs.some((l) => l.includes("두 가지") && l.includes("독립")), "한 축 수정인데 큰 그림 안내가 나옴");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});

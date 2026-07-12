@@ -148,34 +148,45 @@ export async function askAllOptionalWorkflows({
     if (deploy === null) deploy = "none";
     if (publish === null) publish = [];
   } else {
-    if (ask("deploy") || deploy === null) {
+    const willAskDeploy = ask("deploy") || deploy === null;
+    const willAskPublish = ask("publish") || publish === null;
+    // #480 — deploy·publish는 서로 다른 두 축이다. 둘 다 물을 참이면 먼저 큰 그림을 한 번 안내한다.
+    // (수정 메뉴로 한 축만 고칠 때는 맥락이 이미 명확하므로 생략)
+    if (willAskDeploy && willAskPublish && tty && typeof io.select === "function") {
+      say("");
+      say("🧭 배포는 두 가지가 따로 있습니다 — 서로 독립이라 각각 답하시면 됩니다:");
+      say("   1) 실행물 배포 — 서버/호스팅에 올려 돌리는 것 (Docker, Vercel …)");
+      say("   2) 라이브러리 배포(publish) — 남이 가져다 쓰게 레지스트리에 내는 것 (Nexus, npm …)");
+      say("   먼저 (1) 실행물 배포부터 물어보고, 이어서 (2) 라이브러리 배포를 물어봅니다.");
+    }
+    if (willAskDeploy) {
       if (force || !tty || typeof io.select !== "function") {
         deploy = deploy ?? "docker-ssh";
       } else {
         say("");
-        say("🚀 이 프로젝트를 어디에 배포하나요?");
-        say("   서버·호스팅에 올릴 계획이 있으면 고르고, 지금 없으면 '배포 안 함'으로 두면 됩니다.");
+        say("🚀 (1) 실행물(서버/앱)을 어디에 올리나요?");
+        say("   서버·호스팅에 올릴 계획이 있으면 고르고, 없으면 '서버에 올리지 않음'으로 두세요.");
         const ans = await io.select({
-          message: "배포 방식을 선택하세요",
+          message: "실행물 배포 방식을 선택하세요",
           options: [
             { value: "docker-ssh", label: "Docker + SSH 서버 배포 (기본)" },
             { value: "vercel", label: "Vercel" },
-            { value: "none", label: "배포하지 않음 (라이브러리/CI 전용)" },
+            { value: "none", label: "서버에 올리지 않음 (빌드 검증만 · 라이브러리는 다음에서 선택)" },
           ],
         });
         deploy = (!isCancel(ans) && DEPLOY_TARGETS.includes(ans)) ? ans : (deploy ?? "docker-ssh");
-        say(`배포 방식: ${deploy}`);
+        say(`실행물 배포: ${deploy}`);
       }
     }
 
     // ── ③ publish 타겟 (다중 선택) ──
-    if (ask("publish") || publish === null) {
+    if (willAskPublish) {
       if (force || !tty || typeof io.multiselect !== "function") {
         publish = publish ?? [];
       } else {
         say("");
-        say("📦 이 프로젝트를 남이 가져다 쓰는 라이브러리로도 배포(publish)하나요?");
-        say("   서버 배포와 별개입니다. 해당되는 걸 고르고, 라이브러리 배포를 안 하면 아무것도 고르지 말고 Enter.");
+        say("📦 (2) 이 프로젝트를 남이 가져다 쓰는 라이브러리로도 배포(publish)하나요?");
+        say("   (1) 실행물 배포와 별개입니다. 해당되는 걸 고르고, 라이브러리 배포를 안 하면 아무것도 고르지 말고 Enter.");
         const ans = await io.multiselect({
           message: "라이브러리 배포 타겟 (없으면 선택 없이 Enter = 배포 안 함)",
           options: [

@@ -51,7 +51,7 @@
 | 분류 | 특징 | 예시 |
 |------|------|------|
 | **Type A: 단순** | Secrets 없음, 기능 단순 | SYNC-ISSUE-LABELS, VERSION-CONTROL |
-| **Type B: 기본** | Secrets 있음, 환경변수 단순 | CHANGELOG-CONTROL, NEXUS-CI |
+| **Type B: 기본** | Secrets 있음, 환경변수 단순 | RELEASE-CHANGELOG, NEXUS-CI |
 | **Type C: CI** | 빌드 검증, 설정 옵션 다수 | FLUTTER-CI, REACT-CI |
 | **Type D: CD** | 배포, 환경변수 상세 가이드 | SPRING-CICD, PYTHON-CICD |
 | **Type E: 특수** | 마법사 연동, 복잡한 설명 | IOS-TESTFLIGHT, PLAYSTORE-CICD, FIREBASE-CICD |
@@ -278,7 +278,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 - IOS-TESTFLIGHT
 - PLAYSTORE-CICD
 - FIREBASE-CICD
-- SUH-LAB-BUILD-TRIGGER
+- PROJECTOPS-APP-BUILD-TRIGGER
 - PR-PREVIEW
 
 ---
@@ -363,7 +363,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 | PLAYSTORE-CICD | E | ✅ |
 | FIREBASE-CICD | E | ✅ |
 | IOS-TESTFLIGHT | E | ✅ |
-| SUH-LAB-BUILD-TRIGGER | E | ✅ |
+| PROJECTOPS-APP-BUILD-TRIGGER | E | ✅ |
 
 ### project-types/spring/
 

@@ -1,6 +1,6 @@
 # 체인지로그 자동화
 
-main 브랜치로 PR이 생성되면 CodeRabbit AI 리뷰를 기반으로 체인지로그가 자동 생성됩니다.
+main 브랜치로 PR(develop→main)이 생성되면 릴리스 노트 provider(기본: CodeRabbit, 신규 설치 기본: github-ai)가 체인지로그를 자동 생성합니다. provider가 실패해도 폴백 사다리(github-ai → commit)가 릴리스 노트를 끝까지 만들어냅니다 (#455).
 
 ---
 
@@ -8,7 +8,8 @@ main 브랜치로 PR이 생성되면 CodeRabbit AI 리뷰를 기반으로 체인
 
 | 기능 | 설명 |
 |------|------|
-| **AI 분석** | CodeRabbit이 변경사항 자동 분석 |
+| **AI 분석** | 선택한 provider(coderabbit/github-ai/openai 계열/commit)가 변경사항 자동 분석 |
+| **폴백 사다리** | provider 실패 시 github-ai → commit 순 폴백, 폴백 발생 시 PR 댓글 알림 |
 | **카테고리 분류** | Features, Bug Fixes 등 자동 분류 |
 | **이중 형식** | JSON (데이터) + Markdown (가독성) |
 | **PR 제목 자동화** | `Deploy YYYYMMDD-vX.X.X` 형식으로 변경 |
@@ -27,16 +28,52 @@ develop 푸시
 develop → main PR 자동 생성
     │
     ▼
-CodeRabbit AI 리뷰
+릴리스 노트 생성 (provider 사다리)
     │
     ▼
-CHANGELOG-CONTROL 워크플로우
+RELEASE-CHANGELOG 워크플로우
     │
     ├─ Summary 파싱
     ├─ CHANGELOG.json 업데이트
     ├─ CHANGELOG.md 생성
     └─ PR 자동 머지
 ```
+
+> 구명칭 이력: 이 워크플로우는 `PROJECT-COMMON-AUTO-CHANGELOG-CONTROL`에서 v4.3.0에 `PROJECT-COMMON-RELEASE-CHANGELOG`로 리네임되었습니다. 구 파일이 남아있으면 `npx projectops` 업데이트가 자동 무해화합니다 ([NPX 마법사 가이드](NPX-WIZARD.md) 참조).
+
+---
+
+## 릴리스 노트 provider 사다리
+
+릴리스 노트 생성기는 `version.yml`의 `metadata.template.options.changelog.provider`로 선택합니다 (#455).
+
+```yaml
+metadata:
+  template:
+    options:
+      changelog:
+        provider: "github-ai"   # coderabbit | github-ai | openai | gemini | claude | ollama | commit
+        # base_url: "http://localhost:11434/v1"   # ollama 전용 (필수)
+```
+
+| provider | 방식 | 요구사항 |
+|----------|------|---------|
+| `coderabbit` (미설정 시 기본 — 기존 동작 보존) | CodeRabbit Summary 폴링 | 저장소에 CodeRabbit 앱 설치 |
+| `github-ai` (신규 설치 기본) | GitHub Models API (`github_ai.py`) | 없음 — job의 `permissions: models: read` + GITHUB_TOKEN만으로 동작 (API 키 불필요, 기본 모델 `openai/gpt-4o-mini`) |
+| `openai` / `gemini` / `claude` | OpenAI 호환 API (`openai_compatible.py`) | `MODEL_API_KEY` secret |
+| `ollama` | OpenAI 호환 API (자체 호스팅) | `changelog.base_url` 필수 (기본 모델 `qwen2.5`) |
+| `commit` | 커밋 메시지 분석 (`commit.py`) | 없음 — AI·네트워크 무의존 최후 보루 |
+
+**폴백 순서** (`.github/scripts/changelog_providers/ladder.py`):
+
+- `commit` → commit만 실행
+- `openai`/`gemini`/`claude`/`ollama` → 해당 provider → github-ai → commit
+- `github-ai` → github-ai → commit
+- `coderabbit` → Summary 폴링 무응답 시 github-ai → commit
+
+폴백이 발생하면 어떤 provider로 대체됐는지 **PR 댓글로 알림**이 남습니다. commit provider가 항상 완주하므로 릴리스 노트가 비는 일은 없습니다.
+
+테스트: `python -m pytest .github/scripts/test/test_changelog_providers.py`
 
 ---
 
@@ -105,7 +142,7 @@ python3 .github/scripts/changelog_manager.py validate
 
 ## 카테고리 분류
 
-CodeRabbit이 변경사항을 자동으로 분류합니다.
+선택한 provider가 변경사항을 자동으로 분류합니다.
 
 | 카테고리 | 설명 | 예시 키워드 |
 |----------|------|------------|
@@ -150,16 +187,16 @@ on:
 - main 브랜치로 PR 생성/업데이트
 
 **실행 내용**:
-1. CodeRabbit Summary 대기
-2. Summary 파싱
-3. CHANGELOG.json 업데이트
-4. CHANGELOG.md 생성
-5. 변경사항 커밋
+1. version.yml에서 changelog provider 판독 (미설정 시 coderabbit)
+2. provider=coderabbit이면 Summary 요청·폴링 / 아니면 폴링 생략
+3. Summary가 없으면 fallback-summary job이 provider 사다리(ladder.py) 실행
+4. Summary/릴리스 노트 파싱 → CHANGELOG.json 업데이트 → CHANGELOG.md 생성
+5. 변경사항 커밋 (버전 확정 커밋)
 6. PR 자동 머지
 
 ---
 
-## CodeRabbit 연동
+## CodeRabbit 연동 (provider=coderabbit일 때)
 
 ### 필수 조건
 
@@ -213,9 +250,9 @@ CodeRabbit이 PR에 남기는 Summary 형식:
 **증상**: PR 머지 후에도 CHANGELOG가 업데이트 안됨
 
 **확인 사항**:
-1. CodeRabbit이 Summary를 남겼는지 확인
-2. `_GITHUB_PAT_TOKEN` Secret 설정 확인
-3. Actions 로그에서 에러 확인
+1. `version.yml`의 `options.changelog.provider` 값 확인 (coderabbit이면 CodeRabbit이 Summary를 남겼는지 확인)
+2. `_GITHUB_PAT_TOKEN` Secret 설정 확인 (openai 계열 provider는 `MODEL_API_KEY`도 확인)
+3. Actions 로그에서 fallback-summary job이 어느 provider로 완주했는지 확인 (`PROVIDER=<승자>` 출력)
 
 ### Summary 파싱 실패
 

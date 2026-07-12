@@ -153,6 +153,23 @@ snake_case.sh / snake_case.py
 | **deploy** | 실행물(서버/앱)을 어디에 올리나 | **택1** | `docker-ssh`(기본)·`vercel`·`none` | `options.deploy` |
 | **publish** | 라이브러리/패키지를 어느 레지스트리에 내나 | **0..n 공존** | `nexus`·`npm`·`github-packages` | `options.publish` 배열 |
 
+##### 🧭 intent(프로젝트 성격) 우선 분기 (#485, v4.2.14 — agent 필독)
+
+두 축을 낱개로 묻던 구조가 사용자에게 "이게 나한테 해당되나?" 부담을 줬다. 이제 **먼저 프로젝트 성격(intent)을 한 번 묻고, 그 답이 위 두 축을 유도**한다.
+
+| intent | deploy 질문 | publish 질문 | version.yml 키 |
+|--------|------------|-------------|---------------|
+| `app` | 물음 | **스킵**(`publish=[]`) | `options.intent` |
+| `library` | **스킵**(`deploy=none`) | 물음 | |
+| `both` | 물음 | 물음 | |
+| `none` | **스킵**(`none`) | **스킵**(`[]`) | |
+| `manual` | 물음 | 물음(기존 순차 질문 그대로 — 탈출구) | |
+
+- `metadata.template.options.intent`에 저장. 구 version.yml(intent 없음)은 `deploy`/`publish` 값에서 **역추론**(`inferIntent`, `src/core/version-yml.js`)해 하위호환. deploy≠none&publish=[]→app, deploy=none&publish≠[]→library, 둘 다→both, 둘 다 없음→none.
+- 비대화형 `--intent app|library|both|none|manual`. 미지정 시 `--deploy`/`--publish`에서 역추론(기존 CLI 무수정 동작). intent 명시 + 해당 축 플래그 없으면 intent가 그 축을 유도(library→deploy=none 등, `src/index.js`).
+- 수정 메뉴에 "프로젝트 성격" 항목(#485) + 개별 축 항목(#483) 병존. 성격을 바꾸면 축이 재유도되고, 개별 축 항목은 그 축만 세밀 조정(`scope`).
+- **`basic` 단독 타입은 intent 질문도 스킵** — `none`으로 확정.
+
 - **`basic` 단독 타입은 배포/publish 질문을 건너뛴다** — 서버·라이브러리 개념이 없는 범용 타입이라 물어보면 사용자가 당황한다. `deploy=none`·`publish=[]`로 조용히 확정하고 분석 카드에만 표시. 타입을 바꾸면(수정 메뉴 → 프로젝트 타입) 그때 질문이 등장한다. (3중 구현 모두: js `isBasicOnly`, `.sh` `_is_basic_only`, `.ps1` `Test-BasicOnly`)
 - 실타입 질문 앞에는 "**왜 묻는지**" 맥락 한 줄을 붙인다 (서버 올릴 계획 있으면 고르고 없으면 넘기라는 안내).
 - 비대화형: `--deploy docker-ssh|vercel|none` + `--publish nexus,npm`(csv). `.ps1`은 `-Deploy`/`-Publish`.

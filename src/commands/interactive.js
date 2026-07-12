@@ -88,6 +88,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     let changelogProvider = existing?.options?.changelogProvider ?? "github-ai";
     let changelogBaseUrl = existing?.options?.changelogBaseUrl ?? "";
     let deployBranch = existing?.options?.deployBranch ?? "develop"; // #456
+    let intent = existing?.options?.intent ?? null; // #485 프로젝트 성격
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
 
@@ -104,6 +105,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           changelogProvider: existing?.options?.changelogProvider ?? null,
           changelogBaseUrl: existing?.options?.changelogBaseUrl ?? null,
           deployBranch: existing?.options?.deployBranch ?? null,
+          intent: existing?.options?.intent ?? null,
         },
         force: false, tty: realTty,
         io: {
@@ -120,6 +122,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       changelogProvider = r.changelogProvider;
       changelogBaseUrl = r.changelogBaseUrl;
       deployBranch = r.deployBranch;
+      intent = r.intent;
     }
 
     // 확인/수정 루프 — ESC는 '머무르기' (.sh L1877~1881: 명시적 '아니오'만 종료)
@@ -165,7 +168,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
             tempDir, types, targetRoot: cwd, defaultBranch: branch,
             current: {
               deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup,
-              codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch,
+              codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch, intent,
             },
             force: false, tty: realTty, forceAsk: true, scope: [what],
             io: {
@@ -182,6 +185,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           changelogProvider = r.changelogProvider;
           changelogBaseUrl = r.changelogBaseUrl;
           deployBranch = r.deployBranch;
+          intent = r.intent;
         }
       }
     }
@@ -211,7 +215,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     const { now, today } = clock || utcNow();
     const ctx = createContext({
       mode, force: true, types, version, versionCode, branch, paths, deployTarget, publishTargets, includeSecretBackup,
-      codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch,
+      codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch, intent,
       repoName, templateVersion, resolvers, envValues, envUseDefaults, now, today,
     });
     ctx.templateVersion = templateVersion;

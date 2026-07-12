@@ -45,6 +45,15 @@ test("deploy/publish 축 플래그 (#439)", () => {
   assert.equal(parseArgs(["--secret-backup"]).includeSecretBackup, true);
 });
 
+test("--intent 플래그 (#485)", () => {
+  assert.equal(parseArgs(["--intent", "library"]).intent, "library");
+  assert.equal(parseArgs(["--intent", "app"]).intent, "app");
+  assert.equal(parseArgs(["--intent", "both"]).intent, "both");
+  assert.equal(parseArgs(["--intent", "manual"]).intent, "manual");
+  assert.equal(parseArgs([]).intent, null); // 미지정 → null(역추론)
+  assert.throws(() => parseArgs(["--intent", "bogus"]), CliError);
+});
+
 test("deprecated alias — --nexus/--npm-publish는 신 축으로 해석 (#439)", () => {
   const r1 = parseArgs(["--nexus"]);
   assert.deepEqual(r1.publishTargets, ["nexus"]);

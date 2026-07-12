@@ -103,15 +103,26 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   const { now, today } = clock || utcNow();
   const tempDir = join(cwd, PATHS.tempDir);
 
+  // 프로젝트 성격(#485): CLI --intent → version.yml 저장값. deploy/publish 유도의 기준.
+  const intent = opts.intent ?? existing?.options?.intent ?? null;
+  // 배포/publish 축(#439): CLI 플래그 최우선 → 저장값 → 기본값. 단 --intent가 명시됐고 해당 축 플래그가
+  //   없으면 intent가 유도한다 (#485 비대화형): library/none이면 deploy=none, app/none이면 publish=[].
+  let deployTarget = opts.deployTarget ?? existing?.options?.deploy ?? "docker-ssh";
+  let publishTargets = opts.publishTargets ?? existing?.options?.publish ?? [];
+  if (opts.intent != null) {
+    if ((intent === "library" || intent === "none") && opts.deployTarget == null) deployTarget = "none";
+    if ((intent === "app" || intent === "none") && opts.publishTargets == null) publishTargets = [];
+  }
+
   const context = createContext({
     mode: opts.mode, force: true, types, version, versionCode, branch,
     paths,
-    // 배포/publish 축(#439): CLI 플래그 최우선 → version.yml 저장 옵션(구 키 자동 마이그레이션) → 기본값
-    deployTarget: opts.deployTarget ?? existing?.options?.deploy ?? "docker-ssh",
-    publishTargets: opts.publishTargets ?? existing?.options?.publish ?? [],
+    deployTarget,
+    publishTargets,
     includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
     // 릴리스 배포 브랜치(#456): CLI 플래그 → version.yml 저장값 → 빈 값(미출력, 스킬이 develop 폴백)
     deployBranch: opts.deployBranch || existing?.options?.deployBranch || "",
+    intent,
     // changelog/code_review 축(#455): 비대화형은 저장값 → 기본값. null이 흘러 provider:"null"로 기록되던 버그 수정.
     changelogProvider: existing?.options?.changelogProvider ?? "github-ai",
     changelogBaseUrl: existing?.options?.changelogBaseUrl ?? "",

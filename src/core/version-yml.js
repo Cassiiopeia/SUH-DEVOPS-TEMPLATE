@@ -52,7 +52,7 @@ const HEADER = `# ==============================================================
 export function parseTemplateOptions(content) {
   const out = { deploy: null, publish: null, secretBackup: null,
                 changelogProvider: null, changelogBaseUrl: null, codeReviewCoderabbit: null,
-                deployBranch: null };
+                deployBranch: null, intent: null };
   // deploy_branch는 metadata 직속(#456) — template.options 밖이라 별도로 스캔한다.
   for (const line of String(content || "").split("\n")) {
     if (line.startsWith("#")) continue;
@@ -84,6 +84,14 @@ export function parseTemplateOptions(content) {
         if (pm) { out.changelogProvider = strip(pm[1]); continue; }
         const bm = line.match(/^\s+base_url:\s*(.*)/);
         if (bm) { out.changelogBaseUrl = strip(bm[1]); continue; }
+      }
+      // intent(프로젝트 성격, #485) — deploy 라인보다 먼저 매칭 (deploy: 와 intent: 구분).
+      // 값 뒤 인라인 주석(# ...)이 붙으므로 따옴표 안 or 첫 토큰만 취한다.
+      let im = line.match(/^\s+intent:\s*["']?([a-z]+)["']?/);
+      if (im) {
+        const v = im[1];
+        if (["app", "library", "both", "none", "manual"].includes(v)) out.intent = v;
+        continue;
       }
       let m = line.match(/^\s+deploy:\s*(.+)/);
       if (m) {
@@ -142,6 +150,22 @@ export function parseTemplateOptions(content) {
   // 구 synology 키 → secret_backup 승계 (#473) — 신 키가 명시된 경우는 신 키 우선
   if (out.secretBackup === null && legacySynology === true) out.secretBackup = true;
   return out;
+}
+
+// deploy/publish 저장값에서 intent(프로젝트 성격) 역추론 (#485 — intent 키 없는 구 version.yml 하위호환).
+//   deploy≠none & publish=[]  → app     (서버/앱만)
+//   deploy=none & publish≠[]  → library (라이브러리만)
+//   deploy≠none & publish≠[]  → both
+//   deploy=none & publish=[]  → none
+// deploy/publish가 아직 null(미설정)이면 intent도 추론 불가 → null 반환(진입 질문을 하도록).
+export function inferIntent(deploy, publish) {
+  if (deploy == null && (publish == null)) return null;
+  const hasServer = deploy != null && deploy !== "none";
+  const hasLib = Array.isArray(publish) && publish.length > 0;
+  if (hasServer && hasLib) return "both";
+  if (hasServer) return "app";
+  if (hasLib) return "library";
+  return "none";
 }
 
 // v4.1.0 이전 단수 project_type 키 → project_types 배열 최소 변환 (#471).
@@ -267,14 +291,17 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
   // template 옵션 블록 (.sh save_template_options 신규 추가 케이스). templateOptions 지정 시.
   if (templateOptions) {
     const { templateVersion = "unknown", deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, optionsDate = today,
-            changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true } = templateOptions;
+            changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true, intent = null } = templateOptions;
     const publishJson = `[${publishTargets.map((t) => `"${t}"`).join(",")}]`;
+    // intent(프로젝트 성격, #485) — 미지정이면 deploy/publish에서 역추론해 기록 (재통합 시 진입 질문 생략용)
+    const intentVal = intent || inferIntent(deployTarget, publishTargets) || "manual";
     out += `  template:\n`;
     out += `    source: "projectops"\n`;
     out += `    version: "${templateVersion}"\n`;
     out += `    integrated_date: "${optionsDate}"\n`;
     out += `    last_update_date: "${optionsDate}"\n`;
     out += `    options:\n`;
+    out += `      intent: "${intentVal}"   # 프로젝트 성격(app/library/both/none/manual) — 배포 질문 유도 기준\n`;
     out += `      deploy: "${deployTarget}"\n`;
     out += `      publish: ${publishJson}\n`;
     out += `      secret_backup: ${includeSecretBackup}\n`;

@@ -3,6 +3,7 @@ import { VALID_TYPES } from "../context.js";
 
 export const DEPLOY_TARGETS = ["docker-ssh", "vercel", "none"];
 export const PUBLISH_TARGETS = ["nexus", "npm", "github-packages"];
+export const INTENT_VALUES = ["app", "library", "both", "none", "manual"];
 
 // argv(process.argv.slice(2)) → 파싱 결과. 오류 시 throw(호출부에서 exit 1).
 export function parseArgs(argv) {
@@ -14,6 +15,7 @@ export function parseArgs(argv) {
     deployTarget: null,      // 배포 축 (#439): docker-ssh|vercel|none, null=미설정
     publishTargets: null,    // publish 축 (#439): 타겟 배열, null=미설정
     deployBranch: "",        // 릴리스 PR head 브랜치 (#456): --deploy-branch, 빈 값=미지정
+    intent: null,            // 프로젝트 성격 (#485): --intent app|library|both|none|manual, null=미설정(역추론)
     includeSecretBackup: null,
     pathsCsv: "",            // "flutter=app,react=client" 원문 (정규화는 resolve 단계)
     force: false,
@@ -77,6 +79,15 @@ export function parseArgs(argv) {
         // 릴리스 PR head 브랜치 (#456). default_branch와 별개.
         const v = (args.shift() ?? "").trim();
         if (v) result.deployBranch = v;
+        break;
+      }
+      case "--intent": {
+        // 프로젝트 성격 (#485). 미지정이면 --deploy/--publish에서 역추론.
+        const v = (args.shift() ?? "").trim();
+        if (!INTENT_VALUES.includes(v)) {
+          throw new CliError(`--intent 값은 ${INTENT_VALUES.join(" | ")} 중 하나여야 합니다: '${v}'`);
+        }
+        result.intent = v;
         break;
       }
       // ── deprecated alias (1 minor 유지 — #439) ──

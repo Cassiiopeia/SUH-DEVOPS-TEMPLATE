@@ -24,6 +24,7 @@ export function createContext(overrides = {}) {
     changelogBaseUrl: null,  // ollama일 때만 값
     codeReviewCoderabbit: null,
     deployBranch: "",        // 릴리스 PR head 브랜치 (#456). 빈 값=metadata.deploy_branch 미출력
+    intent: null,            // 프로젝트 성격 (#485 — app/library/both/none/manual). null=미설정(역추론)
     templateVersion: "",
     tempDir: "",
     deployValues: new Map(), // "type.KEY" -> value

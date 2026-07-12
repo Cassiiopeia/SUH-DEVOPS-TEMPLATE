@@ -5,11 +5,13 @@
 //
 // 항목 스키마:
 //   id         - 고유 식별자 (kebab-case)
-//   category   - "workflow" | "root-file"  (rules/ 폴더의 구현이 detect/apply 담당)
+//   category   - "workflow" | "root-file" | "legacy-dir"  (rules/ 폴더의 구현이 detect/apply 담당)
 //   tier       - "safe"    : 신형이 같은 기능을 대체(순수 리네임). 공존 시 이중 트리거 실해
 //                            → 확인 1회 후 자동 무해화(.bak) / 삭제
 //                "confirm" : 배포 파이프라인일 수 있음(그 레포의 유일한 현역 배포 가능성)
 //                            → 자동으로 건드리지 않고 안내만. --force에서도 불변
+//                "ask"     : 사용자 콘텐츠가 담긴 폴더 등 — 손실 없는 이동이지만 사용자 소유물 (#476)
+//                            → 대화형: 확인 후 이동 / 비대화형: 자동 조치 없이 안내만
 //   file       - 정확한 파일명 (글롭 금지 — 사용자 커스텀 보호의 핵심)
 //   replacedBy - 대체 신형 파일명 (없으면 null)
 //   since      - 구 파일이 폐기된 템플릿 버전(참고용)
@@ -145,4 +147,9 @@ export const MIGRATIONS = [
     file: "SETUP-GUIDE.md", replacedBy: "PROJECTOPS-SETUP-GUIDE.md",
     since: "2.x", reason: "구 가이드 문서 — 잔재",
     contentMarker: "SUH" }, // 범용 파일명이라 내용에 템플릿 마커가 있을 때만 소유 판정
+
+  // ── legacy-dir / ask — 구명칭 산출물 폴더 (사용자 문서 보존 이동, #476) ────────
+  { id: "dir-docs-suh-template", category: "legacy-dir", tier: "ask",
+    file: "docs/suh-template", replacedBy: "docs/projectops",
+    since: "4.2.9", reason: "리브랜딩 — 스킬 산출물(이슈·보고서) 폴더 구명칭. 신 스킬은 docs/projectops/에 저장" },
 ];

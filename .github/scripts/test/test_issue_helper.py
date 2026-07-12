@@ -177,3 +177,79 @@ def test_comment_contains_marker_twice():
 
 def test_comment_guide_hidden_when_disabled():
     assert "가이드텍스트" not in _body(show_guide=False)
+
+
+from issue_helper import (
+    LEGACY_MARKER_HINTS,
+    find_existing_comment,
+    prepare_comment,
+    should_process,
+    today_yyyymmdd,
+)
+
+
+def _payload(action="opened", title="[버그] 로그인 실패", changes=None):
+    p = {
+        "action": action,
+        "issue": {
+            "number": 7,
+            "title": title,
+            "html_url": "https://github.com/o/r/issues/7",
+            "labels": [{"name": "작업전"}],
+            "assignees": [{"login": "Cassiiopeia"}],
+        },
+        "repository": {"name": "r", "owner": {"login": "o"}},
+    }
+    if changes is not None:
+        p["changes"] = changes
+    return p
+
+
+# ── 이벤트 필터링 ────────────────────────────────────────────────────────
+def test_process_opened():
+    assert should_process(_payload("opened")) is True
+
+def test_process_edited_with_title_change():
+    assert should_process(_payload("edited", changes={"title": {"from": "old"}})) is True
+
+def test_skip_edited_body_only():
+    assert should_process(_payload("edited", changes={"body": {"from": "old"}})) is False
+
+def test_skip_other_actions():
+    assert should_process(_payload("closed")) is False
+
+
+# ── 종단 조립 ────────────────────────────────────────────────────────────
+def test_prepare_comment_end_to_end(tmp_path):
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    branch, commit, body = prepare_comment(_payload(), dict(DEFAULT_CONFIG), wf, "20260712")
+    assert branch == "20260712_#7_로그인_실패"
+    assert commit.startswith("로그인 실패 : fix : ")           # [버그] → fix 추론
+    assert "https://github.com/o/r/issues/7" in commit
+    m = _re.search(r"### 브랜치\s*```\s*([\s\S]*?)\s*```", body)  # 계약 재확인
+    assert m.group(1).strip() == branch
+
+
+# ── upsert 매칭 (구 액션 댓글 하위호환) ──────────────────────────────────────
+def test_find_comment_by_new_marker():
+    comments = [{"id": 1, "body": "무관"}, {"id": 2, "body": "x <!-- SUH-ISSUE-HELPER --> y"}]
+    assert find_existing_comment(comments, "<!-- SUH-ISSUE-HELPER -->")["id"] == 2
+
+def test_find_comment_by_legacy_marker():
+    # 구 액션 기본 마커 — github-issue-helper URL 포함
+    legacy = ("<!-- 이 댓글은 SUH-ISSUE-HELPER 에 의해 자동으로 생성되었습니다."
+              " - https://github.com/Cassiiopeia/github-issue-helper -->")
+    comments = [{"id": 3, "body": f"{legacy}\nGuide by SUH-LAB"}]
+    assert find_existing_comment(comments, "<!-- SUH-ISSUE-HELPER -->")["id"] == 3
+
+def test_find_comment_none():
+    assert find_existing_comment([{"id": 1, "body": "그냥 댓글"}], "<!-- SUH-ISSUE-HELPER -->") is None
+
+
+# ── 날짜 (KST 개선 — 구 액션은 UTC 러너 시각) ────────────────────────────────
+def test_today_is_8_digits():
+    assert _re.fullmatch(r"\d{8}", today_yyyymmdd("Asia/Seoul"))
+
+def test_today_invalid_tz_falls_back():
+    assert _re.fullmatch(r"\d{8}", today_yyyymmdd("No/Such_Zone"))

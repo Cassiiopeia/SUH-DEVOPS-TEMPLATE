@@ -223,3 +223,132 @@ def build_comment_body(cfg: dict, branch_name: str, commit_message: str, guide: 
         f"{guide_block}\n"
         f"{marker}"
     )
+
+
+# ── 이벤트 처리 ──────────────────────────────────────────────────────────
+def should_process(payload: dict) -> bool:
+    """opened 또는 edited(제목 변경)만 처리 — 구 워크플로우 if 조건과 동일."""
+    action = payload.get("action")
+    if action == "opened":
+        return True
+    return action == "edited" and bool(payload.get("changes", {}).get("title"))
+
+
+def today_yyyymmdd(tz_name: str) -> str:
+    """설정 타임존 기준 오늘 날짜. 구 액션의 UTC 러너 시각 오차(한국 새벽 -9h)를 개선."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo(tz_name)).strftime("%Y%m%d")
+    except Exception:
+        return datetime.now(timezone.utc).strftime("%Y%m%d")
+
+
+def prepare_comment(payload: dict, cfg: dict, workflows_dir: Path, date_yyyymmdd: str):
+    """페이로드 → (브랜치명, 커밋 메시지, 댓글 본문). 네트워크 무의존 — 테스트 가능 단위."""
+    issue = payload["issue"]
+    raw_title = issue["title"]
+    title = extract_issue_title(raw_title)
+    issue_number = str(issue["number"])
+
+    branch = create_branch_name(
+        title, issue_number, date_yyyymmdd,
+        branch_prefix=cfg["branch_prefix"], max_branch_length=cfg["max_branch_length"])
+
+    ctx = {
+        "issueTitle": title,
+        "issueUrl": issue["html_url"],
+        "issueNumber": issue_number,
+        "branchName": branch,
+        "date": date_yyyymmdd,
+        "commitType": infer_commit_type(raw_title, cfg["commit_type_map"]),
+        "labels": ", ".join(l["name"] for l in issue.get("labels", [])),
+        "assignees": ", ".join(a["login"] for a in issue.get("assignees", [])),
+    }
+    commit_message = render_commit_message(cfg["commit_template"], ctx)
+    body = build_comment_body(cfg, branch, commit_message, build_guide(workflows_dir))
+    return branch, commit_message, body
+
+
+# ── GitHub API (urllib — 같은 레포 이슈 댓글이라 redirect 없음) ──────────────
+_API = "https://api.github.com"
+
+# 구 액션이 남긴 댓글도 upsert 대상으로 매칭 (중복 댓글 방지 — 하위호환)
+LEGACY_MARKER_HINTS = ("github-issue-helper", "SUH-ISSUE-HELPER 에 의해 자동으로")
+
+
+def _request(method: str, url: str, token: str, data: dict | None = None):
+    req = urllib.request.Request(url, method=method)
+    req.add_header("Authorization", f"token {token}")
+    req.add_header("Accept", "application/vnd.github+json")
+    payload = None
+    if data is not None:
+        payload = json.dumps(data).encode("utf-8")
+        req.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(req, payload) as res:
+        return json.loads(res.read().decode("utf-8"))
+
+
+def find_existing_comment(comments: list, marker: str):
+    """신형 마커 우선, 없으면 구 액션 마커 힌트로 매칭."""
+    for c in comments:
+        if marker in (c.get("body") or ""):
+            return c
+    for c in comments:
+        body = c.get("body") or ""
+        if any(hint in body for hint in LEGACY_MARKER_HINTS):
+            return c
+    return None
+
+
+def upsert_comment(owner: str, repo: str, issue_number: int, marker: str, body: str, token: str):
+    comments = []
+    page = 1
+    while True:
+        batch = _request(
+            "GET",
+            f"{_API}/repos/{owner}/{repo}/issues/{issue_number}/comments?per_page=100&page={page}",
+            token)
+        comments.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+
+    existing = find_existing_comment(comments, marker)
+    if existing:
+        _request("PATCH", f"{_API}/repos/{owner}/{repo}/issues/comments/{existing['id']}",
+                 token, {"body": body})
+        return "updated"
+    _request("POST", f"{_API}/repos/{owner}/{repo}/issues/{issue_number}/comments",
+             token, {"body": body})
+    return "created"
+
+
+def main() -> int:
+    event_path = os.environ.get("GITHUB_EVENT_PATH", "")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not event_path or not Path(event_path).exists():
+        print("❌ GITHUB_EVENT_PATH가 없습니다 (Actions 환경 전용)", file=sys.stderr)
+        return 1
+    if not token:
+        print("❌ GITHUB_TOKEN이 없습니다", file=sys.stderr)
+        return 1
+
+    payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
+    if not should_process(payload):
+        print("ℹ️ 처리 대상 이벤트가 아님 (opened/제목 edited만) → 종료", file=sys.stderr)
+        return 0
+
+    cfg = load_config(".")
+    branch, commit_message, body = prepare_comment(
+        payload, cfg, Path(".github") / "workflows", today_yyyymmdd(cfg["timezone"]))
+
+    owner = payload["repository"]["owner"]["login"]
+    repo = payload["repository"]["name"]
+    result = upsert_comment(
+        owner, repo, payload["issue"]["number"], cfg["comment_marker"], body, token)
+    print(f"✅ 댓글 {result}: {branch}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

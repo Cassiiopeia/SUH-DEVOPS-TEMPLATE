@@ -7,7 +7,7 @@
 
 ## Skill이 뭔가요?
 
-Skill은 특정 작업(예: 코드 리뷰, 이슈 작성, 리팩토링)에 특화된 지침과 출력 포맷을 가진 **전문가 모드**입니다. Claude Code에서는 `/projectops:xxx` 형태로 호출하고, Gemini CLI는 extension, Codex CLI는 plugin marketplace를 통해 이 레포의 `skills/`를 읽습니다.
+Skill은 특정 작업(예: 코드 리뷰, 이슈 작성, 리팩토링)에 특화된 지침과 출력 포맷을 가진 **전문가 모드**입니다. Claude Code에서는 `/pro-<skill>` 형태(예: `/pro-review`)로 호출하고, Gemini CLI는 extension, Codex CLI는 plugin marketplace를 통해 이 레포의 `skills/`를 읽습니다.
 
 예를 들어 `/pro-review`를 실행하면 Claude가 단순히 "코드 좀 봐줘"에 답하는 게 아니라, **보안/성능/버그/품질/아키텍처/테스트 6가지 관점**으로 나눠서 **Critical/Major/Minor 우선순위**로 정리된 리뷰를 돌려줍니다.
 
@@ -22,7 +22,7 @@ claude plugin marketplace add Cassiiopeia/projectops
 claude plugin install projectops@projectops-marketplace --scope user
 ```
 
-설치 후 Claude Code에서 `/projectops:` 까지 입력하면 사용 가능한 Skill 목록이 자동완성됩니다.
+설치 후 Claude Code에서 `/pro-` 까지 입력하면 사용 가능한 Skill 목록이 자동완성됩니다.
 
 ### Cursor
 

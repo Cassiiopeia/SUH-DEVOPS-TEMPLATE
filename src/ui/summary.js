@@ -8,6 +8,7 @@ const SEPARATOR = "────────────────────�
 
 export function printSummary(ctx, targetRoot = ".") {
   const { mode, types = [], version = "", counters = {} } = ctx || {};
+  const deployBranchName = ctx?.deployBranch || "develop"; // #477 — 설정된 배포 브랜치명으로 안내
   const err = (s = "") => process.stderr.write(`${s}\n`);
   // 색상은 TTY일 때만 (.sh YELLOW/CYAN/NC 등가)
   const isTty = !!process.stderr.isTTY;
@@ -138,8 +139,8 @@ export function printSummary(ctx, targetRoot = ".") {
   err("     → Secret Name: _GITHUB_PAT_TOKEN");
   err("     → Scopes: repo, workflow");
   err("");
-  err("  2️⃣  develop 브랜치 생성");
-  err("     → git checkout -b develop && git push -u origin develop");
+  err(`  2️⃣  ${deployBranchName} 브랜치 생성 (아직 없다면)`);
+  err(`     → git checkout -b ${deployBranchName} && git push -u origin ${deployBranchName}`);
   err("");
   err("  3️⃣  CodeRabbit 활성화");
   err("     → https://coderabbit.ai 방문하여 저장소 활성화");

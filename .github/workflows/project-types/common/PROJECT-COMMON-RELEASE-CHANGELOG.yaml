@@ -295,7 +295,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
 
           # main(프로덕션) 대비 커밋을 분석하도록 origin/main 확보 — HEAD는 develop 체크아웃
-          git fetch origin main 2>/dev/null || true
+          git fetch origin "${{ github.event.pull_request.base.ref }}" 2>/dev/null || true
 
           echo "🪜 changelog provider 사다리 실행 (provider=$CHANGELOG_PROVIDER)"
           python3 .github/scripts/changelog_providers/ladder.py
@@ -606,12 +606,12 @@ jobs:
 
           if [ "$PR_MERGEABLE" != "true" ]; then
             echo "⚠️ PR을 GitHub API로 병합할 수 없습니다"
-            echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 main 브랜치에 적용되었습니다"
+            echo "💡 이미 'PR 브랜치 최신화' 단계에서 변경사항이 ${{ github.event.pull_request.base.ref }} 브랜치에 적용되었습니다"
             echo "📝 PR 상태를 업데이트합니다..."
             
             # PR에 댓글 추가
             export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            gh pr comment $PR_NUMBER --body "✅ 변경사항이 자동으로 main 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
+            gh pr comment $PR_NUMBER --body "✅ 변경사항이 자동으로 ${{ github.event.pull_request.base.ref }} 브랜치에 적용되었습니다. PR을 수동으로 닫아주세요."
             
             echo "✅ PR 상태 업데이트 완료"
             exit 0

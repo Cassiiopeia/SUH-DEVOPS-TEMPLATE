@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { PATHS } from "../paths.js";
 import { exists, copyFileSync, listYamlFiles } from "../fsutil.js";
 import { isUnchanged, substituteEnv } from "../wizard-env.js";
+import { substituteBranches } from "../branch-sub.js";
 
 // 한 파일에 env 치환을 적용해 대상 파일을 갱신 (.sh configure_workflow_env 등가).
 // values/useDefaults: env 계획(promptEnvPlan) 결과 — 미지정이면 기본값 경로(현행 force 동작).
@@ -43,7 +44,7 @@ function classify(srcDir, workflowsDir, envOpts) {
 // hooks: { decisions?: Map<filename, 'skip'|'backup'|'template'> } — 기존 파일(changed) 충돌 결정.
 // 반환: {copied, skipped, templateAdded, optionalCopied, copiedFiles[]} — copiedFiles는 실제 복사·교체된 파일명 (#473 요약용)
 export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
-  const { types = [], paths = new Map(), deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, repoName = "", resolvers = {}, envValues = new Map(), envUseDefaults = true } = context;
+  const { types = [], paths = new Map(), deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, repoName = "", resolvers = {}, envValues = new Map(), envUseDefaults = true, branch = "", deployBranch = "" } = context;
   const decisions = hooks.decisions instanceof Map ? hooks.decisions : new Map();
   const workflowsDir = join(targetRoot, PATHS.workflowsDir);
   const projectTypesDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
@@ -52,8 +53,10 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const counters = { copied: 0, skipped: 0, templateAdded: 0, optionalCopied: 0, copiedFiles: [] };
   const deployValues = new Map(); // Map<type, Map<key,value>> — deploy 블록용 ask 값
   counters.deployValues = deployValues;
+  // 브랜치 전략 (#477) — 표준(main/develop)이면 치환·가상비교 모두 no-op
+  const branches = { defaultBranch: branch || "main", deployBranch: deployBranch || "develop" };
   // values/useDefaults는 치환 경로에서만 의미 (isUnchanged는 내부에서 useDefaults:true 강제 — 가상 비교 무손상)
-  const envOptsFor = (type) => ({ type, projectPath: paths.get(type) || ".", repoName, resolvers, values: envValues, useDefaults: envUseDefaults });
+  const envOptsFor = (type) => ({ type, projectPath: paths.get(type) || ".", repoName, resolvers, values: envValues, useDefaults: envUseDefaults, branches });
 
   // (1) common — unchanged면 스킵, 아니면 무조건 덮어쓰기
   const commonDir = join(projectTypesDir, "common");
@@ -109,6 +112,18 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
     }
   }
 
+  // (6) 브랜치 치환 post-pass (#477) — 표준과 다른 브랜치 전략일 때만 복사된 파일에 적용.
+  // isUnchanged 가상 비교에도 같은 branches가 들어가므로 다음 업데이트에서 재복사 churn이 없다.
+  if (branches.defaultBranch !== "main" || branches.deployBranch !== "develop") {
+    for (const f of counters.copiedFiles) {
+      const p = join(workflowsDir, f);
+      if (!existsSync(p)) continue;
+      const before = readFileSync(p, "utf8");
+      const after = substituteBranches(before, branches);
+      if (after !== before) writeFileSync(p, after);
+    }
+  }
+
   return counters;
 }
 
@@ -138,12 +153,13 @@ function applyDecision(decision, srcDir, workflowsDir, filename, counters) {
 // 대상 워크플로우 디렉토리에서 changed(충돌) 파일 목록만 뽑는다 — copyWorkflowsInteractive의 사전 조사용.
 // copyWorkflows 본체와 동일한 classify 기준을 써야 결정 Map이 실제 처리 대상과 1:1로 맞는다.
 export function listWorkflowConflicts(context, tempDir, targetRoot = ".") {
-  const { types = [], paths = new Map(), deployTarget = "docker-ssh", repoName = "", resolvers = {} } = context;
+  const { types = [], paths = new Map(), deployTarget = "docker-ssh", repoName = "", resolvers = {}, branch = "", deployBranch = "" } = context;
   const workflowsDir = join(targetRoot, PATHS.workflowsDir);
   const projectTypesDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   const conflicts = []; // [{ filename, type }] — 엔진 처리 순서와 동일 (타입 순회 → 직하위 → server-deploy)
+  const branches = { defaultBranch: branch || "main", deployBranch: deployBranch || "develop" }; // #477 — 엔진과 동일 기준
   for (const type of types) {
-    const envOpts = { type, projectPath: paths.get(type) || ".", repoName, resolvers };
+    const envOpts = { type, projectPath: paths.get(type) || ".", repoName, resolvers, branches };
     const typeDir = join(projectTypesDir, type);
     if (exists(typeDir)) {
       for (const f of classify(typeDir, workflowsDir, envOpts).changed) conflicts.push({ filename: f, type });

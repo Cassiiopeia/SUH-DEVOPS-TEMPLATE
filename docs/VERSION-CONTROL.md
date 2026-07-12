@@ -43,6 +43,21 @@ project_types: ["spring", "react", "python"]   # 첫 항목이 primary
 - 단수 `project_type` 키는 **v4.1.0에서 제거**되었습니다. 단수 키만 있는 v4.0 이전 형식은 `version_manager.sh`가 명시적으로 실패하며 전환 절차를 안내합니다 (`project_type: "spring"` → `project_types: ["spring"]`).
 - `version_manager.sh`가 배열을 순회하여 모든 타입의 버전 파일을 동기화합니다.
 
+### `project_paths` (모노레포 경로 맵)
+
+타입별 프로젝트가 서브폴더에 있는 모노레포는 `project_paths` 맵(타입 → 레포 루트 기준 상대경로)으로 위치를 지정합니다.
+
+```yaml
+project_types: ["flutter", "react"]
+project_paths:
+  flutter: "app"       # app/pubspec.yaml을 동기화
+  react: "client"      # client/package.json을 동기화
+```
+
+- 키가 없는 타입은 **레포 루트 기준**으로 동작합니다 (기존 동작 100% 유지).
+- `npx projectops` 통합 시 마커 파일(`pubspec.yaml`·`package.json`·`pyproject.toml`·`build.gradle` 등)을 자동 감지해 후보를 제안하며, 비대화형은 `--paths "flutter=app,react=client"`로 지정합니다 ([NPX 마법사 가이드](NPX-WIZARD.md) 참조).
+- `version_manager.sh`가 이 경로를 따라 서브폴더 버전 파일을 동기화하므로, `PROJECT-COMMON-VERSION-CONTROL` 워크플로우는 수정 없이 모노레포를 지원합니다.
+
 ---
 
 ## 프로젝트 타입별 버전 파일
@@ -61,6 +76,8 @@ project_types: ["spring", "react", "python"]   # 첫 항목이 primary
 ---
 
 ## version_manager.sh 사용법
+
+> v4.2부터 실 로직은 `version_manager.py`(stdlib 전용 — yq/jq 불필요)에 있고 `.sh`는 Python 위임 shim입니다 (#448). Windows에서는 `python .github/scripts/version_manager.py get`처럼 .py를 직접 실행합니다.
 
 ### 기본 명령어
 

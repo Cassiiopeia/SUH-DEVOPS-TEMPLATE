@@ -249,7 +249,8 @@ Settings → Actions → General
 | 문서 | 설명 |
 |------|------|
 | [Agent Skills 가이드](docs/SKILLS.md) | 24종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
-| [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 기존 프로젝트에 템플릿 통합 |
+| [NPX 마법사 가이드](docs/NPX-WIZARD.md) | npx projectops 통합·배포/publish 2축·레거시 자동 마이그레이션 |
+| [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 구 integrator 지원 종료(EOF) 안내 |
 | [버전 관리](docs/VERSION-CONTROL.md) | version.yml, 자동 버전 증가 |
 | [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | 릴리스 노트 provider 사다리, CodeRabbit 연동 |
 | [PR Preview](docs/PR-PREVIEW.md) | 임시 서버 배포 시스템 |

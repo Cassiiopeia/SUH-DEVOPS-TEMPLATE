@@ -10,6 +10,7 @@ import { acquireTemplate, readTemplateVersion } from "../core/assets.js";
 import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName, makeResolvers } from "../core/detect-fs.js";
 import { parseExisting } from "../core/version-yml.js";
 import { runBreakingCheck } from "../core/breaking-check.js";
+import { runMigrations } from "../core/migrations/index.js";
 import { resolveProjectPaths } from "../core/paths-resolve.js";
 import { askAllOptionalWorkflows } from "../core/options-ask.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
@@ -241,6 +242,14 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         }
         hooks = { decisions };
       }
+    }
+
+    // 레거시 마이그레이션 (#470) — 워크플로우를 만지는 모드에서만. 대화형은 safe 티어 확인 1회.
+    if (mode === "full" || mode === "workflows") {
+      await runMigrations({
+        targetRoot: cwd,
+        askYesNo: (msg, def) => io.askYesNo(msg, def),
+      });
     }
 
     let result = null;

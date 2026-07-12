@@ -133,6 +133,29 @@ export function parseTemplateOptions(content) {
   return out;
 }
 
+// v4.1.0 이전 단수 project_type 키 → project_types 배열 최소 변환 (#471).
+// version.yml을 재생성하지 않는 경로(workflows 모드)에서 신형 version_manager(단수 키 명시 거부)와의
+// 정합을 맞춘다 — 해당 라인만 교체하고 나머지 내용은 손대지 않는다.
+// 배열 키가 이미 있으면 남은 단수 키만 제거한다(4.1.0: 공존 시 단수 무시 — 잔재 정리).
+// 반환: 변환된 전체 내용 문자열, 변환할 것이 없으면 null.
+export function convertLegacySingularType(content) {
+  const lines = String(content || "").split(/\r?\n/);
+  let hasArray = false, idx = -1, value = "";
+  lines.forEach((l, i) => {
+    if (/^project_types:/.test(l)) hasArray = true;
+    const m = l.match(/^project_type:\s*["']?([a-z-]+)["']?/);
+    if (m && idx < 0) { idx = i; value = m[1]; }
+  });
+  if (idx < 0) return null;
+  if (hasArray) {
+    lines.splice(idx, 1);
+    return lines.join("\n");
+  }
+  const type = value === "next" ? "react" : value; // next 타입은 4.1.0에서 react로 흡수
+  lines[idx] = `project_types: ["${type}"]   # 멀티타입 배열 — 첫 항목이 primary, 직접 편집 가능`;
+  return lines.join("\n");
+}
+
 // 기존 version.yml에서 값 추출 (.sh grep/sed 등가, 주석 라인 오탐 방지).
 export function parseExisting(content) {
   const text = String(content || "");

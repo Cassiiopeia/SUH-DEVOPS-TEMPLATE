@@ -12,6 +12,7 @@ import { acquireTemplate, readTemplateVersion } from "./core/assets.js";
 import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName, makeResolvers } from "./core/detect-fs.js";
 import { parseExisting } from "./core/version-yml.js";
 import { runBreakingCheck } from "./core/breaking-check.js";
+import { runMigrations } from "./core/migrations/index.js";
 import { resolveProjectPaths } from "./core/paths-resolve.js";
 import { printBannerCompact } from "./ui/banner.js";
 import { printSummary } from "./ui/summary.js";
@@ -132,6 +133,11 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     // Breaking Changes 게이트 (.sh execute_integration L4415~4420 등가 — 비대화형은 경고 후 진행)
     const proceed = await runBreakingCheck({ cwd, tempDir, templateVersion: context.templateVersion });
     if (!proceed) return 0;
+
+    // 레거시 마이그레이션 (#470) — 워크플로우를 만지는 모드에서만. 비대화형은 safe 티어 자동 적용.
+    if (opts.mode === "full" || opts.mode === "workflows") {
+      await runMigrations({ targetRoot: cwd });
+    }
 
     switch (opts.mode) {
       case "full": result = runFull(context, tempDir, cwd); break;

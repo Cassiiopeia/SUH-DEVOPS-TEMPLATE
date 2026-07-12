@@ -278,7 +278,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 - IOS-TESTFLIGHT
 - PLAYSTORE-CICD
 - FIREBASE-CICD
-- SUH-LAB-BUILD-TRIGGER
+- PROJECTOPS-APP-BUILD-TRIGGER
 - PR-PREVIEW
 
 ---
@@ -363,7 +363,7 @@ name: PROJECT-iOS-TestFlight-Deploy
 | PLAYSTORE-CICD | E | ✅ |
 | FIREBASE-CICD | E | ✅ |
 | IOS-TESTFLIGHT | E | ✅ |
-| SUH-LAB-BUILD-TRIGGER | E | ✅ |
+| PROJECTOPS-APP-BUILD-TRIGGER | E | ✅ |
 
 ### project-types/spring/
 

@@ -60,13 +60,16 @@ YYYYMMDD_#이슈번호_이슈제목_요약
 
 ### 워크플로우
 
-**파일**: `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yaml`
+**파일**: `PROJECT-COMMON-SUH-ISSUE-HELPER.yaml` (로직: `.github/scripts/issue_helper.py` — v4.3.0 내재화, 외부 액션 의존 없음)
 
 ```yaml
 on:
   issues:
-    types: [opened]
+    types: [opened, edited]
 ```
+
+**커스터마이징**: `version.yml` → `metadata.template.options.issue_helper`
+(branch_prefix / max_branch_length / timezone / commit_template / commit_type_map / comment_marker / show_guide — 섹션 없으면 기본값)
 
 ---
 
@@ -205,9 +208,9 @@ on:
 ### Issue Helper 댓글이 안 생김
 
 **확인 사항**:
-1. `PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yaml` 워크플로우 존재 여부
+1. `PROJECT-COMMON-SUH-ISSUE-HELPER.yaml` 워크플로우와 `.github/scripts/issue_helper.py` 존재 여부
 2. Actions 탭에서 워크플로우 활성화 여부
-3. `_GITHUB_PAT_TOKEN` Secret 설정
+3. Private 레포에서 연쇄 트리거가 필요하면 `_GITHUB_PAT_TOKEN` Secret 설정 (일반 댓글 생성은 GITHUB_TOKEN으로 충분)
 
 ### QA 이슈 생성 안됨
 

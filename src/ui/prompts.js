@@ -39,6 +39,8 @@ export async function editMenu({ showOptional = false } = {}) {
     { value: "branch", label: "기본 브랜치" },
   ];
   if (showOptional) {
+    // #485 — 프로젝트 성격(intent): 재선택 시 배포/publish 축을 재유도한다.
+    options.push({ value: "intent", label: "프로젝트 성격 (배포 유형)" });
     // #483 — 항목별 격리: 한 축만 골라 그 축만 재질문한다 (통짜 "배포/Publish 방식" 분해)
     options.push({ value: "deploy", label: "배포 방식 (서버 실행물)" });
     options.push({ value: "publish", label: "라이브러리 배포(publish) 타겟" });

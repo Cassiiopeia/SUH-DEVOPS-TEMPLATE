@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { listYamlFiles } from "./fsutil.js";
 import { PATHS } from "./paths.js";
-import { parseTemplateOptions } from "./version-yml.js";
+import { parseTemplateOptions, inferIntent } from "./version-yml.js";
 import { branchStatus, createBranch, pushBranch } from "./git-branch.js";
 
 // 개발(배포) 브랜치 존재 확인 + 생성 제안 (#477) — 대화형 전용.
@@ -87,7 +87,12 @@ async function askOptionalWorkflow({ dir, icon, short, desc, current, force, tty
 }
 
 // 옵션 질문의 축 키 (#483 수정 스코프 단위) — 수정 메뉴가 이 단위로 한 축만 재질문한다.
-export const OPTION_AXES = ["deploy", "publish", "code-review", "changelog", "release-branch", "secret"];
+// intent(#485)는 프로젝트 성격 — 재질문 시 deploy/publish 축을 재유도한다.
+export const OPTION_AXES = ["intent", "deploy", "publish", "code-review", "changelog", "release-branch", "secret"];
+
+// intent → 어떤 배포 축을 물을지 (#485). manual은 둘 다(기존 순차 질문), 나머지는 유도.
+const INTENT_ASKS_DEPLOY = { app: true, both: true, manual: true, library: false, none: false };
+const INTENT_ASKS_PUBLISH = { library: true, both: true, manual: true, app: false, none: false };
 
 // 배포/publish 축 + Secret 백업을 순서대로 질문 (.sh ask_all_optional_workflows 등가).
 // tempDir: 템플릿 다운로드 루트 — project-types는 {tempDir}/.github/workflows/project-types
@@ -110,6 +115,7 @@ export async function askAllOptionalWorkflows({
   let changelogProvider = current.changelogProvider ?? null;
   let changelogBaseUrl = current.changelogBaseUrl ?? null;
   let deployBranch = current.deployBranch ?? null; // #456 릴리스 PR head 브랜치
+  let intent = current.intent ?? null; // #485 프로젝트 성격 (app/library/both/none/manual)
 
   // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
   // 배포/publish 질문을 건너뛰고 none·[]로 조용히 확정한다 (타입 변경 시 재질문됨).
@@ -140,24 +146,68 @@ export async function askAllOptionalWorkflows({
       if (changelogBaseUrl === null && saved.changelogBaseUrl !== null) changelogBaseUrl = saved.changelogBaseUrl;
       // #456 deploy_branch 저장값 재사용
       if (deployBranch === null && saved.deployBranch != null) deployBranch = saved.deployBranch;
+      // #485 intent 저장값 재사용 — 없으면 저장된 deploy/publish에서 역추론(구 version.yml 하위호환)
+      if (intent === null) intent = saved.intent ?? inferIntent(saved.deploy, saved.publish);
     }
   }
 
-  // ── ② 배포 방식 (택1) — basic 단독이면 질문 스킵, none으로 확정 ──
+  // ── ② intent(프로젝트 성격) 우선 분기 → 배포 축 유도 (#485) ──
+  // basic 단독이면 intent 개념 자체가 없어 질문 스킵, none/[]로 확정.
   if (isBasicOnly) {
     if (deploy === null) deploy = "none";
     if (publish === null) publish = [];
+    intent = "none";
   } else {
-    const willAskDeploy = ask("deploy") || deploy === null;
-    const willAskPublish = ask("publish") || publish === null;
-    // #480 — deploy·publish는 서로 다른 두 축이다. 둘 다 물을 참이면 먼저 큰 그림을 한 번 안내한다.
-    // (수정 메뉴로 한 축만 고칠 때는 맥락이 이미 명확하므로 생략)
-    if (willAskDeploy && willAskPublish && tty && typeof io.select === "function") {
+    // 수정 메뉴에서 deploy/publish 축만 콕 집어 고칠 때(scope에 그 축이 있고 intent는 없음)는
+    // intent 질문·게이팅을 건너뛰고 그 축만 바로 편집한다 (#483 격리 존중). intent는 값 유지·역추론.
+    const scopedAxisOnly = scopeSet !== null && !scopeSet.has("intent");
+    if (scopedAxisOnly) {
+      if (intent === null) intent = inferIntent(deploy, publish) ?? "manual";
+    } else {
+      // intent 질문: 미확정이거나(초기 통합) intent 축을 강제 재질문(수정 메뉴 "프로젝트 성격")일 때.
+      const askIntent = ask("intent") || intent === null;
+      if (askIntent) {
+        if (force || !tty || typeof io.select !== "function") {
+          // 비대화형: CLI intent 미지정이면 deploy/publish에서 역추론, 그래도 없으면 manual(기존 동작)
+          intent = intent ?? inferIntent(deploy, publish) ?? "manual";
+        } else {
+          say("");
+          say("🧭 이 프로젝트는 어떤 성격인가요? (배포 관련 질문을 여기에 맞춰 좁혀드립니다)");
+          const ans = await io.select({
+            message: "프로젝트 성격을 선택하세요",
+            options: [
+              { value: "app", label: "서버/호스팅에 올려 돌리는 앱·서비스 (배포만)" },
+              { value: "library", label: "남이 가져다 쓰는 라이브러리/패키지 (publish만)" },
+              { value: "both", label: "둘 다 (서버로도 돌리고 라이브러리로도 냄)" },
+              { value: "none", label: "배포 안 함 (CI·빌드 검증만)" },
+              { value: "manual", label: "직접 하나씩 고를게요 (모든 옵션 개별 질문)" },
+            ],
+          });
+          intent = (!isCancel(ans) && INTENT_ASKS_DEPLOY[ans] !== undefined) ? ans : (intent ?? "manual");
+          say(`프로젝트 성격: ${intent}`);
+        }
+        // intent 확정 후 유도: 안 묻는 축은 값 확정, 묻는 축은 재질문 대상으로 되돌린다.
+        if (!INTENT_ASKS_DEPLOY[intent]) deploy = "none";
+        if (!INTENT_ASKS_PUBLISH[intent]) publish = [];
+        if (INTENT_ASKS_DEPLOY[intent] && ask("intent")) deploy = null;
+        if (INTENT_ASKS_PUBLISH[intent] && ask("intent")) publish = null;
+      }
+    }
+    // intent가 정해진 뒤, 유도 규칙에 따라 각 축을 물을지 결정 (#485).
+    // scopedAxisOnly(수정 메뉴 단일 축)면 intent 게이트를 무시하고 그 축을 편집하게 한다.
+    const deployGate = scopedAxisOnly ? true : INTENT_ASKS_DEPLOY[intent];
+    const publishGate = scopedAxisOnly ? true : INTENT_ASKS_PUBLISH[intent];
+    const willAskDeploy = deployGate && (ask("deploy") || deploy === null);
+    const willAskPublish = publishGate && (ask("publish") || publish === null);
+    // 유도로 안 묻는 축은 기본값 확정.
+    if (!deployGate && deploy === null) deploy = "none";
+    if (!publishGate && publish === null) publish = [];
+    // manual(직접 고르기)에서 둘 다 물을 땐 두 축이 별개임을 한 번 안내 (#480 계승).
+    if (intent === "manual" && willAskDeploy && willAskPublish && tty && typeof io.select === "function") {
       say("");
       say("🧭 배포는 두 가지가 따로 있습니다 — 서로 독립이라 각각 답하시면 됩니다:");
       say("   1) 실행물 배포 — 서버/호스팅에 올려 돌리는 것 (Docker, Vercel …)");
       say("   2) 라이브러리 배포(publish) — 남이 가져다 쓰게 레지스트리에 내는 것 (Nexus, npm …)");
-      say("   먼저 (1) 실행물 배포부터 물어보고, 이어서 (2) 라이브러리 배포를 물어봅니다.");
     }
     if (willAskDeploy) {
       if (force || !tty || typeof io.select !== "function") {
@@ -291,11 +341,15 @@ export async function askAllOptionalWorkflows({
     current: secretBackup, force, tty, io, forceAsk: ask("secret"), say,
   });
 
+  const finalDeploy = deploy ?? "docker-ssh";
+  const finalPublish = publish ?? [];
   return {
-    deploy: deploy ?? "docker-ssh", publish: publish ?? [], secretBackup: secretBackup === true,
+    deploy: finalDeploy, publish: finalPublish, secretBackup: secretBackup === true,
     codeReviewCoderabbit: codeReviewCoderabbit === true,
     changelogProvider: changelogProvider ?? "github-ai",
     changelogBaseUrl: changelogBaseUrl ?? "",
     deployBranch: deployBranch ?? "develop",
+    // #485 intent — 확정값 우선, 없으면 최종 deploy/publish에서 역추론(basic·비대화형 경로 보정)
+    intent: intent ?? inferIntent(finalDeploy, finalPublish) ?? "manual",
   };
 }

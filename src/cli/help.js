@@ -13,6 +13,8 @@ export const HELP_TEXT = `projectops — GitHub 프로젝트 자동화 템플릿
                            (next는 react로 흡수됨 — Next.js 프로젝트는 react 사용)
       --project-version V  통합 대상의 초기 버전 (예: 1.0.0). 미지정 시 자동 감지
       --paths "t=p,..."    타입별 프로젝트 경로 (모노레포). 예: flutter=app,react=client
+      --intent KIND        프로젝트 성격(#485): app | library | both | none | manual
+                           (미지정 시 --deploy/--publish에서 역추론. library/none→deploy 제외, app/none→publish 제외)
       --deploy TARGET      배포 방식 택1: docker-ssh(기본) | vercel | none
       --publish CSV        publish 타겟 csv: nexus,npm,github-packages (기본: 없음)
       --deploy-branch NAME 릴리스 PR head 브랜치 (#456, 기본: develop). default_branch와 별개

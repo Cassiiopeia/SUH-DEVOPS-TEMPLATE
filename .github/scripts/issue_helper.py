@@ -112,3 +112,114 @@ def render_commit_message(template: str, ctx: dict) -> str:
                 "date", "commitType", "labels", "assignees"):
         out = out.replace("${" + key + "}", str(ctx.get(key, "")))
     return out.strip()
+
+
+# ── 설정 로드 (version.yml — pyyaml 없이 이 섹션만 파싱) ────────────────────
+def _unquote(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
+def load_config(repo_root: str = ".") -> dict:
+    """version.yml의 issue_helper 블록을 파싱해 DEFAULT_CONFIG에 병합한다.
+
+    파일/섹션이 없으면 기본값 그대로 — 기존 통합 레포의 무설정 동작을 보존한다.
+    향후 마법사 '설정 중앙관리' 메뉴가 이 섹션을 읽고 쓴다 (플랫 스칼라 + 얕은 맵 1개 유지).
+    """
+    cfg = dict(DEFAULT_CONFIG)
+    cfg["commit_type_map"] = dict(DEFAULT_CONFIG["commit_type_map"])
+    path = Path(repo_root) / "version.yml"
+    if not path.exists():
+        return cfg
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    section_indent = None
+    in_type_map = False
+    type_map_indent = 0
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+
+        if section_indent is None:
+            if re.match(r"^issue_helper:\s*(#.*)?$", stripped):
+                section_indent = indent
+            continue
+
+        if indent <= section_indent:  # 섹션 종료
+            break
+
+        m = re.match(r"""^["']?([^"':]+)["']?\s*:\s*(.*?)\s*$""", stripped)
+        if not m:
+            continue
+        key, raw = m.group(1).strip(), re.sub(r"\s+#.*$", "", m.group(2))
+
+        if in_type_map and indent > type_map_indent:
+            cfg["commit_type_map"][key] = _unquote(raw)
+            continue
+        in_type_map = False
+
+        if key == "commit_type_map":
+            in_type_map = True
+            type_map_indent = indent
+        elif key == "max_branch_length":
+            try:
+                cfg[key] = int(_unquote(raw))
+            except ValueError:
+                pass  # 잘못된 값은 기본값 유지
+        elif key == "show_guide":
+            cfg[key] = _unquote(raw).lower() != "false"
+        elif key in ("branch_prefix", "timezone", "commit_template", "comment_marker"):
+            cfg[key] = _unquote(raw)
+    return cfg
+
+
+# ── 동적 가이드 — 레포에 실존하는 워크플로우만 안내 (거짓 안내 원천 차단) ────
+# ⚠️ 확장 규칙: 새 워크플로우가 브랜치 규칙(YYYYMMDD_#번호_)에 의존하게 되면 여기 한 줄 추가.
+#    파일 실존 기반이므로 마법사 setting에서 타입 변경 시 자동 추종된다.
+GUIDE_LINES = [
+    ("PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml",
+     "`@projectops app build` 댓글 빌드 — 이 댓글의 브랜치를 자동 인식해서 빌드"),
+    ("PROJECT-FLUTTER-ANDROID-TEST-APK.yaml",
+     "테스트 APK 빌드 — 브랜치의 `#이슈번호`로 이슈 정보를 빌드 노트에 자동 포함"),
+    ("PROJECT-FLUTTER-IOS-TEST-TESTFLIGHT.yaml",
+     "테스트 TestFlight 빌드 — 브랜치의 `#이슈번호`로 이슈 정보를 자동 연동"),
+]
+
+_GUIDE_ALWAYS = [
+    "커밋/보고서/리뷰 스킬 — 브랜치·worktree 폴더명에서 이슈 번호를 자동 추출해 커밋 메시지·보고서 완성",
+]
+
+
+def build_guide(workflows_dir: Path) -> str:
+    """접이식(details) 안내 본문. 레포에 의존 기능이 있으면 그 목록을, 없으면 권장 한 줄만."""
+    active = [text for fname, text in GUIDE_LINES if (workflows_dir / fname).exists()]
+    items = "\n".join(f"- {t}" for t in active + _GUIDE_ALWAYS)
+    return (
+        "<details>\n"
+        "<summary>💡 왜 이 브랜치명을 써야 하나요?</summary>\n\n"
+        "이 브랜치명 형식(`YYYYMMDD_#이슈번호_제목`)을 쓰면 아래 기능이 자동으로 연동됩니다:\n"
+        f"{items}\n\n"
+        "다른 형식의 브랜치명을 쓰면 위 자동화가 동작하지 않습니다.\n"
+        "</details>"
+    )
+
+
+def build_comment_body(cfg: dict, branch_name: str, commit_message: str, guide: str) -> str:
+    """불변 계약 2: Guide by SUH-LAB + ### 브랜치 코드블록 구조 유지 (구 파서 하위호환)."""
+    marker = cfg["comment_marker"]
+    guide_block = f"\n{guide}\n" if (cfg.get("show_guide", True) and guide) else ""
+    return (
+        f"{marker}\n\n"
+        "Guide by SUH-LAB\n"
+        "---\n\n"
+        "### 브랜치\n"
+        f"```\n{branch_name}\n```\n\n"
+        "### 커밋 메시지\n"
+        f"```\n{commit_message}\n```\n"
+        f"{guide_block}\n"
+        f"{marker}"
+    )

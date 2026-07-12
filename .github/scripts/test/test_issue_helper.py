@@ -95,3 +95,85 @@ def test_render_leaves_unknown_placeholders():
            "branchName": "b", "date": "d", "commitType": "feat", "labels": "", "assignees": ""}
     assert "{변경 사항에 대한 설명}" in render_commit_message(
         "${issueTitle} : feat : {변경 사항에 대한 설명}", ctx)
+
+
+import re as _re
+
+from issue_helper import (
+    DEFAULT_CONFIG,
+    GUIDE_LINES,
+    build_comment_body,
+    build_guide,
+    load_config,
+)
+
+
+# ── 설정 로드 ────────────────────────────────────────────────────────────
+def test_load_config_defaults_when_no_file(tmp_path):
+    cfg = load_config(str(tmp_path))
+    assert cfg == DEFAULT_CONFIG
+
+def test_load_config_defaults_when_no_section(tmp_path):
+    (tmp_path / "version.yml").write_text('version: "1.0.0"\nmetadata:\n  last_updated: "x"\n', encoding="utf-8")
+    assert load_config(str(tmp_path)) == DEFAULT_CONFIG
+
+def test_load_config_reads_section(tmp_path):
+    (tmp_path / "version.yml").write_text(
+        'version: "1.0.0"\n'
+        "metadata:\n"
+        "  template:\n"
+        "    options:\n"
+        "      issue_helper:\n"
+        '        branch_prefix: "feat/"\n'
+        "        max_branch_length: 80\n"
+        '        commit_template: "${issueTitle} : ${commitType} : ${issueUrl}"\n'
+        "        show_guide: false\n"
+        "        commit_type_map:\n"
+        '          "버그": "hotfix"\n'
+        '          "디자인": "style"\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(str(tmp_path))
+    assert cfg["branch_prefix"] == "feat/"
+    assert cfg["max_branch_length"] == 80
+    assert cfg["show_guide"] is False
+    assert cfg["commit_type_map"] == {"버그": "hotfix", "디자인": "style"}
+    assert cfg["timezone"] == "Asia/Seoul"  # 미지정 키는 기본값 유지
+
+
+# ── 동적 가이드 (파일 실존 기반 — 마법사 setting에서 타입 변경 시 자동 추종) ──
+def test_guide_lists_only_existing_workflows(tmp_path):
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "PROJECT-FLUTTER-PROJECTOPS-APP-BUILD-TRIGGER.yaml").write_text("name: x\n", encoding="utf-8")
+    guide = build_guide(wf)
+    assert "@projectops app build" in guide
+    assert "테스트 APK 빌드" not in guide  # 파일 없으면 안내 안 함 (거짓 안내 차단)
+
+def test_guide_always_mentions_skills(tmp_path):
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    guide = build_guide(wf)
+    # 스킬 연동은 레포 구성 무관 — 항상 포함
+    assert "이슈 번호를 자동 추출" in guide
+
+
+# ── 댓글 본문 — 불변 계약 2 (BUILD-TRIGGER 파서 하위호환) ───────────────────
+def _body(show_guide=True):
+    cfg = dict(DEFAULT_CONFIG, show_guide=show_guide)
+    return build_comment_body(cfg, "20260712_#9_제목", "제목 : fix : {설명} url", "가이드텍스트")
+
+def test_comment_contract_guide_by_suh_lab():
+    assert "Guide by SUH-LAB" in _body()
+
+def test_comment_contract_branch_block_parseable():
+    # BUILD-TRIGGER.yaml:220 의 JS 정규식과 동일 패턴으로 파싱 가능해야 한다
+    m = _re.search(r"### 브랜치\s*```\s*([\s\S]*?)\s*```", _body())
+    assert m and m.group(1).strip() == "20260712_#9_제목"
+
+def test_comment_contains_marker_twice():
+    body = _body()
+    assert body.count(DEFAULT_CONFIG["comment_marker"]) == 2  # 구 액션과 동일: 상단+하단
+
+def test_comment_guide_hidden_when_disabled():
+    assert "가이드텍스트" not in _body(show_guide=False)

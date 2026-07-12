@@ -174,10 +174,10 @@ export async function askAllOptionalWorkflows({
         publish = publish ?? [];
       } else {
         say("");
-        say("📦 라이브러리로 배포(publish)할 계획이 있나요?");
-        say("   사내 Nexus·npmjs·GitHub Packages 중 해당되는 걸 고르세요. 없으면 그냥 Enter.");
+        say("📦 이 프로젝트를 남이 가져다 쓰는 라이브러리로도 배포(publish)하나요?");
+        say("   서버 배포와 별개입니다. 해당되는 걸 고르고, 라이브러리 배포를 안 하면 아무것도 고르지 말고 Enter.");
         const ans = await io.multiselect({
-          message: "publish 타겟을 선택하세요 (Space 토글, Enter 확정)",
+          message: "라이브러리 배포 타겟 (없으면 선택 없이 Enter = 배포 안 함)",
           options: [
             { value: "nexus", label: "사내 Maven(Nexus) 라이브러리 배포" },
             { value: "npm", label: "공개 npmjs 패키지 배포 (NPM_TOKEN)" },
@@ -189,7 +189,7 @@ export async function askAllOptionalWorkflows({
         publish = (!isCancel(ans) && Array.isArray(ans))
           ? ans.filter((t) => PUBLISH_TARGETS.includes(t))
           : (publish ?? []);
-        say(`Publish 타겟: ${publish.join(",") || "없음"}`);
+        say(publish.length ? `라이브러리 배포: ${publish.join(", ")}` : "라이브러리 배포: 안 함");
       }
     }
   }
@@ -204,6 +204,13 @@ export async function askAllOptionalWorkflows({
       const ans = await io.confirm({ message: "CodeRabbit AI 코드 리뷰 사용", initialValue: false });
       codeReviewCoderabbit = (ans === true && !isCancel(ans));
       say(`CodeRabbit 코드 리뷰: ${codeReviewCoderabbit ? "사용" : "미사용"}`);
+      // #481 — "사용"만으로는 안 붙는다. 앱 설치 + 레포 접근 권한이 있어야 실제로 리뷰가 달린다.
+      if (codeReviewCoderabbit) {
+        say("   ⚠️ 실제로 리뷰가 붙으려면 추가 설정이 필요합니다:");
+        say("      1) https://coderabbit.ai 접속 → GitHub으로 로그인");
+        say("      2) CodeRabbit GitHub 앱 설치 → 이 저장소에 접근 권한(grant access) 부여");
+        say("      (이 단계를 안 하면 워크플로우는 켜져도 PR에 리뷰 댓글이 달리지 않습니다)");
+      }
     }
   }
 
@@ -213,15 +220,17 @@ export async function askAllOptionalWorkflows({
       changelogProvider = changelogProvider ?? "github-ai";
     } else {
       say("");
-      say("📝 릴리스 노트(changelog)는 뭘로 만들까요?");
+      say("📝 릴리스 노트(changelog)는 1순위로 뭘로 만들까요?");
       say("   GitHub AI는 설정 없이 바로 됩니다. 나머지는 나중에 GitHub Secret 등록이 필요할 수 있어요.");
+      // #481 — 하나만 골라야 하는 게 아니다. 고른 게 실패하면 자동 폴백하므로 안심하고 고르라고 안내.
+      say("   ✅ 고른 방식이 실패해도 자동으로 GitHub AI → 커밋 분석 순으로 폴백하니 릴리스 노트는 항상 생성됩니다.");
       const ans = await io.select({
-        message: "changelog 생성기를 선택하세요",
+        message: "1순위 changelog 생성기를 선택하세요 (실패 시 자동 폴백)",
         options: [
           { value: "github-ai", label: "GitHub AI (추천 · 설정 불필요)" },
           { value: "coderabbit", label: "CodeRabbit" },
           { value: "openai", label: "OpenAI 호환 API (키 등록 필요)" },
-          { value: "commit", label: "커밋 분석만 (AI 없음)" },
+          { value: "commit", label: "커밋 분석만 (AI 없음 · 최후 안전망)" },
         ],
       });
       changelogProvider = (!isCancel(ans) && CHANGELOG_PROVIDERS.includes(ans)) ? ans : (changelogProvider ?? "github-ai");

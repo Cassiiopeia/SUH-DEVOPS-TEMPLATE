@@ -142,8 +142,8 @@ export function printSummary(ctx, targetRoot = ".") {
   err(`  2️⃣  ${deployBranchName} 브랜치 생성 (아직 없다면)`);
   err(`     → git checkout -b ${deployBranchName} && git push -u origin ${deployBranchName}`);
   err("");
-  err("  3️⃣  CodeRabbit 활성화");
-  err("     → https://coderabbit.ai 방문하여 저장소 활성화");
+  err("  3️⃣  CodeRabbit 활성화 (코드 리뷰를 켰다면)");
+  err("     → https://coderabbit.ai 로그인 → GitHub 앱 설치 → 이 저장소에 접근 권한(grant access) 부여");
   err("");
   err(SEPARATOR);
   err("");

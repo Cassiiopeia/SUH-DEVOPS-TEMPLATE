@@ -85,15 +85,23 @@ async function askOptionalWorkflow({ dir, icon, short, desc, current, force, tty
   return include;
 }
 
+// 옵션 질문의 축 키 (#483 수정 스코프 단위) — 수정 메뉴가 이 단위로 한 축만 재질문한다.
+export const OPTION_AXES = ["deploy", "publish", "code-review", "changelog", "release-branch", "secret"];
+
 // 배포/publish 축 + Secret 백업을 순서대로 질문 (.sh ask_all_optional_workflows 등가).
 // tempDir: 템플릿 다운로드 루트 — project-types는 {tempDir}/.github/workflows/project-types
 // current: { deploy: string|null, publish: string[]|null, secretBackup: bool|null } — CLI 명시값
-// 반환: { deploy: string, publish: string[], secretBackup: bool }
+// scope: null이면 전 축(초기 통합·전체 재질문). Set/배열이면 그 축만 forceAsk 대상 (#483 수정 메뉴 격리).
+//        스코프 밖 축은 forceAsk여도 current/저장값을 그대로 유지하고 다시 묻지 않는다.
+// 반환: { deploy, publish, secretBackup, codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch }
 export async function askAllOptionalWorkflows({
   tempDir, types = [], current = {}, targetRoot = ".",
-  force = false, tty = true, io = {}, forceAsk = false, defaultBranch = "",
+  force = false, tty = true, io = {}, forceAsk = false, defaultBranch = "", scope = null,
 }) {
   const say = io.log || ((m) => process.stderr.write(`${m}\n`));
+  // 축별 재질문 여부: 전역 forceAsk이고, scope가 없거나 그 축을 포함할 때만 강제 질문.
+  const scopeSet = scope == null ? null : new Set(scope);
+  const ask = (axis) => forceAsk && (scopeSet === null || scopeSet.has(axis));
   let deploy = current.deploy ?? null;
   let publish = current.publish ?? null;
   let secretBackup = current.secretBackup ?? null;
@@ -139,7 +147,7 @@ export async function askAllOptionalWorkflows({
     if (deploy === null) deploy = "none";
     if (publish === null) publish = [];
   } else {
-    if (forceAsk || deploy === null) {
+    if (ask("deploy") || deploy === null) {
       if (force || !tty || typeof io.select !== "function") {
         deploy = deploy ?? "docker-ssh";
       } else {
@@ -160,7 +168,7 @@ export async function askAllOptionalWorkflows({
     }
 
     // ── ③ publish 타겟 (다중 선택) ──
-    if (forceAsk || publish === null) {
+    if (ask("publish") || publish === null) {
       if (force || !tty || typeof io.multiselect !== "function") {
         publish = publish ?? [];
       } else {
@@ -186,7 +194,7 @@ export async function askAllOptionalWorkflows({
   }
 
   // ── code_review: CodeRabbit AI 코드 리뷰 (changelog와 무관 — #455) ──
-  if (forceAsk || codeReviewCoderabbit === null) {
+  if (ask("code-review") || codeReviewCoderabbit === null) {
     if (force || !tty || typeof io.confirm !== "function") {
       codeReviewCoderabbit = codeReviewCoderabbit ?? false;
     } else {
@@ -199,7 +207,7 @@ export async function askAllOptionalWorkflows({
   }
 
   // ── changelog: 릴리스 노트 생성기 (기본 커서 = github-ai — #455) ──
-  if (forceAsk || changelogProvider === null) {
+  if (ask("changelog") || changelogProvider === null) {
     if (force || !tty || typeof io.select !== "function") {
       changelogProvider = changelogProvider ?? "github-ai";
     } else {
@@ -221,7 +229,7 @@ export async function askAllOptionalWorkflows({
   }
 
   // ollama 선택 시에만 base_url 질문 (나머지 provider는 preset base_url 자동 — #455)
-  if (changelogProvider === "ollama" && (forceAsk || changelogBaseUrl === null || changelogBaseUrl === "")) {
+  if (changelogProvider === "ollama" && (ask("changelog") || changelogBaseUrl === null || changelogBaseUrl === "")) {
     if (force || !tty || typeof io.text !== "function") {
       changelogBaseUrl = changelogBaseUrl ?? "";
     } else {
@@ -235,7 +243,7 @@ export async function askAllOptionalWorkflows({
 
   // ── deploy_branch: 릴리스 PR의 head 브랜치 (#456 — default_branch와 별개) ──
   //    대부분 develop→main 릴리스 구조라 기본값 develop. 다른 head를 쓰는 레포를 위해 물어본다.
-  if (forceAsk || deployBranch === null) {
+  if (ask("release-branch") || deployBranch === null) {
     if (force || !tty || typeof io.text !== "function") {
       deployBranch = deployBranch ?? "develop";
     } else {
@@ -256,7 +264,7 @@ export async function askAllOptionalWorkflows({
   secretBackup = await askOptionalWorkflow({
     dir: join(ptDir, "common", "secret-backup"), icon: "🔐", short: "Secret 서버 백업",
     desc: "GitHub Secret에 저장한 설정 파일을 SSH로 서버에 업로드·이력관리하는 워크플로우입니다.",
-    current: secretBackup, force, tty, io, forceAsk, say,
+    current: secretBackup, force, tty, io, forceAsk: ask("secret"), say,
   });
 
   return {

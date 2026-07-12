@@ -383,3 +383,65 @@ test("parseTemplateOptions: synology:false는 승계 안 함 (null 유지)", () 
   const y = 'metadata:\n  template:\n    options:\n      synology: false\n';
   assert.equal(parseTemplateOptions(y).secretBackup, null);
 });
+
+// ── #483: scope로 한 축만 재질문 (수정 메뉴 격리) ──────────────────────────
+
+test("askAllOptionalWorkflows: scope=[deploy]면 deploy만 재질문, 나머지는 current 유지", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    // deploy select 1회만 응답 — 다른 축은 물으면 안 됨(스텁이 빈 응답이면 undefined로 깨질 것)
+    const io = stubIo({ selects: ["vercel"] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["deploy"],
+      current: {
+        deploy: "docker-ssh", publish: ["nexus"], secretBackup: true,
+        codeReviewCoderabbit: true, changelogProvider: "commit", changelogBaseUrl: "", deployBranch: "release",
+      },
+    });
+    assert.equal(r.deploy, "vercel", "deploy만 새 값");
+    assert.deepEqual(r.publish, ["nexus"], "publish 유지");
+    assert.equal(r.secretBackup, true, "secret 유지");
+    assert.equal(r.codeReviewCoderabbit, true, "code-review 유지");
+    assert.equal(r.changelogProvider, "commit", "changelog 유지");
+    assert.equal(r.deployBranch, "release", "브랜치 유지");
+    assert.equal(io.calls.select.length, 1, "deploy select 한 번만");
+    assert.equal(io.calls.multiselect.length, 0, "publish 안 물음");
+    assert.equal(io.calls.confirm.length, 0, "code-review/secret 안 물음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: scope=[code-review]면 CodeRabbit만 재질문", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ confirms: [true] }); // code-review confirm 1회
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io,
+      forceAsk: true, scope: ["code-review"],
+      current: {
+        deploy: "docker-ssh", publish: [], secretBackup: false,
+        codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop",
+      },
+    });
+    assert.equal(r.codeReviewCoderabbit, true, "code-review 새 값");
+    assert.equal(r.deploy, "docker-ssh", "deploy 유지");
+    assert.equal(io.calls.select.length, 0, "deploy/changelog 안 물음");
+    assert.equal(io.calls.confirm.length, 1, "code-review confirm 한 번만");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: scope=null(기본)이면 forceAsk 시 전 축 재질문 (기존 동작 보존)", async () => {
+  const tempDir = makeTemplateFixture();
+  const target = makeTmp();
+  try {
+    const io = stubIo({ selects: ["none", "github-ai"], multiselects: [[]], confirms: [false, false] });
+    await askAllOptionalWorkflows({
+      tempDir, types: ["spring"], targetRoot: target, tty: true, io, forceAsk: true,
+      current: { deploy: "docker-ssh", publish: [], secretBackup: false, codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop" },
+    });
+    assert.equal(io.calls.select.length, 2, "deploy+changelog 둘 다 물음(전 축)");
+    assert.equal(io.calls.multiselect.length, 1, "publish도 물음");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});

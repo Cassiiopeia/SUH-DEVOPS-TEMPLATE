@@ -12,7 +12,7 @@ import { parseExisting } from "../core/version-yml.js";
 import { runBreakingCheck } from "../core/breaking-check.js";
 import { runMigrations } from "../core/migrations/index.js";
 import { resolveProjectPaths } from "../core/paths-resolve.js";
-import { askAllOptionalWorkflows } from "../core/options-ask.js";
+import { askAllOptionalWorkflows, OPTION_AXES } from "../core/options-ask.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
 import { listWorkflowConflicts } from "../core/copy/workflows.js";
 import { createContext, VALID_TYPES } from "../context.js";
@@ -159,15 +159,15 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         } else if (what === "branch") {
           const b = await io.askText("기본 브랜치", branch);
           if (!isCancel(b) && b) branch = b;
-        } else if (what === "deploy-publish") {
-          // 배포/publish 축 재질문 (#439 — forceAsk)
+        } else if (OPTION_AXES.includes(what)) {
+          // #483 — 선택한 축 하나만 재질문 (scope). 나머지 옵션은 현재값 그대로 유지.
           const r = await askAllOptionalWorkflows({
             tempDir, types, targetRoot: cwd, defaultBranch: branch,
             current: {
               deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup,
               codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch,
             },
-            force: false, tty: realTty, forceAsk: true,
+            force: false, tty: realTty, forceAsk: true, scope: [what],
             io: {
               confirm: ({ message, initialValue }) => io.askYesNo(message, initialValue),
               select: io.engineIo?.select,
@@ -182,9 +182,6 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           changelogProvider = r.changelogProvider;
           changelogBaseUrl = r.changelogBaseUrl;
           deployBranch = r.deployBranch;
-        } else if (what === "secret") {
-          const y = await io.askYesNo("Secret 백업 워크플로우를 포함할까요?", includeSecretBackup);
-          if (!isCancel(y)) includeSecretBackup = y === true;
         }
       }
     }

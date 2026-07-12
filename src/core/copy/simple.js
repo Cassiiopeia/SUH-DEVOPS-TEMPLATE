@@ -9,11 +9,13 @@ import { exists, copyFileSync, copyDirSync } from "../fsutil.js";
 // version_manager는 .sh(위임 shim) + .py(실 로직) 한 쌍 — 둘 다 복사해야 동작 (#448).
 // changelog provider 사다리(.py 5종, #455)는 RELEASE-CHANGELOG 워크플로우 fallback-summary가
 // 호출하므로 함께 복사해야 사용자 프로젝트에서 릴리스 노트 생성이 동작한다.
+// issue_helper.py는 SUH-ISSUE-HELPER 워크플로우가 호출 — 함께 복사 필수 (#478).
 export function copyScripts(tempDir, targetRoot = ".") {
   const scripts = [
     "version_manager.sh", "version_manager.py",
     "changelog_manager.py",
     "truncate_release_notes.sh", "truncate_release_notes.py",
+    "issue_helper.py",
     "changelog_providers/_common.py", "changelog_providers/ladder.py",
     "changelog_providers/commit.py", "changelog_providers/github_ai.py",
     "changelog_providers/openai_compatible.py",

@@ -134,7 +134,7 @@ npx projectops --mode skills
 |------|------|------|
 | **Agent Skills** | Claude Code, Cursor, Gemini CLI, Codex CLI에서 쓰는 24종 AI DevOps Skills | [상세](docs/SKILLS.md) |
 | **버전 자동화** | 릴리스(develop→main PR) 시 patch 버전 자동 증가 + Git 태그 | [상세](docs/VERSION-CONTROL.md) |
-| **AI 체인지로그** | CodeRabbit 리뷰 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
+| **AI 체인지로그** | provider 사다리(CodeRabbit/GitHub Models/OpenAI 계열/commit) 기반 CHANGELOG 자동 생성 | [상세](docs/CHANGELOG-AUTOMATION.md) |
 | **PR Preview** | 댓글 한 줄로 임시 서버 배포, 닫으면 자동 삭제 | [상세](docs/PR-PREVIEW.md) |
 | **이슈 자동화** | 브랜치명/커밋 메시지 자동 제안, QA 이슈 생성 | [상세](docs/ISSUE-AUTOMATION.md) |
 | **Flutter CI/CD** | iOS TestFlight + Android Play Store 자동 배포 | [상세](docs/FLUTTER-CICD-OVERVIEW.md) |
@@ -251,7 +251,7 @@ Settings → Actions → General
 | [Agent Skills 가이드](docs/SKILLS.md) | 24종 Skills 용도, 사용법, 전체 개발 사이클 흐름 |
 | [통합 스크립트 가이드](docs/TEMPLATE-INTEGRATOR.md) | 기존 프로젝트에 템플릿 통합 |
 | [버전 관리](docs/VERSION-CONTROL.md) | version.yml, 자동 버전 증가 |
-| [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | CodeRabbit 연동, AI 문서화 |
+| [체인지로그 자동화](docs/CHANGELOG-AUTOMATION.md) | 릴리스 노트 provider 사다리, CodeRabbit 연동 |
 | [PR Preview](docs/PR-PREVIEW.md) | 임시 서버 배포 시스템 |
 | [Flutter CI/CD](docs/FLUTTER-CICD-OVERVIEW.md) | iOS/Android 자동 배포 |
 | [SSH+Docker 배포](docs/SSH-DOCKER-DEPLOYMENT-GUIDE.md) | SSH 접속 서버에 Docker 배포 (Synology·AWS EC2 등) |

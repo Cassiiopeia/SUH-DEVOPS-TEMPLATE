@@ -41,7 +41,7 @@ function classify(srcDir, workflowsDir, envOpts) {
 //   deployTarget(#439 택1): 'docker-ssh'(기본) | 'vercel' | 'none' — server-deploy는 docker-ssh일 때만,
 //   common/deploy/<target>/은 해당 타겟일 때 복사. publishTargets(#439 다중): 'nexus'|'npm'|'github-packages'.
 // hooks: { decisions?: Map<filename, 'skip'|'backup'|'template'> } — 기존 파일(changed) 충돌 결정.
-// 반환: {copied, skipped, templateAdded, optionalCopied}
+// 반환: {copied, skipped, templateAdded, optionalCopied, copiedFiles[]} — copiedFiles는 실제 복사·교체된 파일명 (#473 요약용)
 export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const { types = [], paths = new Map(), deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, repoName = "", resolvers = {}, envValues = new Map(), envUseDefaults = true } = context;
   const decisions = hooks.decisions instanceof Map ? hooks.decisions : new Map();
@@ -49,7 +49,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const projectTypesDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   if (!exists(projectTypesDir)) throw new Error("템플릿 저장소 구조 오류 — project-types 폴더를 찾지 못했습니다.");
 
-  const counters = { copied: 0, skipped: 0, templateAdded: 0, optionalCopied: 0 };
+  const counters = { copied: 0, skipped: 0, templateAdded: 0, optionalCopied: 0, copiedFiles: [] };
   const deployValues = new Map(); // Map<type, Map<key,value>> — deploy 블록용 ask 값
   counters.deployValues = deployValues;
   // values/useDefaults는 치환 경로에서만 의미 (isUnchanged는 내부에서 useDefaults:true 강제 — 가상 비교 무손상)
@@ -67,6 +67,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
       }
       copyFileSync(src, dst);
       counters.copied++;
+      counters.copiedFiles.push(filename);
     }
   }
 
@@ -91,6 +92,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
       copyFileSync(src, dst);
       counters.optionalCopied++;
       counters.copied++;
+      counters.copiedFiles.push(filename);
     }
   }
 
@@ -103,6 +105,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
       copyFileSync(join(secretDir, filename), dst);
       counters.optionalCopied++;
       counters.copied++;
+      counters.copiedFiles.push(filename);
     }
   }
 
@@ -119,6 +122,7 @@ function applyDecision(decision, srcDir, workflowsDir, filename, counters) {
     renameSync(dst, dst + ".bak");
     copyFileSync(src, dst);
     counters.copied++;
+    counters.copiedFiles?.push(filename);
     return;
   }
   if (decision === "template") {
@@ -180,7 +184,7 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
     const { newFiles, unchanged, changed } = classify(typeDir, workflowsDir, envOpts);
     unchangedNames = unchanged.slice();
     for (const f of unchanged) counters.skipped++;
-    for (const f of newFiles) { copyFileSync(join(typeDir, f), join(workflowsDir, f)); counters.copied++; }
+    for (const f of newFiles) { copyFileSync(join(typeDir, f), join(workflowsDir, f)); counters.copied++; counters.copiedFiles.push(f); }
     // changed: 결정 Map에 따라 처리 (미지정=skip → 현행 force 동작과 동일)
     for (const f of changed) applyDecision(decisions.get(f), typeDir, workflowsDir, f, counters);
   }
@@ -190,7 +194,7 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
   if (exists(serverDeployDir) && (deployTarget || "docker-ssh") === "docker-ssh") {
     const { newFiles, unchanged, changed } = classify(serverDeployDir, workflowsDir, envOpts);
     for (const f of unchanged) counters.skipped++;
-    for (const f of newFiles) { copyFileSync(join(serverDeployDir, f), join(workflowsDir, f)); counters.copied++; }
+    for (const f of newFiles) { copyFileSync(join(serverDeployDir, f), join(workflowsDir, f)); counters.copied++; counters.copiedFiles.push(f); }
     for (const f of changed) applyDecision(decisions.get(f), serverDeployDir, workflowsDir, f, counters);
   }
 
@@ -211,6 +215,7 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
       copyFileSync(src, dst);
       counters.optionalCopied++;
       counters.copied++;
+      counters.copiedFiles.push(filename);
     }
   }
 

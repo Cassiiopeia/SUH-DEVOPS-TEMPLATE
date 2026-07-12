@@ -43,10 +43,11 @@ const HEADER = `# ==============================================================
 // metadata.template.options 상태머신 파싱 (.sh read_template_options L2361~2416 등가).
 // 반환(#439 배포/publish 축): { deploy: string|null, publish: string[]|null, secretBackup: bool|null }
 //   deploy: 'docker-ssh'|'vercel'|'none', publish: ['nexus','npm','github-packages'] 부분집합. null=미기재.
-// 구 키(nexus/npm_publish)는 신 축으로 자동 마이그레이션해 읽는다 (v4.2.0 이전 파일 호환):
+// 구 키(nexus/npm_publish/synology)는 신 축으로 자동 마이그레이션해 읽는다 (v4.2.0 이전 파일 호환):
 //   nexus:true → publish에 'nexus' + deploy 미기재면 'none' (구 동작: nexus면 서버 배포 제외)
 //   npm_publish:true → publish에 'npm'
-// 구 synology 키 등 다른 키는 어느 분기에도 안 걸려 자연히 무시된다.
+//   synology:true → secret_backup 미기재면 true (#473 — 구 Synology 옵션은 Secret 업로드를 포함했으므로
+//                   승계하지 않으면 비대화형 업데이트에서 Secret 백업 워크플로우를 조용히 잃는다)
 // (options-ask.js가 이 함수를 import한다 — 순환 방지 위해 여기(version-yml)에 정의.)
 export function parseTemplateOptions(content) {
   const out = { deploy: null, publish: null, secretBackup: null,
@@ -60,6 +61,7 @@ export function parseTemplateOptions(content) {
   }
   let legacyNexus = null;
   let legacyNpm = null;
+  let legacySynology = null;
   // 값 정규화: 따옴표 제거 + 트림 (.sh tr -d '"' | tr -d "'" | xargs 등가)
   const strip = (s) => String(s).replace(/["']/g, "").trim();
   let inTemplate = false;
@@ -115,6 +117,13 @@ export function parseTemplateOptions(content) {
         if (v === "false") legacyNpm = false;
         continue;
       }
+      m = line.match(/^\s+synology:\s*(.+)/);
+      if (m) {
+        const v = strip(m[1]);
+        if (v === "true") legacySynology = true;
+        if (v === "false") legacySynology = false;
+        continue;
+      }
       // 들여쓰기 0~4칸의 다른 키 → options 섹션 종료 (.sh L2404~2408)
       if (/^\s{0,4}[a-z_]+:/.test(line)) { inOptions = false; inTemplate = false; }
     }
@@ -130,6 +139,8 @@ export function parseTemplateOptions(content) {
     }
     if (legacyNpm === true) out.publish.push("npm");
   }
+  // 구 synology 키 → secret_backup 승계 (#473) — 신 키가 명시된 경우는 신 키 우선
+  if (out.secretBackup === null && legacySynology === true) out.secretBackup = true;
   return out;
 }
 

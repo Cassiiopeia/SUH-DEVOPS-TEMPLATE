@@ -155,7 +155,7 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   // 완료 요약 (.sh print_summary — CLI 모드에서도 출력)
   printSummary({
     mode: opts.mode, types, version,
-    counters: { workflows: result?.workflows?.copied ?? 0, utilModules: 0 },
+    counters: { workflows: result?.workflows?.copied ?? 0, workflowFiles: result?.workflows?.copiedFiles ?? [], utilModules: 0 },
   }, cwd);
   return 0;
 }

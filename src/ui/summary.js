@@ -2,10 +2,7 @@
 // ctx: { mode, types:[], version, counters:{ workflows, utilModules } }
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import {
-  PATHS, WORKFLOW_PREFIX, WORKFLOW_COMMON_PREFIX, WORKFLOW_TEMPLATE_INIT,
-} from "../core/paths.js";
-import { listYamlFiles } from "../core/fsutil.js";
+import { WORKFLOW_COMMON_PREFIX } from "../core/paths.js";
 
 const SEPARATOR = "────────────────────────────────────────";
 
@@ -18,7 +15,6 @@ export function printSummary(ctx, targetRoot = ".") {
   const CYAN = isTty ? "\x1b[0;36m" : "";
   const NC = isTty ? "\x1b[0m" : "";
   const utilModulesCopied = counters.utilModules ?? 0;
-  const workflowsCopied = counters.workflows ?? 0;
 
   err("");
   err(SEPARATOR);
@@ -77,35 +73,18 @@ export function printSummary(ctx, targetRoot = ".") {
   err("");
   err("추가된 워크플로우:");
 
-  // 실제 복사된 워크플로우와 기존 파일 구분 (.sh L5505~5534)
-  const commonWorkflows = [];
-  const typeWorkflows = [];
-  const existingWorkflows = [];
-  const workflowsDir = join(targetRoot, PATHS.workflowsDir);
-  if (existsSync(workflowsDir)) {
-    const typePrefixes = types.map((t) => `${WORKFLOW_PREFIX}-${t.toUpperCase()}-`);
-    for (const filename of listYamlFiles(workflowsDir)) {
-      if (!filename.startsWith(`${WORKFLOW_PREFIX}-`)) continue; // PROJECT-*.{yaml,yml}만
-      if (filename === WORKFLOW_TEMPLATE_INIT) {
-        // TEMPLATE-INITIALIZER는 템플릿 전용 기존 파일로 분류
-        existingWorkflows.push(filename);
-      } else if (filename.startsWith(`${WORKFLOW_COMMON_PREFIX}-`)) {
-        commonWorkflows.push(filename);
-      } else if (typePrefixes.some((p) => filename.startsWith(p))) {
-        typeWorkflows.push(filename);
-      }
-    }
-  }
+  // 실제 복사·교체된 파일 목록만 출력 (#473 — 디렉토리 스캔은 존재 파일 전부를 "새로 설치됨"으로
+  // 오표기했고 카운터와 소스가 달라 (0개) 불일치가 났다. 복사 엔진의 copiedFiles가 유일한 소스.)
+  const copiedFiles = counters.workflowFiles ?? [];
+  const commonWorkflows = copiedFiles.filter((f) => f.startsWith(`${WORKFLOW_COMMON_PREFIX}-`));
+  const typeWorkflows = copiedFiles.filter((f) => !f.startsWith(`${WORKFLOW_COMMON_PREFIX}-`));
 
-  if (commonWorkflows.length > 0 || typeWorkflows.length > 0) {
-    err(`  📦 새로 설치됨 (${workflowsCopied}개):`);
+  if (copiedFiles.length > 0) {
+    err(`  📦 새로 설치·갱신됨 (${copiedFiles.length}개):`);
     for (const wf of commonWorkflows) err(`     📌 ${wf}`);
     for (const wf of typeWorkflows) err(`     🎯 ${wf}`);
-  }
-  if (existingWorkflows.length > 0) {
-    err("");
-    err("  🔧 기존 파일 유지됨:");
-    for (const wf of existingWorkflows) err(`     📌 ${wf} (템플릿 전용)`);
+  } else {
+    err("  📦 새로 설치·갱신된 워크플로우 없음 — 모두 최신 상태");
   }
 
   err("");

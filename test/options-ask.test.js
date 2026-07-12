@@ -366,3 +366,20 @@ test("askAllOptionalWorkflows: multiselect ESC(cancel) → publish 빈 배열", 
     assert.equal(r.secretBackup, false);
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });
+
+// ── 구 synology 키 → secret_backup 승계 (#473) ──
+
+test("parseTemplateOptions: synology:true → secret_backup 미기재면 true 승계", () => {
+  const y = 'metadata:\n  template:\n    options:\n      synology: true\n';
+  assert.equal(parseTemplateOptions(y).secretBackup, true);
+});
+
+test("parseTemplateOptions: 신 secret_backup 키가 있으면 synology 무시 (신 키 우선)", () => {
+  const y = 'metadata:\n  template:\n    options:\n      synology: true\n      secret_backup: false\n';
+  assert.equal(parseTemplateOptions(y).secretBackup, false);
+});
+
+test("parseTemplateOptions: synology:false는 승계 안 함 (null 유지)", () => {
+  const y = 'metadata:\n  template:\n    options:\n      synology: false\n';
+  assert.equal(parseTemplateOptions(y).secretBackup, null);
+});

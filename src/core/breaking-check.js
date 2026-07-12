@@ -39,17 +39,32 @@ export async function runBreakingCheck({ cwd, tempDir, templateVersion, askYesNo
   const { critical, warnings } = collectBreaking(json, current, templateVersion);
   if (critical.length === 0 && warnings.length === 0) return true;
 
-  // 박스 표시 (.sh L2580~2603)
+  // 요약 리스트 표시 (#473 — 전문 통덤프는 벽글이 되어 정작 CRITICAL이 안 읽혔고,
+  // 긴 본문 래핑이 ║ 박스 경계를 붕괴시켰다. 버전·제목만 한 줄씩, 전문은 선택 열람.)
   const e = (s = "") => process.stderr.write(s + "\n");
   e("");
-  e("╔══════════════════════════════════════════════════════════════════╗");
-  e(`║  ⚠️  BREAKING CHANGES (v${current} → v${templateVersion})`);
-  e("╠══════════════════════════════════════════════════════════════════╣");
-  for (const c of critical) { e("║"); e(`║  [CRITICAL] ${c.version} - ${c.title || ""}`); e(`║  → ${c.message || ""}`); }
-  for (const w of warnings) { e("║"); e(`║  [WARNING] ${w.version} - ${w.title || ""}`); e(`║  → ${w.message || ""}`); }
-  e("║");
-  e("╚══════════════════════════════════════════════════════════════════╝");
+  e(`⚠️  BREAKING CHANGES (v${current} → v${templateVersion}) — CRITICAL ${critical.length}건 · WARNING ${warnings.length}건`);
   e("");
+  for (const c of critical) e(`  ❗ [CRITICAL] ${c.version} — ${c.title || ""}`);
+  for (const w of warnings) e(`  ⚠️ [WARNING]  ${w.version} — ${w.title || ""}`);
+  e("");
+
+  if (askYesNo) {
+    // 대화형: 전문(조치 방법)은 원할 때만 펼친다
+    const detail = await askYesNo("각 항목의 상세 내용(조치 방법)을 볼까요?", false);
+    if (detail === true) {
+      for (const it of [...critical, ...warnings]) {
+        e("");
+        e(`■ ${it.version} — ${it.title || ""}`);
+        e(`  ${it.message || ""}`);
+      }
+      e("");
+    }
+  } else {
+    e("  상세 내용·조치 방법: .github/config/breaking-changes.json 참고");
+    e(`  (${BC_URL})`);
+    e("");
+  }
 
   if (critical.length > 0) {
     if (askYesNo) {

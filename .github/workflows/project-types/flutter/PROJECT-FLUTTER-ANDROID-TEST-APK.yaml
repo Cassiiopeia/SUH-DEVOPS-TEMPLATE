@@ -15,6 +15,12 @@
 # - 아티팩트 이름에 브랜치명 포함하여 구분 용이
 # - Firebase App Distribution 연동 (FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 시크릿 있을 때)
 #
+# ⚠️ 브랜치 규칙 의존:
+# 이 워크플로우는 브랜치명 `YYYYMMDD_#이슈번호_제목` 형식에서 이슈 번호를 추출합니다.
+# 이슈 생성 시 SUH-ISSUE-HELPER 댓글이 제안하는 브랜치명을 그대로 사용하세요.
+# 형식이 다르면: 이슈 연동 빌드 정보가 누락됩니다 (빌드 자체는 진행).
+# 상세: docs/BRANCH-CONVENTION.md (템플릿 레포)
+#
 # 사용 방법:
 # 1. 기능 브랜치로 체크아웃
 # 2. GitHub Actions에서 이 워크플로우 선택

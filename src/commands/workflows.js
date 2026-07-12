@@ -7,13 +7,22 @@ import { PATHS } from "../core/paths.js";
 import { copyWorkflows } from "../core/copy/workflows.js";
 import { copyScripts, copyConfigFolder, copySetupGuide } from "../core/copy/simple.js";
 import { copyUtilModules } from "../core/copy/util.js";
+import { convertLegacySingularType } from "../core/version-yml.js";
 
 export function runWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const { types = [], force = true } = context;
   const wf = copyWorkflows(context, tempDir, targetRoot, hooks);
 
-  // update_version_yml_deploy: 기존 version.yml이 있고 ask 값이 있을 때만 deploy 블록 갱신
   const vy = join(targetRoot, PATHS.versionFile);
+
+  // v4.1.0 이전 단수 project_type 최소 변환 (#471) — 여기서 복사되는 신형 version_manager가
+  // 단수 키를 거부하므로, 변환 없이 두면 버전 워크플로우가 전부 실패하는 깨진 상태가 된다.
+  if (existsSync(vy)) {
+    const converted = convertLegacySingularType(readFileSync(vy, "utf8"));
+    if (converted !== null) writeFileSync(vy, converted);
+  }
+
+  // update_version_yml_deploy: 기존 version.yml이 있고 ask 값이 있을 때만 deploy 블록 갱신
   if (existsSync(vy) && wf.deployValues && wf.deployValues.size) {
     writeFileSync(vy, upsertDeployBlock(readFileSync(vy, "utf8"), wf.deployValues));
   }

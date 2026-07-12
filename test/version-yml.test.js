@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseExisting, buildVersionYml } from "../src/core/version-yml.js";
+import { parseExisting, buildVersionYml, convertLegacySingularType } from "../src/core/version-yml.js";
 
 test("roundtrip version/types/versionCode", () => {
   const yml = buildVersionYml({
@@ -72,4 +72,35 @@ test("parseExisting: default_branch·deploy_branch 읽기", () => {
 test("parseExisting: deploy_branch 없으면 null(폴백은 호출부 책임)", () => {
   const p = parseExisting('version: "1.0.0"\nmetadata:\n  default_branch: "main"\n');
   assert.equal(p.deployBranch, null);
+});
+
+// ── convertLegacySingularType (#471) — workflows 모드 구식 스키마 최소 변환 ──
+
+test("convertLegacySingularType: 단수 키만 있으면 배열로 교체 (나머지 내용 보존)", () => {
+  const yml = '# 주석의 project_type: 언급은 무시\nversion: "2.5.81"\nversion_code: 148 # app build number\nproject_type: "spring" # spring, flutter, react\nmetadata:\n  default_branch: "main"\n';
+  const out = convertLegacySingularType(yml);
+  assert.ok(out.includes('project_types: ["spring"]'), "배열 키로 변환");
+  assert.ok(!/^project_type:/m.test(out), "단수 키 제거");
+  assert.ok(out.includes('version: "2.5.81"'), "버전 라인 보존");
+  assert.ok(out.includes("version_code: 148"), "version_code 보존");
+  assert.ok(out.includes('  default_branch: "main"'), "metadata 보존");
+  assert.deepEqual(parseExisting(out).types, ["spring"], "변환 결과를 parseExisting이 읽음");
+});
+
+test("convertLegacySingularType: next 타입은 react로 흡수 (4.1.0)", () => {
+  const out = convertLegacySingularType('project_type: "next"\n');
+  assert.ok(out.includes('project_types: ["react"]'));
+});
+
+test("convertLegacySingularType: 배열 키 공존 시 단수 키만 제거", () => {
+  const out = convertLegacySingularType('project_types: ["spring"]\nproject_type: "spring"\n');
+  assert.ok(out.includes('project_types: ["spring"]'));
+  assert.ok(!/^project_type:/m.test(out));
+});
+
+test("convertLegacySingularType: 변환 불필요(신형/단수 없음)면 null — 멱등 no-op", () => {
+  assert.equal(convertLegacySingularType('version: "1.0.0"\nproject_types: ["spring"]\n'), null);
+  assert.equal(convertLegacySingularType('version: "1.0.0"\n'), null);
+  const converted = convertLegacySingularType('project_type: "spring"\n');
+  assert.equal(convertLegacySingularType(converted), null, "재실행 시 추가 변환 없음");
 });

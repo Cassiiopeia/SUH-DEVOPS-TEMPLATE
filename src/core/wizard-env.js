@@ -1,6 +1,7 @@
 // @wizard env 토큰 엔진 (.sh configure_workflow_env / _wf_set_env / _wf_is_unchanged 등가).
 // ⚠️ YAML 파싱/재직렬화 금지 — 라인 단위 문자열 처리 (포맷·주석 보존이 unchanged 판정 전제).
 // 실측 기준: template_integrator.sh 3282~3360, 3003~3012.
+import { substituteBranches } from "./branch-sub.js";
 
 // KEY 정규식: .sh는 [A-Z_]+ (대문자+언더스코어만). ask/auto 마커가 있는 라인만 대상.
 const MARKER_RE = /#\s*@wizard\s+(ask|auto):(.*)$/;
@@ -96,6 +97,11 @@ export function substituteEnv(content, opts = {}) {
 
 // .sh _wf_is_unchanged 등가: 원본을 "기본값으로 가상 치환한 최종형"과 설치본을 바이트 비교.
 export function isUnchanged(templateContent, installedContent, opts = {}) {
-  const virtual = substituteEnv(templateContent, { ...opts, useDefaults: true });
+  // 브랜치 치환(#477)도 가상 비교에 포함 — 치환 설치본이 "변경됨"으로 오판되어 매 업데이트마다
+  // 재복사(.bak churn)되는 것을 막는다. opts.branches 미지정/표준값이면 no-op.
+  const virtual = substituteBranches(
+    substituteEnv(templateContent, { ...opts, useDefaults: true }),
+    opts.branches ?? null,
+  );
   return virtual === installedContent;
 }

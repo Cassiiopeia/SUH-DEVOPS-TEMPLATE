@@ -97,7 +97,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     // 배포/publish 축 + Secret 백업 질문 (#439 — full/workflows만)
     if (showOptional) {
       const r = await askAllOptionalWorkflows({
-        tempDir, types, targetRoot: cwd,
+        tempDir, types, targetRoot: cwd, defaultBranch: branch,
         current: {
           deploy: existing?.options?.deploy ?? null, publish: existing?.options?.publish ?? null, secretBackup: existing?.options?.secretBackup ?? null,
           codeReviewCoderabbit: existing?.options?.codeReviewCoderabbit ?? null,
@@ -162,7 +162,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         } else if (what === "deploy-publish") {
           // 배포/publish 축 재질문 (#439 — forceAsk)
           const r = await askAllOptionalWorkflows({
-            tempDir, types, targetRoot: cwd,
+            tempDir, types, targetRoot: cwd, defaultBranch: branch,
             current: {
               deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup,
               codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch,
@@ -263,8 +263,8 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
 
     // 완료 요약 (.sh print_summary L5438)
     io.summary?.({
-      mode, types, version,
-      counters: { workflows: result?.workflows?.copied ?? 0, utilModules: 0 },
+      mode, types, version, deployBranch,
+      counters: { workflows: result?.workflows?.copied ?? 0, workflowFiles: result?.workflows?.copiedFiles ?? [], utilModules: 0 },
     }, cwd);
     io.outro?.(`통합 완료 — ${mode} 모드로 설치했습니다.`);
     return 0;

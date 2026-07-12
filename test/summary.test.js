@@ -23,19 +23,22 @@ function captureStderr(fn) {
 test("printSummary: full 모드 스모크 — 워크플로우 분류·타입 안내 포함", () => {
   const root = mkdtempSync(join(tmpdir(), "summary-"));
   try {
-    touch(root, ".github/workflows/PROJECT-COMMON-VERSION-CONTROL.yaml");
-    touch(root, ".github/workflows/PROJECT-SPRING-SIMPLE-CICD.yaml");
-    touch(root, ".github/workflows/PROJECT-TEMPLATE-INITIALIZER.yaml");
+    // 레거시 파일이 디렉토리에 존재해도 목록에 안 나와야 한다 (#473 — 스캔 제거, copiedFiles가 소스)
+    touch(root, ".github/workflows/PROJECT-COMMON-SYNOLOGY-SECRET-FILE-UPLOAD.yaml");
     touch(root, ".github/util/flutter/testflight-wizard/index.html");
     const out = captureStderr(() => printSummary({
       mode: "full", types: ["spring", "flutter"], version: "1.2.3",
-      counters: { workflows: 2, utilModules: 1 },
+      counters: {
+        workflows: 2, utilModules: 1,
+        workflowFiles: ["PROJECT-COMMON-VERSION-CONTROL.yaml", "PROJECT-SPRING-SIMPLE-CICD.yaml"],
+      },
     }, root));
     assert.match(out, /Setup Complete/);
     assert.match(out, /version\.yml \(버전: 1\.2\.3, 타입: spring,flutter\)/);
+    assert.match(out, /새로 설치·갱신됨 \(2개\)/);                        // 카운터 = 목록 길이 (#473)
     assert.match(out, /📌 PROJECT-COMMON-VERSION-CONTROL\.yaml/);       // 공통 분류
     assert.match(out, /🎯 PROJECT-SPRING-SIMPLE-CICD\.yaml/);           // 타입 분류
-    assert.match(out, /PROJECT-TEMPLATE-INITIALIZER\.yaml \(템플릿 전용\)/); // 기존유지 분류
+    assert.doesNotMatch(out, /SYNOLOGY-SECRET-FILE-UPLOAD/);            // 존재만 하는 레거시 미표기 (#473)
     assert.match(out, /testflight-wizard \(flutter\)/);                 // util 모듈 트리
     assert.match(out, /Spring 프로젝트 추가 설정/);                       // spring 안내
     assert.match(out, /Flutter 배포 마법사 사용법/);                      // flutter 안내

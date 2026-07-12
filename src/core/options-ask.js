@@ -11,6 +11,39 @@ import { join } from "node:path";
 import { listYamlFiles } from "./fsutil.js";
 import { PATHS } from "./paths.js";
 import { parseTemplateOptions } from "./version-yml.js";
+import { branchStatus, createBranch, pushBranch } from "./git-branch.js";
+
+// 개발(배포) 브랜치 존재 확인 + 생성 제안 (#477) — 대화형 전용.
+// 로컬에 없고 원격에도 없(거나 불명이)면 기본 브랜치에서 생성을 제안하고, 생성 후 push 여부도 묻는다.
+// git 미설치·비레포·질문 불가(io.confirm 없음)면 조용히 통과 — 마법사 진행을 막지 않는다.
+export async function ensureDeployBranch({ targetRoot = ".", deployBranch = "", defaultBranch = "", io = {}, say = () => {} }) {
+  if (!deployBranch || typeof io.confirm !== "function") return { created: false, pushed: false };
+  const st = branchStatus(targetRoot, deployBranch);
+  if (!st.isRepo || st.local) return { created: false, pushed: false };
+  if (st.remote === true) {
+    say(`ℹ️ '${deployBranch}' 브랜치가 원격에는 있고 로컬에 없습니다 — 필요 시 'git switch ${deployBranch}'로 가져오세요.`);
+    return { created: false, pushed: false };
+  }
+  say(`⚠️ 배포 브랜치 '${deployBranch}'가 없습니다 — 릴리스 파이프라인(${deployBranch}→${defaultBranch || "기본 브랜치"} PR)이 동작하려면 필요합니다.`);
+  const mk = await io.confirm({ message: `${defaultBranch || "현재"} 브랜치에서 '${deployBranch}' 브랜치를 만들까요?`, initialValue: true });
+  if (mk !== true) {
+    say(`→ 건너뜁니다. 나중에 직접: git checkout -b ${deployBranch} && git push -u origin ${deployBranch}`);
+    return { created: false, pushed: false };
+  }
+  if (!createBranch(targetRoot, deployBranch, defaultBranch)) {
+    say(`⚠️ 브랜치 생성 실패 — 직접 실행해주세요: git branch ${deployBranch}${defaultBranch ? ` ${defaultBranch}` : ""}`);
+    return { created: false, pushed: false };
+  }
+  say(`✅ 로컬 브랜치 '${deployBranch}' 생성 완료 (checkout은 하지 않았습니다)`);
+  const up = await io.confirm({ message: "원격(origin)에도 push할까요?", initialValue: true });
+  if (up !== true) return { created: true, pushed: false };
+  if (pushBranch(targetRoot, deployBranch)) {
+    say(`✅ origin/${deployBranch} push 완료`);
+    return { created: true, pushed: true };
+  }
+  say(`⚠️ push 실패(자격/네트워크) — 직접 실행해주세요: git push -u origin ${deployBranch}`);
+  return { created: true, pushed: false };
+}
 
 // 재노출 — 파서 본체는 version-yml.js에 있다 (순환 import 방지: options-ask → version-yml 방향만 허용)
 export { parseTemplateOptions };
@@ -58,7 +91,7 @@ async function askOptionalWorkflow({ dir, icon, short, desc, current, force, tty
 // 반환: { deploy: string, publish: string[], secretBackup: bool }
 export async function askAllOptionalWorkflows({
   tempDir, types = [], current = {}, targetRoot = ".",
-  force = false, tty = true, io = {}, forceAsk = false,
+  force = false, tty = true, io = {}, forceAsk = false, defaultBranch = "",
 }) {
   const say = io.log || ((m) => process.stderr.write(`${m}\n`));
   let deploy = current.deploy ?? null;
@@ -212,6 +245,8 @@ export async function askAllOptionalWorkflows({
       const ans = await io.text({ message: "배포 브랜치", initialValue: deployBranch ?? "develop" });
       deployBranch = (typeof ans === "string" && !isCancel(ans) && ans.trim()) ? ans.trim() : (deployBranch ?? "develop");
       say(`배포 브랜치: ${deployBranch}`);
+      // 브랜치 존재 확인 + 생성 제안 (#477) — 없으면 릴리스 파이프라인이 조용히 놀게 된다
+      await ensureDeployBranch({ targetRoot, deployBranch, defaultBranch, io, say });
     }
   }
 

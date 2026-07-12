@@ -73,6 +73,9 @@ export function detectDefaultBranch(root) {
   const show = gitOut(root, ["remote", "show", "origin"]);
   const m = show.match(/HEAD branch:\s*(\S+)/);
   if (m) return m[1];
+  // origin 없는 로컬 레포(#477) — 현재 HEAD 브랜치가 최선의 추정 (대화형 수정 메뉴로 교정 가능)
+  const head = gitOut(root, ["branch", "--show-current"]);
+  if (head) return head;
   return "main";
 }
 

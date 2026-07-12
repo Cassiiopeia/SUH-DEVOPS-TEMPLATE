@@ -17,6 +17,12 @@
 # - 브랜치명에서 이슈 번호 자동 추출 (YYYYMMDD_#이슈번호_내용 형식)
 # - GitHub API로 이슈 정보 가져와서 릴리즈 노트에 포함
 #
+# ⚠️ 브랜치 규칙 의존:
+# 이 워크플로우는 브랜치명 `YYYYMMDD_#이슈번호_제목` 형식에서 이슈 번호를 추출합니다.
+# 이슈 생성 시 SUH-ISSUE-HELPER 댓글이 제안하는 브랜치명을 그대로 사용하세요.
+# 형식이 다르면: 이슈 연동 빌드 정보가 누락됩니다 (빌드 자체는 진행).
+# 상세: docs/BRANCH-CONVENTION.md (템플릿 레포)
+#
 # 빌드 파이프라인:
 #   1. flutter build ios --no-codesign (Flutter 빌드)
 #   2. xcodebuild archive (Xcode 아카이브 생성)

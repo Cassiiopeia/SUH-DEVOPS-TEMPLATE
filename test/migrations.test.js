@@ -194,3 +194,86 @@ test("legacy-dir: 멱등 — 이동 후 재실행 시 재감지 없음", async (
     assert.equal(d.ask.length, 0);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── 설정 이관 (settingsExtractor, 이슈 헬퍼 내재화 #478) ─────────────────────
+
+const OLD_MODULE = "PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yml";
+
+function writeOldModule(root, withBlock) {
+  writeFileSync(join(wfDir(root), OLD_MODULE), [
+    "name: PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE",
+    "jobs:",
+    "  generate-comment:",
+    "    steps:",
+    "      - uses: Cassiiopeia/github-issue-helper@deploy",
+    "        with:",
+    ...withBlock.map((l) => `          ${l}`),
+    "",
+  ].join("\n"));
+}
+
+test("carryover: 커스텀 with 값이 version.yml issue_helper로 이관된다", () => {
+  const root = fresh();
+  try {
+    writeOldModule(root, ['branch_prefix: "feat/"', "max_branch_length: 100",
+      'commit_template: "${issueTitle} : feat : {변경 사항에 대한 설명} ${issueUrl}"']);
+    writeFileSync(join(root, "version.yml"),
+      'version: "1.0.0"\nmetadata:\n  last_updated: "x"\n');
+    const { safe } = detectMigrations(root);
+    const entry = safe.find((e) => e.file === OLD_MODULE);
+    const [r] = applySafeMigrations(root, [entry]);
+    assert.deepEqual(r.carried, ["branch_prefix"]); // 기본값과 다른 것만 이관
+    const vy = readFileSync(join(root, "version.yml"), "utf8");
+    assert.match(vy, /issue_helper:/);
+    assert.match(vy, /branch_prefix: "feat\/"/);
+    assert.ok(existsSync(join(wfDir(root), `${OLD_MODULE}.bak`))); // 무해화도 수행됨
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("carryover: 전부 기본값이면 version.yml을 건드리지 않는다", () => {
+  const root = fresh();
+  try {
+    writeOldModule(root, ['branch_prefix: ""', "max_branch_length: 100"]);
+    const before = 'version: "1.0.0"\nmetadata:\n  last_updated: "x"\n';
+    writeFileSync(join(root, "version.yml"), before);
+    const { safe } = detectMigrations(root);
+    applySafeMigrations(root, [safe.find((e) => e.file === OLD_MODULE)]);
+    assert.equal(readFileSync(join(root, "version.yml"), "utf8"), before);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("carryover: issue_helper 섹션이 이미 있으면 덮어쓰지 않는다 (신형 설정 우선·멱등)", () => {
+  const root = fresh();
+  try {
+    writeOldModule(root, ['branch_prefix: "old/"']);
+    const before = [
+      'version: "1.0.0"', "metadata:", "  template:", "    options:",
+      "      issue_helper:", '        branch_prefix: "new/"', "",
+    ].join("\n");
+    writeFileSync(join(root, "version.yml"), before);
+    const { safe } = detectMigrations(root);
+    applySafeMigrations(root, [safe.find((e) => e.file === OLD_MODULE)]);
+    assert.equal(readFileSync(join(root, "version.yml"), "utf8"), before);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("carryover: version.yml이 없으면 조용히 건너뛰고 무해화는 진행한다", () => {
+  const root = fresh();
+  try {
+    writeOldModule(root, ['branch_prefix: "feat/"']);
+    const { safe } = detectMigrations(root);
+    const [r] = applySafeMigrations(root, [safe.find((e) => e.file === OLD_MODULE)]);
+    assert.equal(r.action, "bak");
+    assert.ok(!existsSync(join(root, "version.yml")));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("registry: 이슈 헬퍼 구 파일 2종이 safe로 등록되어 있다", () => {
+  const api = MIGRATIONS.find((m) => m.file === "PROJECT-COMMON-SUH-ISSUE-HELPER-API.yaml");
+  const mod = MIGRATIONS.find((m) => m.file === OLD_MODULE);
+  assert.equal(api?.tier, "safe");
+  assert.equal(mod?.tier, "safe");
+  assert.equal(mod?.settingsExtractor, "suh-issue-helper-module");
+  assert.equal(api?.replacedBy, "PROJECT-COMMON-SUH-ISSUE-HELPER.yaml");
+  assert.equal(mod?.replacedBy, "PROJECT-COMMON-SUH-ISSUE-HELPER.yaml");
+});

@@ -18,6 +18,8 @@
 //   reason     - 계획 카드에 표시할 사유
 //   contentMarker - (선택) 파일명이 범용적일 때 오탐 방지용 내용 마커 — 이 문자열이
 //                   파일 내용에 있을 때만 템플릿 소유로 판정
+//   settingsExtractor - (선택) 무해화 직전 실행할 설정 이관기 이름
+//                       (rules/settings-extractors.js의 EXTRACTORS 키)
 //
 // 데이터 출처: git 히스토리 삭제/리네임 전수 + 실제 통합 레포 14개 스캔 (2026-07-11, 설계 문서 참조)
 export const MIGRATIONS = [
@@ -35,11 +37,18 @@ export const MIGRATIONS = [
     file: "sync-issue-labels.yaml", replacedBy: "PROJECT-COMMON-SYNC-ISSUE-LABELS.yaml",
     since: "2.x", reason: "0세대 리네임 — 공존 시 라벨 동기화 중복" },
   { id: "wf-issue-comment-v1", category: "workflow", tier: "safe",
-    file: "PROJECT-ISSUE-COMMENT.yaml", replacedBy: "PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yml",
+    file: "PROJECT-ISSUE-COMMENT.yaml", replacedBy: "PROJECT-COMMON-SUH-ISSUE-HELPER.yaml",
     since: "2.x", reason: "이슈 헬퍼 1세대 — 공존 시 이슈 댓글 중복" },
   { id: "wf-issue-comment-v2", category: "workflow", tier: "safe",
-    file: "PROJECT-COMMON-ISSUE-COMMENT.yaml", replacedBy: "PROJECT-COMMON-SUH-ISSUE-HELPER-API.yaml",
+    file: "PROJECT-COMMON-ISSUE-COMMENT.yaml", replacedBy: "PROJECT-COMMON-SUH-ISSUE-HELPER.yaml",
     since: "2.x", reason: "이슈 헬퍼 2세대 — 공존 시 이슈 댓글 중복" },
+  { id: "wf-issue-helper-api", category: "workflow", tier: "safe",
+    file: "PROJECT-COMMON-SUH-ISSUE-HELPER-API.yaml", replacedBy: "PROJECT-COMMON-SUH-ISSUE-HELPER.yaml",
+    since: "4.3.0", reason: "이슈 헬퍼 API 버전 폐기 (dispatch 전용 비활성 잔재)" },
+  { id: "wf-issue-helper-module", category: "workflow", tier: "safe",
+    file: "PROJECT-COMMON-SUH-ISSUE-HELPER-MODULE.yml", replacedBy: "PROJECT-COMMON-SUH-ISSUE-HELPER.yaml",
+    since: "4.3.0", reason: "외부 액션 내재화(#478) — 공존 시 이슈 댓글 중복",
+    settingsExtractor: "suh-issue-helper-module" }, // 무해화 전 with: 커스텀 값을 version.yml로 이관
   { id: "wf-auto-changelog-v1", category: "workflow", tier: "safe",
     file: "PROJECT-AUTO-CHANGELOG-CONTROL.yaml", replacedBy: "PROJECT-COMMON-RELEASE-CHANGELOG.yaml",
     since: "2.x", reason: "릴리스 워크플로우 1세대 — 공존 시 릴리스 PR 이중 처리" },

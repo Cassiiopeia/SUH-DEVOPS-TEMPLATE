@@ -1,14 +1,38 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-12T06:49:19Z",
-    "currentVersion": "4.2.9",
+    "lastUpdated": "2026-07-12T06:59:52Z",
+    "currentVersion": "4.2.10",
     "projectType": "basic",
-    "totalReleases": 194,
+    "totalReleases": 195,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.10",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-12",
+      "pr_number": 474,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **문서**\n  * NPX 마법사 가이드 문서가 새로 추가되었습니다\n  * 배포·패키지 배포 옵션 선택 방법 안내가 문서화되었습니다\n  * 구버전 워크플로우 자동 정리 기능 사용법과 주의사항이 문서화되었습니다\n  * 체인지로그 문서가 새 릴리스 노트 생성 방식 기준으로 개편되었습니다\n  * 버전 관리 문서에 모노레포 폴더 구성 안내가 추가되었습니다\n  * 문서 곳곳에 남아있던 옛 이름·명령어 표기가 최신 기준으로 정리되었습니다",
+      "parsed_changes": {
+        "문서": {
+          "title": "문서",
+          "items": [
+            "NPX 마법사 가이드 문서가 새로 추가되었습니다",
+            "배포·패키지 배포 옵션 선택 방법 안내가 문서화되었습니다",
+            "구버전 워크플로우 자동 정리 기능 사용법과 주의사항이 문서화되었습니다",
+            "체인지로그 문서가 새 릴리스 노트 생성 방식 기준으로 개편되었습니다",
+            "버전 관리 문서에 모노레포 폴더 구성 안내가 추가되었습니다",
+            "문서 곳곳에 남아있던 옛 이름·명령어 표기가 최신 기준으로 정리되었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.9",
       "project_type": "basic",

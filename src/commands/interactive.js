@@ -11,7 +11,7 @@ import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName, makeRe
 import { parseExisting } from "../core/version-yml.js";
 import { runBreakingCheck } from "../core/breaking-check.js";
 import { runMigrations } from "../core/migrations/index.js";
-import { resolveProjectPaths } from "../core/paths-resolve.js";
+import { resolveProjectPaths, filterExcludedTypes } from "../core/paths-resolve.js";
 import { askAllOptionalWorkflows, OPTION_AXES } from "../core/options-ask.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
 import { listWorkflowConflicts } from "../core/copy/workflows.js";
@@ -196,6 +196,8 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         root: cwd, types, paths, existingPaths: existing?.paths ?? new Map(),
         force: false, tty: realTty, io: io.engineIo ?? {},
       });
+      // 타입 탈출구 (#487) — 경로 단계에서 제외된 타입은 version.yml·복사·env 전 단계에서 뺀다
+      types = filterExcludedTypes(types, paths);
     } else {
       for (const t of types) if (t !== "basic" && !paths.has(t)) paths.set(t, existing?.paths.get(t) || ".");
     }

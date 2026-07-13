@@ -11,6 +11,7 @@ import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName, makeRe
 import { parseExisting } from "../core/version-yml.js";
 import { runBreakingCheck } from "../core/breaking-check.js";
 import { runMigrations } from "../core/migrations/index.js";
+import { detectOrphanWorkflows, applyOrphanCleanup } from "../core/orphan-workflows.js";
 import { resolveProjectPaths, filterExcludedTypes } from "../core/paths-resolve.js";
 import { askAllOptionalWorkflows, OPTION_AXES } from "../core/options-ask.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
@@ -253,6 +254,24 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
         targetRoot: cwd,
         askYesNo: (msg, def) => io.askYesNo(msg, def),
       });
+    }
+
+    // 고아 타입 워크플로우 정리 (#487) — 타입 변경으로 선택에서 빠진 타입의 잔존 워크플로우
+    if (mode === "full" || mode === "workflows") {
+      const orphans = detectOrphanWorkflows({ tempDir, targetRoot: cwd, selectedTypes: types });
+      if (orphans.length > 0) {
+        io.note?.(
+          orphans.map((o) => `• ${o.filename} (${o.type} 타입 — 현재 미선택)`).join("\n"),
+          `🧹 선택되지 않은 타입의 워크플로우 ${orphans.length}개 발견`,
+        );
+        const yes = await io.askYesNo(`위 ${orphans.length}개를 정리할까요? (.bak 무해화 — 복원 가능)`, true);
+        if (yes === true) {
+          const results = applyOrphanCleanup(cwd, orphans);
+          const ok = results.filter((r) => r.action === "bak");
+          const failed = results.filter((r) => r.action === "error");
+          io.note?.(`✅ 고아 워크플로우 정리: ${ok.length}개${failed.length ? ` (실패 ${failed.length}개)` : ""}`, "정리 완료");
+        }
+      }
     }
 
     let result = null;

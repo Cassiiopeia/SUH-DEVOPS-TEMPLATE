@@ -13,6 +13,7 @@ import { detectTypes, detectVersion, detectDefaultBranch, detectRepoName, makeRe
 import { parseExisting } from "./core/version-yml.js";
 import { runBreakingCheck } from "./core/breaking-check.js";
 import { runMigrations } from "./core/migrations/index.js";
+import { detectOrphanWorkflows } from "./core/orphan-workflows.js";
 import { resolveProjectPaths } from "./core/paths-resolve.js";
 import { printBannerCompact } from "./ui/banner.js";
 import { printSummary } from "./ui/summary.js";
@@ -148,6 +149,14 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     // 레거시 마이그레이션 (#470) — 워크플로우를 만지는 모드에서만. 비대화형은 safe 티어 자동 적용.
     if (opts.mode === "full" || opts.mode === "workflows") {
       await runMigrations({ targetRoot: cwd });
+    }
+
+    // 고아 타입 워크플로우 안내 (#487) — 비대화형은 자동 무해화 금지(배포 파이프라인일 수 있음), 안내만
+    if (opts.mode === "full" || opts.mode === "workflows") {
+      const orphans = detectOrphanWorkflows({ tempDir, targetRoot: cwd, selectedTypes: types });
+      for (const o of orphans) {
+        console.error(`⚠️ 선택되지 않은 타입(${o.type})의 워크플로우가 남아있습니다: ${o.filename} — 대화형 마법사(npx projectops)에서 정리할 수 있습니다.`);
+      }
     }
 
     switch (opts.mode) {

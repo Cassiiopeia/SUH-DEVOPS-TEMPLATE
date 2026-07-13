@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { runInteractive } from "../src/commands/interactive.js";
 import { CANCEL } from "../src/ui/prompts.js";
 import { writeText, exists } from "../src/core/fsutil.js";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -100,5 +100,67 @@ test("대화형: skills 모드 → IDE 스킬 설치 흐름 실행 후 exit 0", 
     assert.equal(exists(join(cwd, "version.yml")), false);
     // TEMP 정리됨
     assert.equal(exists(join(cwd, ".template_download_temp")), false);
+  } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
+});
+
+// ── #487 타입 탈출구 + 고아 워크플로우 정리 통합 시나리오 ──
+
+test("대화형: 오감지 타입을 '이 타입 제외'로 탈출 → basic 폴백, 해당 타입 미설치 (#487)", async () => {
+  const src = mkdtempSync(join(tmpdir(), "iasrc5-"));
+  const cwd = mkdtempSync(join(tmpdir(), "iacwd5-"));
+  try {
+    makeSource(src);
+    // 이슈 재현: 아카이브 폴더의 build.gradle이 spring으로 오감지된 상태 (version.yml에 spring 기록)
+    writeText(join(cwd, "version.yml"), 'version: "1.0.0"\nversion_code: 1\nproject_types: ["spring"]\n');
+    writeText(join(cwd, "code-archive/old/build.gradle"), "// archived\n");
+    const engineIo = {
+      select: async ({ options }) => {
+        const ex = options.find((o) => o.value === "이 타입 제외");
+        return ex ? ex.value : options[0].value;
+      },
+      text: async ({ defaultValue }) => defaultValue ?? "",
+      confirm: async ({ initialValue }) => initialValue ?? true,
+      multiselect: async ({ initialValues }) => initialValues ?? [],
+    };
+    // 경로 확정의 대화형 분기(탈출구)는 realTty에서만 열린다 — 테스트 러너는 파이프라 임시로 강제
+    const savedTty = process.stdout.isTTY;
+    process.stdout.isTTY = true;
+    let code;
+    try {
+      code = await runInteractive({}, {
+        cwd, source: { type: "local", path: src }, clock: { now: "2026-07-13 00:00:00", today: "2026-07-13" },
+        io: { ...stubIo({ mode: "full", confirm: "continue" }), engineIo },
+      });
+    } finally { process.stdout.isTTY = savedTty; }
+    assert.equal(code, 0);
+    // spring이 제외되어 basic으로 폴백 — version.yml에 spring이 남지 않는다
+    const vy = readFileSync(join(cwd, "version.yml"), "utf8");
+    assert.ok(vy.includes('"basic"'), `basic 폴백이어야 함: ${vy}`);
+    assert.ok(!vy.includes('"spring"'), `spring이 제거돼야 함: ${vy}`);
+  } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
+});
+
+test("대화형: 선택 안 된 타입의 고아 워크플로우 → 확인 후 .bak 무해화 (#487)", async () => {
+  const src = mkdtempSync(join(tmpdir(), "iasrc6-"));
+  const cwd = mkdtempSync(join(tmpdir(), "iacwd6-"));
+  try {
+    makeSource(src);
+    // 템플릿에 spring 타입 워크플로우 존재 (server-deploy 하위)
+    writeText(join(src, ".github/workflows/project-types/spring/server-deploy/PROJECT-SPRING-SIMPLE-CICD.yaml"), "name: s\n");
+    // 대상 레포: react 프로젝트인데 과거 설치된 spring 워크플로우가 잔존 (고아)
+    writeText(join(cwd, "package.json"), '{"dependencies":{"react":"18"}}');
+    writeText(join(cwd, ".github/workflows/PROJECT-SPRING-SIMPLE-CICD.yaml"), "old\n");
+    writeText(join(cwd, ".github/workflows/PROJECT-SPRING-MY-CUSTOM.yaml"), "custom\n"); // 사용자 커스텀 — 보호 대상
+    const code = await runInteractive({}, {
+      cwd, source: { type: "local", path: src }, clock: { now: "2026-07-13 00:00:00", today: "2026-07-13" },
+      io: stubIo({ mode: "full", confirm: "continue" }), // askYesNo 기본값 → 고아 정리 예
+    });
+    assert.equal(code, 0);
+    // 고아는 .bak 무해화, 커스텀은 보존
+    assert.equal(exists(join(cwd, ".github/workflows/PROJECT-SPRING-SIMPLE-CICD.yaml")), false);
+    assert.ok(exists(join(cwd, ".github/workflows/PROJECT-SPRING-SIMPLE-CICD.yaml.bak")));
+    assert.ok(exists(join(cwd, ".github/workflows/PROJECT-SPRING-MY-CUSTOM.yaml")));
+    // 선택된 react 워크플로우는 정상 설치
+    assert.ok(exists(join(cwd, ".github/workflows/PROJECT-REACT-CICD.yaml")));
   } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
 });

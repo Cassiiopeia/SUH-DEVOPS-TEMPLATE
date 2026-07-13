@@ -181,7 +181,9 @@ export async function resolveProjectPaths({
       continue;
     }
 
-    // ── ⑤-b 대화형: 후보 개수별 분기 (.sh L1492~1525) ──
+    // ── ⑤-b 대화형: 후보 개수별 분기 (.sh L1492~1525) + 타입 탈출구 (#487) ──
+    const EXCLUDE = "이 타입 제외"; // 센티넬 — 한국어 value로 노출 (기존 "직접 입력" 패턴)
+    let excluded = false;
     if (candidates.length === 1) {
       const cand = candidates[0];
       const candMarker = existingMarkerInDir(t, cand === "." ? root : join(root, cand));
@@ -189,31 +191,38 @@ export async function resolveProjectPaths({
       say("");
       say(`  ${prog} 🔍 ${t} — ${candMarker} 발견`);
       say(`      위치: <레포루트>/${candFull}`);
-      // '아니오'/취소 시 chosen 미설정 → 아래 직접입력 루프로
-      const ok = await io.confirm({
-        message: `  ${t} 프로젝트 루트를 '${cand}'(으)로 설정할까요? (${candFull} 기준 — 아니오 선택 시 직접 입력)`,
-        initialValue: true,
+      const sel = await io.select({
+        message: `  ${t} 프로젝트 루트를 '${cand}'(으)로 설정할까요?`,
+        options: [
+          { value: cand, label: `예 — '${cand}' 사용 (${candFull} 기준)` },
+          { value: "직접 입력", label: "아니오 — 경로 직접 입력" },
+          { value: EXCLUDE, label: `이 타입 아님 — ${t} 설치 대상에서 제외` },
+        ],
       });
-      if (ok === true) chosen = cand;
+      if (sel === EXCLUDE) excluded = true;
+      else if (!isCancel(sel) && sel != null && sel !== "직접 입력") chosen = sel;
+      // ESC/직접 입력 → 아래 직접입력 루프로
     } else if (candidates.length > 1) {
       say("");
       say(`  ${prog} 🔍 ${t}: 경로 후보 ${candidates.length}개 발견`);
-      // 후보들 + '직접 입력' 메뉴 — value 자체를 한국어로 (센티넬 노출 방지, .sh L1508~1521)
+      // 후보들 + '직접 입력'/'이 타입 제외' 메뉴 — value 자체를 한국어로 (센티넬 노출 방지, .sh L1508~1521)
       const options = candidates.map((c) => ({
         value: c,
         label: `${c} (${existingMarkerInDir(t, c === "." ? root : join(root, c))})`,
       }));
       options.push({ value: "직접 입력", label: "직접 입력" });
+      options.push({ value: EXCLUDE, label: `이 타입 아님 — ${t} 설치 대상에서 제외` });
       const sel = await io.select({ message: `  ${t} 프로젝트 루트를 선택하세요`, options });
       // ESC(취소)도 직접 입력으로 폴백 (.sh `|| _sel="직접 입력"`)
-      if (!isCancel(sel) && sel != null && sel !== "직접 입력") chosen = sel;
+      if (sel === EXCLUDE) excluded = true;
+      else if (!isCancel(sel) && sel != null && sel !== "직접 입력") chosen = sel;
     } else {
       say("");
       say(`  ⚠️ ${prog} ${t}: 프로젝트를 찾지 못했습니다 (maxdepth 3).`);
     }
 
-    // ── 직접 입력 루프 (위에서 미확정 시, .sh L1528~1553) ──
-    while (!chosen) {
+    // ── 직접 입력 루프 (위에서 미확정 시, .sh L1528~1553) — 제외 탈출구 포함 (#487) ──
+    while (!chosen && !excluded) {
       const hintMarker = existingMarkerInDir(t, root);
       let prompt = `  ${t} 프로젝트 루트 경로 입력 (${hintMarker} 이 있는 폴더, 예: server, app — 루트면 그냥 Enter`;
       if (existing) prompt += `, 현재값: ${existing}`;
@@ -229,9 +238,23 @@ export async function resolveProjectPaths({
         chosen = input;
       } else {
         say(`  ⚠️ ${input}/${m} 파일이 없습니다.`);
-        const forceOk = await io.confirm({ message: "  그래도 이 경로를 사용할까요?", initialValue: false });
-        if (forceOk === true) chosen = input;
+        const act = await io.select({
+          message: "  어떻게 할까요?",
+          options: [
+            { value: "retry", label: "다시 입력" },
+            { value: "force", label: `그래도 '${input}' 경로 사용` },
+            { value: EXCLUDE, label: `이 타입 아님 — ${t} 설치 대상에서 제외` },
+          ],
+        });
+        if (act === "force") chosen = input;
+        else if (act === EXCLUDE) excluded = true;
+        // retry/ESC → 루프 계속
       }
+    }
+
+    if (excluded) {
+      say(`  ➖ ${t} 제외 — 이 타입은 버전 동기화·워크플로우 설치 대상에서 빠집니다`);
+      continue;
     }
 
     result.set(t, chosen);
@@ -258,4 +281,11 @@ export async function resolveProjectPaths({
   }
   say("");
   return result;
+}
+
+// 경로 단계에서 제외된 타입 반영 (#487) — basic이 아니면서 paths에 없는 타입 제거.
+// 전부 제외되면 basic 폴백 (타입 0개 상태 금지). 비대화형은 제외가 불가능하므로 no-op.
+export function filterExcludedTypes(types, paths) {
+  const kept = types.filter((t) => t === "basic" || paths.has(t));
+  return kept.length ? kept : ["basic"];
 }

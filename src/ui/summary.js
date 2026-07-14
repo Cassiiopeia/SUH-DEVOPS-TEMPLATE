@@ -128,10 +128,12 @@ export function printSummary(ctx, targetRoot = ".") {
 
   err("  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/projectops");
   err("  📚 워크플로우 가이드: .github/workflows/project-types/README.md");
-  // #493 — 이번 실행의 마이그레이션 기록 (수동 체크리스트·breaking 조치·AI 메타데이터)
+  // #493 — 이번 실행의 마이그레이션 기록. "뭐가 남았고 AI에게 어떻게 시키는지"가 바로 보이게 행동 유도형으로 안내.
   if (ctx?.migrationGuidePath) {
     err(`  🧭 마이그레이션 가이드: ${ctx.migrationGuidePath}`);
-    err("     (이번 실행의 변경 내역, 수동 확인 체크리스트, AI Agent용 메타데이터가 기록됐습니다)");
+    err("     이번 설치에서 바뀐 내용과 직접 확인해야 할 작업이 이 파일에 정리되어 있습니다.");
+    err("     💡 AI Agent(Claude, Cursor 등)에게 \"마이그레이션 가이드 확인하고");
+    err("        남은 작업 처리해줘\"라고 요청하면 이 문서를 읽고 대신 진행합니다.");
   }
   err("");
 

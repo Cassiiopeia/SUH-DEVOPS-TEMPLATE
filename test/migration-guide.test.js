@@ -41,7 +41,7 @@ test("renderGuideEntry: 동적 체크리스트 — 발생한 항목만 출력", 
   assert.match(md, /\.bak 백업 파일 확인 후 정리/);           // replaced-bak 있음
   assert.match(md, /신형과 병합 검토/);                        // skipped-conflict 있음
   assert.match(md, /`JAVA_VERSION` = `17`/);                  // env 검증 항목
-  assert.match(md, /- \[x\] 개발\(릴리스 소스\) 브랜치 `develop` — 마법사가 생성·확인 완료/);
+  assert.match(md, /- \[x\] 개발\(릴리스 소스\) 브랜치 `develop`: 마법사가 생성 및 확인 완료/);
   assert.doesNotMatch(md, /구세대 배포 워크플로우/);           // leftover 없음 → 항목 자체가 없음
   assert.doesNotMatch(md, /통과한 호환성 변경/);               // breaking 없음 → 섹션 없음
 });
@@ -55,7 +55,7 @@ test("renderGuideEntry: breaking 임베드 — 조치 방법 전문 + 메타 act
     },
   }));
   assert.match(md, /### 통과한 호환성 변경 \(v2\.7\.7 → v4\.2\.16\)/);
-  assert.match(md, /❗ \[CRITICAL\] 3\.0\.186 — 브랜치 전략 전면 전환/);
+  assert.match(md, /❗ \[CRITICAL\] 3\.0\.186 - 브랜치 전략 전면 전환/);
   assert.match(md, /deploy 브랜치를 폐기하고 develop\/main 구조로 전환하세요\./); // 전문 임베드
   assert.match(md, /\{ version: "3\.0\.186", severity: critical, title: "브랜치 전략 전면 전환", action_required: true \}/);
   assert.match(md, /\{ version: "4\.2\.0", severity: warning, .* action_required: false \}/);

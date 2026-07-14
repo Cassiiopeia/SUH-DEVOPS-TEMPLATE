@@ -19,12 +19,12 @@ const HEADER = `# ProjectOps 마이그레이션 가이드
 ## 사람이 읽는 법
 
 - 각 엔트리의 **확인 체크리스트**가 그 실행 이후 사람이 마무리해야 하는 수동 작업입니다.
-- 체크리스트는 실행에서 실제 발생한 것만 나옵니다 — 항목이 없으면 할 일이 없다는 뜻입니다.
-- 상세 실행 기록(파일별 결정·치환 전후값)은 엔트리 메타의 \`trace_file\`(JSONL)·\`log_file\`(터미널 원문)에 있습니다.
+- 체크리스트는 실행에서 실제 발생한 것만 나옵니다. 항목이 없으면 할 일이 없다는 뜻입니다.
+- 상세 실행 기록(파일별 결정과 치환 전후값)은 엔트리 메타의 \`trace_file\`(JSONL)과 \`log_file\`(터미널 원문)에 있습니다.
 
 ## AI Agent 해석 가이드라인
 
-각 엔트리의 \`\`\`yaml 메타 블록(\`# projectops-migration\`)을 파싱해 아래 규칙으로 판단·조치한다.
+각 엔트리의 \`\`\`yaml 메타 블록(\`# projectops-migration\`)을 파싱해 아래 규칙으로 판단하고 조치한다.
 
 | 필드 | 의미 | 권장 조치 |
 |------|------|----------|
@@ -34,8 +34,8 @@ const HEADER = `# ProjectOps 마이그레이션 가이드
 | \`env_applied\` | 워크플로우에 적용된 환경값 | 실제 워크플로우 env와 대조 → 드리프트 발견 시 경고 |
 | \`breaking_traversed\` | 이 실행이 통과한 호환성 변경 (조치 방법 전문은 사람용 섹션) | \`action_required: true\` 항목의 조치 완료 여부 확인 |
 | \`manual_actions_pending\` | 남은 수동 작업 코드 목록 | 비어 있지 않으면 사용자에게 상기 |
-| \`trace_file\` | 파일별 결정·치환 전후값 JSONL (Layer 2) | "왜 이 파일이 이렇게 됐나"는 파일명으로 grep |
-| \`log_file\` | 터미널 출력 원문 (Layer 3) | 실행 재현·포렌식 디버깅용 |
+| \`trace_file\` | 파일별 결정과 치환 전후값 JSONL (Layer 2) | "왜 이 파일이 이렇게 됐나"는 파일명으로 grep |
+| \`log_file\` | 터미널 출력 원문 (Layer 3) | 실행 재현, 포렌식 디버깅용 |
 
 - 스키마는 \`schema\` 필드로 버저닝된다. 모르는 필드는 무시하고, 아는 필드만 사용한다.
 - 여러 엔트리가 있으면 **가장 최근 엔트리**가 현재 상태의 기준이다. 과거 엔트리는 이력 참고용.
@@ -93,39 +93,39 @@ export function renderGuideEntry(report) {
   const L = [];
   L.push("---");
   L.push("");
-  L.push(`## ${r.now || ""} — v${from} → v${to} (${r.mode || "full"})`);
+  L.push(`## ${r.now || ""} - v${from} → v${to} (${r.mode || "full"})`);
   L.push("");
-  L.push(`- 타입: ${(r.types ?? []).join(", ") || "-"} · 배포: ${r.options?.deploy ?? "-"} · publish: ${(r.options?.publish ?? []).join(",") || "없음"}`);
-  L.push(`- 워크플로우: 신규/갱신 ${wf.added.length + wf.replacedBak.length}개 · 유지(unchanged/충돌스킵) ${(r.counters?.skipped ?? 0)}개`);
+  L.push(`- 타입: ${(r.types ?? []).join(", ") || "-"} / 배포: ${r.options?.deploy ?? "-"} / publish: ${(r.options?.publish ?? []).join(",") || "없음"}`);
+  L.push(`- 워크플로우: 신규/갱신 ${wf.added.length + wf.replacedBak.length}개, 유지(unchanged/충돌스킵) ${(r.counters?.skipped ?? 0)}개`);
   L.push("");
 
   // ── 확인 체크리스트 (동적 — 실제 발생분만) ──
   const checklist = [];
   if (leftoverOldGen.length) {
-    checklist.push(`- [ ] **구세대 배포 워크플로우 ${leftoverOldGen.length}개 전환 후 삭제** — 현역 배포일 수 있어 마법사가 건드리지 않았습니다:`);
+    checklist.push(`- [ ] **구세대 배포 워크플로우 ${leftoverOldGen.length}개 전환 후 삭제** (현역 배포일 수 있어 마법사가 건드리지 않았습니다):`);
     for (const o of leftoverOldGen) checklist.push(`  - \`${o.file}\`${o.replacement ? ` → 신형 \`${o.replacement}\`` : ""}`);
   }
   if (wf.replacedBak.length || legacyNeutralized.length) {
-    checklist.push(`- [ ] **.bak 백업 파일 확인 후 정리** — 커스텀 유실분이 없는지 신형과 비교하세요:`);
+    checklist.push(`- [ ] **.bak 백업 파일 확인 후 정리** (커스텀 유실분이 없는지 신형과 비교하세요):`);
     for (const f of wf.replacedBak) checklist.push(`  - \`${f}.bak\` (충돌 교체 백업)`);
     for (const a of legacyNeutralized) if (a.to && String(a.to).endsWith(".bak")) checklist.push(`  - \`${a.to}\` (레거시 무해화)`);
   }
   if (wf.skippedConflict.length) {
-    checklist.push(`- [ ] **기존 수정본 유지 ${wf.skippedConflict.length}개 — 신형과 병합 검토**: ${wf.skippedConflict.map((f) => `\`${f}\``).join(", ")}`);
+    checklist.push(`- [ ] **기존 수정본 유지 ${wf.skippedConflict.length}개, 신형과 병합 검토**: ${wf.skippedConflict.map((f) => `\`${f}\``).join(", ")}`);
   }
   if (wf.added.length || wf.replacedBak.length) {
     checklist.push(`- [ ] **새/갱신 CICD가 요구하는 GitHub Secrets 등록 확인** (Settings → Secrets → Actions, \`_GITHUB_PAT_TOKEN\` 포함)`);
   }
   if (envByType.size) {
-    checklist.push(`- [ ] **적용된 배포 환경값 검증** — 실제 환경과 다르면 워크플로우 env를 직접 수정:`);
+    checklist.push(`- [ ] **적용된 배포 환경값 검증** (실제 환경과 다르면 워크플로우 env를 직접 수정):`);
     for (const [t, kv] of envByType) {
-      for (const [k, v] of kv) checklist.push(`  - ${t} · \`${k}\` = \`${v}\``);
+      for (const [k, v] of kv) checklist.push(`  - ${t} \`${k}\` = \`${v}\``);
     }
   }
   if (r.branches?.created === true) {
-    checklist.push(`- [x] 개발(릴리스 소스) 브랜치 \`${r.branches?.deployBranch ?? "develop"}\` — 마법사가 생성·확인 완료`);
+    checklist.push(`- [x] 개발(릴리스 소스) 브랜치 \`${r.branches?.deployBranch ?? "develop"}\`: 마법사가 생성 및 확인 완료`);
   } else if (r.branches?.ready === false) {
-    checklist.push(`- [ ] 개발(릴리스 소스) 브랜치 \`${r.branches?.deployBranch ?? "develop"}\` 생성 — 릴리스 PR이 동작하려면 필요합니다`);
+    checklist.push(`- [ ] 개발(릴리스 소스) 브랜치 \`${r.branches?.deployBranch ?? "develop"}\` 생성 (릴리스 PR이 동작하려면 필요합니다)`);
   }
   if (checklist.length) {
     L.push("### 확인 체크리스트");
@@ -140,7 +140,7 @@ export function renderGuideEntry(report) {
     L.push("");
     for (const it of breakingAll) {
       const sev = (breaking.critical ?? []).includes(it) ? "CRITICAL" : "WARNING";
-      L.push(`#### ${sev === "CRITICAL" ? "❗" : "⚠️"} [${sev}] ${it.version} — ${it.title || ""}`);
+      L.push(`#### ${sev === "CRITICAL" ? "❗" : "⚠️"} [${sev}] ${it.version} - ${it.title || ""}`);
       if (it.message) L.push(`${it.message}`);
       L.push("");
     }

@@ -14,6 +14,8 @@ import { parseExisting } from "./core/version-yml.js";
 import { runBreakingCheck } from "./core/breaking-check.js";
 import { runMigrations } from "./core/migrations/index.js";
 import { detectOrphanWorkflows } from "./core/orphan-workflows.js";
+import { createRunTrace } from "./core/run-trace.js";
+import { appendGuideEntry } from "./core/migration-guide.js";
 import { resolveProjectPaths } from "./core/paths-resolve.js";
 import { printBannerCompact } from "./ui/banner.js";
 import { printSummary } from "./ui/summary.js";
@@ -135,6 +137,13 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   });
 
   let result = null;
+  // 실행 트레이스 (#494) — 비대화형도 이벤트 기록 (터미널 미러는 CLI 실행에서만 유의미하므로 함께 켠다)
+  const trace = createRunTrace();
+  const recordArtifacts = opts.mode === "full" || opts.mode === "workflows";
+  let breakingReport = null;
+  let migrationsResult = null;
+  let orphanPending = [];
+  if (recordArtifacts) trace.mirrorStart();
   try {
     acquireTemplate({ tempDir, source });
     context.templateVersion = readTemplateVersion(tempDir);
@@ -143,38 +152,60 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     printBannerCompact({ version: context.templateVersion, mode: opts.mode });
 
     // Breaking Changes 게이트 (.sh execute_integration L4415~4420 등가 — 비대화형은 경고 후 진행)
-    const proceed = await runBreakingCheck({ cwd, tempDir, templateVersion: context.templateVersion });
+    const proceed = await runBreakingCheck({
+      cwd, tempDir, templateVersion: context.templateVersion,
+      onItems: (items) => { breakingReport = items; },
+    });
     if (!proceed) return 0;
 
     // 레거시 마이그레이션 (#470) — 워크플로우를 만지는 모드에서만. 비대화형은 safe 티어 자동 적용.
-    if (opts.mode === "full" || opts.mode === "workflows") {
-      await runMigrations({ targetRoot: cwd });
+    if (recordArtifacts) {
+      migrationsResult = await runMigrations({ targetRoot: cwd });
+      for (const a of migrationsResult.applied ?? []) trace.event("legacy", a.action === "error" ? "error" : "neutralized", a.from ?? a.id ?? "", { to: a.to ?? "", id: a.id ?? "" });
+      for (const e of migrationsResult.confirmPending ?? []) trace.event("legacy", "leftover-old-gen", e.file, { replacement: e.replacedBy ?? "", reason: e.reason ?? "" });
     }
 
     // 고아 타입 워크플로우 안내 (#487) — 비대화형은 자동 무해화 금지(배포 파이프라인일 수 있음), 안내만
-    if (opts.mode === "full" || opts.mode === "workflows") {
+    if (recordArtifacts) {
       const orphans = detectOrphanWorkflows({ tempDir, targetRoot: cwd, selectedTypes: types });
+      orphanPending = orphans.map((o) => o.filename);
       for (const o of orphans) {
         console.error(`⚠️ 선택되지 않은 타입(${o.type})의 워크플로우가 남아있습니다: ${o.filename} — 대화형 마법사(npx projectops)에서 정리할 수 있습니다.`);
       }
     }
 
     switch (opts.mode) {
-      case "full": result = runFull(context, tempDir, cwd); break;
+      case "full": result = runFull(context, tempDir, cwd, { trace }); break;
       case "version": result = runVersion(context, tempDir, cwd); break;
-      case "workflows": result = runWorkflows(context, tempDir, cwd); break;
+      case "workflows": result = runWorkflows(context, tempDir, cwd, { trace }); break;
       case "issues": result = runIssues(context, tempDir, cwd); break;
       default:
         // 알 수 없는 모드 → .sh와 동일하게 복사 0건, 에러 아님
         break;
     }
   } finally {
+    trace.mirrorStop();
     remove(tempDir);
+  }
+
+  // 마이그레이션 기록 (#493/#494) — Layer 2/3 트레이스 파일 + Layer 1 가이드 엔트리
+  let migrationGuidePath = null;
+  if (recordArtifacts) {
+    const files = trace.write({ targetRoot: cwd, fromVersion: existing?.templateVersion || "", toVersion: context.templateVersion, now });
+    migrationGuidePath = appendGuideEntry(cwd, {
+      now, mode: opts.mode, types, repoName,
+      templateFrom: existing?.templateVersion || "", templateTo: context.templateVersion,
+      options: { deploy: deployTarget, publish: publishTargets, secretBackup: context.includeSecretBackup, coderabbit: context.codeReviewCoderabbit, changelogProvider: context.changelogProvider, intent },
+      branches: { defaultBranch: branch, deployBranch: context.deployBranch || "develop", ready: null, created: null },
+      breaking: breakingReport, migrations: migrationsResult, orphans: { cleaned: [], pending: orphanPending },
+      events: trace.events, counters: { skipped: result?.workflows?.skipped ?? 0 },
+      traceFile: files?.traceFile ?? "", logFile: files?.logFile ?? "",
+    }).guidePath;
   }
 
   // 완료 요약 (.sh print_summary — CLI 모드에서도 출력)
   printSummary({
-    mode: opts.mode, types, version, deployBranch: context.deployBranch,
+    mode: opts.mode, types, version, deployBranch: context.deployBranch, migrationGuidePath,
     counters: { workflows: result?.workflows?.copied ?? 0, workflowFiles: result?.workflows?.copiedFiles ?? [], utilModules: 0 },
   }, cwd);
   return 0;

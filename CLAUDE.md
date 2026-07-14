@@ -130,6 +130,20 @@ snake_case.sh / snake_case.py
 | `PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC` | version.json 변경 | Util HTML 버전 동기화 (util 모듈 보유 레포에만 복사 — #491) |
 | `PROJECT-COMMON-PROJECTS-SYNC-MANAGER` | 이슈 라벨 변경 | Issue Label → Projects Status 동기화 |
 
+### 마이그레이션 기록 3계층 (#493·#494 — agent 필독)
+
+마법사(full/workflows)가 끝나면 **대상 레포**의 `docs/projectops/migration/`에 실행 기록을 남긴다:
+
+| 계층 | 파일 | 내용 | 소스 모듈 |
+|------|------|------|----------|
+| 1 | `PROJECTOPS-MIGRATION-GUIDE.md` | 고정 헤더(AI 해석 가이드라인) + 실행 엔트리 append-only: 동적 체크리스트·통과한 breaking 전문·yaml 메타(`schema` 버저닝) | `src/core/migration-guide.js` |
+| 2 | `{stamp}_v{from}_to_v{to}.jsonl` | 파일별 결정·env 치환 전후값 이벤트 (파일명 grep으로 인과 추적) | `src/core/run-trace.js` |
+| 3 | `{stamp}_..._.log` | 터미널 출력 원문 미러 (실 CLI에서만) | 〃 |
+
+- 엔진(copy/env/legacy/orphan)은 `hooks.trace` / `ctx.trace`로 **null-safe emit** — trace 미주입 경로(기존 테스트)는 무영향.
+- 가이드의 워크플로우 목록·env 값은 trace events에서 **파생**한다 (단일 소스). 새 엔진 동작을 추가하면 이벤트 emit도 함께 추가할 것.
+- 민감값(PAT·token·secret·password 키)은 `scrubDetail`이 이벤트에서 자동 제거 — 우회 금지.
+
 ### 타입별 워크플로우
 
 #### Flutter

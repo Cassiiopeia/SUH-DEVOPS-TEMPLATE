@@ -14,6 +14,8 @@ import { runMigrations } from "../core/migrations/index.js";
 import { detectOrphanWorkflows, applyOrphanCleanup } from "../core/orphan-workflows.js";
 import { resolveProjectPaths, filterExcludedTypes } from "../core/paths-resolve.js";
 import { askAllOptionalWorkflows, OPTION_AXES } from "../core/options-ask.js";
+import { createRunTrace } from "../core/run-trace.js";
+import { appendGuideEntry } from "../core/migration-guide.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
 import { listWorkflowConflicts } from "../core/copy/workflows.js";
 import { createContext, VALID_TYPES } from "../context.js";
@@ -31,6 +33,9 @@ const isCancel = (v) => v === CANCEL || typeof v === "symbol";
 // skills = runSkills 주입 지점(테스트가 실제 IDE CLI를 안 건드리게). 기본은 실제 runSkills.
 export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { type: "git" }, clock, io = prompts, skills = runSkills } = {}) {
   const tempDir = join(cwd, PATHS.tempDir);
+  // 실행 트레이스 (#494) — 실제 CLI(io=prompts)에서만 터미널 미러를 켠다 (테스트 스텁 io는 이벤트만).
+  const trace = createRunTrace();
+  if (io === prompts) trace.mirrorStart();
   try {
     // 템플릿 먼저 획득 — 배너에 실제 템플릿 버전을 표시 (.sh는 원격 version.yml fetch L4270~4280 등가)
     acquireTemplate({ tempDir, source });
@@ -53,9 +58,11 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     if (mode === CANCEL || mode == null) { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
 
     // Breaking Changes 게이트 (.sh execute_integration L4415~4420 — 모든 모드 공통, 대화형은 확인 질문)
+    let breakingReport = null; // #493 — 통과 구간 항목을 가이드에 조치 방법 전문으로 임베드
     const proceed = await runBreakingCheck({
       cwd, tempDir, templateVersion,
       askYesNo: (msg, def) => io.askYesNo(msg, def),
+      onItems: (items) => { breakingReport = items; },
     });
     if (!proceed) { io.cancelMessage?.("통합을 안전하게 취소했습니다."); return 0; }
 
@@ -90,6 +97,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     let changelogBaseUrl = existing?.options?.changelogBaseUrl ?? "";
     let deployBranch = existing?.options?.deployBranch ?? "develop"; // #456
     let deployBranchReady = null; // #490 — 이번 실행에서 개발 브랜치 존재/생성이 확인됐는지
+    let deployBranchCreated = null; // #493 — 마법사가 직접 생성했는지 (가이드 기록용)
     let intent = existing?.options?.intent ?? null; // #485 프로젝트 성격
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
@@ -125,6 +133,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       changelogBaseUrl = r.changelogBaseUrl;
       deployBranch = r.deployBranch;
       deployBranchReady = r.deployBranchReady ?? deployBranchReady; // #490
+      deployBranchCreated = r.deployBranchCreated ?? deployBranchCreated; // #493
       intent = r.intent;
     }
 
@@ -189,6 +198,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           changelogBaseUrl = r.changelogBaseUrl;
           deployBranch = r.deployBranch;
           deployBranchReady = r.deployBranchReady ?? deployBranchReady; // #490
+          deployBranchCreated = r.deployBranchCreated ?? deployBranchCreated; // #493
           intent = r.intent;
         }
       }
@@ -252,14 +262,18 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     }
 
     // 레거시 마이그레이션 (#470) — 워크플로우를 만지는 모드에서만. 대화형은 safe 티어 확인 1회.
+    let migrationsResult = null; // #493 — 가이드 기록용
     if (mode === "full" || mode === "workflows") {
-      await runMigrations({
+      migrationsResult = await runMigrations({
         targetRoot: cwd,
         askYesNo: (msg, def) => io.askYesNo(msg, def),
       });
+      for (const a of migrationsResult.applied ?? []) trace.event("legacy", a.action === "error" ? "error" : "neutralized", a.from ?? a.id ?? "", { to: a.to ?? "", id: a.id ?? "" });
+      for (const e of migrationsResult.confirmPending ?? []) trace.event("legacy", "leftover-old-gen", e.file, { replacement: e.replacedBy ?? "", reason: e.reason ?? "" });
     }
 
     // 고아 타입 워크플로우 정리 (#487) — 타입 변경으로 선택에서 빠진 타입의 잔존 워크플로우
+    const orphanReport = { cleaned: [], pending: [] }; // #493 — 가이드 기록용
     if (mode === "full" || mode === "workflows") {
       const orphans = detectOrphanWorkflows({ tempDir, targetRoot: cwd, selectedTypes: types });
       if (orphans.length > 0) {
@@ -272,28 +286,48 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           const results = applyOrphanCleanup(cwd, orphans);
           const ok = results.filter((r) => r.action === "bak");
           const failed = results.filter((r) => r.action === "error");
+          orphanReport.cleaned = ok.map((r) => r.filename);
+          for (const r of ok) trace.event("orphan", "neutralized", r.filename);
           io.note?.(`✅ 고아 워크플로우 정리: ${ok.length}개${failed.length ? ` (실패 ${failed.length}개)` : ""}`, "정리 완료");
+        } else {
+          orphanReport.pending = orphans.map((o) => o.filename);
         }
       }
     }
 
     let result = null;
-    if (mode === "full") result = runFull(ctx, tempDir, cwd, hooks);
+    if (mode === "full") result = runFull(ctx, tempDir, cwd, { ...hooks, trace });
     else if (mode === "version") result = runVersion(ctx, tempDir, cwd);
-    else if (mode === "workflows") result = runWorkflows(ctx, tempDir, cwd, hooks);
+    else if (mode === "workflows") result = runWorkflows(ctx, tempDir, cwd, { ...hooks, trace });
 
     // 통합 후 IDE 스킬 제안 (.sh L4557 offer_ide_tools_install — 사전 질문 게이트, 기본 N)
     const wantSkills = await io.askYesNo("AI 에이전트 스킬(Claude·Cursor·Gemini·Codex·PI)도 설치/업데이트할까요?", false);
     if (wantSkills === true) await skills({ templateVersion, tempDir, interactive: true });
 
+    // 마이그레이션 기록 (#493/#494) — Layer 2/3 트레이스 파일 + Layer 1 가이드 엔트리 (full/workflows만)
+    let migrationGuidePath = null;
+    if (mode === "full" || mode === "workflows") {
+      const files = trace.write({ targetRoot: cwd, fromVersion: existing?.templateVersion || "", toVersion: templateVersion, now });
+      migrationGuidePath = appendGuideEntry(cwd, {
+        now, mode, types, repoName,
+        templateFrom: existing?.templateVersion || "", templateTo: templateVersion,
+        options: { deploy: deployTarget, publish: publishTargets, secretBackup: includeSecretBackup, coderabbit: codeReviewCoderabbit, changelogProvider, intent },
+        branches: { defaultBranch: branch, deployBranch, ready: deployBranchReady, created: deployBranchCreated },
+        breaking: breakingReport, migrations: migrationsResult, orphans: orphanReport,
+        events: trace.events, counters: { skipped: result?.workflows?.skipped ?? 0 },
+        traceFile: files?.traceFile ?? "", logFile: files?.logFile ?? "",
+      }).guidePath;
+    }
+
     // 완료 요약 (.sh print_summary L5438)
     io.summary?.({
-      mode, types, version, deployBranch, deployBranchReady,
+      mode, types, version, deployBranch, deployBranchReady, migrationGuidePath,
       counters: { workflows: result?.workflows?.copied ?? 0, workflowFiles: result?.workflows?.copiedFiles ?? [], utilModules: 0 },
     }, cwd);
     io.outro?.(`통합 완료 — ${mode} 모드로 설치했습니다.`);
     return 0;
   } finally {
+    trace.mirrorStop();
     remove(tempDir);
   }
 }

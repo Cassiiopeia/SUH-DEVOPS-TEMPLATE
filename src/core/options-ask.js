@@ -16,34 +16,39 @@ import { branchStatus, createBranch, pushBranch } from "./git-branch.js";
 // 개발(배포) 브랜치 존재 확인 + 생성 제안 (#477) — 대화형 전용.
 // 로컬에 없고 원격에도 없(거나 불명이)면 기본 브랜치에서 생성을 제안하고, 생성 후 push 여부도 묻는다.
 // git 미설치·비레포·질문 불가(io.confirm 없음)면 조용히 통과 — 마법사 진행을 막지 않는다.
+// 반환 ready (#490 — 완료 요약이 "브랜치 만들어라" 재지시를 접을지 판단):
+//   true  = 브랜치가 이미 있거나 이번 실행에서 생성함 → 요약에서 생성 안내 불필요
+//   false = 없는데 사용자가 거절/생성 실패 → 안내 유지
+//   null  = 확인 자체를 못 함(비레포·질문 불가) → 안내 유지(보수적)
 export async function ensureDeployBranch({ targetRoot = ".", deployBranch = "", defaultBranch = "", io = {}, say = () => {} }) {
-  if (!deployBranch || typeof io.confirm !== "function") return { created: false, pushed: false };
+  if (!deployBranch || typeof io.confirm !== "function") return { created: false, pushed: false, ready: null };
   const st = branchStatus(targetRoot, deployBranch);
-  if (!st.isRepo || st.local) return { created: false, pushed: false };
+  if (!st.isRepo) return { created: false, pushed: false, ready: null };
+  if (st.local) return { created: false, pushed: false, ready: true };
   if (st.remote === true) {
     say(`ℹ️ '${deployBranch}' 브랜치가 원격에는 있고 로컬에 없습니다 — 필요 시 'git switch ${deployBranch}'로 가져오세요.`);
-    return { created: false, pushed: false };
+    return { created: false, pushed: false, ready: true };
   }
   say(`⚠️ 개발(릴리스 소스) 브랜치 '${deployBranch}'가 없습니다 — 릴리스(${deployBranch}→${defaultBranch || "기본 브랜치"} PR)가 동작하려면 필요합니다.`);
   const mk = await io.confirm({ message: `${defaultBranch || "현재"} 브랜치에서 '${deployBranch}' 브랜치를 만들까요?`, initialValue: true });
   if (mk !== true) {
     say(`→ 건너뜁니다. 나중에 직접: git checkout -b ${deployBranch} && git push -u origin ${deployBranch}`);
-    return { created: false, pushed: false };
+    return { created: false, pushed: false, ready: false };
   }
   if (!createBranch(targetRoot, deployBranch, defaultBranch)) {
     say(`⚠️ 브랜치 생성 실패 — 직접 실행해주세요: git branch ${deployBranch}${defaultBranch ? ` ${defaultBranch}` : ""}`);
-    return { created: false, pushed: false };
+    return { created: false, pushed: false, ready: false };
   }
   say(`✅ 로컬 브랜치 '${deployBranch}' 생성 완료 (checkout은 하지 않았습니다)`);
   // #481 — push 질문에 브랜치명 명시 ("어느 브랜치를 push하는지" 불명확 방지)
   const up = await io.confirm({ message: `원격(origin)에 '${deployBranch}' 브랜치도 push할까요?`, initialValue: true });
-  if (up !== true) return { created: true, pushed: false };
+  if (up !== true) return { created: true, pushed: false, ready: true };
   if (pushBranch(targetRoot, deployBranch)) {
     say(`✅ origin/${deployBranch} push 완료`);
-    return { created: true, pushed: true };
+    return { created: true, pushed: true, ready: true };
   }
   say(`⚠️ push 실패(자격/네트워크) — 직접 실행해주세요: git push -u origin ${deployBranch}`);
-  return { created: true, pushed: false };
+  return { created: true, pushed: false, ready: true };
 }
 
 // 재노출 — 파서 본체는 version-yml.js에 있다 (순환 import 방지: options-ask → version-yml 방향만 허용)
@@ -115,6 +120,7 @@ export async function askAllOptionalWorkflows({
   let changelogProvider = current.changelogProvider ?? null;
   let changelogBaseUrl = current.changelogBaseUrl ?? null;
   let deployBranch = current.deployBranch ?? null; // #456 릴리스 PR head 브랜치
+  let deployBranchReady = null; // #490 — 이번 실행에서 브랜치 존재/생성이 확인됐는지 (null=확인 안 함)
   let intent = current.intent ?? null; // #485 프로젝트 성격 (app/library/both/none/manual)
 
   // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
@@ -328,7 +334,9 @@ export async function askAllOptionalWorkflows({
       deployBranch = (typeof ans === "string" && !isCancel(ans) && ans.trim()) ? ans.trim() : (deployBranch ?? "develop");
       say(`개발(릴리스 소스) 브랜치: ${deployBranch}`);
       // 브랜치 존재 확인 + 생성 제안 (#477) — 없으면 릴리스 파이프라인이 조용히 놀게 된다
-      await ensureDeployBranch({ targetRoot, deployBranch, defaultBranch, io, say });
+      // #490 — 결과(ready)를 완료 요약에 전달해 이미 생성/확인한 브랜치를 재지시하지 않는다
+      const br = await ensureDeployBranch({ targetRoot, deployBranch, defaultBranch, io, say });
+      deployBranchReady = br.ready;
     }
   }
 
@@ -349,6 +357,8 @@ export async function askAllOptionalWorkflows({
     changelogProvider: changelogProvider ?? "github-ai",
     changelogBaseUrl: changelogBaseUrl ?? "",
     deployBranch: deployBranch ?? "develop",
+    deployBranchReady, // #490 — true=존재/생성 확인됨, false=거절/실패, null=확인 안 함
+
     // #485 intent — 확정값 우선, 없으면 최종 deploy/publish에서 역추론(basic·비대화형 경로 보정)
     intent: intent ?? inferIntent(finalDeploy, finalPublish) ?? "manual",
   };

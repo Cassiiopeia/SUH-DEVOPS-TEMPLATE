@@ -71,3 +71,18 @@ test("printSummary: issues 모드 — 체크리스트에 템플릿만", () => {
     assert.doesNotMatch(out, /버전 관리 시스템/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// #490 — 마법사가 이번 실행에서 브랜치를 확인·생성했으면 재지시하지 않는다
+test("printSummary: deployBranchReady=true면 생성 재지시 대신 완료 표시 (#490)", () => {
+  const root = mkdtempSync(join(tmpdir(), "summary-br-"));
+  try {
+    const base = { mode: "full", types: ["spring"], version: "1.0.0", deployBranch: "develop", counters: { workflows: 0, workflowFiles: [] } };
+    const done = captureStderr(() => printSummary({ ...base, deployBranchReady: true }, root));
+    assert.match(done, /develop 브랜치 준비 완료/);
+    assert.equal(done.includes("git checkout -b develop"), false, "완료됐는데 생성 명령 안내 금지");
+    // 미확인(기본) — 기존 안내 유지
+    const todo = captureStderr(() => printSummary(base, root));
+    assert.match(todo, /develop 브랜치 생성 \(아직 없다면\)/);
+    assert.equal(todo.includes("git checkout -b develop"), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

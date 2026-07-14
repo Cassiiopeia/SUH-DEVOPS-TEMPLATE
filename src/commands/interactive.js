@@ -89,6 +89,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     let changelogProvider = existing?.options?.changelogProvider ?? "github-ai";
     let changelogBaseUrl = existing?.options?.changelogBaseUrl ?? "";
     let deployBranch = existing?.options?.deployBranch ?? "develop"; // #456
+    let deployBranchReady = null; // #490 — 이번 실행에서 개발 브랜치 존재/생성이 확인됐는지
     let intent = existing?.options?.intent ?? null; // #485 프로젝트 성격
     const showOptional = mode === "full" || mode === "workflows";
     const realTty = process.stdout.isTTY === true;
@@ -123,6 +124,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       changelogProvider = r.changelogProvider;
       changelogBaseUrl = r.changelogBaseUrl;
       deployBranch = r.deployBranch;
+      deployBranchReady = r.deployBranchReady ?? deployBranchReady; // #490
       intent = r.intent;
     }
 
@@ -186,6 +188,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
           changelogProvider = r.changelogProvider;
           changelogBaseUrl = r.changelogBaseUrl;
           deployBranch = r.deployBranch;
+          deployBranchReady = r.deployBranchReady ?? deployBranchReady; // #490
           intent = r.intent;
         }
       }
@@ -285,7 +288,7 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
 
     // 완료 요약 (.sh print_summary L5438)
     io.summary?.({
-      mode, types, version, deployBranch,
+      mode, types, version, deployBranch, deployBranchReady,
       counters: { workflows: result?.workflows?.copied ?? 0, workflowFiles: result?.workflows?.copiedFiles ?? [], utilModules: 0 },
     }, cwd);
     io.outro?.(`통합 완료 — ${mode} 모드로 설치했습니다.`);

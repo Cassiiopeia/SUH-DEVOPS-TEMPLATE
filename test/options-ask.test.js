@@ -333,6 +333,7 @@ test("askAllOptionalWorkflows: 비대화형 — current 유지, 미설정은 기
     });
     assert.deepEqual(r, { deploy: "vercel", publish: [], secretBackup: false,
       codeReviewCoderabbit: false, changelogProvider: "github-ai", changelogBaseUrl: "", deployBranch: "develop",
+      deployBranchReady: null, // #490 — 비대화형은 브랜치 확인 안 함
       intent: "app" }); // deploy≠none & publish=[] → app 역추론 (#485)
     assert.equal(io.calls.select.length, 0);
     assert.equal(io.calls.multiselect.length, 0);

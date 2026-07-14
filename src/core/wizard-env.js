@@ -41,6 +41,13 @@ export function resolveToken(name, type, resolvers = {}) {
   return typeof fn === "function" ? (fn(type) ?? "") : "";
 }
 
+// 잔여 전역 토큰 치환 (.sh 3347~3351) — 파일 본문·수집값(#489)·카드 표시가 전부 같은 규칙을 쓴다.
+// 파일에 실제 써지는 값과 version.yml deploy 블록 기억값이 어긋나지 않게 하는 단일 지점.
+export function resolveGlobalTokens(s, repoName = "") {
+  if (typeof s !== "string" || (!s.includes("__PROJECT_NAME__") && !s.includes("__APP_ARTIFACT_NAME__"))) return s;
+  return s.replaceAll("__PROJECT_NAME__", repoName).replaceAll("__APP_ARTIFACT_NAME__", repoName);
+}
+
 // 파일 전체 치환 (configure_workflow_env 등가).
 // content: 원본 워크플로우 텍스트. 반환: 치환된 텍스트.
 // opts:
@@ -70,16 +77,16 @@ export function substituteEnv(content, opts = {}) {
       if (chosen != null && chosen !== "" && !useDefaults) val = chosen;
       else val = def;
       // ask 키만 수집 (.sh wf_deploy_set — auto는 저장 안 함). deploy 블록용.
-      if (collectAsks) collectAsks.set(p.key, val);
+      // #489 — 파일 본문은 아래 전역 토큰 치환을 거치므로 수집값도 동일 치환해
+      //        version.yml deploy 블록이 설치본과 항상 바이트 일치하게 한다.
+      if (collectAsks) collectAsks.set(p.key, resolveGlobalTokens(val, repoName));
     }
     lines[i] = setEnvLine(lines[i], p.key, val);
   }
   let out = lines.join(usesCRLF ? "\r\n" : "\n");
 
   // 잔여 전역 토큰 (.sh 3347~3351)
-  if (out.includes("__PROJECT_NAME__") || out.includes("__APP_ARTIFACT_NAME__")) {
-    out = out.replaceAll("__PROJECT_NAME__", repoName).replaceAll("__APP_ARTIFACT_NAME__", repoName);
-  }
+  out = resolveGlobalTokens(out, repoName);
 
   // paths-anchor (.sh 3353~3360): 경로가 '.'이 아니면 주석 라인 전체를 paths 라인으로 교체
   if (PATHS_ANCHOR_RE.test(out) && projectPath && projectPath !== ".") {

@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { stdin, stderr } from "node:process";
 import { PATHS } from "../core/paths.js";
 import { exists, listYamlFiles } from "../core/fsutil.js";
-import { parseWizardLine, resolveToken } from "../core/wizard-env.js";
+import { parseWizardLine, resolveToken, resolveGlobalTokens } from "../core/wizard-env.js";
 import { loadWizardPrompts, wfField, workflowDisplayName } from "../core/wizard-labels.js";
 import * as engine from "./readline-engine.js";
 
@@ -39,7 +39,7 @@ export function scopeString(usages = []) {
 // 반환: { keys:[], defaults:Map<key,default>, typeDefaults:Map<"type|key",default>,
 //        usages:Map<key,[{type,workflowName}]> }
 export function collectAsks(tempDir, types = [], opts = {}) {
-  const { resolvers = {}, deployTarget = "docker-ssh", publishTargets = [], prompts = null } = opts;
+  const { resolvers = {}, deployTarget = "docker-ssh", publishTargets = [], prompts = null, repoName = "" } = opts;
   const baseDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   const keys = [];
   const defaults = new Map();
@@ -64,9 +64,13 @@ export function collectAsks(tempDir, types = [], opts = {}) {
           const p = parseWizardLine(line); // KEY 정규식 [A-Z_]+ (.sh와 동일)
           if (!p || p.action !== "ask") continue;
           // 타입별 기본값: @접두면 resolver 해석, 아니면 리터럴 (.sh _type_default 등가)
-          const typeDefault = p.arg.startsWith("@")
-            ? resolveToken(p.arg.slice(1), type, resolvers)
-            : p.arg;
+          // #489 — __PROJECT_NAME__ 등 전역 토큰은 카드 표시 전에 미리 해석한다.
+          //        설치본(파일 복사 시 전역 치환)과 동일한 값을 보여주지 않으면
+          //        사용자가 "리터럴이 그대로 박히나?" 오해하게 된다.
+          const typeDefault = resolveGlobalTokens(
+            p.arg.startsWith("@") ? resolveToken(p.arg.slice(1), type, resolvers) : p.arg,
+            repoName,
+          );
           typeDefaults.set(`${type}|${p.key}`, typeDefault);
           if (!defaults.has(p.key)) { keys.push(p.key); defaults.set(p.key, typeDefault); }
           const list = usages.get(p.key) || [];
@@ -140,7 +144,7 @@ export async function promptEnvPlan({
   deployTarget = "docker-ssh", publishTargets = [], targetRoot = ".", repoName = "", log = defaultLog,
 } = {}) {
   const prompts = loadWizardPrompts(targetRoot, tempDir);
-  const asks = collectAsks(tempDir, types, { resolvers, deployTarget, publishTargets, prompts });
+  const asks = collectAsks(tempDir, types, { resolvers, deployTarget, publishTargets, prompts, repoName });
   const defaults = asks.defaults;
 
   // 수집 키 0개 → 질문 자체가 없음 (.sh `[ ${#WF_ASK_KEYS[@]} -eq 0 ]` 등가)

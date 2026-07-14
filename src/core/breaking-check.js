@@ -27,7 +27,9 @@ export async function loadBreakingJson(tempDir) {
 //   templateVersion - 설치하려는 템플릿 버전 (.sh의 DEFAULT_VERSION 고정 버그를 실버전으로 교정 — 설계 D2)
 //   askYesNo        - async(message, defaultYes)→bool. null이면 비대화형: 경고만 출력 후 진행
 //   loader          - 테스트 주입용 (기본 loadBreakingJson)
-export async function runBreakingCheck({ cwd, tempDir, templateVersion, askYesNo = null, loader = loadBreakingJson }) {
+//   onItems         - (#493) 통과 구간 항목 콜백 ({current, target, critical, warnings}) —
+//                     마이그레이션 가이드가 조치 방법 전문을 임베드하는 데 쓴다 (표시 여부와 무관하게 호출)
+export async function runBreakingCheck({ cwd, tempDir, templateVersion, askYesNo = null, loader = loadBreakingJson, onItems = null }) {
   const vy = join(cwd, "version.yml");
   if (!existsSync(vy)) return true; // 신규 통합 — 비교 기준 없음
   const { templateVersion: current } = parseExisting(readFileSync(vy, "utf8"));
@@ -37,6 +39,7 @@ export async function runBreakingCheck({ cwd, tempDir, templateVersion, askYesNo
   if (!json) return true;
 
   const { critical, warnings } = collectBreaking(json, current, templateVersion);
+  if (critical.length || warnings.length) onItems?.({ current, target: templateVersion, critical, warnings });
   if (critical.length === 0 && warnings.length === 0) return true;
 
   // 요약 리스트 표시 (#473 — 전문 통덤프는 벽글이 되어 정작 CRITICAL이 안 읽혔고,

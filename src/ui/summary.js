@@ -131,7 +131,7 @@ export function printSummary(ctx, targetRoot = ".") {
   // #493 — 이번 실행의 마이그레이션 기록 (수동 체크리스트·breaking 조치·AI 메타데이터)
   if (ctx?.migrationGuidePath) {
     err(`  🧭 마이그레이션 가이드: ${ctx.migrationGuidePath}`);
-    err("     (이번 실행의 변경 내역·수동 확인 체크리스트·AI Agent용 메타데이터가 기록됐습니다)");
+    err("     (이번 실행의 변경 내역, 수동 확인 체크리스트, AI Agent용 메타데이터가 기록됐습니다)");
   }
   err("");
 
@@ -147,7 +147,7 @@ export function printSummary(ctx, targetRoot = ".") {
   err("");
   // #490 — 마법사가 브랜치를 직접 생성(또는 존재 확인)했으면 같은 작업을 재지시하지 않는다
   if (deployBranchReady) {
-    err(`  2️⃣  ✅ ${deployBranchName} 브랜치 준비 완료 — 마법사가 확인·생성했습니다 (추가 작업 불필요)`);
+    err(`  2️⃣  ✅ ${deployBranchName} 브랜치 준비 완료: 마법사가 확인 및 생성했습니다 (추가 작업 불필요)`);
   } else {
     err(`  2️⃣  ${deployBranchName} 브랜치 생성 (아직 없다면)`);
     err(`     → git checkout -b ${deployBranchName} && git push -u origin ${deployBranchName}`);

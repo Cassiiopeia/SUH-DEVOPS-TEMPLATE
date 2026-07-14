@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-14T01:35:40Z",
-    "currentVersion": "4.2.17",
+    "lastUpdated": "2026-07-14T04:32:55Z",
+    "currentVersion": "4.2.18",
     "projectType": "basic",
-    "totalReleases": 202,
+    "totalReleases": 203,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.18",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-14",
+      "pr_number": 496,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 마이그레이션 가이드와 완료 안내 문구를 읽기 쉬운 문장부호로 다듬었습니다",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "마이그레이션 가이드와 완료 안내 문구를 읽기 쉬운 문장부호로 다듬었습니다"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.17",
       "project_type": "basic",

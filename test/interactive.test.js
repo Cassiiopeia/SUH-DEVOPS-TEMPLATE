@@ -164,3 +164,31 @@ test("대화형: 선택 안 된 타입의 고아 워크플로우 → 확인 후 
     assert.ok(exists(join(cwd, ".github/workflows/PROJECT-REACT-CICD.yaml")));
   } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
 });
+
+// #493/#494 — full 실행이 끝나면 마이그레이션 가이드·트레이스가 남는다
+test("대화형: full 완료 시 마이그레이션 가이드 + JSONL 트레이스 생성", async () => {
+  const src = mkdtempSync(join(tmpdir(), "iasrc-mg-"));
+  const cwd = mkdtempSync(join(tmpdir(), "iacwd-mg-"));
+  try {
+    makeSource(src);
+    writeText(join(cwd, "package.json"), '{"dependencies":{"react":"18"}}');
+    const code = await runInteractive({}, {
+      cwd, source: { type: "local", path: src }, clock: { now: "2026-07-14 00:16:04", today: "2026-07-14" },
+      io: stubIo({ mode: "full", confirm: "continue" }),
+    });
+    assert.equal(code, 0);
+    const guide = join(cwd, "docs/projectops/migration/PROJECTOPS-MIGRATION-GUIDE.md");
+    assert.ok(exists(guide), "가이드 생성");
+    const md = readFileSync(guide, "utf8");
+    assert.match(md, /# ProjectOps 마이그레이션 가이드/);
+    assert.match(md, /schema: 1/);
+    assert.match(md, /PROJECT-REACT-CICD\.yaml/); // 복사된 워크플로우가 메타에 반영
+    // JSONL 트레이스 — 가이드 메타의 trace_file 경로가 실제로 존재
+    const traceFile = (md.match(/trace_file: "([^"]+)"/) || [])[1];
+    assert.ok(traceFile, "trace_file 포인터 존재");
+    assert.ok(exists(join(cwd, traceFile)), "JSONL 파일 존재");
+    const jsonl = readFileSync(join(cwd, traceFile), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    assert.equal(jsonl[0].kind, "projectops-migration-trace");
+    assert.ok(jsonl.some((e) => e.phase === "copy" && e.target === "PROJECT-REACT-CICD.yaml"));
+  } finally { rmSync(src, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); }
+});

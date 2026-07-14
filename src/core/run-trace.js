@@ -1,0 +1,89 @@
+// 마법사 실행 트레이스 (#494) — 3계층 기록의 Layer 2(JSONL 이벤트) + Layer 3(터미널 미러).
+// 마법사의 모든 결정·행동을 이벤트 한 줄씩 남겨, 나중에 사람·AI Agent가 파일명 grep 한 번으로
+// "이 파일에 마법사가 한 모든 일"을 시간순 추적할 수 있게 한다 (v4.2.15 수동 로그 복사 진단의 자동화).
+// Layer 1(큐레이션 가이드)은 migration-guide.js — 이 모듈의 events를 단일 소스로 소비한다.
+import { join } from "node:path";
+import { writeText } from "./fsutil.js";
+
+export const MIGRATION_DIR = "docs/projectops/migration";
+export const TRACE_SCHEMA = 1;
+
+// 민감값 가드 — PAT·토큰·시크릿·비밀번호는 어떤 이벤트에도 남기지 않는다 (#494 안전 규칙).
+const SENSITIVE_KEY_RE = /pat|token|secret|password|credential/i;
+export function scrubDetail(detail) {
+  if (detail == null || typeof detail !== "object" || Array.isArray(detail)) return detail;
+  const out = {};
+  for (const [k, v] of Object.entries(detail)) {
+    if (SENSITIVE_KEY_RE.test(k)) continue;
+    out[k] = (v != null && typeof v === "object" && !Array.isArray(v)) ? scrubDetail(v) : v;
+  }
+  return out;
+}
+
+// now("YYYY-MM-DD HH:MM:SS") → 파일명 스탬프 "YYYYMMDD_HHMMSS". 형식이 아니면 "run" 폴백(테스트 주입 clock 안전).
+export function stampFromNow(now) {
+  const digits = String(now ?? "").replace(/[^0-9]/g, "");
+  if (digits.length < 14) return "run";
+  return `${digits.slice(0, 8)}_${digits.slice(8, 14)}`;
+}
+
+// 트레이스 팩토리. clockIso 주입 가능(테스트 결정성) — 기본은 실제 UTC.
+export function createRunTrace({ clockIso = null } = {}) {
+  const events = [];
+  const lines = [];
+  let restore = null;
+
+  const nowIso = () => clockIso ?? new Date().toISOString().replace(/\.\d+Z$/, "Z");
+
+  return {
+    events,
+    lines,
+
+    // 이벤트 1건 기록. detail은 민감키 스크럽 후 저장.
+    event(phase, action, target = "", detail = null) {
+      const e = { ts: nowIso(), phase, action, target };
+      const d = scrubDetail(detail);
+      if (d != null && (typeof d !== "object" || Object.keys(d).length > 0)) e.detail = d;
+      events.push(e);
+      return e;
+    },
+
+    // 터미널 출력 미러 시작 — stdout/stderr write를 감싸 사본만 수집(출력 자체는 그대로 통과).
+    // 실제 CLI 실행에서만 켠다 (테스트 스텁 io 경로는 호출하지 않음).
+    mirrorStart() {
+      if (restore) return;
+      const so = process.stdout.write; // 원본 참조 보관 — 복원 시 identity 유지
+      const se = process.stderr.write;
+      const capture = (chunk) => {
+        try { lines.push(typeof chunk === "string" ? chunk : chunk.toString("utf8")); } catch { /* 미러 실패는 실행에 영향 없음 */ }
+      };
+      process.stdout.write = function (chunk, ...rest) { capture(chunk); return so.apply(process.stdout, [chunk, ...rest]); };
+      process.stderr.write = function (chunk, ...rest) { capture(chunk); return se.apply(process.stderr, [chunk, ...rest]); };
+      restore = () => { process.stdout.write = so; process.stderr.write = se; };
+    },
+
+    mirrorStop() {
+      if (restore) { restore(); restore = null; }
+    },
+
+    // Layer 2/3 파일 기록 — docs/projectops/migration/{stamp}_v{from}_to_v{to}.{jsonl,log}
+    // 반환: { traceFile, logFile } (targetRoot 기준 상대 경로 — 가이드 메타 포인터용).
+    // 이벤트가 0건이면 기록하지 않는다(no-op 실행 오염 방지) — null 반환.
+    write({ targetRoot = ".", fromVersion = "", toVersion = "", now = "" } = {}) {
+      if (events.length === 0) return null;
+      const stamp = stampFromNow(now);
+      const from = String(fromVersion || "new").replace(/[^0-9a-zA-Z.-]/g, "");
+      const to = String(toVersion || "unknown").replace(/[^0-9a-zA-Z.-]/g, "");
+      const base = `${stamp}_v${from}_to_v${to}`;
+      const traceFile = `${MIGRATION_DIR}/${base}.jsonl`;
+      const header = JSON.stringify({ schema: TRACE_SCHEMA, kind: "projectops-migration-trace", from, to, started: events[0]?.ts ?? "" });
+      writeText(join(targetRoot, traceFile), [header, ...events.map((e) => JSON.stringify(e))].join("\n") + "\n");
+      let logFile = null;
+      if (lines.length > 0) {
+        logFile = `${MIGRATION_DIR}/${base}.log`;
+        writeText(join(targetRoot, logFile), lines.join(""));
+      }
+      return { traceFile, logFile };
+    },
+  };
+}

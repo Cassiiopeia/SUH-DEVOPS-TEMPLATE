@@ -11,11 +11,16 @@ import { substituteBranches } from "../branch-sub.js";
 
 // 한 파일에 env 치환을 적용해 대상 파일을 갱신 (.sh configure_workflow_env 등가).
 // values/useDefaults: env 계획(promptEnvPlan) 결과 — 미지정이면 기본값 경로(현행 force 동작).
-function configureEnv(targetPath, { type, projectPath = ".", repoName = "", resolvers = {}, collectAsks = null, values = new Map(), useDefaults = true }) {
+// trace(#494): 치환 1건당 env.substituted 이벤트 (before/after 포함 — 치환 불일치류 버그의 즉시 발견 근거).
+function configureEnv(targetPath, filename, { type, projectPath = ".", repoName = "", resolvers = {}, collectAsks = null, values = new Map(), useDefaults = true, trace = null }) {
   const content = readFileSync(targetPath, "utf8");
   if (!content.includes("@wizard")) return;
-  const out = substituteEnv(content, { type, useDefaults, values, projectPath, repoName, resolvers, collectAsks });
+  const collectSubs = trace ? [] : null;
+  const out = substituteEnv(content, { type, useDefaults, values, projectPath, repoName, resolvers, collectAsks, collectSubs });
   writeFileSync(targetPath, out);
+  if (trace && collectSubs) {
+    for (const s of collectSubs) trace.event("env", "substituted", filename, { type, ...s });
+  }
 }
 
 // util 버전 동기화 워크플로우 (#491) — .github/util/ 모듈(version.json)이 있는 레포에서만 의미가 있다.
@@ -57,6 +62,7 @@ function classify(srcDir, workflowsDir, envOpts) {
 export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const { types = [], paths = new Map(), deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, repoName = "", resolvers = {}, envValues = new Map(), envUseDefaults = true, branch = "", deployBranch = "" } = context;
   const decisions = hooks.decisions instanceof Map ? hooks.decisions : new Map();
+  const trace = hooks.trace ?? null; // #494 — 실행 트레이스 (null-safe: 미주입이면 전 이벤트 no-op)
   const workflowsDir = join(targetRoot, PATHS.workflowsDir);
   const projectTypesDir = join(tempDir, PATHS.workflowsDir, PATHS.projectTypesDir);
   if (!exists(projectTypesDir)) throw new Error("템플릿 저장소 구조 오류 — project-types 폴더를 찾지 못했습니다.");
@@ -74,23 +80,28 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   if (exists(commonDir)) {
     for (const filename of listYamlFiles(commonDir)) {
       // #491 — util 동기화 워크플로우는 util 모듈이 있(게 되)는 레포에만 복사
-      if (filename === UTIL_VERSION_SYNC && !utilSyncApplies(tempDir, targetRoot, types)) continue;
+      if (filename === UTIL_VERSION_SYNC && !utilSyncApplies(tempDir, targetRoot, types)) {
+        trace?.event("copy", "excluded", filename, { reason: "util-modules-absent" });
+        continue;
+      }
       const src = join(commonDir, filename);
       const dst = join(workflowsDir, filename);
       if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOptsFor("common"))) {
         counters.skipped++;
+        trace?.event("copy", "skipped-unchanged", filename, { group: "common" });
         continue;
       }
       copyFileSync(src, dst);
       counters.copied++;
       counters.copiedFiles.push(filename);
+      trace?.event("copy", "copied", filename, { group: "common" });
     }
   }
 
   // (2~4) 타입별
   for (const type of types) {
     const asks = new Map();
-    copyWorkflowsForType(type, projectTypesDir, workflowsDir, { deployTarget, publishTargets, ...context, envOptsFor, collectAsks: asks, decisions }, counters);
+    copyWorkflowsForType(type, projectTypesDir, workflowsDir, { deployTarget, publishTargets, ...context, envOptsFor, collectAsks: asks, decisions, trace }, counters);
     if (asks.size) deployValues.set(type, asks);
   }
 
@@ -102,13 +113,16 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
       const dst = join(workflowsDir, filename);
       if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOptsFor("common"))) {
         counters.skipped++;
+        trace?.event("copy", "skipped-unchanged", filename, { group: "common-deploy" });
         continue;
       }
-      if (existsSync(dst)) renameSync(dst, dst + ".bak");
+      const backedUp = existsSync(dst);
+      if (backedUp) renameSync(dst, dst + ".bak");
       copyFileSync(src, dst);
       counters.optionalCopied++;
       counters.copied++;
       counters.copiedFiles.push(filename);
+      trace?.event("copy", backedUp ? "replaced-bak" : "copied", filename, { group: "common-deploy" });
     }
   }
 
@@ -122,6 +136,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
       counters.optionalCopied++;
       counters.copied++;
       counters.copiedFiles.push(filename);
+      trace?.event("copy", "copied", filename, { group: "secret-backup" });
     }
   }
 
@@ -133,7 +148,10 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
       if (!existsSync(p)) continue;
       const before = readFileSync(p, "utf8");
       const after = substituteBranches(before, branches);
-      if (after !== before) writeFileSync(p, after);
+      if (after !== before) {
+        writeFileSync(p, after);
+        trace?.event("env", "branch-substituted", f, { defaultBranch: branches.defaultBranch, deployBranch: branches.deployBranch });
+      }
     }
   }
 
@@ -142,7 +160,7 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
 
 // changed(기존에 있고 내용이 바뀐) 파일 1개를 결정에 따라 처리 (.sh 3440~3508 3지선 case 등가).
 // 'skip'(기본): 기존 유지. 'backup': 기존→.bak 후 교체. 'template': 기존 유지 + 새 버전을 .template.yaml로.
-function applyDecision(decision, srcDir, workflowsDir, filename, counters) {
+function applyDecision(decision, srcDir, workflowsDir, filename, counters, trace = null) {
   const src = join(srcDir, filename);
   const dst = join(workflowsDir, filename);
   if (decision === "backup") {
@@ -151,6 +169,7 @@ function applyDecision(decision, srcDir, workflowsDir, filename, counters) {
     copyFileSync(src, dst);
     counters.copied++;
     counters.copiedFiles?.push(filename);
+    trace?.event("copy", "replaced-bak", filename, { decision });
     return;
   }
   if (decision === "template") {
@@ -158,9 +177,11 @@ function applyDecision(decision, srcDir, workflowsDir, filename, counters) {
     const templateName = (filename.endsWith(".yaml") ? filename.slice(0, -".yaml".length) : filename) + ".template.yaml";
     copyFileSync(src, join(workflowsDir, templateName)); // cp가 기존 .template.yaml 덮어씀(.sh rm -f + cp 등가)
     counters.templateAdded++;
+    trace?.event("copy", "template-added", templateName, { original: filename });
     return;
   }
   counters.skipped++; // 'skip'/미지정/ESC → 기존 유지 (.sh S)·force 기본)
+  trace?.event("copy", "skipped-conflict", filename, { decision: decision ?? "skip", note: "사용자 수정본 유지 — 병합 검토 후보" });
 }
 
 // 대상 워크플로우 디렉토리에서 changed(충돌) 파일 목록만 뽑는다 — copyWorkflowsInteractive의 사전 조사용.
@@ -203,7 +224,7 @@ export async function copyWorkflowsInteractive(context, tempDir, targetRoot = ".
 const PUBLISH_TARGETS = ["nexus", "npm", "github-packages"];
 
 function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters) {
-  const { deployTarget = "docker-ssh", publishTargets = [], force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null, decisions = new Map() } = ctx;
+  const { deployTarget = "docker-ssh", publishTargets = [], force = false, paths = new Map(), repoName = "", resolvers = {}, envOptsFor, collectAsks = null, decisions = new Map(), trace = null } = ctx;
   const typeDir = join(projectTypesDir, type);
   const envOpts = envOptsFor(type);
   let unchangedNames = [];
@@ -212,19 +233,19 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
   if (exists(typeDir)) {
     const { newFiles, unchanged, changed } = classify(typeDir, workflowsDir, envOpts);
     unchangedNames = unchanged.slice();
-    for (const f of unchanged) counters.skipped++;
-    for (const f of newFiles) { copyFileSync(join(typeDir, f), join(workflowsDir, f)); counters.copied++; counters.copiedFiles.push(f); }
+    for (const f of unchanged) { counters.skipped++; trace?.event("copy", "skipped-unchanged", f, { group: type }); }
+    for (const f of newFiles) { copyFileSync(join(typeDir, f), join(workflowsDir, f)); counters.copied++; counters.copiedFiles.push(f); trace?.event("copy", "copied", f, { group: type }); }
     // changed: 결정 Map에 따라 처리 (미지정=skip → 현행 force 동작과 동일)
-    for (const f of changed) applyDecision(decisions.get(f), typeDir, workflowsDir, f, counters);
+    for (const f of changed) applyDecision(decisions.get(f), typeDir, workflowsDir, f, counters, trace);
   }
 
   // server-deploy — deploy=docker-ssh일 때만 포함 (#439)
   const serverDeployDir = join(typeDir, "server-deploy");
   if (exists(serverDeployDir) && (deployTarget || "docker-ssh") === "docker-ssh") {
     const { newFiles, unchanged, changed } = classify(serverDeployDir, workflowsDir, envOpts);
-    for (const f of unchanged) counters.skipped++;
-    for (const f of newFiles) { copyFileSync(join(serverDeployDir, f), join(workflowsDir, f)); counters.copied++; counters.copiedFiles.push(f); }
-    for (const f of changed) applyDecision(decisions.get(f), serverDeployDir, workflowsDir, f, counters);
+    for (const f of unchanged) { counters.skipped++; trace?.event("copy", "skipped-unchanged", f, { group: `${type}/server-deploy` }); }
+    for (const f of newFiles) { copyFileSync(join(serverDeployDir, f), join(workflowsDir, f)); counters.copied++; counters.copiedFiles.push(f); trace?.event("copy", "copied", f, { group: `${type}/server-deploy` }); }
+    for (const f of changed) applyDecision(decisions.get(f), serverDeployDir, workflowsDir, f, counters, trace);
   }
 
   // publish/<target> (opt-in — #439 publish 축. 타입은 파일 위치일 뿐 게이트가 아니다)
@@ -238,13 +259,16 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
       const dst = join(workflowsDir, filename);
       if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOpts)) {
         counters.skipped++;
+        trace?.event("copy", "skipped-unchanged", filename, { group: `${type}/publish/${target}` });
         continue;
       }
-      if (existsSync(dst)) renameSync(dst, dst + ".bak");
+      const backedUp = existsSync(dst);
+      if (backedUp) renameSync(dst, dst + ".bak");
       copyFileSync(src, dst);
       counters.optionalCopied++;
       counters.copied++;
       counters.copiedFiles.push(filename);
+      trace?.event("copy", backedUp ? "replaced-bak" : "copied", filename, { group: `${type}/publish/${target}` });
     }
   }
 
@@ -255,7 +279,7 @@ function copyWorkflowsForType(type, projectTypesDir, workflowsDir, ctx, counters
       const target = join(workflowsDir, filename);
       if (!existsSync(target)) continue;            // 건너뛴 파일 제외
       if (unchangedNames.includes(filename)) continue; // unchanged 제외
-      configureEnv(target, { ...envOpts, collectAsks }); // env 계획 values/useDefaults 포함
+      configureEnv(target, filename, { ...envOpts, collectAsks, trace }); // env 계획 values/useDefaults 포함
     }
   }
 }

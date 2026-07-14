@@ -128,6 +128,11 @@ export function printSummary(ctx, targetRoot = ".") {
 
   err("  📖 TEMPLATE REPO: https://github.com/Cassiiopeia/projectops");
   err("  📚 워크플로우 가이드: .github/workflows/project-types/README.md");
+  // #493 — 이번 실행의 마이그레이션 기록 (수동 체크리스트·breaking 조치·AI 메타데이터)
+  if (ctx?.migrationGuidePath) {
+    err(`  🧭 마이그레이션 가이드: ${ctx.migrationGuidePath}`);
+    err("     (이번 실행의 변경 내역·수동 확인 체크리스트·AI Agent용 메타데이터가 기록됐습니다)");
+  }
   err("");
 
   // 필수 3가지 작업 안내 (.sh L5605~5625 — 원문 유지)

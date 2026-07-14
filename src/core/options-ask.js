@@ -121,6 +121,7 @@ export async function askAllOptionalWorkflows({
   let changelogBaseUrl = current.changelogBaseUrl ?? null;
   let deployBranch = current.deployBranch ?? null; // #456 릴리스 PR head 브랜치
   let deployBranchReady = null; // #490 — 이번 실행에서 브랜치 존재/생성이 확인됐는지 (null=확인 안 함)
+  let deployBranchCreated = null; // #493 — 이번 실행에서 마법사가 직접 생성했는지 (가이드 기록용)
   let intent = current.intent ?? null; // #485 프로젝트 성격 (app/library/both/none/manual)
 
   // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
@@ -337,6 +338,7 @@ export async function askAllOptionalWorkflows({
       // #490 — 결과(ready)를 완료 요약에 전달해 이미 생성/확인한 브랜치를 재지시하지 않는다
       const br = await ensureDeployBranch({ targetRoot, deployBranch, defaultBranch, io, say });
       deployBranchReady = br.ready;
+      deployBranchCreated = br.created;
     }
   }
 
@@ -358,6 +360,7 @@ export async function askAllOptionalWorkflows({
     changelogBaseUrl: changelogBaseUrl ?? "",
     deployBranch: deployBranch ?? "develop",
     deployBranchReady, // #490 — true=존재/생성 확인됨, false=거절/실패, null=확인 안 함
+    deployBranchCreated, // #493 — true=이번 실행에서 마법사가 생성, null=확인 안 함
 
     // #485 intent — 확정값 우선, 없으면 최종 deploy/publish에서 역추론(basic·비대화형 경로 보정)
     intent: intent ?? inferIntent(finalDeploy, finalPublish) ?? "manual",

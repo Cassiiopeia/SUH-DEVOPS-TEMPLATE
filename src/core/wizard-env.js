@@ -57,8 +57,9 @@ export function resolveGlobalTokens(s, repoName = "") {
 //   resolvers     - resolveToken용
 //   repoName      - __PROJECT_NAME__/__APP_ARTIFACT_NAME__ 치환값
 //   projectPath   - paths-anchor 치환용 ('.'이면 anchor 미변경)
+//   collectSubs   - 배열이면 치환 1건당 {key, action, before, after}를 push (#494 트레이스용)
 export function substituteEnv(content, opts = {}) {
-  const { type = "", values = new Map(), useDefaults = true, resolvers = {}, repoName = "", projectPath = ".", collectAsks = null } = opts;
+  const { type = "", values = new Map(), useDefaults = true, resolvers = {}, repoName = "", projectPath = ".", collectAsks = null, collectSubs = null } = opts;
   if (!content.includes("@wizard")) return content;
 
   // CRLF 안전: EOL을 분리해 LF 기준으로 파싱·치환하고, 원래 EOL 스타일을 복원한다.
@@ -80,6 +81,11 @@ export function substituteEnv(content, opts = {}) {
       // #489 — 파일 본문은 아래 전역 토큰 치환을 거치므로 수집값도 동일 치환해
       //        version.yml deploy 블록이 설치본과 항상 바이트 일치하게 한다.
       if (collectAsks) collectAsks.set(p.key, resolveGlobalTokens(val, repoName));
+    }
+    // #494 트레이스 — 치환 전후값 기록 (after는 파일 최종형과 동일하게 전역 토큰까지 해석)
+    if (Array.isArray(collectSubs) && val !== "" && val != null) {
+      const before = (lines[i].match(/:\s*"([^"]*)"/) || [])[1] ?? "";
+      collectSubs.push({ key: p.key, action: p.action, before, after: resolveGlobalTokens(val, repoName) });
     }
     lines[i] = setEnvLine(lines[i], p.key, val);
   }

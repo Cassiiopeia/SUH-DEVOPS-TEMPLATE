@@ -94,3 +94,59 @@ test("copyWorkflows: common unchanged면 재복사 스킵", () => {
     assert.ok(c.skipped >= 1, "unchanged common 스킵");
   } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
 });
+
+// #491 — 템플릿 util 동기화 워크플로우는 util 모듈이 있(게 되)는 레포에만 복사된다
+test("copyWorkflows: util 없는 레포에는 TEMPLATE-UTIL-VERSION-SYNC 제외 (#491)", () => {
+  const tmp = fresh("wfu1t-"); const tgt = fresh("wfu1g-");
+  try {
+    makeTemplate(tmp);
+    writeText(join(tmp, ".github/workflows/project-types/common/PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml"), "name: util-sync\n");
+    // spring 단독: 템플릿에 util/spring 없음 + 대상에 .github/util 없음 → 제외
+    const ctx = { types: ["spring"], paths: new Map(), deployTarget: "docker-ssh", publishTargets: [], includeSecretBackup: false, force: true, repoName: "r", resolvers: {} };
+    copyWorkflows(ctx, tmp, tgt);
+    assert.equal(exists(join(tgt, ".github/workflows/PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml")), false, "util 없는 레포 — 제외");
+    assert.ok(exists(join(tgt, ".github/workflows/PROJECT-COMMON-CI.yaml")), "다른 common은 정상 복사");
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});
+
+test("copyWorkflows: util 모듈이 복사될 타입이면 TEMPLATE-UTIL-VERSION-SYNC 포함 (#491)", () => {
+  const tmp = fresh("wfu2t-"); const tgt = fresh("wfu2g-");
+  try {
+    makeTemplate(tmp);
+    writeText(join(tmp, ".github/workflows/project-types/common/PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml"), "name: util-sync\n");
+    writeText(join(tmp, ".github/util/spring/some-wizard/version.json"), "{}\n"); // 이번 통합에서 util 복사 예정
+    const ctx = { types: ["spring"], paths: new Map(), deployTarget: "docker-ssh", publishTargets: [], includeSecretBackup: false, force: true, repoName: "r", resolvers: {} };
+    copyWorkflows(ctx, tmp, tgt);
+    assert.ok(exists(join(tgt, ".github/workflows/PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml")), "util 복사 예정 타입 — 포함");
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});
+
+test("copyWorkflows: 대상에 이미 .github/util 있으면(업데이트) TEMPLATE-UTIL-VERSION-SYNC 포함 (#491)", () => {
+  const tmp = fresh("wfu3t-"); const tgt = fresh("wfu3g-");
+  try {
+    makeTemplate(tmp);
+    writeText(join(tmp, ".github/workflows/project-types/common/PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml"), "name: util-sync\n");
+    writeText(join(tgt, ".github/util/flutter/testflight-wizard/version.json"), "{}\n"); // 기존 설치 레포
+    const ctx = { types: ["spring"], paths: new Map(), deployTarget: "docker-ssh", publishTargets: [], includeSecretBackup: false, force: true, repoName: "r", resolvers: {} };
+    copyWorkflows(ctx, tmp, tgt);
+    assert.ok(exists(join(tgt, ".github/workflows/PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml")), "대상 util 보유 — 포함");
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});
+
+// #489 — deploy 블록(version.yml 기억값)에 들어갈 수집값이 파일 설치본과 일치해야 한다
+test("copyWorkflows: deployValues 수집값도 __PROJECT_NAME__ 치환 — 설치본과 일치 (#489)", () => {
+  const tmp = fresh("wfd1t-"); const tgt = fresh("wfd1g-");
+  try {
+    makeTemplate(tmp);
+    writeText(join(tmp, ".github/workflows/project-types/spring/server-deploy/PROJECT-SPRING-VOL.yaml"), [
+      "env:",
+      '  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask:/volume1/projects/__PROJECT_NAME__',
+      "",
+    ].join("\n"));
+    const ctx = { types: ["spring"], paths: new Map(), deployTarget: "docker-ssh", publishTargets: [], includeSecretBackup: false, force: true, repoName: "my-repo", resolvers: {} };
+    const c = copyWorkflows(ctx, tmp, tgt);
+    const installed = readText(join(tgt, ".github/workflows/PROJECT-SPRING-VOL.yaml"));
+    assert.match(installed, /"\/volume1\/projects\/my-repo"/);
+    assert.equal(c.deployValues.get("spring").get("VOLUME_HOST_PATH"), "/volume1/projects/my-repo");
+  } finally { rmSync(tmp, { recursive: true, force: true }); rmSync(tgt, { recursive: true, force: true }); }
+});

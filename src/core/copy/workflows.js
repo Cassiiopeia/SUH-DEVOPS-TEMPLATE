@@ -18,6 +18,17 @@ function configureEnv(targetPath, { type, projectPath = ".", repoName = "", reso
   writeFileSync(targetPath, out);
 }
 
+// util 버전 동기화 워크플로우 (#491) — .github/util/ 모듈(version.json)이 있는 레포에서만 의미가 있다.
+// util이 없는 레포(예: spring 단독)에 복사하면 트리거가 영원히 안 걸리는 no-op 오염이 된다.
+const UTIL_VERSION_SYNC = "PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC.yml";
+
+// 이 통합에서 util 모듈이 존재하게 되는가 — 대상에 이미 있거나(업데이트),
+// 선택 타입의 util이 템플릿에 있어 곧 복사될 예정(runFull 6단계)이면 true.
+function utilSyncApplies(tempDir, targetRoot, types) {
+  if (exists(join(targetRoot, ".github", "util"))) return true;
+  return types.some((t) => exists(join(tempDir, ".github", "util", t)));
+}
+
 // 3분류 (신규/unchanged/changed) — 대상 워크플로우 디렉토리 기준.
 function classify(srcDir, workflowsDir, envOpts) {
   const result = { newFiles: [], unchanged: [], changed: [] };
@@ -62,6 +73,8 @@ export function copyWorkflows(context, tempDir, targetRoot = ".", hooks = {}) {
   const commonDir = join(projectTypesDir, "common");
   if (exists(commonDir)) {
     for (const filename of listYamlFiles(commonDir)) {
+      // #491 — util 동기화 워크플로우는 util 모듈이 있(게 되)는 레포에만 복사
+      if (filename === UTIL_VERSION_SYNC && !utilSyncApplies(tempDir, targetRoot, types)) continue;
       const src = join(commonDir, filename);
       const dst = join(workflowsDir, filename);
       if (existsSync(dst) && isUnchanged(readFileSync(src, "utf8"), readFileSync(dst, "utf8"), envOptsFor("common"))) {

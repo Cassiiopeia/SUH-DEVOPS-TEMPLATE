@@ -150,3 +150,39 @@ test("ensureDeployBranch: 비레포·io.confirm 없음이면 no-op", async () =>
     assert.equal(r2.created, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// #490 — ready 시그널: 완료 요약이 "브랜치 만들어라" 재지시를 접을지 판단하는 근거
+test("ensureDeployBranch: ready — 존재/생성=true, 거절=false, 비레포=null (#490)", async () => {
+  const root = gitRepo();
+  try {
+    // 이미 로컬 존재 → true
+    createBranch(root, "develop", "main");
+    const r1 = await ensureDeployBranch({
+      targetRoot: root, deployBranch: "develop", defaultBranch: "main",
+      io: { confirm: async () => true },
+    });
+    assert.equal(r1.ready, true);
+    // 없는데 생성 거절 → false
+    const r2 = await ensureDeployBranch({
+      targetRoot: root, deployBranch: "rel-a", defaultBranch: "main",
+      io: { confirm: async () => false }, say: () => {},
+    });
+    assert.equal(r2.ready, false);
+    // 생성 승인(push 거절) → true
+    const answers = [true, false];
+    const r3 = await ensureDeployBranch({
+      targetRoot: root, deployBranch: "rel-b", defaultBranch: "main",
+      io: { confirm: async () => answers.shift() }, say: () => {},
+    });
+    assert.equal(r3.ready, true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  // 비레포 → null (확인 불가 — 요약은 보수적으로 안내 유지)
+  const nr = mkdtempSync(join(tmpdir(), "nonrepo-rd-"));
+  try {
+    const r = await ensureDeployBranch({
+      targetRoot: nr, deployBranch: "develop", defaultBranch: "main",
+      io: { confirm: async () => true },
+    });
+    assert.equal(r.ready, null);
+  } finally { rmSync(nr, { recursive: true, force: true }); }
+});

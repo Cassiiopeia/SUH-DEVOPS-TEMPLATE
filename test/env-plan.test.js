@@ -153,3 +153,18 @@ test("printFieldCard: 라벨·사용처·기본값 라인 출력 (log 주입)", 
   assert.match(lines[0], /\(1\/4\) JAVA_VERSION\s+\[spring 단일 서버 배포\]/);
   assert.ok(lines.some((l) => l.includes("기본값: 21")));
 });
+
+// #489 — 카드에 노출되는 기본값도 설치본과 동일하게 전역 토큰을 해석해 보여준다
+test("collectAsks: repoName 주입 시 기본값의 __PROJECT_NAME__ 해석 (#489)", () => {
+  const tmp = fresh("ep-rn-");
+  try {
+    const base = join(tmp, ".github/workflows/project-types");
+    writeText(join(base, "spring/server-deploy/PROJECT-SPRING-SIMPLE-CICD.yaml"), [
+      "env:",
+      '  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask:/volume1/projects/__PROJECT_NAME__',
+      "",
+    ].join("\n"));
+    const asks = collectAsks(tmp, ["spring"], { repoName: "my-repo" });
+    assert.equal(asks.defaults.get("VOLUME_HOST_PATH"), "/volume1/projects/my-repo");
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
+});

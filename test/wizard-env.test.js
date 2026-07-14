@@ -77,3 +77,13 @@ test("no @wizard marker returns content unchanged", () => {
   const c = "name: test\non:\n  push:\n";
   assert.equal(substituteEnv(c, {}), c);
 });
+
+// #489 — 수집값(collectAsks)도 파일 본문과 동일하게 전역 토큰이 치환되어야 한다.
+// (파일은 치환되는데 version.yml deploy 블록에 리터럴이 남는 불일치의 회귀 방지)
+test("collectAsks 수집값도 __PROJECT_NAME__ 전역 치환 — 파일 본문과 바이트 일치 (#489)", () => {
+  const c = '  VOLUME_HOST_PATH: "/volume1/projects/__PROJECT_NAME__"  # @wizard ask:/volume1/projects/__PROJECT_NAME__';
+  const collect = new Map();
+  const out = substituteEnv(c, { useDefaults: true, repoName: "my-repo", collectAsks: collect });
+  assert.match(out, /"\/volume1\/projects\/my-repo"/);
+  assert.equal(collect.get("VOLUME_HOST_PATH"), "/volume1/projects/my-repo");
+});

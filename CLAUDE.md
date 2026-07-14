@@ -127,7 +127,7 @@ snake_case.sh / snake_case.py
 | `PROJECT-COMMON-SUH-ISSUE-HELPER` | 이슈 생성 | 브랜치명/커밋 제안 (내부 py — `issue_helper.py`, #478 내재화) |
 | `PROJECT-COMMON-QA-ISSUE-CREATION-BOT` | @projectops 멘션 | QA 이슈 자동 생성 |
 | `PROJECT-COMMON-SYNC-ISSUE-LABELS` | 라벨 파일 변경 | GitHub 라벨 동기화 |
-| `PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC` | version.json 변경 | Util HTML 버전 동기화 |
+| `PROJECT-COMMON-TEMPLATE-UTIL-VERSION-SYNC` | version.json 변경 | Util HTML 버전 동기화 (util 모듈 보유 레포에만 복사 — #491) |
 | `PROJECT-COMMON-PROJECTS-SYNC-MANAGER` | 이슈 라벨 변경 | Issue Label → Projects Status 동기화 |
 
 ### 타입별 워크플로우

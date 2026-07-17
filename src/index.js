@@ -17,6 +17,7 @@ import { detectOrphanWorkflows } from "./core/orphan-workflows.js";
 import { createRunTrace } from "./core/run-trace.js";
 import { appendGuideEntry } from "./core/migration-guide.js";
 import { resolveProjectPaths } from "./core/paths-resolve.js";
+import { applicableTargets } from "./core/options-ask.js";
 import { printBannerCompact } from "./ui/banner.js";
 import { printSummary } from "./ui/summary.js";
 import { runFull } from "./commands/full.js";
@@ -107,15 +108,23 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
   const tempDir = join(cwd, PATHS.tempDir);
 
   // 프로젝트 성격(#485): CLI --intent → version.yml 저장값. deploy/publish 유도의 기준.
-  const intent = opts.intent ?? existing?.options?.intent ?? null;
-  // 배포/publish 축(#439): CLI 플래그 최우선 → 저장값 → 기본값. 단 --intent가 명시됐고 해당 축 플래그가
-  //   없으면 intent가 유도한다 (#485 비대화형): library/none이면 deploy=none, app/none이면 publish=[].
-  let deployTarget = opts.deployTarget ?? existing?.options?.deploy ?? "docker-ssh";
+  let intent = opts.intent ?? existing?.options?.intent ?? null;
+  // 배포/publish 축(#439): CLI 플래그 최우선 → 저장값 → 기본값(적용 가능할 때만 docker-ssh — #498).
+  //   단 --intent가 명시됐고 해당 축 플래그가 없으면 intent가 유도한다 (#485 비대화형):
+  //   library/none이면 deploy=none, app/none이면 publish=[].
+  const applicable = applicableTargets(types);
+  let deployTarget = opts.deployTarget ?? existing?.options?.deploy
+    ?? (applicable.deploy.includes("docker-ssh") ? "docker-ssh" : "none");
   let publishTargets = opts.publishTargets ?? existing?.options?.publish ?? [];
   if (opts.intent != null) {
     if ((intent === "library" || intent === "none") && opts.deployTarget == null) deployTarget = "none";
     if ((intent === "app" || intent === "none") && opts.publishTargets == null) publishTargets = [];
   }
+  // 적용 불가 타겟 조용한 정리 (#498) — 대화형과 동일 규칙. 타입에 성립하지 않는 축 값은
+  // 복사 결과가 동일하므로 경고 없이 none/교집합으로 정리한다 (모바일 앱/basic 단독 등).
+  if (deployTarget !== "none" && !applicable.deploy.includes(deployTarget)) deployTarget = "none";
+  publishTargets = publishTargets.filter((t) => applicable.publish.includes(t));
+  if (types.length > 0 && applicable.deploy.length === 0 && applicable.publish.length === 0) intent = "none";
 
   const context = createContext({
     mode: opts.mode, force: true, types, version, versionCode, branch,

@@ -184,7 +184,17 @@ snake_case.sh / snake_case.py
 - 수정 메뉴에 "프로젝트 성격" 항목(#485) + 개별 축 항목(#483) 병존. 성격을 바꾸면 축이 재유도되고, 개별 축 항목은 그 축만 세밀 조정(`scope`).
 - **`basic` 단독 타입은 intent 질문도 스킵** — `none`으로 확정.
 
-- **`basic` 단독 타입은 배포/publish 질문을 건너뛴다** — 서버·라이브러리 개념이 없는 범용 타입이라 물어보면 사용자가 당황한다. `deploy=none`·`publish=[]`로 조용히 확정하고 분석 카드에만 표시. 타입을 바꾸면(수정 메뉴 → 프로젝트 타입) 그때 질문이 등장한다. (3중 구현 모두: js `isBasicOnly`, `.sh` `_is_basic_only`, `.ps1` `Test-BasicOnly`)
+##### 🧩 타입별 축 적용성 (#498 — agent 필독)
+
+deploy/publish 축은 **타입에 따라 적용 자체가 안 될 수 있다.** `src/core/options-ask.js`의 `TYPE_DEPLOY_TARGETS`/`TYPE_PUBLISH_TARGETS` 선언이 타입별 적용 가능 타겟을 정의하고, `applicableTargets(types)`가 선택 타입 집합의 합집합을 산출한다.
+
+- **모바일 앱 타입(flutter/react-native/react-native-expo)은 두 축 모두 빈 배열** — 스토어 배포(Play Store/TestFlight/Firebase 등)는 타입 워크플로우가 항상 포함되므로 서버 deploy 축과 무관하고, 레지스트리 publish 개념도 없다. basic처럼 **intent 질문까지 통째로 스킵**하고 `none`/`[]`로 조용히 확정한다 (안내 문구도 안 띄움 — 보여줄 이유가 없다).
+- **저장값/CLI값이 적용 불가면 경고 없이 정리** — 구버전에서 flutter 단독에 `deploy: docker-ssh`가 저장된 레포도 업데이트 시 조용히 `none`/교집합으로 정리된다 (복사 결과 동일 — SSOT). 비대화형(`src/index.js`)도 동일 규칙.
+- 수정 메뉴(`editMenu`)도 적용 불가 축 항목("프로젝트 성격"·"배포 방식"·"publish 타겟")을 숨긴다. 타입을 바꾸면 다음 진입부터 다시 노출.
+- 서버형 타입(spring/react/node/python)은 현행 선택지 전체 유지 (동작 무변경 — 타입별 세분화는 후속 과제). 질문 선택지는 `applicable.*`로 필터링되므로 이후 선언만 좁히면 선택지가 자동 반영된다.
+- **새 타입을 추가하면 두 선언에 항목을 반드시 넣는다** — `test/options-ask.test.js`의 정합성 테스트가 `project-types` 폴더(`server-deploy/`·`publish/<target>/`)와의 모순을 자동 검증한다. 미선언 타입은 보수적으로 전체 허용(질문 유지).
+
+- **`basic` 단독 타입은 배포/publish 질문을 건너뛴다** — 서버·라이브러리 개념이 없는 범용 타입이라 물어보면 사용자가 당황한다. `deploy=none`·`publish=[]`로 조용히 확정하고 분석 카드에만 표시. 타입을 바꾸면(수정 메뉴 → 프로젝트 타입) 그때 질문이 등장한다. (구 js `isBasicOnly` 특례는 #498의 두-축-빈-타입 일반 판정 `noAxes`로 흡수됨 — `.sh`/`.ps1`은 #458 EOF)
 - 실타입 질문 앞에는 "**왜 묻는지**" 맥락 한 줄을 붙인다 (서버 올릴 계획 있으면 고르고 없으면 넘기라는 안내).
 - 비대화형: `--deploy docker-ssh|vercel|none` + `--publish nexus,npm`(csv). `.ps1`은 `-Deploy`/`-Publish`.
 - **구 플래그 `--nexus`/`--npm-publish`는 deprecated**(1 minor 유지) — `--publish nexus`/`--publish npm`으로 해석되며 경고를 출력한다. `--nexus`는 추가로 `--deploy none`을 함의(구 동작 보존).

@@ -56,6 +56,42 @@ export { parseTemplateOptions };
 
 export const DEPLOY_TARGETS = ["docker-ssh", "vercel", "none"];
 export const PUBLISH_TARGETS = ["nexus", "npm", "github-packages"];
+
+// #498 — 타입별 적용 가능 deploy/publish 타겟 선언.
+// 빈 배열 = 그 축이 개념상 성립하지 않는 타입. 모바일 앱(flutter/react-native/expo)은 스토어 배포
+// (Play Store/TestFlight/Firebase 등) 워크플로우가 타입 자체에 항상 포함되므로 서버 deploy 축과
+// 무관하고, 레지스트리 publish 개념도 없다. 두 축이 모두 빈 타입만 선택되면 질문 자체를 스킵한다.
+// 서버형 타입은 현행 선택지 전체를 유지한다 (동작 무변경 — 타입별 세분화는 후속 과제).
+export const TYPE_DEPLOY_TARGETS = {
+  spring: ["docker-ssh", "vercel"],
+  react: ["docker-ssh", "vercel"],
+  node: ["docker-ssh", "vercel"],
+  python: ["docker-ssh", "vercel"],
+  flutter: [],
+  "react-native": [],
+  "react-native-expo": [],
+  basic: [],
+};
+export const TYPE_PUBLISH_TARGETS = {
+  spring: ["nexus", "npm", "github-packages"],
+  react: ["nexus", "npm", "github-packages"],
+  node: ["nexus", "npm", "github-packages"],
+  python: ["nexus", "npm", "github-packages"],
+  flutter: [],
+  "react-native": [],
+  "react-native-expo": [],
+  basic: [],
+};
+
+// 선택된 타입 집합의 합집합으로 적용 가능 타겟 산출 (#498). 'none'은 항상 허용이라 목록에서 제외.
+// 미선언 타입은 보수적으로 전체 허용(질문 유지) — 새 타입 추가 시 위 선언도 함께 넣는 게 원칙.
+export function applicableTargets(types = []) {
+  const deployAll = DEPLOY_TARGETS.filter((t) => t !== "none");
+  return {
+    deploy: deployAll.filter((t) => types.some((ty) => (TYPE_DEPLOY_TARGETS[ty] ?? deployAll).includes(t))),
+    publish: PUBLISH_TARGETS.filter((t) => types.some((ty) => (TYPE_PUBLISH_TARGETS[ty] ?? PUBLISH_TARGETS).includes(t))),
+  };
+}
 // #455 — changelog 생성기 provider. github-ai가 기본(설정 제로). openai/gemini/claude/ollama는 openai 호환 한 갈래.
 export const CHANGELOG_PROVIDERS = ["github-ai", "coderabbit", "openai", "gemini", "claude", "ollama", "commit"];
 
@@ -124,10 +160,12 @@ export async function askAllOptionalWorkflows({
   let deployBranchCreated = null; // #493 — 이번 실행에서 마법사가 직접 생성했는지 (가이드 기록용)
   let intent = current.intent ?? null; // #485 프로젝트 성격 (app/library/both/none/manual)
 
-  // basic 단독 타입은 서버 배포도 라이브러리 publish도 개념상 성립하지 않는다.
-  // 배포/publish 질문을 건너뛰고 none·[]로 조용히 확정한다 (타입 변경 시 재질문됨).
-  // (basic은 "그 외" 폴백이라 항상 단독으로만 존재 — every로 안전 판정)
-  const isBasicOnly = types.length > 0 && types.every((t) => t === "basic");
+  // 두 축이 모두 빈 타입 조합(#498 — basic 단독, flutter 등 모바일 앱 단독)은 서버 배포도
+  // 라이브러리 publish도 개념상 성립하지 않는다. 질문을 전부 건너뛰고 none·[]로 조용히 확정한다
+  // (모바일 스토어 배포는 타입 워크플로우가 항상 포함되므로 안내조차 불필요 — 타입 변경 시 재질문됨).
+  // 구 isBasicOnly 특례를 일반화한 판정이다.
+  const applicable = applicableTargets(types);
+  const noAxes = types.length > 0 && applicable.deploy.length === 0 && applicable.publish.length === 0;
 
   // ① --force-ask가 아니면 version.yml 저장값을 먼저 읽어 재질문을 건너뛴다.
   //    CLI 명시값(current)이 이미 있으면 그쪽이 우선 — 저장값은 빈 자리만 채운다.
@@ -158,9 +196,14 @@ export async function askAllOptionalWorkflows({
     }
   }
 
+  // 적용 불가 타겟 조용한 정리 (#498) — 구버전에서 저장된 무의미 값(예: flutter 단독 + docker-ssh)은
+  // 어차피 복사 결과가 동일하므로 경고 없이 none/교집합으로 정리한다 (SSOT — 무의미 값 잔존 금지).
+  if (deploy !== null && deploy !== "none" && !applicable.deploy.includes(deploy)) deploy = "none";
+  if (Array.isArray(publish)) publish = publish.filter((t) => applicable.publish.includes(t));
+
   // ── ② intent(프로젝트 성격) 우선 분기 → 배포 축 유도 (#485) ──
-  // basic 단독이면 intent 개념 자체가 없어 질문 스킵, none/[]로 확정.
-  if (isBasicOnly) {
+  // 두 축 모두 빈 타입 조합이면 intent 개념 자체가 없어 질문 스킵, none/[]로 확정 (#498).
+  if (noAxes) {
     if (deploy === null) deploy = "none";
     if (publish === null) publish = [];
     intent = "none";
@@ -216,22 +259,28 @@ export async function askAllOptionalWorkflows({
       say("   1) 실행물 배포 — 서버/호스팅에 올려 돌리는 것 (Docker, Vercel …)");
       say("   2) 라이브러리 배포(publish) — 남이 가져다 쓰게 레지스트리에 내는 것 (Nexus, npm …)");
     }
+    // 비대화형/폴백 기본값 (#498) — docker-ssh가 적용 가능할 때만 기본, 아니면 none.
+    const deployDefault = applicable.deploy.includes("docker-ssh") ? "docker-ssh" : "none";
     if (willAskDeploy) {
       if (force || !tty || typeof io.select !== "function") {
-        deploy = deploy ?? "docker-ssh";
+        deploy = deploy ?? deployDefault;
       } else {
         say("");
         say("🚀 (1) 실행물(서버/앱)을 어디에 올리나요?");
         say("   서버·호스팅에 올릴 계획이 있으면 고르고, 없으면 '서버에 올리지 않음'으로 두세요.");
+        // 선택지는 적용 가능 타겟으로 필터링 (#498) — 'none'은 항상 노출.
+        const deployLabels = [
+          { value: "docker-ssh", label: "Docker + SSH 서버 배포 (기본)" },
+          { value: "vercel", label: "Vercel" },
+        ];
         const ans = await io.select({
           message: "실행물 배포 방식을 선택하세요",
           options: [
-            { value: "docker-ssh", label: "Docker + SSH 서버 배포 (기본)" },
-            { value: "vercel", label: "Vercel" },
+            ...deployLabels.filter((o) => applicable.deploy.includes(o.value)),
             { value: "none", label: "서버에 올리지 않음 (빌드 검증만 · 라이브러리는 다음에서 선택)" },
           ],
         });
-        deploy = (!isCancel(ans) && DEPLOY_TARGETS.includes(ans)) ? ans : (deploy ?? "docker-ssh");
+        deploy = (!isCancel(ans) && (ans === "none" || applicable.deploy.includes(ans))) ? ans : (deploy ?? deployDefault);
         say(`실행물 배포: ${deploy}`);
       }
     }
@@ -244,18 +293,20 @@ export async function askAllOptionalWorkflows({
         say("");
         say("📦 (2) 이 프로젝트를 남이 가져다 쓰는 라이브러리로도 배포(publish)하나요?");
         say("   (1) 실행물 배포와 별개입니다. 해당되는 걸 고르고, 라이브러리 배포를 안 하면 아무것도 고르지 말고 Enter.");
+        // 선택지는 적용 가능 타겟으로 필터링 (#498)
+        const publishLabels = [
+          { value: "nexus", label: "사내 Maven(Nexus) 라이브러리 배포" },
+          { value: "npm", label: "공개 npmjs 패키지 배포 (NPM_TOKEN)" },
+          { value: "github-packages", label: "GitHub Packages 라이브러리 배포" },
+        ];
         const ans = await io.multiselect({
           message: "라이브러리 배포 타겟 (없으면 선택 없이 Enter = 배포 안 함)",
-          options: [
-            { value: "nexus", label: "사내 Maven(Nexus) 라이브러리 배포" },
-            { value: "npm", label: "공개 npmjs 패키지 배포 (NPM_TOKEN)" },
-            { value: "github-packages", label: "GitHub Packages 라이브러리 배포" },
-          ],
+          options: publishLabels.filter((o) => applicable.publish.includes(o.value)),
           initialValues: publish ?? [],
           required: false,
         });
         publish = (!isCancel(ans) && Array.isArray(ans))
-          ? ans.filter((t) => PUBLISH_TARGETS.includes(t))
+          ? ans.filter((t) => applicable.publish.includes(t))
           : (publish ?? []);
         say(publish.length ? `라이브러리 배포: ${publish.join(", ")}` : "라이브러리 배포: 안 함");
       }
@@ -351,7 +402,8 @@ export async function askAllOptionalWorkflows({
     current: secretBackup, force, tty, io, forceAsk: ask("secret"), say,
   });
 
-  const finalDeploy = deploy ?? "docker-ssh";
+  // 최종 폴백도 적용 가능 타겟 기준 (#498) — 모바일/basic 조합에서 docker-ssh가 새어 나가지 않게.
+  const finalDeploy = deploy ?? (applicable.deploy.includes("docker-ssh") ? "docker-ssh" : "none");
   const finalPublish = publish ?? [];
   return {
     deploy: finalDeploy, publish: finalPublish, secretBackup: secretBackup === true,

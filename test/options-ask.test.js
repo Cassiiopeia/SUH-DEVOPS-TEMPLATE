@@ -1,10 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
-import { parseTemplateOptions, askAllOptionalWorkflows } from "../src/core/options-ask.js";
+import {
+  parseTemplateOptions, askAllOptionalWorkflows,
+  applicableTargets, TYPE_DEPLOY_TARGETS, TYPE_PUBLISH_TARGETS,
+} from "../src/core/options-ask.js";
 import { parseExisting, buildVersionYml } from "../src/core/version-yml.js";
+import { VALID_TYPES } from "../src/context.js";
 
 function touch(root, rel, content = "") {
   const p = join(root, rel);
@@ -580,5 +584,103 @@ test("askAllOptionalWorkflows: 한 축만 수정(scope)이면 큰 그림 안내 
       current: { deploy: "docker-ssh", publish: ["nexus"], secretBackup: true, codeReviewCoderabbit: true, changelogProvider: "commit", changelogBaseUrl: "", deployBranch: "develop" },
     });
     assert.ok(!io.calls.logs.some((l) => l.includes("두 가지") && l.includes("독립")), "한 축 수정인데 큰 그림 안내가 나옴");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+// ── #498: 타입별 적용 가능 deploy/publish 타겟 — 모바일 앱 타입 질문 스킵 ──
+
+test("applicableTargets: 모바일 앱/basic은 두 축 모두 빈 배열, 서버형은 전체 유지 (#498)", () => {
+  assert.deepEqual(applicableTargets(["flutter"]), { deploy: [], publish: [] });
+  assert.deepEqual(applicableTargets(["react-native"]), { deploy: [], publish: [] });
+  assert.deepEqual(applicableTargets(["react-native-expo"]), { deploy: [], publish: [] });
+  assert.deepEqual(applicableTargets(["basic"]), { deploy: [], publish: [] });
+  assert.deepEqual(applicableTargets(["spring"]), { deploy: ["docker-ssh", "vercel"], publish: ["nexus", "npm", "github-packages"] });
+  // 멀티타입 합집합 — flutter+spring이면 spring 덕에 두 축 모두 살아 있다
+  assert.deepEqual(applicableTargets(["flutter", "spring"]), { deploy: ["docker-ssh", "vercel"], publish: ["nexus", "npm", "github-packages"] });
+});
+
+test("타입 선언 정합성: 모든 VALID_TYPES에 선언 존재 + 템플릿 폴더와 모순 없음 (#498)", () => {
+  const ROOT = process.cwd();
+  for (const t of VALID_TYPES) {
+    assert.ok(Array.isArray(TYPE_DEPLOY_TARGETS[t]), `TYPE_DEPLOY_TARGETS에 ${t} 선언 누락`);
+    assert.ok(Array.isArray(TYPE_PUBLISH_TARGETS[t]), `TYPE_PUBLISH_TARGETS에 ${t} 선언 누락`);
+    const typeDir = join(ROOT, ".github/workflows/project-types", t);
+    // server-deploy 폴더 보유 타입은 docker-ssh가 반드시 선언돼 있어야 한다 (없으면 복사 게이트가 죽는다)
+    if (existsSync(join(typeDir, "server-deploy"))) {
+      assert.ok(TYPE_DEPLOY_TARGETS[t].includes("docker-ssh"), `${t}: server-deploy 폴더가 있는데 docker-ssh 미선언`);
+    }
+    // publish/<target> 폴더 보유 타입은 그 타겟이 선언에 포함돼야 한다
+    const pubDir = join(typeDir, "publish");
+    if (existsSync(pubDir)) {
+      for (const target of readdirSync(pubDir)) {
+        assert.ok(TYPE_PUBLISH_TARGETS[t].includes(target), `${t}: publish/${target} 폴더가 있는데 선언에 없음`);
+      }
+    }
+  }
+});
+
+test("askAllOptionalWorkflows: flutter 단독 — intent/deploy/publish 질문 전부 스킵, none·[] (#498)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    // basic 단독과 동일하게 배포 질문 없음 — select는 changelog 하나만
+    const io = stubIo({ selects: ["github-ai"], confirms: [false], texts: ["develop"] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["flutter"], targetRoot: target, tty: true, io,
+    });
+    assert.equal(r.deploy, "none");
+    assert.deepEqual(r.publish, []);
+    assert.equal(r.intent, "none");
+    assert.equal(io.calls.select.length, 1, "intent/deploy 스킵 — changelog만");
+    assert.equal(io.calls.multiselect.length, 0, "publish 질문 안 함");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: flutter 단독 + 저장값 docker-ssh — 조용히 none 정리, 안내 없음 (#498)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    // 구버전 통합으로 flutter 단독인데 deploy: docker-ssh가 저장된 케이스 (실측: elum)
+    touch(target, "version.yml", VY_NEW("docker-ssh", ["nexus"], false).replace('["spring"]', '["flutter"]'));
+    const io = stubIo({ selects: ["github-ai"], confirms: [false], texts: ["develop"] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["flutter"], targetRoot: target, tty: true, io,
+    });
+    assert.equal(r.deploy, "none", "적용 불가 docker-ssh는 none으로 정리");
+    assert.deepEqual(r.publish, [], "적용 불가 nexus는 제거");
+    assert.equal(r.intent, "none");
+    assert.equal(io.calls.select.length, 1, "재질문 없음 — changelog만");
+    // 사용자 방침: 경고/안내 자체가 불필요 — 정리 관련 ⚠ 문구가 없어야 한다
+    assert.ok(!io.calls.logs.some((l) => l.includes("⚠") && l.includes("deploy")), "정리에 경고 문구가 나옴");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: flutter+spring 멀티타입 — 질문 유지 (#498)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    // spring이 있으므로 intent 질문부터 정상 진행
+    const io = stubIo({ selects: ["app", "docker-ssh", "github-ai"], confirms: [false], texts: ["develop"] });
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["flutter", "spring"], targetRoot: target, tty: true, io,
+    });
+    assert.equal(r.intent, "app");
+    assert.equal(r.deploy, "docker-ssh");
+    assert.equal(io.calls.select.length, 3, "intent + deploy + changelog");
+  } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
+});
+
+test("askAllOptionalWorkflows: 비대화형 flutter 단독 — 기본값도 none으로 확정 (#498)", async () => {
+  const tempDir = makeTemplateFixture({ secretBackup: false });
+  const target = makeTmp();
+  try {
+    const io = stubIo(); // 호출 자체가 없어야 함
+    const r = await askAllOptionalWorkflows({
+      tempDir, types: ["flutter"], targetRoot: target, force: true, tty: false, io,
+    });
+    assert.equal(r.deploy, "none", "docker-ssh 기본값이 새어 나가면 안 됨");
+    assert.deepEqual(r.publish, []);
+    assert.equal(r.intent, "none");
+    assert.equal(io.calls.select.length, 0);
   } finally { rmSync(tempDir, { recursive: true, force: true }); rmSync(target, { recursive: true, force: true }); }
 });

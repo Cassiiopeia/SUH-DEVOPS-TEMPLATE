@@ -13,7 +13,7 @@ import { runBreakingCheck } from "../core/breaking-check.js";
 import { runMigrations } from "../core/migrations/index.js";
 import { detectOrphanWorkflows, applyOrphanCleanup } from "../core/orphan-workflows.js";
 import { resolveProjectPaths, filterExcludedTypes } from "../core/paths-resolve.js";
-import { askAllOptionalWorkflows, OPTION_AXES } from "../core/options-ask.js";
+import { askAllOptionalWorkflows, OPTION_AXES, applicableTargets } from "../core/options-ask.js";
 import { createRunTrace } from "../core/run-trace.js";
 import { appendGuideEntry } from "../core/migration-guide.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
@@ -154,7 +154,8 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       // edit 루프
       let editing = true;
       while (editing) {
-        const what = await io.editMenu({ showOptional });
+        // #498 — 타입에 적용 불가한 배포 축 항목은 메뉴에서 숨김 (타입을 바꾸면 다음 진입부터 다시 노출)
+        const what = await io.editMenu({ showOptional, axes: applicableTargets(types) });
         if (isCancel(what) || what === "done") { editing = false; break; }
         if (what === "type") {
           const t = await io.selectTypes(types);

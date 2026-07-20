@@ -46,10 +46,10 @@ export async function runBreakingCheck({ cwd, tempDir, templateVersion, askYesNo
   // 긴 본문 래핑이 ║ 박스 경계를 붕괴시켰다. 버전·제목만 한 줄씩, 전문은 선택 열람.)
   const e = (s = "") => process.stderr.write(s + "\n");
   e("");
-  e(`⚠️  BREAKING CHANGES (v${current} → v${templateVersion}) — CRITICAL ${critical.length}건 · WARNING ${warnings.length}건`);
+  e(`⚠️  BREAKING CHANGES (v${current} -> v${templateVersion}) - CRITICAL ${critical.length}건, WARNING ${warnings.length}건`);
   e("");
-  for (const c of critical) e(`  ❗ [CRITICAL] ${c.version} — ${c.title || ""}`);
-  for (const w of warnings) e(`  ⚠️ [WARNING]  ${w.version} — ${w.title || ""}`);
+  for (const c of critical) e(`  ❗ [CRITICAL] ${c.version} - ${c.title || ""}`);
+  for (const w of warnings) e(`  ⚠️ [WARNING]  ${w.version} - ${w.title || ""}`);
   e("");
 
   if (askYesNo) {
@@ -58,13 +58,13 @@ export async function runBreakingCheck({ cwd, tempDir, templateVersion, askYesNo
     if (detail === true) {
       for (const it of [...critical, ...warnings]) {
         e("");
-        e(`■ ${it.version} — ${it.title || ""}`);
+        e(`■ ${it.version} - ${it.title || ""}`);
         e(`  ${it.message || ""}`);
       }
       e("");
     }
   } else {
-    e("  상세 내용·조치 방법: .github/config/breaking-changes.json 참고");
+    e("  상세 내용, 조치 방법: .github/config/breaking-changes.json 참고");
     e(`  (${BC_URL})`);
     e("");
   }

@@ -19,7 +19,7 @@ export function printDetectionLog({ types = [], version = "", branch = "" }, out
   } else {
     out(`${GUT}  ${paint("─", A.dim)} 마커 파일 없음 → ${paint("basic", A.bold)} (직접 선택 가능)\n`);
   }
-  out(`${GUT}  ${OK} 버전: ${paint(`v${version}`, A.green)} · 브랜치: ${paint(branch, A.green)}\n`);
+  out(`${GUT}  ${OK} 버전: ${paint(`v${version}`, A.green)} - 브랜치: ${paint(branch, A.green)}\n`);
   out(`${GUT}\n`);
 }
 

@@ -45,7 +45,7 @@ test("printDetectionLog: 타입별 마커 + 버전/브랜치, basic 폴백", () 
   const t = strip(out.text());
   assert.match(t, /build\.gradle 발견 → spring 감지/);
   assert.match(t, /package\.json 발견 → react 감지/);
-  assert.match(t, /버전: v1\.2\.3 · 브랜치: main/);
+  assert.match(t, /버전: v1\.2\.3 - 브랜치: main/);
 
   const out2 = capture();
   printDetectionLog({ types: ["basic"], version: "0.0.1", branch: "main" }, out2);

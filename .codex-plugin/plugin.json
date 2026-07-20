@@ -1,6 +1,6 @@
 {
   "name": "projectops",
-  "version": "4.2.20",
+  "version": "4.2.21",
   "description": "DevOps automation skills for coding agents",
   "skills": "./skills/"
 }

@@ -67,10 +67,10 @@ open .github/util/flutter/playstore-wizard/playstore-wizard.html
 
 # 또는 설정 스크립트 실행
 # macOS/Linux
-.github/util/flutter/playstore-wizard/playstore-wizard-setup.sh
+python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup
 
 # Windows
-.github/util/flutter/playstore-wizard/playstore-wizard-setup.ps1
+python .github\util\flutter\playstore-wizard\playstore-wizard.py setup
 ```
 
 ### 마법사 진행 단계
@@ -253,13 +253,7 @@ base64 release-key.jks               # Linux
 .github/util/flutter/playstore-wizard/
 ├── playstore-wizard.html          # 마법사 웹 UI
 ├── playstore-wizard.js            # 마법사 로직
-├── playstore-wizard-setup.sh      # 설정 스크립트 (macOS/Linux)
-├── playstore-wizard-setup.ps1     # 설정 스크립트 (Windows)
-├── playstore-wizard-apply.sh      # 적용 스크립트
-├── playstore-wizard-apply.ps1     # 적용 스크립트
-├── detect-application-id.sh       # Application ID 감지
-├── detect-application-id.ps1      # Application ID 감지
-├── patch-build-gradle.py          # build.gradle 패치
+├── playstore-wizard.py            # 설정 스크립트 (setup / apply / detect-app-id 서브커맨드, 전 OS 공용)
 ├── version.json                   # 버전 정보
 ├── version-sync.sh                # 버전 동기화 스크립트
 ├── images/                        # 가이드 이미지

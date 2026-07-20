@@ -217,6 +217,8 @@ deploy/publish 축은 **타입에 따라 적용 자체가 안 될 수 있다.** 
 > **⚠️ 워크플로우를 리네임/삭제할 때 (agent 필독, #470)**: 구 이름을 `src/core/migrations/registry.js`에 반드시 추가한다 — 마법사 업데이트가 기존 통합 레포의 구 파일을 자동 무해화(.bak)하는 유일한 경로다(레거시 마이그레이션은 전부 이 레지스트리 한 곳에서 관리). tier는 `safe`(순수 리네임 — 공존 시 중복 실행 실해) / `confirm`(배포 파이프라인일 수 있음 — 자동 조치 없이 안내만) 중 실해 기준으로 고른다. `test/migrations.test.js`가 레지스트리와 현행 배포 세트의 충돌(살아있는 워크플로우 오살)을 자동 검증한다. 구 파일에 사용자 커스텀 설정이 들어있을 수 있으면 registry 항목에 `settingsExtractor`를 지정해 무해화 직전 version.yml로 자동 이관한다 (`rules/settings-extractors.js`, #478 이슈 헬퍼가 모범 사례).
 > 참고: **타입 선택 해제로 남는 고아 워크플로우**는 registry가 아니라 `src/core/orphan-workflows.js`가 동적 감지한다(#487) — registry는 리네임·폐기 전용, 고아 정리는 템플릿 인벤토리 대조(정확한 파일명 일치) 방식이다. 대화형은 확인 후 .bak 무해화, 비대화형은 안내만 출력한다.
 >
+> **`.github/util/` 모듈 안의 파일을 리네임/폐기할 때도 동일하다 (#500)**: registry에 `category: "util-file"`(tier safe, 정확 경로)로 구 파일을 등록한다 — util 복사(`src/core/copy/util.js`)는 overlay라 구 파일을 지우지 않으므로 registry가 유일한 정리 경로다. `test/migrations.test.js`의 util-file 충돌 테스트가 현행 템플릿 파일 오살을 자동 검증한다.
+>
 > **⚠️ 브랜치 규칙(`YYYYMMDD_#번호_제목`)에 의존하는 워크플로우를 추가할 때 (agent 필독, #478)**:
 > `.github/scripts/issue_helper.py`의 `GUIDE_LINES`에 (파일명, 안내 문구)를 추가하고,
 > 워크플로우 헤더에 "⚠️ 브랜치 규칙 의존" 주석 블록을 넣는다. 상세: `docs/BRANCH-CONVENTION.md`

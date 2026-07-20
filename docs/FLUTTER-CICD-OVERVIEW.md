@@ -176,7 +176,7 @@ PR 또는 이슈에 댓글 작성:
 │   ├── testflight-wizard/           # iOS 마법사
 │   │   ├── testflight-wizard.html
 │   │   ├── testflight-wizard.js
-│   │   ├── testflight-wizard-setup.sh
+│   │   ├── testflight-wizard.py
 │   │   └── templates/
 │   │       ├── ExportOptions.plist
 │   │       ├── Fastfile
@@ -185,8 +185,7 @@ PR 또는 이슈에 댓글 작성:
 │   └── playstore-wizard/            # Android 마법사
 │       ├── playstore-wizard.html
 │       ├── playstore-wizard.js
-│       ├── playstore-wizard-setup.sh
-│       ├── playstore-wizard-setup.ps1
+│       ├── playstore-wizard.py
 │       └── templates/
 │           ├── Fastfile.playstore.template
 │           └── build.gradle.kts.signing.template

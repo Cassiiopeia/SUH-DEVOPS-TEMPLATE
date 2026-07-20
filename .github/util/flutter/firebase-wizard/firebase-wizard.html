@@ -7,10 +7,19 @@
     <script type="application/json" id="versionJson">
 {
   "name": "Firebase App Distribution Setup Wizard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Flutter Android 앱을 Firebase App Distribution에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2026-05-15",
+  "lastUpdated": "2026-07-20",
   "changelog": [
+    {
+      "version": "1.1.0",
+      "date": "2026-07-20",
+      "changes": [
+        "setup 스크립트를 Python 단일 파일(firebase-wizard.py)로 통합",
+        "sh/ps1 이중 관리 제거",
+        "테스트도 Python으로 통합 (test/setup-script-test.py)"
+      ]
+    },
     {
       "version": "1.0.0",
       "date": "2026-05-15",
@@ -305,12 +314,12 @@
                 </div>
 
                 <div id="osCmdBash" class="hidden">
-                    <pre class="bg-slate-900 rounded p-3 text-xs font-mono text-green-400 overflow-x-auto" id="cmdBashCode">./firebase-wizard-setup.sh --project-path . --app-id "" --tester-group ""</pre>
+                    <pre class="bg-slate-900 rounded p-3 text-xs font-mono text-green-400 overflow-x-auto" id="cmdBashCode">python3 .github/util/flutter/firebase-wizard/firebase-wizard.py setup --project-path . --app-id "" --tester-group ""</pre>
                     <button class="mt-2 px-3 py-1 bg-firebase-primary text-slate-900 rounded text-xs hover:opacity-90" onclick="copyCode(this)">복사</button>
                 </div>
 
                 <div id="osCmdPs" class="hidden">
-                    <pre class="bg-slate-900 rounded p-3 text-xs font-mono text-green-400 overflow-x-auto" id="cmdPsCode">.\firebase-wizard-setup.ps1 -ProjectPath . -AppId "" -TesterGroup ""</pre>
+                    <pre class="bg-slate-900 rounded p-3 text-xs font-mono text-green-400 overflow-x-auto" id="cmdPsCode">python .github\util\flutter\firebase-wizard\firebase-wizard.py setup --project-path . --app-id "" --tester-group ""</pre>
                     <button class="mt-2 px-3 py-1 bg-firebase-primary text-slate-900 rounded text-xs hover:opacity-90" onclick="copyCode(this)">복사</button>
                 </div>
             </div>

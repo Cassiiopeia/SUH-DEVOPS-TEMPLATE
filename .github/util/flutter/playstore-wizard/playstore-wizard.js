@@ -552,7 +552,7 @@ function updateCommandsForOS() {
         }
         
         if (windowsCommandEl) {
-            windowsCommandEl.textContent = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter\\playstore-wizard\\playstore-wizard-setup.ps1`;
+            windowsCommandEl.textContent = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup`;
         }
         
         // Windows 사용자에게 관리자 권한 안내 표시
@@ -578,7 +578,7 @@ function updateCommandsForOS() {
         }
         
         if (macCommandEl) {
-            macCommandEl.textContent = `cd "${unixPath}" && bash .github/util/flutter/playstore-wizard/playstore-wizard-setup.sh`;
+            macCommandEl.textContent = `cd "${unixPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup`;
         }
     }
 }
@@ -1166,7 +1166,7 @@ function generateSetupCommand() {
             return str.replace(/"/g, '`"').replace(/\$/g, '`$');
         };
         
-        cmd = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter\\playstore-wizard\\playstore-wizard-setup.ps1 "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
+        cmd = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
     } else {
         // Mac/Linux Bash 명령어
         // 특수문자 이스케이프 처리
@@ -1174,7 +1174,7 @@ function generateSetupCommand() {
             return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
         };
         
-        cmd = `cd "${projectPath}" && bash .github/util/flutter/playstore-wizard/playstore-wizard-setup.sh "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
+        cmd = `cd "${projectPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
     }
 
     const setupCmdEl = document.getElementById('setupCmd');
@@ -1224,12 +1224,12 @@ function generateApplicationIdDetectionCommand(projectPath) {
         const escapePowerShell = (str) => {
             return str.replace(/"/g, '`"').replace(/\$/g, '`$');
         };
-        cmd = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter\\playstore-wizard\\detect-application-id.ps1 "${escapePowerShell(winPath)}"`;
+        cmd = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py detect-app-id "${escapePowerShell(winPath)}"`;
     } else {
         const escapeBash = (str) => {
             return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
         };
-        cmd = `cd "${projectPath}" && bash .github/util/flutter/playstore-wizard/detect-application-id.sh "${escapeBash(projectPath)}"`;
+        cmd = `cd "${projectPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py detect-app-id "${escapeBash(projectPath)}"`;
     }
     
     // 명령어 표시
@@ -1441,13 +1441,13 @@ function generateKeystoreCreationCommand() {
             return str.replace(/"/g, '`"').replace(/\$/g, '`$');
         };
         
-        cmd = `cd "${winPath}"; powershell -ExecutionPolicy Bypass -File .github\\util\\flutter\\playstore-wizard\\playstore-wizard-setup.ps1 "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
+        cmd = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
     } else {
         const escapeBash = (str) => {
             return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
         };
         
-        cmd = `cd "${projectPath}" && bash .github/util/flutter/playstore-wizard/playstore-wizard-setup.sh "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
+        cmd = `cd "${projectPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
     }
     
     // 명령어 표시 (항상 보이므로 hidden 처리 불필요)

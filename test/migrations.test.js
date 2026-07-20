@@ -38,9 +38,55 @@ test("registry: 모든 항목이 필수 필드와 유효한 tier/category를 가
   for (const m of MIGRATIONS) {
     assert.ok(m.id && m.file && m.reason, `필드 누락: ${m.id || m.file}`);
     assert.ok(["safe", "confirm", "ask"].includes(m.tier), `tier 오류: ${m.id}`);
-    assert.ok(["workflow", "root-file", "legacy-dir"].includes(m.category), `category 오류: ${m.id}`);
+    assert.ok(["workflow", "root-file", "legacy-dir", "util-file"].includes(m.category), `category 오류: ${m.id}`);
     assert.ok(!m.file.includes("*"), `글롭 금지 위반: ${m.id}`); // 정확명 매칭 원칙
   }
+});
+
+// ── util-file (#500 — Flutter 마법사 스크립트 Python 단일화) ─────────────
+
+test("registry: util-file 항목이 현행 템플릿 파일과 겹치지 않는다 (살아있는 util 파일 오살 방지)", () => {
+  const collisions = MIGRATIONS.filter(
+    (m) => m.category === "util-file" && existsSync(join(ROOT, m.file)),
+  );
+  assert.deepEqual(collisions.map((m) => m.file), [],
+    `레지스트리에 현행 템플릿 util 파일이 들어있음(오살 위험): ${collisions.map((m) => m.file).join(", ")}`);
+});
+
+test("util-file: 구 마법사 sh/ps1 감지 후 삭제, 멱등", () => {
+  const root = fresh();
+  try {
+    const wiz = join(root, ".github", "util", "flutter", "playstore-wizard");
+    mkdirSync(wiz, { recursive: true });
+    writeFileSync(join(wiz, "playstore-wizard-setup.sh"), "old\n");
+    writeFileSync(join(wiz, "playstore-wizard-setup.ps1"), "old\n");
+    writeFileSync(join(wiz, "playstore-wizard.py"), "new\n"); // 신형은 건드리면 안 됨
+
+    const { safe } = detectMigrations(root);
+    assert.deepEqual(safe.map((e) => e.id).sort(),
+      ["util-playstore-setup-ps1", "util-playstore-setup-sh"]);
+
+    const results = applySafeMigrations(root, safe);
+    assert.ok(results.every((r) => r.action === "deleted"), JSON.stringify(results));
+    assert.ok(!existsSync(join(wiz, "playstore-wizard-setup.sh")));
+    assert.ok(!existsSync(join(wiz, "playstore-wizard-setup.ps1")));
+    assert.ok(existsSync(join(wiz, "playstore-wizard.py")), "신형 py를 오살함!");
+    assert.equal(detectMigrations(root).safe.length, 0); // 멱등
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("util-file: 비대화형(--force)에서도 safe 티어로 자동 정리된다", async () => {
+  const root = fresh();
+  try {
+    const wiz = join(root, ".github", "util", "flutter", "firebase-wizard");
+    mkdirSync(join(wiz, "test"), { recursive: true });
+    writeFileSync(join(wiz, "firebase-wizard-setup.sh"), "old\n");
+    writeFileSync(join(wiz, "test", "setup-script-test.ps1"), "old\n");
+    const { applied } = await runMigrations({ targetRoot: root, log: () => {} });
+    assert.equal(applied.length, 2);
+    assert.ok(!existsSync(join(wiz, "firebase-wizard-setup.sh")));
+    assert.ok(!existsSync(join(wiz, "test", "setup-script-test.ps1")));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 // ── detect ────────────────────────────────────────────────────────────

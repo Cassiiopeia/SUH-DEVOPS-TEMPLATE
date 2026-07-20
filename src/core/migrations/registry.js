@@ -5,7 +5,9 @@
 //
 // 항목 스키마:
 //   id         - 고유 식별자 (kebab-case)
-//   category   - "workflow" | "root-file" | "legacy-dir"  (rules/ 폴더의 구현이 detect/apply 담당)
+//   category   - "workflow" | "root-file" | "legacy-dir" | "util-file"  (rules/ 폴더의 구현이 detect/apply 담당)
+//                util-file: .github/util/ 모듈 안의 폐기 파일 — root-file rule 재사용(정확 경로 삭제).
+//                           util 복사(copy/util.js)는 overlay라 구 파일을 지우지 않는다 — 정리는 여기가 유일 경로.
 //   tier       - "safe"    : 신형이 같은 기능을 대체(순수 리네임). 공존 시 이중 트리거 실해
 //                            → 확인 1회 후 자동 무해화(.bak) / 삭제
 //                "confirm" : 배포 파이프라인일 수 있음(그 레포의 유일한 현역 배포 가능성)
@@ -161,4 +163,44 @@ export const MIGRATIONS = [
   { id: "dir-docs-suh-template", category: "legacy-dir", tier: "ask",
     file: "docs/suh-template", replacedBy: "docs/projectops",
     since: "4.2.9", reason: "리브랜딩 — 스킬 산출물(이슈·보고서) 폴더 구명칭. 신 스킬은 docs/projectops/에 저장" },
+
+  // ── util-file / safe — Flutter 마법사 스크립트 Python 단일화 (#500) ──────────
+  // 로컬 실행 도구라 CI 중복 실행 위험은 없지만, 신형 py와 공존 시 사용자가 구 스크립트를
+  // 실행해 갈라진 동작을 볼 수 있다. 마법사 폴더에 사용자 상태가 없어 삭제가 기대 동작.
+  { id: "util-playstore-setup-sh", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/playstore-wizard-setup.sh", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — setup 서브커맨드로 대체" },
+  { id: "util-playstore-setup-ps1", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/playstore-wizard-setup.ps1", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — setup 서브커맨드로 대체" },
+  { id: "util-playstore-apply-sh", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/playstore-wizard-apply.sh", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — apply 서브커맨드로 대체" },
+  { id: "util-playstore-apply-ps1", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/playstore-wizard-apply.ps1", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — apply 서브커맨드로 대체" },
+  { id: "util-playstore-detect-sh", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/detect-application-id.sh", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — detect-app-id 서브커맨드로 대체" },
+  { id: "util-playstore-detect-ps1", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/detect-application-id.ps1", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — detect-app-id 서브커맨드로 대체" },
+  { id: "util-playstore-patch-py", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/playstore-wizard/patch-build-gradle.py", replacedBy: "playstore-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — 내부 함수로 흡수" },
+  { id: "util-firebase-setup-sh", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/firebase-wizard/firebase-wizard-setup.sh", replacedBy: "firebase-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — setup 서브커맨드로 대체" },
+  { id: "util-firebase-setup-ps1", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/firebase-wizard/firebase-wizard-setup.ps1", replacedBy: "firebase-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — setup 서브커맨드로 대체" },
+  { id: "util-firebase-test-sh", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/firebase-wizard/test/setup-script-test.sh", replacedBy: "test/setup-script-test.py",
+    since: "4.3.0", reason: "마법사 테스트 Python 단일화" },
+  { id: "util-firebase-test-ps1", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/firebase-wizard/test/setup-script-test.ps1", replacedBy: "test/setup-script-test.py",
+    since: "4.3.0", reason: "마법사 테스트 Python 단일화" },
+  { id: "util-testflight-setup-sh", category: "util-file", tier: "safe",
+    file: ".github/util/flutter/testflight-wizard/testflight-wizard-setup.sh", replacedBy: "testflight-wizard.py",
+    since: "4.3.0", reason: "마법사 스크립트 Python 단일화 — setup 서브커맨드로 대체" },
 ];

@@ -5,6 +5,8 @@ import { readdirSync } from "node:fs";
 import { exists, copyDirSync } from "../fsutil.js";
 
 // 반환: {copied:bool, moduleCount:number}. force가 아니면(비TTY) 스킵.
+// ⚠️ overlay 복사다 — 템플릿에서 삭제/리네임된 구 파일은 여기서 지우지 않는다.
+//    구 util 파일 정리는 migrations registry(util-file 카테고리)가 담당한다 (#500).
 export function copyUtilModules(tempDir, type, { force = false } = {}, targetRoot = ".") {
   const src = join(tempDir, ".github", "util", type);
   if (!exists(src)) return { copied: false, moduleCount: 0 };

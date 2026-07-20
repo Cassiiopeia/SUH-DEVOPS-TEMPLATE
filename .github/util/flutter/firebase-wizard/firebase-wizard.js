@@ -231,9 +231,9 @@ function updateSetupCommands() {
     const appId = shellEscape(state.firebaseAppId);
     const tester = shellEscape(state.firebaseTesterGroup);
 
-    const bashCmd = `./firebase-wizard-setup.sh --project-path ${path} --app-id "${appId}" --tester-group "${tester}"`;
+    const bashCmd = `python3 .github/util/flutter/firebase-wizard/firebase-wizard.py setup --project-path ${path} --app-id "${appId}" --tester-group "${tester}"`;
     const psPath = (path === '.') ? '.' : path.replace(/\//g, '\\');
-    const psCmd = `.\\firebase-wizard-setup.ps1 -ProjectPath ${psPath} -AppId "${appId}" -TesterGroup "${tester}"`;
+    const psCmd = `python .github\\util\\flutter\\firebase-wizard\\firebase-wizard.py setup --project-path ${psPath} --app-id "${appId}" --tester-group "${tester}"`;
 
     const bashEl = document.getElementById('cmdBashCode');
     const psEl = document.getElementById('cmdPsCode');
@@ -614,12 +614,8 @@ async function exportZip() {
     // setup 스크립트 — GitHub raw에서 fetch 시도, 실패 시 README 안내만
     const wizardBaseUrl = 'https://raw.githubusercontent.com/Cassiiopeia/projectops/main/.github/util/flutter/firebase-wizard';
     try {
-        const [shResp, ps1Resp] = await Promise.all([
-            fetch(`${wizardBaseUrl}/firebase-wizard-setup.sh`).then(r => r.ok ? r.text() : null).catch(() => null),
-            fetch(`${wizardBaseUrl}/firebase-wizard-setup.ps1`).then(r => r.ok ? r.text() : null).catch(() => null)
-        ]);
-        if (shResp) zip.file('firebase-wizard-setup.sh', shResp);
-        if (ps1Resp) zip.file('firebase-wizard-setup.ps1', ps1Resp);
+        const pyResp = await fetch(`${wizardBaseUrl}/firebase-wizard.py`).then(r => r.ok ? r.text() : null).catch(() => null);
+        if (pyResp) zip.file('firebase-wizard.py', pyResp);
     } catch (e) {
         console.warn('setup 스크립트 fetch 실패:', e);
     }
@@ -633,8 +629,7 @@ async function exportZip() {
 ## 폴더 구조
 
 - github-secrets/         GitHub Repository Secrets에 등록할 값 파일들
-- firebase-wizard-setup.sh   워크플로우 placeholder 안전 치환 (bash)
-- firebase-wizard-setup.ps1  동일 동작 (PowerShell)
+- firebase-wizard.py      워크플로우 placeholder 안전 치환 (Python, macOS/Windows 공용)
 
 ## 등록 절차
 
@@ -646,8 +641,7 @@ async function exportZip() {
 
 ### macOS / Linux
 \`\`\`bash
-chmod +x firebase-wizard-setup.sh
-./firebase-wizard-setup.sh \\
+python3 firebase-wizard.py setup \\
   --project-path /path/to/project \\
   --app-id "${state.firebaseAppId}" \\
   --tester-group "${state.firebaseTesterGroup}"
@@ -655,17 +649,17 @@ chmod +x firebase-wizard-setup.sh
 
 ### Windows (PowerShell)
 \`\`\`powershell
-.\\firebase-wizard-setup.ps1 \`
-  -ProjectPath C:\\path\\to\\project \`
-  -AppId "${state.firebaseAppId}" \`
-  -TesterGroup "${state.firebaseTesterGroup}"
+python firebase-wizard.py setup \`
+  --project-path C:\\path\\to\\project \`
+  --app-id "${state.firebaseAppId}" \`
+  --tester-group "${state.firebaseTesterGroup}"
 \`\`\`
 
 ## 옵션
 
-- --dry-run / -DryRun           실제 변경 없이 미리보기
-- --non-interactive / -NonInteractive  충돌 시 자동 SKIP
-- --no-backup / -NoBackup       백업 파일 생성 비활성화
+- --dry-run             실제 변경 없이 미리보기
+- --non-interactive     충돌 시 자동 SKIP
+- --no-backup           백업 파일 생성 비활성화
 `;
     zip.file('README.md', readme);
 

@@ -10,6 +10,7 @@ const RULES = {
   workflow: workflowRule,
   "root-file": rootFileRule,
   "legacy-dir": legacyDirRule,
+  "util-file": rootFileRule, // #500 — util 모듈 내 폐기 파일: 정확 경로 삭제 (root-file rule 재사용)
 };
 
 // 대상 레포에서 레거시 잔재 감지. 반환: { safe: [entry], confirm: [entry], ask: [entry] }

@@ -132,6 +132,8 @@ export async function run(argv, { cwd = process.cwd(), source = { type: "git" },
     deployTarget,
     publishTargets,
     includeSecretBackup: opts.includeSecretBackup ?? existing?.options?.secretBackup ?? false,
+    // #502 — version 모드가 기존 full 통합 기록(mode)을 강등하지 않도록 (full이 우세)
+    recordMode: existing?.templateMode === "full" ? "full" : "version",
     // 릴리스 배포 브랜치(#456): CLI 플래그 → version.yml 저장값 → 빈 값(미출력, 스킬이 develop 폴백)
     deployBranch: opts.deployBranch || existing?.options?.deployBranch || "",
     intent,

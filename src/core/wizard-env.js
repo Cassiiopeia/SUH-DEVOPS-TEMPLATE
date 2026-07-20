@@ -34,6 +34,19 @@ export function setEnvLine(line, key, value) {
   return out + cr;
 }
 
+// 설치본에서 env 실값 추출 (#502 — 업데이트 모드 carryover).
+// 치환 시 @wizard 주석은 제거되지만 `KEY: "값"` 라인은 남는다(setEnvLine) — 그 값을 걷어온다.
+// 템플릿 지식 불필요: substituteEnv가 values를 ask 키에만 참조하므로 무관 키가 섞여도 무해하다.
+// 빈 값("")은 제외 — substituteEnv도 빈 chosen을 무시하고 기본값을 쓴다 (동일 규칙).
+export function extractEnvValues(installedContent) {
+  const values = new Map();
+  for (const raw of String(installedContent || "").split(/\r?\n/)) {
+    const m = raw.match(/^\s*([A-Z_]+):\s*"([^"]*)"/);
+    if (m && m[2] !== "") values.set(m[1], m[2]);
+  }
+  return values;
+}
+
 // resolver — .sh resolve_token 등가. 값 계산은 주입된 resolvers로 위임(순수성 유지).
 // resolvers: { repo, "spring-app-yml-dir"(type), "spring-app-yml-path"(type), "flutter-root" }
 export function resolveToken(name, type, resolvers = {}) {

@@ -30,7 +30,9 @@ export function formatStatuses(rows, templateVersion) {
   });
 }
 
-// 대화형/비대화형 공통 진입. opts: {io, templateVersion, sourceSkillsDir, tempDir, interactive, ui}
+// 대화형/비대화형 공통 진입. opts: {io, templateVersion, sourceSkillsDir, tempDir, interactive, ui, installedOnly}
+// installedOnly(#502 — 업데이트 모드): 비대화형 apply를 이미 설치된 어댑터로 한정한다.
+// 미설치 IDE에 새로 설치하지 않는다 — 업데이트는 "있는 것을 최신으로"가 계약.
 export async function runSkills(opts = {}) {
   const io = opts.io || defaultIo();
   const ui = opts.ui || skillsPrompts;
@@ -43,8 +45,12 @@ export async function runSkills(opts = {}) {
   io.log("");
 
   // 비대화형: 감지된(=관리 가능) 모든 어댑터에 apply(설치/업데이트) 순차 실행.
+  // installedOnly면 설치된 어댑터만 (업데이트 모드 — 미설치 IDE는 건드리지 않음).
   if (!opts.interactive) {
-    for (const { adapter } of rows) safe(() => adapter.apply(io, ctx), false);
+    for (const { adapter, status } of rows) {
+      if (opts.installedOnly && !status.installed) continue;
+      safe(() => adapter.apply(io, ctx), false);
+    }
     return 0;
   }
 

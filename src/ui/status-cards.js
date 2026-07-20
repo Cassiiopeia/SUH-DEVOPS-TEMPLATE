@@ -85,7 +85,7 @@ export function printIdeStatus(statuses, out = (s) => process.stdout.write(s)) {
 export function printInstallKind({ currentTemplateVersion = "", templateVersion = "" }, out = (s) => process.stdout.write(s)) {
   if (currentTemplateVersion) {
     out(`${GUT}  ♻️  ${paint("업데이트", A.bold)} — 템플릿 ${paint(`v${currentTemplateVersion}`, A.dim)} → ${paint(`v${templateVersion}`, A.green)}\n`);
-    out(`${GUT}     ${paint("version.yml에 이전 통합 기록이 있어 업데이트로 진행합니다", A.dim)}\n`);
+    out(`${GUT}     ${paint("version.yml에 이전 통합 기록이 있습니다 — 메뉴 맨 위 '업데이트'가 저장된 설정 그대로 반영합니다", A.dim)}\n`);
   } else {
     out(`${GUT}  🆕 ${paint("신규 통합", A.bold)} — 이 프로젝트에 처음 설치합니다 (템플릿 ${paint(`v${templateVersion}`, A.green)})\n`);
     out(`${GUT}     ${paint("version.yml에 이전 통합 기록이 없어 신규로 봅니다", A.dim)}\n`);

@@ -12,14 +12,14 @@ export async function selectMode({ update = null } = {}) {
   const options = [];
   if (update) {
     const range = update.from ? `v${update.from} → v${update.to}` : `v${update.to}`;
-    options.push({ value: "update", label: `업데이트 — 저장된 설정 그대로 ${range} 반영 (추천)` });
+    options.push({ value: "update", label: `업데이트 (v${range})` });
   }
   options.push(
-    { value: "full", label: `전체 설치 — 버전관리 + 자동화 워크플로우 + 이슈·PR 템플릿${update ? "" : " (처음이라면 추천)"}` },
-    { value: "version", label: "버전 관리만 — 버전 자동 증가·동기화 시스템만 설치" },
-    { value: "workflows", label: "워크플로우만 — 빌드·배포 GitHub Actions만 설치" },
-    { value: "issues", label: "이슈·PR 템플릿만 — GitHub 이슈/PR 양식만 설치" },
-    { value: "skills", label: "AI 스킬만 — Claude·Cursor·Gemini·Codex·PI용 스킬만 설치" },
+    { value: "full", label: "전체 설치 (버전관리 + 워크플로우 + 템플릿)" },
+    { value: "version", label: "버전 관리 전용 (자동화 시스템)" },
+    { value: "workflows", label: "워크플로우 전용 (GitHub Actions 빌드, 배포)" },
+    { value: "issues", label: "이슈/PR 템플릿 전용" },
+    { value: "skills", label: "AI 스킬 전용 (Claude, Cursor, Gemini, Codex, PI)" },
   );
   return engine.select({ message: "무엇을 설치할까요?", options });
 }

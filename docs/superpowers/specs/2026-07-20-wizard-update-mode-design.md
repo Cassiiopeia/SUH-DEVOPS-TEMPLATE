@@ -22,9 +22,15 @@
 ### 메뉴 (src/ui/prompts.js selectMode)
 
 - 시그니처를 `selectMode({ update = null } = {})`로 확장. `update = { from, to }`가 오면
-  맨 위에 항목을 추가하고 기본 선택으로 둔다:
-  `♻️ 업데이트 — 저장된 설정 그대로 v{from} → v{to} 반영 (추천)`
-- 신규 설치 5개 항목은 그대로 유지. update 미전달(신규 레포)이면 현행과 동일.
+  맨 위에 항목을 추가하고 기본 선택으로 둔다.
+- 디자인 규칙: 괄호 안의 번잡한 보조 문구를 제거해 라벨 길이를 축약하고, 중간점(`·`) 기호는 혼란을 야기하므로 슬래시(`/`) 혹은 쉼표(`,`)로 대체하여 전면 제거한다.
+- 확정된 최종 UI 메뉴 항목 명세 (대안 A 승인안):
+  - **`update`**: `업데이트 (v{from} → v{to})`
+  - **`full`**: `전체 설치 (버전관리 + 워크플로우 + 템플릿)`
+  - **`version`**: `버전 관리 전용 (자동화 시스템)`
+  - **`workflows`**: `워크플로우 전용 (GitHub Actions 빌드, 배포)`
+  - **`issues`**: `이슈/PR 템플릿 전용`
+  - **`skills`**: `AI 스킬 전용 (Claude, Cursor, Gemini, Codex, PI)`
 - 기존 테스트 스텁(`selectMode: async () => q.mode`)은 인자를 무시하므로 무수정 호환.
 
 ### 통합 범위(mode) 기록 (src/core/version-yml.js)

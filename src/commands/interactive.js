@@ -405,7 +405,14 @@ function summarize({ mode, types, version, branch, deployTarget, publishTargets,
 }
 
 function modeLabel(m) {
-  return { full: "전체 설치", version: "버전 관리만", workflows: "워크플로우만", issues: "이슈·PR 템플릿만", skills: "AI 스킬만", update: "업데이트" }[m] || m;
+  return {
+    full: "전체 설치 (버전관리 + 워크플로우 + 템플릿)",
+    version: "버전 관리 전용 (자동화 시스템)",
+    workflows: "워크플로우 전용 (GitHub Actions 빌드, 배포)",
+    issues: "이슈/PR 템플릿 전용",
+    skills: "AI 스킬 전용 (Claude, Cursor, Gemini, Codex, PI)",
+    update: "업데이트"
+  }[m] || m;
 }
 
 function utcNow(date = new Date()) {

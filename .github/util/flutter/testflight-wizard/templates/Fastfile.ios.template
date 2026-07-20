@@ -1,7 +1,7 @@
 # ============================================================
 # iOS Fastfile (TestFlight 업로드 + App Store 심사 자동 제출)
 # ============================================================
-# ★ 이 파일은 마법사(testflight-wizard-setup.sh)가 ios/fastlane/Fastfile 로 깔며,
+# ★ 이 파일은 마법사(testflight-wizard.py setup)가 ios/fastlane/Fastfile 로 깔며,
 #   GitHub Actions 워크플로우(PROJECT-FLUTTER-IOS-TESTFLIGHT.yaml)가 그대로 실행합니다.
 #   (Android의 Fastfile.playstore 와 동일한 "깐 파일 = 도는 파일" 구조)
 #

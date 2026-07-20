@@ -120,8 +120,9 @@ export function printSummary(ctx, targetRoot = ".") {
   }
   if (types.includes("flutter") && utilModulesCopied > 0) {
     err("  💡 Flutter 배포 마법사 사용법:");
-    err("     • iOS TestFlight: .github/util/flutter/ios-testflight-setup-wizard/index.html");
-    err("     • Android Play Store: .github/util/flutter/android-playstore-setup-wizard/index.html");
+    err("     • iOS TestFlight: .github/util/flutter/testflight-wizard/testflight-wizard.html");
+    err("     • Android Play Store: .github/util/flutter/playstore-wizard/playstore-wizard.html");
+    err("     • Firebase App Distribution: .github/util/flutter/firebase-wizard/firebase-wizard.html");
     err("     • 브라우저에서 열어 필요한 정보 입력 후 파일 생성");
     err("");
   }

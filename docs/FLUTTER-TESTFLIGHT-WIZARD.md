@@ -253,7 +253,7 @@ base64 -i AppDistribution.mobileprovision | pbcopy
 .github/util/flutter/testflight-wizard/
 ├── testflight-wizard.html      # 마법사 웹 UI
 ├── testflight-wizard.js        # 마법사 로직
-├── testflight-wizard-setup.sh  # 설정 스크립트
+├── testflight-wizard.py        # 설정 스크립트 (setup 서브커맨드)
 ├── version.json                # 버전 정보
 ├── version-sync.sh             # 버전 동기화 스크립트
 ├── images/                     # 가이드 이미지

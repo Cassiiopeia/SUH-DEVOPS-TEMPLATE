@@ -1,14 +1,33 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-20T01:48:45Z",
-    "currentVersion": "4.2.23",
+    "lastUpdated": "2026-07-20T01:51:47Z",
+    "currentVersion": "4.2.24",
     "projectType": "basic",
-    "totalReleases": 208,
+    "totalReleases": 209,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.24",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-20",
+      "pr_number": 505,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * 마법사 첫 환영 배너, 감지 로그, 그리고 호환성 경고(`BREAKING CHANGES`) 카드 내부의 모든 중간점(`·`, `—` 등) 기호들을 전면 숙청하고 깔끔한 대시(`-`) 및 쉼표(`,`) 기호로 통일했습니다.",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "마법사 첫 환영 배너, 감지 로그, 그리고 호환성 경고(`BREAKING CHANGES`) 카드 내부의 모든 중간점(`·`, `—` 등) 기호들을 전면 숙청하고 깔끔한 대시(`-`) 및 쉼표(`,`) 기호로 통일했습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.23",
       "project_type": "basic",

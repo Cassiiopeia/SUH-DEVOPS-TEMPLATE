@@ -18,6 +18,7 @@ import { createRunTrace } from "../core/run-trace.js";
 import { appendGuideEntry } from "../core/migration-guide.js";
 import { promptEnvPlan } from "../ui/env-plan.js";
 import { listWorkflowConflicts } from "../core/copy/workflows.js";
+import { extractEnvValues } from "../core/wizard-env.js";
 import { createContext, VALID_TYPES } from "../context.js";
 import { runFull } from "./full.js";
 import { runVersion } from "./version.js";
@@ -53,9 +54,14 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     io.ideStatus?.();
     io.installKind?.({ currentTemplateVersion: existing?.templateVersion || "", templateVersion });
 
-    // 1) 모드 선택
-    const mode = await io.selectMode();
-    if (mode === CANCEL || mode == null) { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
+    // 1) 모드 선택 — 기존 통합 레포면 업데이트 항목을 맨 위에 노출 (#502)
+    const updateInfo = existing?.templateVersion ? { from: existing.templateVersion, to: templateVersion } : null;
+    const picked = await io.selectMode(updateInfo ? { update: updateInfo } : {});
+    if (picked === CANCEL || picked == null) { io.cancelMessage?.("설치를 취소했습니다."); return 0; }
+    // 업데이트 모드(#502): 저장된 통합 범위(templateMode, 없으면 full)를 재실행하고
+    // 이하 updateRun 분기가 질문을 최소화한다 ("저장된 설정 그대로 반영"이 계약).
+    const updateRun = picked === "update";
+    const mode = updateRun ? (existing?.templateMode || "full") : picked;
 
     // Breaking Changes 게이트 (.sh execute_integration L4415~4420 — 모든 모드 공통, 대화형은 확인 질문)
     let breakingReport = null; // #493 — 통과 구간 항목을 가이드에 조치 방법 전문으로 임베드
@@ -84,6 +90,11 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
 
     // full/version/workflows — 감지 (version은 기존 version.yml 최우선)
     let types = detectTypes(cwd);
+    // 업데이트 모드 — 저장된 타입 우선 (재감지로 타입 집합이 흔들리지 않게, #502)
+    if (updateRun && existing?.types?.length) {
+      const saved = existing.types.filter((t) => VALID_TYPES.includes(t));
+      if (saved.length) types = saved;
+    }
     let version = (existing?.version) || detectVersion(cwd);
     let branch = detectDefaultBranch(cwd);
     const repoName = detectRepoName(cwd);
@@ -140,6 +151,15 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     // 확인/수정 루프 — ESC는 '머무르기' (.sh L1877~1881: 명시적 '아니오'만 종료)
     let paths = new Map();
     let confirmed = false;
+    // 업데이트 모드 — 카드는 보여주되 확인 루프 생략 (#502: 설정 변경은 기존 모드의 몫)
+    if (updateRun) {
+      if (io.analysisCard) {
+        io.analysisCard({ mode, modeLabel: `업데이트 (${modeLabel(mode)} 범위)`, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional, paths });
+      } else {
+        io.note?.(summarize({ mode, types, version, branch, deployTarget, publishTargets, includeSecretBackup, showOptional, changelogProvider, codeReviewCoderabbit }), "업데이트 — 저장된 설정으로 진행");
+      }
+      confirmed = true;
+    }
     while (!confirmed) {
       // 층3 — 프로젝트 분석 개요 카드 (#446). 스텁엔 없음 → note 폴백.
       if (io.analysisCard) {
@@ -217,10 +237,11 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       for (const t of types) if (t !== "basic" && !paths.has(t)) paths.set(t, existing?.paths.get(t) || ".");
     }
 
-    // @wizard env 계획 질문 (.sh wf_prompt_env_plan L3220 — full/workflows만)
+    // @wizard env 계획 질문 (.sh wf_prompt_env_plan L3220 — full/workflows만).
+    // 업데이트 모드는 생략 — 신규 파일은 기본값, 교체 파일은 아래 carryover가 기존 실값을 이월한다.
     const resolvers = makeResolvers(cwd, repoName, paths);
     let envValues = new Map(), envUseDefaults = true;
-    if (showOptional) {
+    if (showOptional && !updateRun) {
       const plan = await promptEnvPlan({
         tempDir, types, io: io.engineIo ?? null, force: false,
         resolvers, deployTarget, publishTargets, targetRoot: cwd, repoName,
@@ -229,17 +250,45 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
       envUseDefaults = plan.useDefaults;
     }
 
+    // 업데이트 모드 충돌 처리 (#502) — 타입별 3지선다 대신 일괄 확인 1회(기본 Y: .bak 백업 후 교체).
+    // 교체를 선택하면 기존 설치본의 env 실값을 추출해 새 파일에 이월(carryover)한다 —
+    // 기본값 재치환으로 사용자가 채운 값(FIREBASE_APP_ID 등)이 초기화되는 것을 막는 핵심.
+    let updateDecisions = null;
+    if (showOptional && updateRun) {
+      const liteCtx = { types, paths, deployTarget, publishTargets, repoName, resolvers, branch, deployBranch };
+      const conflicts = listWorkflowConflicts(liteCtx, tempDir, cwd);
+      if (conflicts.length) {
+        io.note?.(conflicts.map((c) => `• ${c.filename}`).join("\n"), `♻️ 템플릿이 갱신된 워크플로우 ${conflicts.length}개`);
+        const yes = await io.askYesNo(`위 ${conflicts.length}개를 .bak 백업 후 새 버전으로 교체할까요? (기존 설정값은 유지됩니다)`, true);
+        const decision = yes === true ? "backup" : "skip";
+        updateDecisions = new Map();
+        for (const { filename } of conflicts) updateDecisions.set(filename, decision);
+        if (decision === "backup") {
+          const carried = new Map();
+          for (const { filename } of conflicts) {
+            const p = join(cwd, PATHS.workflowsDir, filename);
+            if (!existsSync(p)) continue;
+            for (const [k, v] of extractEnvValues(readFileSync(p, "utf8"))) carried.set(k, v);
+          }
+          if (carried.size) { envValues = carried; envUseDefaults = false; }
+        }
+      }
+    }
+
     const { now, today } = clock || utcNow();
     const ctx = createContext({
       mode, force: true, types, version, versionCode, branch, paths, deployTarget, publishTargets, includeSecretBackup,
       codeReviewCoderabbit, changelogProvider, changelogBaseUrl, deployBranch, intent,
       repoName, templateVersion, resolvers, envValues, envUseDefaults, now, today,
+      // #502 — version 모드가 기존 full 기록을 강등하지 않도록 (full이 우세)
+      recordMode: existing?.templateMode === "full" ? "full" : "version",
     });
     ctx.templateVersion = templateVersion;
 
     // 기존 워크플로우 충돌 3지선 — 타입당 1회 결정을 파일에 캐시 적용 (.sh L3440~3508 UX 등가)
-    let hooks = {};
-    if (showOptional && io.engineIo?.select) {
+    // 업데이트 모드는 위에서 일괄 결정(updateDecisions)했으므로 3지선다를 건너뛴다 (#502).
+    let hooks = updateDecisions ? { decisions: updateDecisions } : {};
+    if (showOptional && io.engineIo?.select && !updateRun) {
       const conflicts = listWorkflowConflicts(ctx, tempDir, cwd);
       if (conflicts.length) {
         const perType = new Map();
@@ -302,8 +351,13 @@ export async function runInteractive(baseCtx, { cwd = process.cwd(), source = { 
     else if (mode === "workflows") result = runWorkflows(ctx, tempDir, cwd, { ...hooks, trace });
 
     // 통합 후 IDE 스킬 제안 (.sh L4557 offer_ide_tools_install — 사전 질문 게이트, 기본 N)
-    const wantSkills = await io.askYesNo("AI 에이전트 스킬(Claude·Cursor·Gemini·Codex·PI)도 설치/업데이트할까요?", false);
-    if (wantSkills === true) await skills({ templateVersion, tempDir, interactive: true });
+    // 업데이트 모드(#502): 이미 설치된 IDE 스킬만 질문 없이 최신화 (미설치 IDE는 건드리지 않음)
+    if (updateRun) {
+      await skills({ templateVersion, tempDir, interactive: false, installedOnly: true });
+    } else {
+      const wantSkills = await io.askYesNo("AI 에이전트 스킬(Claude·Cursor·Gemini·Codex·PI)도 설치/업데이트할까요?", false);
+      if (wantSkills === true) await skills({ templateVersion, tempDir, interactive: true });
+    }
 
     // 마이그레이션 기록 (#493/#494) — Layer 2/3 트레이스 파일 + Layer 1 가이드 엔트리 (full/workflows만)
     let migrationGuidePath = null;
@@ -351,7 +405,7 @@ function summarize({ mode, types, version, branch, deployTarget, publishTargets,
 }
 
 function modeLabel(m) {
-  return { full: "전체 설치", version: "버전 관리만", workflows: "워크플로우만", issues: "이슈·PR 템플릿만", skills: "AI 스킬만" }[m] || m;
+  return { full: "전체 설치", version: "버전 관리만", workflows: "워크플로우만", issues: "이슈·PR 템플릿만", skills: "AI 스킬만", update: "업데이트" }[m] || m;
 }
 
 function utcNow(date = new Date()) {

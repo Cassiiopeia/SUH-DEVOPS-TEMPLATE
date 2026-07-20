@@ -41,7 +41,7 @@ export function runFull(context, tempDir, targetRoot = ".", hooks = {}) {
       version, types, paths, pathMarkers, branch, deployBranch, versionCode, now, today,
       deployValues,
       templateOptions: { templateVersion, deployTarget, publishTargets, includeSecretBackup, optionsDate: today,
-        changelogProvider, changelogBaseUrl, codeReviewCoderabbit, intent },
+        changelogProvider, changelogBaseUrl, codeReviewCoderabbit, intent, mode: "full" },
     }));
 
   // 2. README 버전 섹션

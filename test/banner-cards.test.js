@@ -113,7 +113,7 @@ test("printInstallKind: 신규 vs 업데이트 + 판정 근거 라인", () => {
   printInstallKind({ currentTemplateVersion: "3.0.188", templateVersion: "4.0.3" }, out2);
   const t2 = strip(out2.text());
   assert.match(t2, /업데이트 — 템플릿 v3\.0\.188 → v4\.0\.3/);
-  assert.match(t2, /이전 통합 기록이 있어/, "왜 업데이트인지 근거를 밝힌다");
+  assert.match(t2, /이전 통합 기록이 있/, "왜 업데이트인지 근거를 밝힌다");
 });
 
 test("collectIdeStatuses: 어댑터 전체 순회 (예외 없음)", () => {

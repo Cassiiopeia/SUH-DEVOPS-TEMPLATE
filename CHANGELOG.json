@@ -1,14 +1,46 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-20T01:05:41Z",
-    "currentVersion": "4.2.21",
+    "lastUpdated": "2026-07-20T01:37:08Z",
+    "currentVersion": "4.2.22",
     "projectType": "basic",
-    "totalReleases": 206,
+    "totalReleases": 207,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.22",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-20",
+      "pr_number": 503,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **새 기능**\n  * 이전 통합 설정을 안전하게 보존하면서 원클릭으로 최신화하는 '업데이트 모드'가 신설되었습니다.\n\n* **개선**\n  * 업데이트 실행 시 기존 워크플로우에 정의해 두었던 환경 변수 실값을 새 템플릿에 안전하게 자동 이월하여 보존합니다.\n  * 이미 설치된 에이전트 스킬들을 대화형 질문 없이 조용히 최신 스킬 패키지로 유지 보정합니다.\n\n* **문서**\n  * 마법사 업데이트 모드 추가에 따른 설계 상세 스펙 및 세부 구현 보고서가 보완되었습니다.",
+      "parsed_changes": {
+        "새_기능": {
+          "title": "새 기능",
+          "items": [
+            "이전 통합 설정을 안전하게 보존하면서 원클릭으로 최신화하는 '업데이트 모드'가 신설되었습니다."
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "업데이트 실행 시 기존 워크플로우에 정의해 두었던 환경 변수 실값을 새 템플릿에 안전하게 자동 이월하여 보존합니다.",
+            "이미 설치된 에이전트 스킬들을 대화형 질문 없이 조용히 최신 스킬 패키지로 유지 보정합니다."
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "마법사 업데이트 모드 추가에 따른 설계 상세 스펙 및 세부 구현 보고서가 보완되었습니다."
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.21",
       "project_type": "basic",

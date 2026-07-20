@@ -222,14 +222,17 @@ export function parseExisting(content) {
       else if (/^\S/.test(l)) inPaths = false; // 들여쓰기 끝 → 블록 종료
     }
   }
-  // template: 블록 내 version
+  // template: 블록 내 version + mode (#502 — 업데이트 모드가 재실행할 통합 범위)
   let templateVersion = "";
+  let templateMode = null;
   let inTemplate = false;
   for (const l of text.split("\n")) {
     if (/^\s*template:/.test(l)) { inTemplate = true; continue; }
     if (inTemplate) {
-      const m = l.match(/^\s*version:\s*"([0-9][0-9.]*)"/);
-      if (m) { templateVersion = m[1]; break; }
+      const vm = l.match(/^\s*version:\s*"([0-9][0-9.]*)"/);
+      if (vm && !templateVersion) templateVersion = vm[1];
+      const mm = l.match(/^\s*mode:\s*"([a-z]+)"/);
+      if (mm && ["full", "version", "workflows"].includes(mm[1])) templateMode = mm[1];
       if (/^\S/.test(l)) break;
     }
   }
@@ -238,7 +241,7 @@ export function parseExisting(content) {
   const deployBranch = line(/^\s*deploy_branch:\s*"([^"]*)"/);
   // 선택 워크플로우 옵션 (metadata.template.options — nexus/secret_backup)
   const options = parseTemplateOptions(text);
-  return { version, versionCode, types, paths, templateVersion, options, defaultBranch, deployBranch };
+  return { version, versionCode, types, paths, templateVersion, templateMode, options, defaultBranch, deployBranch };
 }
 
 // version.yml 전체 생성 (.sh create_version_yml + save_template_options 신규 케이스 등가).
@@ -291,13 +294,15 @@ export function buildVersionYml({ version, types = [], paths = new Map(), pathMa
   // template 옵션 블록 (.sh save_template_options 신규 추가 케이스). templateOptions 지정 시.
   if (templateOptions) {
     const { templateVersion = "unknown", deployTarget = "docker-ssh", publishTargets = [], includeSecretBackup = false, optionsDate = today,
-            changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true, intent = null } = templateOptions;
+            changelogProvider = "github-ai", changelogBaseUrl = "", codeReviewCoderabbit = true, intent = null, mode = null } = templateOptions;
     const publishJson = `[${publishTargets.map((t) => `"${t}"`).join(",")}]`;
     // intent(프로젝트 성격, #485) — 미지정이면 deploy/publish에서 역추론해 기록 (재통합 시 진입 질문 생략용)
     const intentVal = intent || inferIntent(deployTarget, publishTargets) || "manual";
     out += `  template:\n`;
     out += `    source: "projectops"\n`;
     out += `    version: "${templateVersion}"\n`;
+    // mode(#502) — 이 레포에 통합된 범위. 업데이트 모드가 같은 범위를 재실행하는 기준.
+    if (mode) out += `    mode: "${mode}"   # 통합 범위(full/version/workflows) — 업데이트 모드 재실행 기준\n`;
     out += `    integrated_date: "${optionsDate}"\n`;
     out += `    last_update_date: "${optionsDate}"\n`;
     out += `    options:\n`;

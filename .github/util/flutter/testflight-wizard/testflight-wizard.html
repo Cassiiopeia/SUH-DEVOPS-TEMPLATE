@@ -30,7 +30,10 @@
         "p12 개인키 포함 여부 검증 명령(openssl pkcs12) 추가",
         "p12 유출 위험 및 백업 경고 추가",
         "Step 2 완료 체크리스트 추가 - find-identity 기대 출력 예시 포함",
-        "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시"
+        "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시",
+        "Step 3에 Capabilities 선택 가이드 추가 - 체크할 것/Info.plist로 처리되는 것 구분",
+        "Step 3에 Xcode Bundle ID 대조 경고 추가 - Flutter 기본값 잔존으로 인한 서명 실패 예방",
+        "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인"
       ]
     },
     {
@@ -81,7 +84,6 @@
   },
   "repository": "https://github.com/Cassiiopeia/projectops"
 }
-
     </script>
     <!-- JSZip for ZIP export -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1122,7 +1124,43 @@
                             </div>
                         </div>
                     </li>
-                    <li>Capabilities: 필요한 기능만 체크 (Push Notifications 등)</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">4단계: Capabilities — 목록이 150개쯤 나옵니다</span>
+                            <div class="text-slate-400 mt-2 text-[11px]">
+                                <span class="text-green-400 font-bold">대부분 체크할 필요 없습니다.</span>
+                                Capabilities는 <span class="text-slate-300">Apple 서버 인프라를 쓰거나 샌드박스를 넘는 기능</span>만 해당됩니다.
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-[11px] text-slate-300 mb-1">✅ 해당되면 체크:</div>
+                                <ul class="text-[10px] text-slate-400 list-disc list-inside space-y-0.5">
+                                    <li><span class="text-slate-300">Push Notifications</span> — 푸시 알림 (별도 .p8 키 필요)</li>
+                                    <li><span class="text-slate-300">Sign In with Apple</span> — 애플 로그인</li>
+                                    <li><span class="text-slate-300">In-App Purchase</span> — 인앱 결제</li>
+                                    <li><span class="text-slate-300">Associated Domains</span> — 딥링크/유니버설 링크</li>
+                                    <li><span class="text-slate-300">HealthKit · iCloud · Maps</span> — 해당 프레임워크 사용 시</li>
+                                </ul>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-[11px] text-red-400 font-bold mb-1">❌ 체크하지 마세요 — Info.plist로 처리되는 것들</div>
+                                <div class="text-[10px] text-slate-400">
+                                    카메라 · 마이크 녹음 · 음성인식(STT) · TTS · 위치 · 사진앨범 · 블루투스
+                                </div>
+                                <div class="text-[10px] text-slate-500 mt-1">
+                                    이들은 런타임에 사용자 허락을 받는 방식이라 프로비저닝과 무관합니다.
+                                    <code class="text-slate-400">Info.plist</code>의 <code class="text-slate-400">NS...UsageDescription</code> 문자열만 넣으면 됩니다.
+                                </div>
+                                <div class="text-[10px] text-orange-400 mt-2">
+                                    ⚠️ <span class="font-bold">Siri</span>는 "내 앱을 Siri로 호출"(SiriKit)용입니다.
+                                    앱 안에서 음성인식하는 것과 <span class="text-slate-400">무관하니 체크하지 마세요.</span>
+                                </div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700 text-[10px] text-slate-500">
+                                💡 나중에 추가할 수 있지만, 추가하면 <span class="text-slate-400">Provisioning Profile을 재생성</span>해야 합니다(Step 4 반복).
+                                계획이 확실한 기능은 지금 함께 체크하세요.
+                            </div>
+                        </div>
+                    </li>
                     <li><span class="text-green-400 font-bold">Register</span> 클릭!</li>
                 </ol>
             </div>
@@ -1201,6 +1239,20 @@
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
                     placeholder="kr.suhsaechan.suhDevopsTemplate">
                 <p class="text-xs text-slate-500 mt-1">Flutter 프로젝트의 ios/Runner.xcodeproj Bundle Identifier와 동일해야 합니다</p>
+                <div class="mt-3 p-3 bg-red-900/30 border border-red-700 rounded">
+                    <p class="text-xs text-red-300 font-bold mb-2">⚠️ 등록 전 Xcode 프로젝트 값과 대조하세요</p>
+                    <div class="bg-slate-900 rounded p-2 font-mono text-[10px] overflow-x-auto">
+                        <div class="text-green-400 break-all">grep PRODUCT_BUNDLE_IDENTIFIER ios/Runner.xcodeproj/project.pbxproj</div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2">
+                        Flutter가 만든 기본값(<code class="text-slate-300">com.example.앱이름</code> 등)이 그대로 남아 있는 경우가 많습니다.
+                        Apple에 등록할 값과 다르면 <span class="text-red-400">서명 단계에서 실패</span>합니다.
+                    </p>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        다르면 지금 맞추세요. <code class="text-slate-400">RunnerTests</code> 항목까지 함께 바꿔야 합니다.
+                        <span class="text-yellow-400">App Store 출시 후에는 Bundle ID를 변경할 수 없습니다.</span>
+                    </p>
+                </div>
             </div>
 
             <div class="flex justify-between items-center mt-8">
@@ -1294,7 +1346,29 @@
                             </div>
                         </div>
                     </li>
-                    <li><span class="text-green-400 font-bold">Generate</span> → <span class="text-blue-400 font-bold">Download</span></li>
+                    <li><span class="text-green-400 font-bold">Generate</span> → <span class="text-blue-400 font-bold">Download</span> → <code class="text-orange-400">.mobileprovision</code> 저장
+                        <span class="text-slate-500 text-[10px]">(Step 2의 .p12와 달리 키체인 설치 불필요 — 파일만 있으면 됩니다)</span>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-emerald-500">
+                            <span class="text-emerald-400 font-bold">✅ 제대로 만들어졌는지 검증 (권장)</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                프로파일은 텍스트가 아니라 서명된 바이너리라 그냥 열면 깨져 보입니다. 아래 명령으로 내용을 확인하세요.
+                            </div>
+                            <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] overflow-x-auto">
+                                <div class="text-green-400 break-all">security cms -D -i ~/Downloads/파일명.mobileprovision | plutil -p - | grep -E "Name|application-identifier|ExpirationDate|aps-environment"</div>
+                            </div>
+                            <div class="text-slate-400 mt-2 text-[11px]">확인할 것:</div>
+                            <ul class="text-[10px] text-slate-400 list-disc list-inside mt-1 space-y-0.5">
+                                <li><span class="text-slate-300">application-identifier</span>가 <span class="text-yellow-400">팀ID.본인BundleID</span> 형태인지</li>
+                                <li><span class="text-slate-300">aps-environment</span>가 <span class="text-green-400">production</span>인지 (푸시 켠 경우)</li>
+                                <li><span class="text-slate-300">ExpirationDate</span>가 1년 뒤인지</li>
+                            </ul>
+                            <div class="text-slate-500 text-[10px] mt-2">
+                                ⚠️ <span class="text-slate-400">get-task-allow</span>가 <span class="text-red-400">true</span>면 개발용 프로파일을 잘못 만든 것입니다 → Distribution으로 다시 생성하세요.
+                            </div>
+                        </div>
+                    </li>
                 </ol>
             </div>
 

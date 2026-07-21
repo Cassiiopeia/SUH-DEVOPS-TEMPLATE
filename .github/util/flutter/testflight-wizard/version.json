@@ -1,9 +1,21 @@
 {
   "name": "iOS TestFlight Setup Wizard",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2026-07-20",
+  "lastUpdated": "2026-07-21",
   "changelog": [
+    {
+      "version": "1.4.0",
+      "date": "2026-07-21",
+      "changes": [
+        "Step 2 인증서 가이드를 실제 실행 순서(2-0 확인 → 2-1 CSR → 2-2 발급 → 2-3 p12)로 재구성",
+        "2-0 사전 확인 단계 신설 - security find-identity로 기존 인증서 유무 판별 후 분기",
+        "Apple Distribution 인증서 계정당 3개 제한 및 Revoke 안내 추가",
+        "CSR 다이얼로그의 '디스크에 저장됨' 라디오 선택 강조 (기본값이 'CA로 이메일 보냄'이라 오설정 빈발)",
+        "키체인 인증서 목록이 비어있는 경우를 정상 상태로 명시 - 최초 진입자 혼란 해소",
+        "p12 내보내기 전 개인키 존재 확인 단계 추가"
+      ]
+    },
     {
       "version": "1.3.0",
       "date": "2026-07-20",

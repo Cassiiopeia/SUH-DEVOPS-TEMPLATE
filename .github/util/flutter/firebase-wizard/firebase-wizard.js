@@ -200,9 +200,12 @@ function prevStep() {
     if (state.currentStep > 1) showStep(state.currentStep - 1);
 }
 
+// 단계 이동에 순서 제약을 두지 않는다.
+// 이미 발급받은 값이 있거나 특정 단계만 다시 확인하려는 경우가 많아,
+// 앞 단계 완료를 강제하면 오히려 진행을 막는다. (testflight/playstore 마법사와 동일 동작)
 function goToStep(step) {
-    if (step <= state.maxReachedStep) showStep(step);
-    else showToast('⚠️ 이전 단계를 먼저 완료해주세요');
+    if (step === state.currentStep) return;
+    if (step >= 1 && step <= state.totalSteps) showStep(step);
 }
 
 function resetWizard() {

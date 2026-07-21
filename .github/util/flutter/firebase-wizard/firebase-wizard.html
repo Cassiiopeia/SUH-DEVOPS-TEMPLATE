@@ -20,7 +20,8 @@
         "Firebase Console에서 받은 Admin SDK 키도 IAM 역할 부여가 별도로 필요함을 명시",
         "다른 프로젝트의 Service Account는 재사용 불가함을 안내",
         "테스터 그룹의 표시 이름과 실제 별칭(alias)이 다름을 명시 - 배포에는 소문자 별칭 사용",
-        "배포 전 권한 사전 검증 방법 및 응답 코드별 원인 진단표 추가"
+        "배포 전 권한 사전 검증 방법 및 응답 코드별 원인 진단표 추가",
+        "단계 이동 제약 제거 - 어느 단계로든 자유롭게 이동 가능 (다른 마법사와 동작 일치)"
       ]
     },
     {
@@ -93,6 +94,9 @@
         .step-dot.active { background: #FFA000; color: #0f172a; }
         .step-dot.completed { background: #22c55e; color: #0f172a; }
         .step-dot.pending { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+        /* 어느 단계로든 자유롭게 이동 가능함을 호버로 드러낸다 */
+        .step-dot:hover { border-color: #FFA000; color: #FFCA28; }
+        .step-dot.active:hover { color: #0f172a; }
         .step-line { width: 2rem; height: 2px; background: #334155; }
         .step-line.completed { background: #22c55e; }
         .skip-btn { color: #94a3b8; font-size: 0.875rem; cursor: pointer; padding: 0.5rem 1rem; }

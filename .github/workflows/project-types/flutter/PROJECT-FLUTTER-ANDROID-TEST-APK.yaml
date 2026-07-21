@@ -418,8 +418,14 @@ jobs:
       - name: Setup Gradle
         working-directory: ${{ env.APP_ROOT }}/android
         run: |
-          chmod +x gradlew
-          echo "✅ Gradle wrapper permissions set"
+          # Flutter 기본 .gitignore가 gradlew를 제외하므로 CI 체크아웃 시 없을 수 있다.
+          # flutter build가 자체 Gradle을 쓰므로 없어도 빌드는 진행된다.
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            echo "✅ Gradle wrapper permissions set"
+          else
+            echo "ℹ️ gradlew 없음 - Flutter 내장 Gradle을 사용합니다"
+          fi
 
       # Java 설정
       - name: Set up Java

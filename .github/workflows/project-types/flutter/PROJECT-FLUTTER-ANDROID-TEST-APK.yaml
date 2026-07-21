@@ -353,12 +353,12 @@ jobs:
           KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          cat > android/key.properties << EOF
-storeFile=keystore/key.jks
-storePassword=$STORE_PASSWORD
-keyAlias=$KEY_ALIAS
-keyPassword=$KEY_PASSWORD
-EOF
+          cat << EOF | sed -E 's/^ {10}//' > android/key.properties
+          storeFile=keystore/key.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
           echo "✅ key.properties 생성 완료"
 
       # google-services.json 생성 (선택적)
@@ -654,25 +654,25 @@ EOF
           COMMIT_SHORT="${{ needs.prepare-test-build.outputs.commit_hash }}"
           BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
-          cat > build-info.txt << EOF
-테스트 APK 빌드 정보
+          cat << EOF | sed -E 's/^ {10}//' > build-info.txt
+          테스트 APK 빌드 정보
 
-빌드 번호: #$BUILD_NUMBER
-EOF
+          빌드 번호: #$BUILD_NUMBER
+          EOF
 
           if [ -n "$PR_NUMBER" ]; then
-            cat >> build-info.txt << EOF
-PR 번호: #$PR_NUMBER
-EOF
+            cat << EOF | sed -E 's/^ {12}//' >> build-info.txt
+            PR 번호: #$PR_NUMBER
+            EOF
           fi
 
-          cat >> build-info.txt << EOF
-브랜치: $BRANCH_NAME
-커밋: $COMMIT_SHORT
-전체 커밋 해시: $COMMIT_SHA
-빌드 날짜: $BUILD_DATE
+          cat << EOF | sed -E 's/^ {10}//' >> build-info.txt
+          브랜치: $BRANCH_NAME
+          커밋: $COMMIT_SHORT
+          전체 커밋 해시: $COMMIT_SHA
+          빌드 날짜: $BUILD_DATE
 
-EOF
+          EOF
 
           # 이슈 정보가 있으면 추가
           if [ -n "${{ needs.prepare-test-build.outputs.issue_number }}" ]; then
@@ -680,12 +680,12 @@ EOF
             ISSUE_TITLE="${{ needs.prepare-test-build.outputs.issue_title }}"
             ISSUE_URL="${{ needs.prepare-test-build.outputs.issue_url }}"
 
-            cat >> build-info.txt << EOF
-관련 이슈:
-- #$ISSUE_NUMBER: $ISSUE_TITLE
-- URL: $ISSUE_URL
+            cat << EOF | sed -E 's/^ {12}//' >> build-info.txt
+            관련 이슈:
+            - #$ISSUE_NUMBER: $ISSUE_TITLE
+            - URL: $ISSUE_URL
 
-EOF
+            EOF
           fi
 
           echo "📋 빌드 정보 파일 생성 완료:"
@@ -694,14 +694,14 @@ EOF
       # 빌드 메타데이터 파일 생성 (댓글 작성 워크플로우용)
       - name: Create build metadata file
         run: |
-          cat > build-metadata.json << EOF
-{
-  "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
-  "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
-  "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
-  "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
-}
-EOF
+          cat << EOF | sed -E 's/^ {10}//' > build-metadata.json
+          {
+            "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
+            "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
+            "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
+            "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+          }
+          EOF
           cat build-metadata.json
 
       # APK와 빌드 정보를 아티팩트로 업로드 (브랜치명 포함)

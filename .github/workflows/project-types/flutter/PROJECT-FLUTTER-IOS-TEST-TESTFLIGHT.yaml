@@ -335,14 +335,14 @@ jobs:
 
           echo "commit_hash=$COMMIT_SHORT" >> $GITHUB_OUTPUT
 
-          cat > final_release_notes.txt << EOF
-테스트 빌드 #$BUILD_NUMBER
+          cat << EOF | sed -E 's/^ {10}//' > final_release_notes.txt
+          테스트 빌드 #$BUILD_NUMBER
 
-브랜치: $BRANCH_NAME
-커밋: $COMMIT_SHORT
-날짜: $BUILD_DATE
+          브랜치: $BRANCH_NAME
+          커밋: $COMMIT_SHORT
+          날짜: $BUILD_DATE
 
-EOF
+          EOF
 
           # 이슈 정보가 있으면 추가
           if [ -n "${{ steps.issue_info.outputs.issue_number }}" ]; then
@@ -350,12 +350,12 @@ EOF
             ISSUE_TITLE="${{ steps.issue_info.outputs.issue_title }}"
             ISSUE_URL="${{ steps.issue_info.outputs.issue_url }}"
 
-            cat >> final_release_notes.txt << EOF
-관련 이슈:
-- #$ISSUE_NUMBER: $ISSUE_TITLE
-- URL: $ISSUE_URL
+            cat << EOF | sed -E 's/^ {12}//' >> final_release_notes.txt
+            관련 이슈:
+            - #$ISSUE_NUMBER: $ISSUE_TITLE
+            - URL: $ISSUE_URL
 
-EOF
+            EOF
           fi
 
           echo "📋 생성된 릴리즈 노트:"
@@ -650,14 +650,14 @@ EOF
 
       - name: Create build metadata file
         run: |
-          cat > build-metadata.json << EOF
-{
-  "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
-  "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
-  "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
-  "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
-}
-EOF
+          cat << EOF | sed -E 's/^ {10}//' > build-metadata.json
+          {
+            "pr_number": "${{ needs.prepare-test-build.outputs.pr_number }}",
+            "build_number": "${{ needs.prepare-test-build.outputs.build_number }}",
+            "issue_number": "${{ needs.prepare-test-build.outputs.issue_number }}",
+            "branch_name": "${{ github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name || github.ref_name }}"
+          }
+          EOF
           cat build-metadata.json
 
       - name: Upload IPA artifact

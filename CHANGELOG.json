@@ -1,14 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-21T05:56:29Z",
-    "currentVersion": "4.2.29",
+    "lastUpdated": "2026-07-21T06:54:12Z",
+    "currentVersion": "4.2.30",
     "projectType": "basic",
-    "totalReleases": 214,
+    "totalReleases": 215,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.30",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-21",
+      "pr_number": 515,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 테스트 빌드 워크플로우가 실행되지 않던 문제 해결\n  * 앱이 하위 폴더에 있을 때 준비 단계에서 중단되던 문제 해결\n\n* **문서**\n  * 여러 작업이 동시에 진행될 때 지켜야 할 규칙 안내 추가",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "테스트 빌드 워크플로우가 실행되지 않던 문제 해결",
+            "앱이 하위 폴더에 있을 때 준비 단계에서 중단되던 문제 해결"
+          ]
+        },
+        "문서": {
+          "title": "문서",
+          "items": [
+            "여러 작업이 동시에 진행될 때 지켜야 할 규칙 안내 추가"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.29",
       "project_type": "basic",

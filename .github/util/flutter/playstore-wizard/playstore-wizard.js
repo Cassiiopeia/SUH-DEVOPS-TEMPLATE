@@ -1061,7 +1061,7 @@ function resetWizard() {
         // Application ID 입력 필드 placeholder 복원
         const applicationIdInput = document.getElementById('applicationId');
         if (applicationIdInput) {
-            applicationIdInput.placeholder = '예: com.example.app 또는 kr.suhsaechan.suh_devops_template';
+            applicationIdInput.placeholder = '예: kr.mycompany.myapp';
         }
         
         // 유효기간 초기화

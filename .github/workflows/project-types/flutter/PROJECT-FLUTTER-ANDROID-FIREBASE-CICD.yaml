@@ -588,9 +588,12 @@ jobs:
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ env.FIREBASE_APP_ID }}
-          serviceCredentialsFile: firebase-service-account.json
+          # ⚠️ uses: 액션은 job의 defaults.working-directory를 따르지 않고
+          #    항상 레포 루트 기준으로 경로를 해석한다.
+          #    자격증명·AAB는 APP_ROOT에서 생성되므로 prefix가 필요하다.
+          serviceCredentialsFile: ${{ env.APP_ROOT }}/firebase-service-account.json
           groups: ${{ env.FIREBASE_TESTER_GROUP }}
-          file: build/app/outputs/bundle/release/app-release.aab
+          file: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/app-release.aab
           releaseNotesFile: final_release_notes.txt
 
       # Firebase 인증 파일 삭제 (보안)

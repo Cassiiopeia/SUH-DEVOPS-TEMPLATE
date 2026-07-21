@@ -181,10 +181,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: project-files
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
           path: |
-            pubspec.yaml
-            lib/
-            assets/
+            ${{ env.APP_ROOT }}/pubspec.yaml
+            ${{ env.APP_ROOT }}/lib/
+            ${{ env.APP_ROOT }}/assets/
           retention-days: 1
 
   build-android:
@@ -510,6 +511,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-aab
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
           path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/app-release.aab
           retention-days: 1
 
@@ -540,7 +542,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android-aab
-          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/
+          # 업로드 경로에 APP_ROOT prefix가 포함되므로 레포 루트에 풀어야 원위치로 복원된다
+          # (APP_ROOT를 다시 붙이면 client/client/build/... 로 이중 중첩)
+          path: .
 
       # 릴리즈 노트 다운로드
       - name: Download release notes

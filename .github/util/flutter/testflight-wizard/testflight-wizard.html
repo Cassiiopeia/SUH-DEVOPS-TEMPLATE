@@ -21,6 +21,8 @@
         "Apple Distribution 인증서 계정당 3개 제한 및 Revoke 안내 추가",
         "CSR 다이얼로그의 '디스크에 저장됨' 라디오 선택 강조 (기본값이 'CA로 이메일 보냄'이라 오설정 빈발)",
         "키체인 인증서 목록이 비어있는 경우를 정상 상태로 명시 - 최초 진입자 혼란 해소",
+        ".cer 다운로드 후 더블클릭 설치 및 '인증서 추가' 창의 키체인 선택(로그인) 안내 추가",
+        "설치 확인 명령(security find-identity) 안내 추가",
         "p12 내보내기 전 개인키 존재 확인 단계 추가"
       ]
     },
@@ -778,7 +780,32 @@
                     </li>
                     <li><span class="text-yellow-400">Choose File</span> → 2-1에서 만든 <span class="text-orange-400">.certSigningRequest</span> 업로드 → Continue</li>
                     <li><span class="text-yellow-400">Download</span> 클릭 → .cer 파일 저장</li>
-                    <li>다운로드한 .cer 파일 <span class="text-yellow-400">더블클릭</span> → 키체인에 자동 설치</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">⚠️ 다운로드만으로는 끝이 아닙니다 — 반드시 설치하세요!</span>
+                            <div class="text-slate-400 mt-2 text-[11px]">
+                                다운로드한 .cer 파일을 <span class="text-yellow-400 font-bold">더블클릭</span>하세요.
+                                (또는 터미널에서 <code class="text-slate-300">open ~/Downloads/apple_distribution.cer</code>)
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-orange-400 font-bold text-[11px] mb-1">"인증서 추가" 창이 뜨면 — 키체인 선택</div>
+                                <div class="flex items-center gap-2 text-[11px]">
+                                    <span class="text-green-400">✅</span>
+                                    <span class="text-green-400 font-bold">로그인</span>
+                                    <span class="text-slate-400">← 기본값 그대로 두고 "추가" 클릭</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                                    <span class="text-red-400">❌</span>
+                                    <span>iCloud / 시스템 / 시스템 루트 <span class="text-slate-600">(선택 금지)</span></span>
+                                </div>
+                                <div class="text-slate-500 text-[10px] mt-2">
+                                    개인키가 <span class="text-slate-400">로그인 키체인</span>에 저장돼 있어서, 인증서도 같은 키체인에 넣어야
+                                    짝이 맞아 .p12로 내보낼 수 있습니다.
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>설치 확인: 터미널에서 <code class="text-slate-300">security find-identity -v -p codesigning</code> → <span class="text-green-400">Apple Distribution</span>이 보이면 성공</li>
                 </ol>
                 <div class="mt-3 p-2 bg-slate-800/50 rounded text-[11px] text-slate-400">
                     "maximum number of certificates" 에러가 뜨면 → 2-0의 개수 제한 안내대로 기존 인증서를 Revoke하세요.

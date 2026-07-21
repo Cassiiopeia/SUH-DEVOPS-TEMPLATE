@@ -190,6 +190,36 @@ function getInputValue(id) {
     return element?.value?.trim() || '';
 }
 
+/**
+ * Team ID 실시간 검증.
+ * 복붙 중 마지막 글자가 누락된 9자리 입력이 잦은데, 그대로 Secret에 들어가면
+ * 빌드 서명 단계에서야 팀 불일치로 실패해 원인 추적이 어렵다. 입력 시점에 잡는다.
+ */
+function validateTeamId(input) {
+    const warning = document.getElementById('teamId-warning');
+    if (!warning) return;
+
+    const value = (input.value || '').trim().toUpperCase();
+    input.value = value;
+
+    // 미입력 상태에서는 경고를 띄우지 않는다 (입력 전부터 빨간 글씨는 노이즈)
+    if (value.length === 0) {
+        warning.className = 'text-xs mt-1 hidden';
+        return;
+    }
+
+    if (value.length < 10) {
+        warning.textContent = `⚠️ ${value.length}자리 - Team ID는 10자리입니다. 마지막 글자가 빠지지 않았는지 확인하세요.`;
+        warning.className = 'text-xs mt-1 text-red-400';
+    } else if (!/^[A-Z0-9]{10}$/.test(value)) {
+        warning.textContent = '⚠️ Team ID는 영문 대문자와 숫자 10자리입니다.';
+        warning.className = 'text-xs mt-1 text-red-400';
+    } else {
+        warning.textContent = '✅ 형식이 올바릅니다';
+        warning.className = 'text-xs mt-1 text-green-400';
+    }
+}
+
 function setElementText(id, text) {
     const element = document.getElementById(id);
     if (element) {

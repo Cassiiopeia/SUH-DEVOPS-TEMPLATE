@@ -25,7 +25,10 @@
         "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시",
         "Step 3에 Capabilities 선택 가이드 추가 - 체크할 것/Info.plist로 처리되는 것 구분",
         "Step 3에 Xcode Bundle ID 대조 경고 추가 - Flutter 기본값 잔존으로 인한 서명 실패 예방",
-        "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인"
+        "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인",
+        "Team ID 입력란에 실시간 자리수 검증 추가 - 9자리 오입력이 Secret에 저장되는 문제 예방",
+        "Team ID를 프로비저닝 프로파일에서 추출하는 명령 안내 추가",
+        "Step 7에 .p8 파일명으로 Key ID 확인하는 방법 및 기존 키 재사용 안내 추가"
       ]
     },
     {

@@ -33,7 +33,10 @@
         "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시",
         "Step 3에 Capabilities 선택 가이드 추가 - 체크할 것/Info.plist로 처리되는 것 구분",
         "Step 3에 Xcode Bundle ID 대조 경고 추가 - Flutter 기본값 잔존으로 인한 서명 실패 예방",
-        "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인"
+        "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인",
+        "Team ID 입력란에 실시간 자리수 검증 추가 - 9자리 오입력이 Secret에 저장되는 문제 예방",
+        "Team ID를 프로비저닝 프로파일에서 추출하는 명령 안내 추가",
+        "Step 7에 .p8 파일명으로 Key ID 확인하는 방법 및 기존 키 재사용 안내 추가"
       ]
     },
     {
@@ -1654,7 +1657,10 @@
                     </label>
                     <input type="text" id="teamId" maxlength="10"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm uppercase focus:border-blue-500 outline-none"
-                        placeholder="ABC1234DEF">
+                        placeholder="ABC1234DEF"
+                        oninput="validateTeamId(this)">
+                    <!-- 자리수 미달 경고: 복붙 중 마지막 글자 누락이 잦아 실시간으로 잡는다 -->
+                    <p id="teamId-warning" class="text-xs mt-1 hidden"></p>
                 </div>
 
                 <!-- Profile Name (자동 채워짐) -->
@@ -1688,6 +1694,15 @@
                     </a>
                 </div>
                 <p class="text-xs text-slate-400">페이지에서 "Team ID" 항목을 찾으세요 (10자리 영문+숫자)</p>
+                <div class="mt-3 pt-3 border-t border-slate-600">
+                    <p class="text-xs text-slate-400 mb-2">또는 Step 4에서 받은 프로파일에서 바로 확인:</p>
+                    <div class="bg-slate-900 rounded p-2 font-mono text-[10px] overflow-x-auto">
+                        <div class="text-green-400 break-all">security cms -D -i ~/Downloads/파일명.mobileprovision | plutil -p - | grep -A2 TeamIdentifier</div>
+                    </div>
+                    <p class="text-[11px] text-red-400 mt-2">
+                        ⚠️ 복사할 때 <span class="font-bold">마지막 글자가 빠지기 쉽습니다.</span> 반드시 10자리인지 세어보세요.
+                    </p>
+                </div>
             </div>
 
             <!-- 암호화 설정 -->
@@ -1756,7 +1771,31 @@
                     <li>Team Keys 탭에서 <span class="text-blue-400 font-bold">+</span> 버튼 클릭</li>
                     <li>Name: 알아보기 쉬운 이름 (예: MY-PROJECT-KEY)</li>
                     <li>Access: <span class="text-orange-400 font-bold">Admin</span> 선택 (권장)</li>
-                    <li>Generate → <span class="text-red-400 font-bold">.p8 파일 즉시 다운로드!</span></li>
+                    <li>Generate → <span class="text-red-400 font-bold">.p8 파일 즉시 다운로드!</span>
+                        <div class="mt-2 p-2 bg-slate-800/50 rounded border-l-4 border-emerald-500 text-[11px]">
+                            <span class="text-emerald-400 font-bold">💡 Key ID는 파일명에 들어 있습니다</span>
+                            <div class="text-slate-400 mt-1 font-mono">
+                                AuthKey_<span class="text-yellow-400">9S3Y25UVZN</span>.p8 → Key ID = <span class="text-yellow-400">9S3Y25UVZN</span>
+                            </div>
+                            <div class="text-slate-500 mt-1">따로 적어두지 않았어도 파일명만 보면 됩니다.</div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">이미 발급받은 .p8이 있다면</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                새로 만들지 말고 기존 것을 재사용하세요. 단, App Store Connect의
+                                <span class="text-slate-300">Active Keys</span> 목록에 그 Key ID가 남아 있는지 확인해야 합니다.
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-1">
+                                Revoked 된 키는 목록에서 사라지며, 파일이 있어도 업로드가 실패합니다.
+                            </div>
+                            <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] overflow-x-auto">
+                                <div class="text-slate-500"># 파일이 정상 규격인지 확인 (EC P-256이면 정상)</div>
+                                <div class="text-green-400 break-all">openssl pkcs8 -in ~/Downloads/AuthKey_XXXXXXXXXX.p8 -nocrypt | openssl ec -noout -text | grep NIST</div>
+                            </div>
+                        </div>
+                    </li>
                 </ol>
             </div>
 

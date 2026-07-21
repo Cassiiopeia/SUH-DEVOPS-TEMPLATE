@@ -499,8 +499,13 @@ jobs:
       - name: Install CocoaPods
         run: |
           gem install cocoapods
-          cd ios && pod install --repo-update || pod install
-          echo "✅ CocoaPods installed"
+          # 플러그인 의존성이 없으면 Flutter가 Podfile을 만들지 않으므로 건너뛴다
+          if [ -f ios/Podfile ]; then
+            cd ios && pod install --repo-update || pod install
+            echo "✅ CocoaPods installed"
+          else
+            echo "ℹ️ ios/Podfile 없음 - CocoaPods 의존성이 없는 프로젝트이므로 건너뜁니다"
+          fi
 
       # iOS 빌드 (서명 없이)
       - name: Build iOS

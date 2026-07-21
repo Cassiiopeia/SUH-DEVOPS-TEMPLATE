@@ -164,7 +164,13 @@ jobs:
       - name: Install CocoaPods
         run: |
           gem install cocoapods
-          cd ios && pod install
+          # 플러그인 의존성이 없는 프로젝트는 Flutter가 Podfile을 만들지 않는다.
+          # 이 경우 pod install은 불필요하므로 건너뛴다 (없으면 실패하던 문제).
+          if [ -f ios/Podfile ]; then
+            cd ios && pod install
+          else
+            echo "ℹ️ ios/Podfile 없음 - CocoaPods 의존성이 없는 프로젝트이므로 건너뜁니다"
+          fi
 
       - name: 버전 관리 스크립트 권한 설정
         working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 FLUTTER_ROOT가 아닌 레포 루트 기준
@@ -306,7 +312,13 @@ jobs:
       - name: Install CocoaPods
         run: |
           gem install cocoapods
-          cd ios && pod install
+          # 플러그인 의존성이 없는 프로젝트는 Flutter가 Podfile을 만들지 않는다.
+          # 이 경우 pod install은 불필요하므로 건너뛴다 (없으면 실패하던 문제).
+          if [ -f ios/Podfile ]; then
+            cd ios && pod install
+          else
+            echo "ℹ️ ios/Podfile 없음 - CocoaPods 의존성이 없는 프로젝트이므로 건너뜁니다"
+          fi
 
       - name: Import Code-Signing Certificates
         uses: Apple-Actions/import-codesign-certs@v2

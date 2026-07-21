@@ -38,7 +38,12 @@
         "Step 7에 .p8 파일명으로 Key ID 확인하는 방법 및 기존 키 재사용 안내 추가",
         "폴더 선택 시 입력칸이 안내문으로 덮어써져 경로가 사라지던 문제 수정 - 힌트 영역 분리",
         "프로젝트 경로 미입력 시 Step 8 명령어가 /path/to/project로 생성되던 문제에 경고 배너 추가",
-        "프로젝트 경로 상대경로 입력 차단 및 pwd 안내 추가"
+        "프로젝트 경로 상대경로 입력 차단 및 pwd 안내 추가",
+        "모노레포 지원 - 레포 루트와 Flutter 루트가 다를 때 cd 대상과 인자를 분리해 생성",
+        "Git 레포 루트 입력란 추가 (선택) 및 경로가 두 개인 이유 안내",
+        "Flutter 루트가 pubspec.yaml 위치임을 디렉토리 트리로 명시",
+        "Windows/macOS 경로 확인법 분리 안내 (pwd vs cd, 구분자 차이)",
+        "Windows 환경에서 python 실행 파일명과 역슬래시 경로로 명령어 생성"
       ]
     },
     {
@@ -622,8 +627,25 @@
             <!-- 프로젝트 경로 -->
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-slate-300">
-                    Flutter 프로젝트 절대 경로
+                    Flutter 프로젝트 루트 절대 경로 <span class="text-red-400">*</span>
                 </label>
+                <div class="mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                    <p class="text-xs text-blue-200 font-bold mb-1">📍 "Flutter 루트"란 — pubspec.yaml이 있는 폴더</p>
+                    <p class="text-[11px] text-slate-400">
+                        Git 레포 루트와 다를 수 있습니다. <code class="text-slate-300">pubspec.yaml</code>과
+                        <code class="text-slate-300">ios/</code> 폴더가 함께 있는 위치를 입력하세요.
+                    </p>
+                    <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] space-y-0.5">
+                        <div class="text-slate-500">my-repo/            <span class="text-red-400">← ❌ 레포 루트 (pubspec.yaml 없음)</span></div>
+                        <div class="text-slate-500">├─ .github/</div>
+                        <div class="text-slate-500">└─ client/          <span class="text-green-400">← ✅ 여기! Flutter 루트</span></div>
+                        <div class="text-slate-500">&nbsp;&nbsp;&nbsp;├─ pubspec.yaml</div>
+                        <div class="text-slate-500">&nbsp;&nbsp;&nbsp;└─ ios/</div>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-2">
+                        레포 루트에 pubspec.yaml이 바로 있는 일반 구조라면 레포 루트가 곧 Flutter 루트입니다.
+                    </p>
+                </div>
                 <div class="flex gap-3">
                     <input type="text" id="projectPath"
                         class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
@@ -637,9 +659,51 @@
                 </div>
                 <!-- 폴더 선택 결과 표시 — 입력칸을 덮어쓰지 않고 여기에만 안내한다 -->
                 <p id="projectPath-hint" class="text-xs mt-2 text-slate-400 hidden"></p>
-                <p class="text-xs text-slate-500 mt-2">
-                    💡 브라우저는 보안상 폴더 절대경로를 알 수 없습니다. 터미널에서
-                    <code class="text-slate-400">cd 프로젝트폴더 && pwd</code> 실행 후 그 값을 붙여넣으세요.
+
+                <!-- OS별 경로 확인법: 구분자와 명령이 달라 나눠서 안내한다 -->
+                <div class="mt-3 bg-slate-700/50 border border-slate-600 rounded-lg p-3">
+                    <p class="text-xs font-medium text-blue-400 mb-2">🔍 절대경로 확인하는 법</p>
+                    <p class="text-[11px] text-slate-500 mb-2">
+                        브라우저는 보안상 폴더의 절대경로를 알 수 없어 직접 입력해야 합니다.
+                    </p>
+                    <div class="grid md:grid-cols-2 gap-2">
+                        <div class="bg-slate-900 rounded p-2">
+                            <div class="text-[11px] text-slate-300 font-bold mb-1">🍎 macOS / Linux</div>
+                            <div class="font-mono text-[10px] text-green-400 break-all">cd 프로젝트폴더 && pwd</div>
+                            <div class="text-[10px] text-slate-500 mt-1.5">결과 예시:</div>
+                            <div class="font-mono text-[10px] text-slate-400 break-all">/Users/hong/projects/myapp</div>
+                            <div class="text-[10px] text-slate-600 mt-1">구분자 <span class="text-slate-400">/</span> · <span class="text-slate-400">/</span>로 시작</div>
+                        </div>
+                        <div class="bg-slate-900 rounded p-2">
+                            <div class="text-[11px] text-slate-300 font-bold mb-1">🪟 Windows</div>
+                            <div class="font-mono text-[10px] text-green-400 break-all">cd 프로젝트폴더 && cd</div>
+                            <div class="text-[10px] text-slate-500 mt-1.5">결과 예시:</div>
+                            <div class="font-mono text-[10px] text-slate-400 break-all">C:\Users\hong\projects\myapp</div>
+                            <div class="text-[10px] text-slate-600 mt-1">구분자 <span class="text-slate-400">\</span> · <span class="text-slate-400">드라이브문자:</span>로 시작</div>
+                        </div>
+                    </div>
+                    <div class="mt-2 p-2 bg-orange-900/30 border border-orange-700/50 rounded">
+                        <p class="text-[10px] text-orange-300">
+                            ⚠️ <span class="font-bold">iOS 빌드·서명은 macOS에서만 가능합니다.</span>
+                            Windows에서는 이 마법사로 설정 파일 생성과 GitHub Secrets 등록까지만 하고,
+                            실제 빌드는 GitHub Actions(macOS 러너)가 수행합니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 모노레포 대응: 레포 루트가 Flutter 루트와 다를 때만 필요 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Git 레포 루트 절대 경로
+                    <span class="text-xs text-slate-500 font-normal">(선택 — 위와 같으면 비워두세요)</span>
+                </label>
+                <input type="text" id="repoRoot"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:border-blue-500 outline-none transition"
+                    placeholder="/Users/username/my-repo (.github 폴더가 있는 위치)">
+                <p class="text-xs text-slate-500 mt-1">
+                    <code class="text-slate-400">.github/</code> 폴더가 있는 위치입니다.
+                    모노레포(Flutter가 <code class="text-slate-400">client/</code> 등 하위에 있는 구조)에서만 입력하세요.
                 </p>
             </div>
 
@@ -1957,6 +2021,15 @@
                     <p class="text-[11px] text-slate-400 mt-1">
                         Step 1로 돌아가 Flutter 프로젝트의 절대경로를 입력하세요. 이대로 실행하면
                         <code class="text-slate-300">cd: no such file or directory</code> 오류가 납니다.
+                    </p>
+                </div>
+                <!-- 모노레포일 때 cd 대상과 인자가 다른 이유를 설명 -->
+                <div id="initCmd-mono" class="hidden mb-2 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                    <p class="text-xs text-blue-200 font-bold">📌 경로가 두 개인 이유</p>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        <code class="text-slate-300">cd</code>는 스크립트가 있는 <span class="text-yellow-400">레포 루트</span>로,
+                        인자는 pubspec.yaml이 있는 <span class="text-yellow-400">Flutter 루트</span>로 지정됩니다.
+                        모노레포라 두 위치가 달라 이렇게 나눠야 동작합니다.
                     </p>
                 </div>
                 <div class="code-block">

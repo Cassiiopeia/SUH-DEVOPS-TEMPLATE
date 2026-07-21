@@ -11,6 +11,7 @@ const state = {
     currentStep: 1,
     totalSteps: 9,
     projectPath: '',
+    repoRoot: '',
     bundleId: '',
     teamId: '',
     profileName: '',
@@ -85,6 +86,7 @@ function restoreUIFromState() {
     // 입력 필드 복원
     const inputs = {
         'projectPath': state.projectPath,
+        'repoRoot': state.repoRoot,
         'bundleId': state.bundleId,
         'bundleId-confirm': state.bundleId,
         'teamId': state.teamId,
@@ -188,6 +190,11 @@ function $$(selector) {
 function getInputValue(id) {
     const element = document.getElementById(id);
     return element?.value?.trim() || '';
+}
+
+/** POSIX(/...)와 Windows(C:\...) 절대경로를 모두 허용한다 */
+function isAbsolutePath(p) {
+    return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p);
 }
 
 /**
@@ -654,6 +661,7 @@ function resetWizard() {
     if (confirm('모든 데이터를 초기화하시겠습니까?')) {
         state.currentStep = 1;
         state.projectPath = '';
+        state.repoRoot = '';
         state.bundleId = '';
         state.teamId = '';
         state.profileName = '';
@@ -669,7 +677,7 @@ function resetWizard() {
         clearState();
 
         // UI 초기화
-        const inputs = ['projectPath', 'bundleId', 'bundleId-confirm', 'teamId', 'profileName', 'profileName-confirm', 'appName', 'p12-password', 'api-key-id', 'issuer-id'];
+        const inputs = ['projectPath', 'repoRoot', 'bundleId', 'bundleId-confirm', 'teamId', 'profileName', 'profileName-confirm', 'appName', 'p12-password', 'api-key-id', 'issuer-id'];
         inputs.forEach(id => {
             const input = document.getElementById(id);
             if (input) input.value = '';
@@ -710,9 +718,15 @@ function saveCurrentStepData() {
                 state.projectPath = '';
             }
             // 상대경로는 Step 8 명령어에서 cd 실패로 이어지므로 미리 걸러낸다
-            if (state.projectPath && !state.projectPath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(state.projectPath)) {
+            if (state.projectPath && !isAbsolutePath(state.projectPath)) {
                 showToast('절대경로를 입력해주세요 (예: /Users/이름/projects/myapp)');
                 state.projectPath = '';
+            }
+            // 모노레포에서만 채우는 선택 입력 — 비어 있으면 Flutter 루트를 그대로 쓴다
+            state.repoRoot = getInputValue('repoRoot');
+            if (state.repoRoot && !isAbsolutePath(state.repoRoot)) {
+                showToast('레포 루트도 절대경로로 입력해주세요');
+                state.repoRoot = '';
             }
             break;
         case 2:
@@ -772,7 +786,23 @@ function generateInitCommand() {
         warning.classList.toggle('hidden', !pathMissing);
     }
 
-    const cmd = `cd "${projectPath}" && python3 ".github/util/flutter/testflight-wizard/testflight-wizard.py" setup "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
+    // 스크립트(.github/...)는 레포 루트 기준인데 pubspec.yaml은 Flutter 루트 기준이다.
+    // 모노레포(예: repo/client/)에서는 두 위치가 달라, cd 지점을 레포 루트로 잡고
+    // Flutter 루트는 인자로 따로 넘겨야 양쪽 다 해결된다.
+    const repoRoot = state.repoRoot || projectPath;
+    const isMonorepo = !!state.repoRoot && state.repoRoot !== state.projectPath;
+
+    const monoNote = document.getElementById('initCmd-mono');
+    if (monoNote) {
+        monoNote.classList.toggle('hidden', !isMonorepo);
+    }
+    const isWindows = /^[A-Za-z]:[\\/]/.test(repoRoot);
+    const python = isWindows ? 'python' : 'python3';
+    const scriptPath = isWindows
+        ? '.github\\util\\flutter\\testflight-wizard\\testflight-wizard.py'
+        : '.github/util/flutter/testflight-wizard/testflight-wizard.py';
+
+    const cmd = `cd "${repoRoot}" && ${python} "${scriptPath}" setup "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
     setElementText('initCmd', cmd);
 }
 

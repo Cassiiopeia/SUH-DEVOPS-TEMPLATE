@@ -277,18 +277,13 @@ jobs:
           echo "=== Initializing Xcode components ==="
           xcrun simctl list >/dev/null 2>&1 || true
           echo "=== Downloading iOS platform ==="
-          # ⚠️ 디렉터리 존재만으로 판정하면 안 된다 — 디렉터리는 있어도 SDK가 없을 수 있다.
-          #    실제 SDK 목록으로 판정하고, 없으면 재시도한다.
-          if xcodebuild -showsdks 2>/dev/null | grep -q "iphoneos"; then
-            echo "✅ iOS SDK 사용 가능 - 다운로드 생략"
-          else
-            for i in 1 2 3; do
-              xcodebuild -downloadPlatform iOS || echo "⚠️ 시도 $i 실패"
-              xcodebuild -showsdks 2>/dev/null | grep -q "iphoneos" && break
-              sleep 15
-            done
-          fi
-          xcodebuild -showsdks | grep iphoneos || { echo "❌ iOS SDK 없음"; exit 1; }
+          # ⚠️ 설치 여부를 미리 판정해 건너뛰면 안 된다 (showsdks가 잡는 SDK와
+          #    기기 빌드용 디바이스 플랫폼은 별개). 조건 없이 항상 다운로드한다.
+          for i in 1 2 3; do
+            xcodebuild -downloadPlatform iOS && break
+            echo "⚠️ 시도 $i 실패 - 재시도"
+            sleep 15
+          done
 
       - name: Download project files
         uses: actions/download-artifact@v4

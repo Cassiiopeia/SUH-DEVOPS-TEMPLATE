@@ -365,13 +365,19 @@ EOF
         uses: actions/upload-artifact@v4
         with:
           name: project-files
+          # 모노레포 대응: 산출물은 FLUTTER_ROOT 기준이라 경로 prefix가 필요하다.
+          # (없으면 레포 루트에서 찾아 0건 → if-no-files-found 기본값 warn으로 조용히 통과)
           path: |
-            ${{ env.ENV_FILE_PATH }}
-            ios/Flutter/Secrets.xcconfig
-            pubspec.yaml
-            lib/
-            assets/
+            ${{ env.FLUTTER_ROOT }}/${{ env.ENV_FILE_PATH }}
+            ${{ env.FLUTTER_ROOT }}/ios/Flutter/Secrets.xcconfig
+            ${{ env.FLUTTER_ROOT }}/pubspec.yaml
+            ${{ env.FLUTTER_ROOT }}/lib/
+            ${{ env.FLUTTER_ROOT }}/assets/
           retention-days: 1
+          include-hidden-files: true   # .env가 숨김 파일이라 기본값 false면 누락된다
+          # assets/ 등 일부 경로는 프로젝트마다 없을 수 있어 warn 유지.
+          # (전체 0건이어도 통과하지만, 경로 prefix 수정으로 실제 누락은 해소됨)
+          if-no-files-found: warn
 
       # 진행 상황 업데이트 - 준비 실패
       - name: 진행 상황 업데이트 - 준비 실패
@@ -525,6 +531,7 @@ EOF
         uses: actions/download-artifact@v4
         with:
           name: project-files
+          # 업로드 시 FLUTTER_ROOT prefix가 붙으므로 레포 루트에 풀면 원래 위치로 복원된다
           path: .
 
       - name: Ensure .env file exists

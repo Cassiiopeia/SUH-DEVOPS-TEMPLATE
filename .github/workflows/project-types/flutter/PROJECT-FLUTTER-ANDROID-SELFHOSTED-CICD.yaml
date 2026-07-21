@@ -145,7 +145,7 @@ jobs:
 
       # Gradle 셋업
       - name: Setup Gradle
-        working-directory: android
+        working-directory: ${{ env.APP_ROOT }}/android
         run: |
           chmod +x gradlew
           echo "Gradle wrapper permissions set"
@@ -175,7 +175,7 @@ jobs:
 
       # Fastlane 설치 (Bundler 방식 - gem 충돌 방지)
       - name: Install Fastlane
-        working-directory: android
+        working-directory: ${{ env.APP_ROOT }}/android
         run: |
           # multi_json: google-apis transitive 의존성이 선언 누락한 upstream 버그 회피 (gemspec 미선언 → Gem::LoadError)
           printf 'source "https://rubygems.org"\ngem "fastlane"\ngem "multi_json"\n' > Gemfile

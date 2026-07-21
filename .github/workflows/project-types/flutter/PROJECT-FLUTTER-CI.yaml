@@ -402,7 +402,7 @@ jobs:
 
       # Gradle 셋업
       - name: Setup Gradle
-        working-directory: android
+        working-directory: ${{ env.APP_ROOT }}/android
         run: |
           chmod +x gradlew
           echo "✅ Gradle wrapper permissions set"

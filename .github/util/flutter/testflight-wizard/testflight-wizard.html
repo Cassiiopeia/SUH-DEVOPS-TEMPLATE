@@ -45,7 +45,9 @@
         "Windows 환경에서 python 실행 파일명과 역슬래시 경로로 명령어 생성",
         "p12 비밀번호 입력란에 대응 Secret 키(APPLE_CERTIFICATE_PASSWORD) 표시",
         "Step 8 생성 파일 목록을 실제 산출물과 일치시킴 - Appfile 오기재 제거, 수정 파일 목록 추가",
-        "Step 9 Secret 설명에 누락됐던 IOS_PROVISIONING_PROFILE_NAME/IOS_BUNDLE_ID/APPLE_TEAM_ID 추가"
+        "Step 9 Secret 설명에 누락됐던 IOS_PROVISIONING_PROFILE_NAME/IOS_BUNDLE_ID/APPLE_TEAM_ID 추가",
+        "Flutter 워크플로우 7종의 Flutter 버전을 3.38.9로 상향 - Dart SDK 요구사항 불일치로 의존성 설치 실패 해결",
+        "Step 1에 CI/로컬 Flutter 버전 대조 점검 항목 추가 - version solving failed 사전 예방"
       ]
     },
     {
@@ -622,6 +624,33 @@
                     <li class="flex items-center gap-2">
                         <input type="checkbox" id="check-flutter" class="w-4 h-4 rounded">
                         <label for="check-flutter">Flutter 프로젝트 준비됨</label>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <input type="checkbox" id="check-flutter-version" class="w-4 h-4 rounded mt-0.5">
+                        <div>
+                            <label for="check-flutter-version">CI의 Flutter 버전이 로컬과 맞는지 확인</label>
+                            <div class="mt-2 p-3 bg-red-900/30 border border-red-700 rounded">
+                                <p class="text-[11px] text-red-300 font-bold mb-1">⚠️ 가장 흔한 빌드 실패 원인입니다</p>
+                                <p class="text-[11px] text-slate-400">
+                                    <code class="text-slate-300">flutter create</code>는 <span class="text-slate-300">로컬 Flutter 버전</span> 기준으로
+                                    pubspec.yaml에 Dart SDK 요구사항을 씁니다. CI의 Flutter가 더 낮으면
+                                    의존성 설치 단계에서 <code class="text-slate-300">version solving failed</code>로 실패합니다.
+                                </p>
+                                <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] space-y-1 overflow-x-auto">
+                                    <div class="text-slate-500"># 1) 내 Flutter/Dart 버전</div>
+                                    <div class="text-green-400">flutter --version</div>
+                                    <div class="text-slate-500 mt-1"># 2) pubspec이 요구하는 Dart 버전</div>
+                                    <div class="text-green-400">grep -A2 '^environment:' pubspec.yaml</div>
+                                    <div class="text-slate-500 mt-1"># 3) CI에 설정된 버전</div>
+                                    <div class="text-green-400">grep -rn 'FLUTTER_VERSION:' .github/workflows/</div>
+                                </div>
+                                <p class="text-[11px] text-slate-400 mt-2">
+                                    3번 값이 1번보다 낮으면 워크플로우의
+                                    <code class="text-yellow-400">FLUTTER_VERSION</code>을 로컬과 동일하게 맞추세요.
+                                    <span class="text-slate-500">(Android 워크플로우도 함께 수정)</span>
+                                </p>
+                            </div>
+                        </div>
                     </li>
                 </ul>
             </div>

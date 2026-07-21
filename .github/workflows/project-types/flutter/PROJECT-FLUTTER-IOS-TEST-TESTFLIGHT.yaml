@@ -65,7 +65,7 @@ on:
 # 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
 # ===================================================================
 env:
-  FLUTTER_VERSION: "3.35.5"
+  FLUTTER_VERSION: "3.38.9"
   XCODE_VERSION: "26.0"
   PROJECT_TYPE: "flutter"
   ENV_FILE_PATH: ".env"

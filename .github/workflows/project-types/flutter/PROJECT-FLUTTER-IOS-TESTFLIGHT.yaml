@@ -75,7 +75,7 @@ on:
 # ============================================
 env:
   FLUTTER_ROOT: "."  # @wizard auto:flutter-root
-  FLUTTER_VERSION: "3.35.5"
+  FLUTTER_VERSION: "3.38.9"
   XCODE_VERSION: "26.0"
   PROJECT_TYPE: "flutter"
 

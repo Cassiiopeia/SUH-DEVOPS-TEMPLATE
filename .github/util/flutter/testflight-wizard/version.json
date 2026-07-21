@@ -37,7 +37,9 @@
         "Windows 환경에서 python 실행 파일명과 역슬래시 경로로 명령어 생성",
         "p12 비밀번호 입력란에 대응 Secret 키(APPLE_CERTIFICATE_PASSWORD) 표시",
         "Step 8 생성 파일 목록을 실제 산출물과 일치시킴 - Appfile 오기재 제거, 수정 파일 목록 추가",
-        "Step 9 Secret 설명에 누락됐던 IOS_PROVISIONING_PROFILE_NAME/IOS_BUNDLE_ID/APPLE_TEAM_ID 추가"
+        "Step 9 Secret 설명에 누락됐던 IOS_PROVISIONING_PROFILE_NAME/IOS_BUNDLE_ID/APPLE_TEAM_ID 추가",
+        "Flutter 워크플로우 7종의 Flutter 버전을 3.38.9로 상향 - Dart SDK 요구사항 불일치로 의존성 설치 실패 해결",
+        "Step 1에 CI/로컬 Flutter 버전 대조 점검 항목 추가 - version solving failed 사전 예방"
       ]
     },
     {

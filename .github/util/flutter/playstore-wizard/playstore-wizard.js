@@ -26,11 +26,42 @@ function detectOS() {
 // State Management
 // ============================================
 
+/** Unix 경로를 Windows 경로로 변환 (기존 winPath 산출 로직과 동일 규칙) */
+function toWinPath(p) {
+    let w = p || '';
+    if (!w.includes('\\') && !/^[A-Za-z]:/.test(w)) {
+        w = w.replace(/\//g, '\\');
+        if (w.startsWith('\\')) w = 'C:' + w;
+    } else {
+        w = w.replace(/\//g, '\\');
+    }
+    return w;
+}
+
+/**
+ * 마법사 스크립트(.github/util/...)는 레포 루트 기준인데
+ * pubspec.yaml은 Flutter 루트 기준이다. 모노레포(repo/client 등)에서는
+ * 두 위치가 달라 cd 대상과 인자를 분리해야 한다.
+ */
+function getRepoRoot() {
+    return state.repoRoot || state.projectPath || '/path/to/your/project';
+}
+
+
+/** 레포 루트 입력 시 state 반영 + 명령어 갱신 (모노레포에서만 채운다) */
+function onRepoRootInput(el) {
+    const v = (el.value || '').trim();
+    state.repoRoot = v;
+    saveState();
+    if (typeof updateCommandsForOS === 'function') updateCommandsForOS();
+}
+
 const state = {
     currentStep: 1,
     maxReachedStep: 1, // 도달한 최대 단계 (이전 단계로 돌아가도 유지)
     totalSteps: 7, // Step 1~7 (프로젝트, Keystore, AAB 빌드, 앱 생성, AAB 업로드, Service Account, 완료)
     projectPath: '',
+    repoRoot: '',      // 모노레포: .github가 있는 레포 루트 (비면 projectPath와 동일)
     detectedOS: 'mac', // OS 감지 결과
     // Project Info
     applicationId: '',
@@ -126,6 +157,7 @@ function restoreUIFromState() {
     // 입력 필드 복원
     const inputs = {
         'projectPath': state.projectPath,
+        'repoRoot': state.repoRoot,
         'applicationId': state.applicationId,
         'keyAlias': state.keyAlias,
         'storePassword': state.storePassword,
@@ -552,7 +584,7 @@ function updateCommandsForOS() {
         }
         
         if (windowsCommandEl) {
-            windowsCommandEl.textContent = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup`;
+            windowsCommandEl.textContent = `cd "${toWinPath(getRepoRoot())}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup`;
         }
         
         // Windows 사용자에게 관리자 권한 안내 표시
@@ -578,7 +610,7 @@ function updateCommandsForOS() {
         }
         
         if (macCommandEl) {
-            macCommandEl.textContent = `cd "${unixPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup`;
+            macCommandEl.textContent = `cd "${getRepoRoot()}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup`;
         }
     }
 }
@@ -887,6 +919,7 @@ cd "${winPath}"; flutter build appbundle --release`;
 function restoreInputValues() {
     const inputs = {
         'projectPath': state.projectPath,
+        'repoRoot': state.repoRoot,
         'keyAlias': state.keyAlias,
         'storePassword': state.storePassword,
         'keyPassword': state.keyPassword,
@@ -1013,7 +1046,7 @@ function resetWizard() {
         }
 
         // UI 초기화
-        const inputs = ['projectPath', 'applicationId', 'keyAlias', 'storePassword', 'keyPassword', 'certCN', 'certO', 'certL', 'certC', 'envFileContent', 'scriptOutput'];
+        const inputs = ['projectPath', 'repoRoot', 'applicationId', 'keyAlias', 'storePassword', 'keyPassword', 'certCN', 'certO', 'certL', 'certC', 'envFileContent', 'scriptOutput'];
         inputs.forEach(id => {
             const input = document.getElementById(id);
             if (input) {
@@ -1166,7 +1199,7 @@ function generateSetupCommand() {
             return str.replace(/"/g, '`"').replace(/\$/g, '`$');
         };
         
-        cmd = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
+        cmd = `cd "${toWinPath(getRepoRoot())}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
     } else {
         // Mac/Linux Bash 명령어
         // 특수문자 이스케이프 처리
@@ -1174,7 +1207,7 @@ function generateSetupCommand() {
             return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
         };
         
-        cmd = `cd "${projectPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
+        cmd = `cd "${getRepoRoot()}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
     }
 
     const setupCmdEl = document.getElementById('setupCmd');
@@ -1224,12 +1257,12 @@ function generateApplicationIdDetectionCommand(projectPath) {
         const escapePowerShell = (str) => {
             return str.replace(/"/g, '`"').replace(/\$/g, '`$');
         };
-        cmd = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py detect-app-id "${escapePowerShell(winPath)}"`;
+        cmd = `cd "${toWinPath(getRepoRoot())}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py detect-app-id "${escapePowerShell(winPath)}"`;
     } else {
         const escapeBash = (str) => {
             return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
         };
-        cmd = `cd "${projectPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py detect-app-id "${escapeBash(projectPath)}"`;
+        cmd = `cd "${getRepoRoot()}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py detect-app-id "${escapeBash(projectPath)}"`;
     }
     
     // 명령어 표시
@@ -1441,13 +1474,13 @@ function generateKeystoreCreationCommand() {
             return str.replace(/"/g, '`"').replace(/\$/g, '`$');
         };
         
-        cmd = `cd "${winPath}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
+        cmd = `cd "${toWinPath(getRepoRoot())}"; python .github\\util\\flutter\\playstore-wizard\\playstore-wizard.py setup "${escapePowerShell(winPath)}" "${escapePowerShell(applicationId)}" "${escapePowerShell(keyAlias)}" "${escapePowerShell(storePassword)}" "${escapePowerShell(keyPassword)}" "${validityDays}" "${escapePowerShell(certCN)}" "${escapePowerShell(certO)}" "${escapePowerShell(certL)}" "${certC}"`;
     } else {
         const escapeBash = (str) => {
             return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
         };
         
-        cmd = `cd "${projectPath}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
+        cmd = `cd "${getRepoRoot()}" && python3 .github/util/flutter/playstore-wizard/playstore-wizard.py setup "${escapeBash(projectPath)}" "${escapeBash(applicationId)}" "${escapeBash(keyAlias)}" "${escapeBash(storePassword)}" "${escapeBash(keyPassword)}" "${validityDays}" "${escapeBash(certCN)}" "${escapeBash(certO)}" "${escapeBash(certL)}" "${certC}"`;
     }
     
     // 명령어 표시 (항상 보이므로 hidden 처리 불필요)
@@ -2194,7 +2227,7 @@ function setupInputHandlers() {
     });
 
     // 입력 필드 변경 시 저장
-    const inputIds = ['projectPath', 'keyAlias', 'storePassword', 'keyPassword', 'certCN', 'certO', 'certL', 'certC', 'envFileContent', 'scriptOutput'];
+    const inputIds = ['projectPath', 'repoRoot', 'keyAlias', 'storePassword', 'keyPassword', 'certCN', 'certO', 'certL', 'certC', 'envFileContent', 'scriptOutput'];
     inputIds.forEach(id => {
         const input = document.getElementById(id);
         if (input) {

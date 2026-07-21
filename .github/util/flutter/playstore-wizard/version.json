@@ -1,9 +1,18 @@
 {
   "name": "Android Play Store Setup Wizard",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Flutter Android 앱을 Play Store에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2026-07-20",
+  "lastUpdated": "2026-07-21",
   "changelog": [
+    {
+      "version": "1.4.0",
+      "date": "2026-07-21",
+      "changes": [
+        "모노레포 지원 - 레포 루트와 Flutter 루트가 다를 때 cd 대상과 인자를 분리해 명령어 생성",
+        "Git 레포 루트 입력란 추가 (선택) 및 Flutter 루트가 pubspec.yaml 위치임을 디렉토리 트리로 명시",
+        "Windows 명령어도 레포 루트 기준으로 경로 변환하도록 수정"
+      ]
+    },
     {
       "version": "1.3.0",
       "date": "2026-07-20",

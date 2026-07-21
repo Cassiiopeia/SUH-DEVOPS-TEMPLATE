@@ -1,14 +1,36 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-21T06:54:12Z",
-    "currentVersion": "4.2.30",
+    "lastUpdated": "2026-07-21T07:58:19Z",
+    "currentVersion": "4.2.31",
     "projectType": "basic",
-    "totalReleases": 215,
+    "totalReleases": 216,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.31",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-21",
+      "pr_number": 518,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 코드 검사가 Android·iOS 양쪽에서 중단되던 문제 해결\n  * 테스트 빌드 워크플로우가 실행되지 않던 문제 해결\n  * 앱이 하위 폴더에 있을 때 빌드가 중단되던 문제 해결\n  * 일부 프로젝트에서 Android 빌드 준비 단계가 실패하던 문제 해결",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "코드 검사가 Android·iOS 양쪽에서 중단되던 문제 해결",
+            "테스트 빌드 워크플로우가 실행되지 않던 문제 해결",
+            "앱이 하위 폴더에 있을 때 빌드가 중단되던 문제 해결",
+            "일부 프로젝트에서 Android 빌드 준비 단계가 실패하던 문제 해결"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.30",
       "project_type": "basic",

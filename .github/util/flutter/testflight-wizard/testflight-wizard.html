@@ -30,7 +30,6 @@
         "p12 개인키 포함 여부 검증 명령(openssl pkcs12) 추가",
         "p12 유출 위험 및 백업 경고 추가",
         "Step 2 완료 체크리스트 추가 - find-identity 기대 출력 예시 포함",
-        "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시",
         "Step 3에 Capabilities 선택 가이드 추가 - 체크할 것/Info.plist로 처리되는 것 구분",
         "Step 3에 Xcode Bundle ID 대조 경고 추가 - Flutter 기본값 잔존으로 인한 서명 실패 예방",
         "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인",
@@ -43,7 +42,10 @@
         "Git 레포 루트 입력란 추가 (선택) 및 경로가 두 개인 이유 안내",
         "Flutter 루트가 pubspec.yaml 위치임을 디렉토리 트리로 명시",
         "Windows/macOS 경로 확인법 분리 안내 (pwd vs cd, 구분자 차이)",
-        "Windows 환경에서 python 실행 파일명과 역슬래시 경로로 명령어 생성"
+        "Windows 환경에서 python 실행 파일명과 역슬래시 경로로 명령어 생성",
+        "p12 비밀번호 입력란에 대응 Secret 키(APPLE_CERTIFICATE_PASSWORD) 표시",
+        "Step 8 생성 파일 목록을 실제 산출물과 일치시킴 - Appfile 오기재 제거, 수정 파일 목록 추가",
+        "Step 9 Secret 설명에 누락됐던 IOS_PROVISIONING_PROFILE_NAME/IOS_BUNDLE_ID/APPLE_TEAM_ID 추가"
       ]
     },
     {
@@ -968,7 +970,7 @@
                             <span class="text-red-400 font-bold">🔑 비밀번호 2번 입력 (암호 · 확인)</span>
                             <div class="text-slate-400 mt-1 text-[11px]">
                                 여기서 정한 비밀번호가 곧 GitHub Secret
-                                <code class="text-yellow-400">IOS_DIST_CERT_PASSWORD</code> 값이 됩니다.
+                                <code class="text-yellow-400">APPLE_CERTIFICATE_PASSWORD</code> 값이 됩니다.
                                 <span class="text-red-400">반드시 기록해두세요.</span>
                             </div>
                             <div class="text-slate-500 text-[10px] mt-1">
@@ -1114,7 +1116,7 @@
                 <input type="password" id="p12-password" placeholder="2-3에서 내보낼 때 설정한 비밀번호"
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none">
                 <p class="text-xs text-slate-500 mt-1">
-                    GitHub Secret <code class="text-yellow-400">IOS_DIST_CERT_PASSWORD</code>로 등록됩니다
+                    GitHub Secret <code class="text-yellow-400">APPLE_CERTIFICATE_PASSWORD</code>로 등록됩니다
                 </p>
             </div>
 
@@ -2004,13 +2006,22 @@
             </div>
 
             <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
-                <p class="text-sm text-yellow-200 mb-1">생성되는 파일:</p>
+                <p class="text-sm text-yellow-200 mb-1">새로 생성되는 파일:</p>
                 <ul class="text-xs text-slate-300 list-disc list-inside">
-                    <li>ios/Gemfile</li>
-                    <li>ios/fastlane/Appfile</li>
-                    <li>ios/fastlane/Fastfile</li>
-                    <li>ios/ExportOptions.plist</li>
+                    <li><code class="text-slate-400">ios/Gemfile</code> — Fastlane 의존성</li>
+                    <li><code class="text-slate-400">ios/fastlane/Fastfile</code> — TestFlight 업로드 lane</li>
+                    <li><code class="text-slate-400">ios/ExportOptions.plist</code> — IPA 익스포트 설정</li>
                 </ul>
+                <p class="text-sm text-yellow-200 mt-3 mb-1">수정되는 기존 파일:</p>
+                <ul class="text-xs text-slate-300 list-disc list-inside">
+                    <li><code class="text-slate-400">ios/Runner.xcodeproj/project.pbxproj</code> — Bundle ID, Manual Signing, Team ID</li>
+                    <li><code class="text-slate-400">ios/Runner/Info.plist</code> — 암호화 설정(ITSAppUsesNonExemptEncryption)</li>
+                    <li><code class="text-slate-400">ios/.gitignore</code> — Gemfile.lock 추가</li>
+                </ul>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    ⚠️ Bundle ID가 Step 3에서 입력한 값과 다르면 <span class="text-slate-400">자동으로 변경</span>됩니다.
+                    Appfile은 만들지 않습니다 — 앱 식별자를 GitHub Actions 환경변수로 주입하는 방식이라 불필요합니다.
+                </p>
             </div>
 
             <div class="mb-6">
@@ -2142,6 +2153,18 @@
                     <div class="p-2 bg-slate-800/50 rounded">
                         <code class="text-green-400 font-bold">APP_STORE_CONNECT_ISSUER_ID</code>
                         <p class="text-slate-400 mt-1">App Store Connect Issuer ID (UUID 형식)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">IOS_PROVISIONING_PROFILE_NAME</code>
+                        <p class="text-slate-400 mt-1">Step 4에서 입력한 프로파일 이름 (예: Elum AppStore Distribution)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">IOS_BUNDLE_ID</code>
+                        <p class="text-slate-400 mt-1">Step 3에서 등록한 Bundle ID (예: kr.example.myapp)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APPLE_TEAM_ID</code>
+                        <p class="text-slate-400 mt-1">Apple Team ID (10자리 영문+숫자)</p>
                     </div>
                 </div>
             </div>

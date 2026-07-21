@@ -68,6 +68,10 @@ env:
   FIREBASE_APP_ID: "your-firebase-app-id"
   FIREBASE_TESTER_GROUP: "testers"
 
+  # Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+  # 통합 시점에 integrator의 flutter-root resolver가 project_paths.flutter 값으로 1회 치환.
+  # FLUTTER_ROOT는 Flutter SDK 경로용 공식 변수라 충돌 — APP_ROOT로 분리
+  APP_ROOT: "."  # @wizard auto:flutter-root
 jobs:
   prepare-build:
     name: 환경 설정 및 준비
@@ -80,6 +84,9 @@ jobs:
       version_code: ${{ steps.current_version.outputs.version_code }}
       project_type: ${{ steps.current_version.outputs.project_type }}
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -115,12 +122,14 @@ jobs:
 
       # 버전 관리 스크립트 권한 설정
       - name: 버전 관리 스크립트 권한 설정
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts·version.yml)은 APP_ROOT가 아닌 레포 루트 기준
         run: |
           chmod +x ./.github/scripts/version_manager.sh
           chmod +x ./.github/scripts/changelog_manager.py
 
       # version_manager.sh를 사용하여 현재 버전 정보 가져오기
       - name: 현재 버전 정보 가져오기
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts·version.yml)은 APP_ROOT가 아닌 레포 루트 기준
         id: current_version
         run: |
           # VERSION 가져오기 (x.y.z 형식)
@@ -148,6 +157,7 @@ jobs:
 
       # CHANGELOG.json에서 릴리즈 노트 추출 - changelog_manager.py 사용
       - name: 릴리즈 노트 생성
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts·version.yml)은 APP_ROOT가 아닌 레포 루트 기준
         id: release_notes
         run: |
           VERSION="${{ steps.current_version.outputs.version }}"
@@ -192,10 +202,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: project-files
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
           path: |
-            pubspec.yaml
-            lib/
-            assets/
+            ${{ env.APP_ROOT }}/pubspec.yaml
+            ${{ env.APP_ROOT }}/lib/
+            ${{ env.APP_ROOT }}/assets/
           retention-days: 1
 
   build-android:
@@ -203,6 +214,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: prepare-build
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -518,7 +532,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
+          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/app-release.aab
           retention-days: 1
 
   deploy-firebase:
@@ -526,6 +541,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [prepare-build, build-android]
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -538,7 +556,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android-aab
-          path: build/app/outputs/bundle/release/
+          # ⚠️ 업로드 path가 '단일 파일'이면 upload-artifact가 경로를 평탄화한다.
+          #    레포 루트에 풀면 원위치가 복원되지 않으므로 원래 디렉터리를 명시한다.
+          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/
 
       # 릴리즈 노트 다운로드
       - name: Download release notes
@@ -555,6 +575,7 @@ jobs:
 
       # Firebase App Distribution release notes 길이 제한 (안전망)
       - name: Truncate release notes
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts·version.yml)은 APP_ROOT가 아닌 레포 루트 기준
         run: |
           if [ -f "final_release_notes.txt" ]; then
             # Firebase App Distribution release notes 길이 제한 안전망 (4000자)

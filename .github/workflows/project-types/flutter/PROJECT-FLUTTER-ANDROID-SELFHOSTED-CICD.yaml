@@ -38,6 +38,10 @@ env:
   SMB_PORT: "44445" # 기본 445
   SMB_SHARE: "web"
   SMB_PATH_IOS: "/your-project/ios/download" # SMB 경로: /{APP_ARTIFACT_NAME}/ios/download 형식으로 사용
+  # Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+  # 통합 시점에 integrator의 flutter-root resolver가 project_paths.flutter 값으로 1회 치환.
+  # FLUTTER_ROOT는 Flutter SDK 경로용 공식 변수라 충돌 — APP_ROOT로 분리
+  APP_ROOT: "."  # @wizard auto:flutter-root
 jobs:
   build-android:
     name: Build Android APK
@@ -45,6 +49,9 @@ jobs:
     # CHANGELOG 워크플로우가 성공한 경우에만 실행
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       # Repository 체크아웃 및 목록 출력
       - name: Check out repository
@@ -214,7 +221,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_ARTIFACT_NAME }}-apk
-          path: ./android/app/build/outputs/apk/release/${{ env.APP_ARTIFACT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
+          path: ${{ env.APP_ROOT }}/android/app/build/outputs/apk/release/${{ env.APP_ARTIFACT_NAME }}-v${{ env.VERSION }}-${{ env.SHORT_COMMIT_HASH }}.apk
           retention-days: 1
 
   deploy-android:
@@ -223,6 +231,9 @@ jobs:
     needs: build-android
     if: github.ref == 'refs/heads/main'
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -242,7 +253,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ env.APP_ARTIFACT_NAME }}-apk
-          path: android/app/build/outputs/
+          # ⚠️ 업로드 path가 '단일 파일'이면 upload-artifact가 경로를 평탄화한다.
+          #    레포 루트에 풀면 원위치가 복원되지 않으므로 원래 디렉터리를 명시한다.
+          path: ${{ env.APP_ROOT }}/android/app/build/outputs/apk/release/
 
       - name: List downloaded structure (Debug)
         run: |

@@ -156,12 +156,36 @@
 
                 <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
                     <p class="text-sm font-medium text-firebase-accent mb-2">2) Android 앱 등록</p>
+                    <div class="mb-3 p-3 bg-red-900/30 border border-red-700 rounded">
+                        <p class="text-xs text-red-300 font-bold mb-1">⚠️ Flutter 아이콘이 아니라 Android 아이콘을 고르세요</p>
+                        <p class="text-[11px] text-slate-400">
+                            앱 추가 화면에 <span class="text-slate-300">Flutter</span> 항목이 보이지만, 이걸 누르면
+                            <code class="text-slate-300">flutterfire configure</code> CLI로 Firebase SDK를 앱에 통합하는 절차로 넘어갑니다.
+                        </p>
+                        <p class="text-[11px] text-slate-400 mt-1">
+                            <span class="text-green-400 font-bold">App Distribution은 APK만 업로드하면 되므로 SDK 통합이 필요 없습니다.</span>
+                            Android 아이콘(🤖)으로 등록하세요.
+                        </p>
+                    </div>
                     <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
-                        <li>프로젝트 개요 → Android 아이콘 클릭</li>
-                        <li>Android 패키지 이름 (예: <code class="text-yellow-400">kr.mycompany.myapp</code>)</li>
-                        <li>SHA-1 인증서 지문 입력 (선택)</li>
-                        <li><strong class="text-green-400">google-services.json</strong> 다운로드 → Step 4에서 업로드</li>
-                        <li>등록 후 좌측 하단 "톱니바퀴 → 프로젝트 설정"에서 <strong class="text-yellow-400">앱 ID</strong> (예: <code>1:905...:android:abc</code>) 복사 → Step 3에서 사용</li>
+                        <li>좌측 상단 <span class="text-yellow-400">프로젝트 개요</span> 클릭</li>
+                        <li>앱 추가 아이콘 중 <span class="text-green-400 font-bold">Android(🤖)</span> 선택</li>
+                        <li>Android 패키지 이름 (예: <code class="text-yellow-400">kr.mycompany.myapp</code>)
+                            <div class="text-slate-500 text-[10px] mt-0.5">
+                                <code class="text-slate-400">android/app/build.gradle.kts</code>의 <code class="text-slate-400">applicationId</code>와 동일해야 합니다
+                            </div>
+                        </li>
+                        <li>SHA-1 인증서 지문은 <span class="text-slate-400">비워도 됩니다</span> (App Distribution에 불필요)</li>
+                        <li><span class="text-yellow-400">앱 등록</span> 클릭 → <strong class="text-green-400">google-services.json</strong> 다운로드 → Step 4에서 업로드</li>
+                        <li class="pl-4">
+                            <div class="mt-1 p-2 bg-slate-800/50 rounded border-l-4 border-emerald-500">
+                                <span class="text-emerald-400 font-bold text-[11px]">이후 SDK 설치 단계는 건너뛰세요</span>
+                                <div class="text-slate-500 text-[10px] mt-0.5">
+                                    "Firebase SDK 추가" · "다음 단계로 이동" 화면은 App Distribution만 쓸 경우 불필요합니다.
+                                </div>
+                            </div>
+                        </li>
+                        <li>좌측 하단 "톱니바퀴 → 프로젝트 설정"에서 <strong class="text-yellow-400">앱 ID</strong> (예: <code>1:905...:android:abc</code>) 복사 → Step 3에서 사용</li>
                     </ol>
                 </div>
 

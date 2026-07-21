@@ -85,6 +85,10 @@ env:
   XCODE_VERSION: "26.0"
   ENV_FILE_PATH: ".env"     # 환경변수 파일 경로 (커스터마이징 가능)
 
+  # Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+  # 통합 시점에 integrator의 flutter-root resolver가 project_paths.flutter 값으로 1회 치환.
+  # FLUTTER_ROOT는 Flutter SDK 경로용 공식 변수라 충돌 — APP_ROOT로 분리
+  APP_ROOT: "."  # @wizard auto:flutter-root
 concurrency:
   group: flutter-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -234,6 +238,9 @@ jobs:
       status: ${{ steps.result.outputs.status }}
       duration: ${{ steps.result.outputs.duration }}
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: 분석 시작 시간 기록
         id: analyze_start
@@ -322,6 +329,9 @@ jobs:
       status: ${{ steps.result.outputs.status }}
       duration: ${{ steps.result.outputs.duration }}
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: 빌드 시작 시간 기록
         id: build_start
@@ -441,6 +451,9 @@ jobs:
       status: ${{ steps.result.outputs.status }}
       duration: ${{ steps.result.outputs.duration }}
 
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     steps:
       - name: 빌드 시작 시간 기록
         id: build_start

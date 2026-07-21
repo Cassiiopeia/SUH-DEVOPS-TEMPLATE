@@ -277,7 +277,17 @@ jobs:
           echo "=== Initializing Xcode components ==="
           xcrun simctl list >/dev/null 2>&1 || true
           echo "=== Downloading iOS platform ==="
-          xcodebuild -downloadPlatform iOS
+          # 이미 설치돼 있으면 생략. 없으면 재시도 (러너 상태에 따라
+          # 'Unable to connect to simulator'(exit 70)로 실패할 수 있다)
+          if [ -d "$DEVELOPER_DIR/Platforms/iPhoneOS.platform" ]; then
+            echo "✅ iPhoneOS.platform 이미 설치됨 - 다운로드 생략"
+          else
+            for i in 1 2 3; do
+              xcodebuild -downloadPlatform iOS && break
+              echo "⚠️ 시도 $i 실패 - 재시도"
+              sleep 15
+            done
+          fi
 
       - name: Download project files
         uses: actions/download-artifact@v4

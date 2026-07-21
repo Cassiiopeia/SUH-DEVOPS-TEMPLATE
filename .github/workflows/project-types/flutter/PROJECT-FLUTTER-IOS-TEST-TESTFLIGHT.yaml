@@ -384,7 +384,6 @@ jobs:
             ${{ env.APP_ROOT }}/assets/
           include-hidden-files: true   # .env가 숨김 파일이라 기본값 false면 누락된다
           retention-days: 1
-          include-hidden-files: true   # .env가 숨김 파일이라 기본값 false면 누락된다
           # assets/ 등 일부 경로는 프로젝트마다 없을 수 있어 warn 유지.
           # (전체 0건이어도 통과하지만, 경로 prefix 수정으로 실제 누락은 해소됨)
           if-no-files-found: warn
@@ -839,7 +838,7 @@ jobs:
           echo "✅ Fastfile 확인됨: ios/fastlane/Fastfile"
 
       - name: Install Fastlane
-        working-directory: ios
+        working-directory: ${{ env.APP_ROOT }}/ios
         run: |
           # multi_json: google-apis transitive 의존성이 선언 누락한 upstream 버그 회피 (gemspec 미선언 → Gem::LoadError)
           printf 'source "https://rubygems.org"\ngem "fastlane"\ngem "multi_json"\n' > Gemfile

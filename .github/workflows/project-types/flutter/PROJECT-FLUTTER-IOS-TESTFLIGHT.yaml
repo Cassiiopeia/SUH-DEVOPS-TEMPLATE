@@ -74,8 +74,9 @@ on:
 # 🔧 프로젝트별 설정 (아래 값들을 수정하세요)
 # ============================================
 env:
-  FLUTTER_ROOT: "."  # @wizard auto:flutter-root
-  FLUTTER_VERSION: "3.35.5"
+  # FLUTTER_ROOT는 Flutter SDK 경로용 공식 변수라 충돌 — APP_ROOT로 분리
+  APP_ROOT: "."  # @wizard auto:flutter-root
+  FLUTTER_VERSION: "3.38.9"
   XCODE_VERSION: "26.0"
   PROJECT_TYPE: "flutter"
 
@@ -101,7 +102,7 @@ jobs:
     runs-on: macos-26
     defaults:
       run:
-        working-directory: ${{ env.FLUTTER_ROOT }}
+        working-directory: ${{ env.APP_ROOT }}
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
 
     outputs:
@@ -164,10 +165,16 @@ jobs:
       - name: Install CocoaPods
         run: |
           gem install cocoapods
-          cd ios && pod install
+          # 플러그인 의존성이 없는 프로젝트는 Flutter가 Podfile을 만들지 않는다.
+          # 이 경우 pod install은 불필요하므로 건너뛴다 (없으면 실패하던 문제).
+          if [ -f ios/Podfile ]; then
+            cd ios && pod install
+          else
+            echo "ℹ️ ios/Podfile 없음 - CocoaPods 의존성이 없는 프로젝트이므로 건너뜁니다"
+          fi
 
       - name: 버전 관리 스크립트 권한 설정
-        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 FLUTTER_ROOT가 아닌 레포 루트 기준
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 APP_ROOT가 아닌 레포 루트 기준
         run: |
           chmod +x ./.github/scripts/version_manager.sh
           chmod +x ./.github/scripts/changelog_manager.py
@@ -217,13 +224,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: project-files
+          # 모노레포 대응: 산출물은 APP_ROOT 기준이라 경로 prefix가 필요하다.
+          # (없으면 레포 루트에서 찾아 0건 → if-no-files-found 기본값 warn으로 조용히 통과)
           path: |
-            ${{ env.ENV_FILE_PATH }}
-            ios/Flutter/Secrets.xcconfig
-            pubspec.yaml
-            lib/
-            assets/
+            ${{ env.APP_ROOT }}/${{ env.ENV_FILE_PATH }}
+            ${{ env.APP_ROOT }}/ios/Flutter/Secrets.xcconfig
+            ${{ env.APP_ROOT }}/pubspec.yaml
+            ${{ env.APP_ROOT }}/lib/
+            ${{ env.APP_ROOT }}/assets/
           retention-days: 1
+          include-hidden-files: true   # .env가 숨김 파일이라 기본값 false면 누락된다
+          # assets/ 등 일부 경로는 프로젝트마다 없을 수 있어 warn 유지.
+          # (전체 0건이어도 통과하지만, 경로 prefix 수정으로 실제 누락은 해소됨)
+          if-no-files-found: warn
 
   # ============================================
   # iOS 빌드 (xcodebuild 직접 사용)
@@ -233,7 +246,7 @@ jobs:
     runs-on: macos-26
     defaults:
       run:
-        working-directory: ${{ env.FLUTTER_ROOT }}
+        working-directory: ${{ env.APP_ROOT }}
     needs: prepare-build
 
     steps:
@@ -270,6 +283,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: project-files
+          # 업로드 시 APP_ROOT prefix가 붙으므로 레포 루트에 풀면 원래 위치로 복원된다
           path: .
 
       - name: Ensure .env file exists
@@ -306,7 +320,13 @@ jobs:
       - name: Install CocoaPods
         run: |
           gem install cocoapods
-          cd ios && pod install
+          # 플러그인 의존성이 없는 프로젝트는 Flutter가 Podfile을 만들지 않는다.
+          # 이 경우 pod install은 불필요하므로 건너뛴다 (없으면 실패하던 문제).
+          if [ -f ios/Podfile ]; then
+            cd ios && pod install
+          else
+            echo "ℹ️ ios/Podfile 없음 - CocoaPods 의존성이 없는 프로젝트이므로 건너뜁니다"
+          fi
 
       - name: Import Code-Signing Certificates
         uses: Apple-Actions/import-codesign-certs@v2
@@ -366,7 +386,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: ${{ env.FLUTTER_ROOT }}/ios/build/ipa/*.ipa
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
+          path: ${{ env.APP_ROOT }}/ios/build/ipa/*.ipa
           retention-days: 1
 
   # ============================================
@@ -377,7 +398,7 @@ jobs:
     runs-on: macos-26
     defaults:
       run:
-        working-directory: ${{ env.FLUTTER_ROOT }}
+        working-directory: ${{ env.APP_ROOT }}
     needs: [prepare-build, build-ios]
 
     steps:
@@ -396,7 +417,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ios-ipa
-          path: ${{ env.FLUTTER_ROOT }}/ios/build/ipa/
+          # 업로드 경로에 APP_ROOT prefix가 포함되므로 레포 루트에 풀어야 원위치로 복원된다
+          # (APP_ROOT를 다시 붙이면 client/client/ios/... 로 이중 중첩)
+          path: .
 
       - name: Download release notes
         uses: actions/download-artifact@v4
@@ -415,7 +438,7 @@ jobs:
           echo "✅ Fastfile 확인됨: ios/fastlane/Fastfile"
 
       - name: Install Fastlane
-        working-directory: ${{ env.FLUTTER_ROOT }}/ios
+        working-directory: ${{ env.APP_ROOT }}/ios
         run: |
           # multi_json: google-apis transitive 의존성이 선언 누락한 upstream 버그 회피 (gemspec 미선언 → Gem::LoadError)
           printf 'source "https://rubygems.org"\ngem "fastlane"\ngem "multi_json"\n' > Gemfile
@@ -427,16 +450,17 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           SKIP_WAITING_FOR_BUILD_PROCESSING: ${{ env.SKIP_WAITING_FOR_BUILD_PROCESSING }}
+          APP_ROOT: ${{ env.APP_ROOT }}   # 아래 스크립트가 셸 변수로 참조한다
         run: |
           # IPA 절대경로 탐색
-          IPA_PATH=$(find "$GITHUB_WORKSPACE/${FLUTTER_ROOT}/ios/build/ipa" -name "*.ipa" | head -1)
+          IPA_PATH=$(find "$GITHUB_WORKSPACE/${APP_ROOT}/ios/build/ipa" -name "*.ipa" | head -1)
           echo "📦 Found IPA at: $IPA_PATH"
 
           if [ ! -f "$IPA_PATH" ]; then
             echo "❌ IPA 파일을 찾을 수 없습니다!"; ls -la ios/build/ipa/ || true; exit 1
           fi
 
-          # Release notes 준비 (final_release_notes.txt·truncate 스크립트는 레포 루트 기준 — working-directory가 FLUTTER_ROOT이므로 절대경로 사용)
+          # Release notes 준비 (final_release_notes.txt·truncate 스크립트는 레포 루트 기준 — working-directory가 APP_ROOT이므로 절대경로 사용)
           if [ -f "$GITHUB_WORKSPACE/final_release_notes.txt" ]; then
             # App Store Connect "What to Test" 한도(4000 바이트)에 맞춰 절단 (마진 두어 3800byte)
             bash "$GITHUB_WORKSPACE/.github/scripts/truncate_release_notes.sh" "$GITHUB_WORKSPACE/final_release_notes.txt" 3800 byte

@@ -365,15 +365,21 @@ async function selectProjectFolder() {
     if ('showDirectoryPicker' in window) {
         try {
             const dirHandle = await window.showDirectoryPicker();
-            const projectPath = dirHandle.name;
+            const folderName = dirHandle.name;
 
-            const input = document.getElementById('projectPath');
-            if (input) {
-                input.value = `선택된 폴더: ${projectPath} (터미널에서 실제 경로를 사용하세요)`;
-                input.placeholder = '선택된 폴더를 확인하고 실제 경로를 입력하세요';
+            // 브라우저는 보안상 절대경로를 주지 않는다 (폴더명만 얻을 수 있음).
+            // 입력칸에 안내문을 써넣으면 실제 경로를 덮어써 폴백(/path/to/project)이 나가므로,
+            // 입력칸은 건드리지 않고 힌트 영역에만 폴더명을 표시한다.
+            const hint = document.getElementById('projectPath-hint');
+            if (hint) {
+                hint.innerHTML = `선택한 폴더: <span class="text-yellow-400 font-mono">${folderName}</span> — 아래 칸에 이 폴더의 <span class="text-yellow-400">절대경로</span>를 입력하세요 (터미널에서 <code class="text-slate-300">pwd</code>)`;
+                hint.classList.remove('hidden');
             }
 
-            showToast(`폴더 "${projectPath}" 선택됨`);
+            const input = document.getElementById('projectPath');
+            if (input) input.focus();
+
+            showToast(`폴더 "${folderName}" 선택됨 - 절대경로를 입력해주세요`);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error('폴더 선택 오류:', err);
@@ -699,7 +705,13 @@ function saveCurrentStepData() {
         case 1:
             // Step 1: 시작하기 - 프로젝트 경로
             state.projectPath = getInputValue('projectPath');
+            // 구버전이 입력칸에 써넣던 안내문이 남아 있으면 경로로 쓰지 않는다
             if (state.projectPath.startsWith('선택된 폴더:')) {
+                state.projectPath = '';
+            }
+            // 상대경로는 Step 8 명령어에서 cd 실패로 이어지므로 미리 걸러낸다
+            if (state.projectPath && !state.projectPath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(state.projectPath)) {
+                showToast('절대경로를 입력해주세요 (예: /Users/이름/projects/myapp)');
                 state.projectPath = '';
             }
             break;
@@ -746,11 +758,19 @@ function saveCurrentStepData() {
 // ============================================
 
 function generateInitCommand() {
-    const projectPath = state.projectPath || '/path/to/project';
+    // 경로 미입력 시 placeholder가 그대로 나가면 cd 실패로 이어진다.
+    // 명령어를 감추는 대신 배너로 무엇을 채워야 하는지 알린다.
+    const pathMissing = !state.projectPath;
+    const projectPath = state.projectPath || '<<Step 1에서 프로젝트 절대경로를 입력하세요>>';
     const bundleId = state.bundleId || 'com.example.app';
     const teamId = state.teamId || 'TEAM_ID';
     const profileName = state.profileName || 'Profile Name';
     const usesNonExemptEncryption = state.encryptionType === 'standard' ? 'true' : 'false';
+
+    const warning = document.getElementById('initCmd-warning');
+    if (warning) {
+        warning.classList.toggle('hidden', !pathMissing);
+    }
 
     const cmd = `cd "${projectPath}" && python3 ".github/util/flutter/testflight-wizard/testflight-wizard.py" setup "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
     setElementText('initCmd', cmd);

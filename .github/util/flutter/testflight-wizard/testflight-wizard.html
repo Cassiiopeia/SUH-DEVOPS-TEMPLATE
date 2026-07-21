@@ -35,8 +35,10 @@
         "Step 3에 Xcode Bundle ID 대조 경고 추가 - Flutter 기본값 잔존으로 인한 서명 실패 예방",
         "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인",
         "Team ID 입력란에 실시간 자리수 검증 추가 - 9자리 오입력이 Secret에 저장되는 문제 예방",
-        "Team ID를 프로비저닝 프로파일에서 추출하는 명령 안내 추가",
-        "Step 7에 .p8 파일명으로 Key ID 확인하는 방법 및 기존 키 재사용 안내 추가"
+        "Step 7에 .p8 파일명으로 Key ID 확인하는 방법 및 기존 키 재사용 안내 추가",
+        "폴더 선택 시 입력칸이 안내문으로 덮어써져 경로가 사라지던 문제 수정 - 힌트 영역 분리",
+        "프로젝트 경로 미입력 시 Step 8 명령어가 /path/to/project로 생성되던 문제에 경고 배너 추가",
+        "프로젝트 경로 상대경로 입력 차단 및 pwd 안내 추가"
       ]
     },
     {
@@ -633,6 +635,12 @@
                         폴더
                     </button>
                 </div>
+                <!-- 폴더 선택 결과 표시 — 입력칸을 덮어쓰지 않고 여기에만 안내한다 -->
+                <p id="projectPath-hint" class="text-xs mt-2 text-slate-400 hidden"></p>
+                <p class="text-xs text-slate-500 mt-2">
+                    💡 브라우저는 보안상 폴더 절대경로를 알 수 없습니다. 터미널에서
+                    <code class="text-slate-400">cd 프로젝트폴더 && pwd</code> 실행 후 그 값을 붙여넣으세요.
+                </p>
             </div>
 
             <div class="flex justify-end mt-8">
@@ -1699,9 +1707,6 @@
                     <div class="bg-slate-900 rounded p-2 font-mono text-[10px] overflow-x-auto">
                         <div class="text-green-400 break-all">security cms -D -i ~/Downloads/파일명.mobileprovision | plutil -p - | grep -A2 TeamIdentifier</div>
                     </div>
-                    <p class="text-[11px] text-red-400 mt-2">
-                        ⚠️ 복사할 때 <span class="font-bold">마지막 글자가 빠지기 쉽습니다.</span> 반드시 10자리인지 세어보세요.
-                    </p>
                 </div>
             </div>
 
@@ -1946,6 +1951,14 @@
 
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-slate-300">터미널에서 실행:</label>
+                <!-- 경로 미입력 시 cd 실패로 이어지므로 복사 전에 경고 -->
+                <div id="initCmd-warning" class="hidden mb-2 p-3 bg-red-900/30 border border-red-700 rounded-lg">
+                    <p class="text-xs text-red-300 font-bold">⚠️ 프로젝트 경로가 비어 있습니다</p>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Step 1로 돌아가 Flutter 프로젝트의 절대경로를 입력하세요. 이대로 실행하면
+                        <code class="text-slate-300">cd: no such file or directory</code> 오류가 납니다.
+                    </p>
+                </div>
                 <div class="code-block">
                     <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
                     <pre id="initCmd">cd "/path/to/project" && python3 ".github/util/flutter/testflight-wizard/testflight-wizard.py" setup ...</pre>

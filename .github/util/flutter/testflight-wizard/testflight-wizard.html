@@ -8,10 +8,46 @@
     <script type="application/json" id="versionJson">
 {
   "name": "iOS TestFlight Setup Wizard",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Flutter iOS 앱을 TestFlight에 배포하기 위한 설정 마법사",
-  "lastUpdated": "2026-07-20",
+  "lastUpdated": "2026-07-21",
   "changelog": [
+    {
+      "version": "1.4.0",
+      "date": "2026-07-21",
+      "changes": [
+        "Step 2 인증서 가이드를 실제 실행 순서(2-0 확인 → 2-1 CSR → 2-2 발급 → 2-3 p12)로 재구성",
+        "2-0 사전 확인 단계 신설 - security find-identity로 기존 인증서 유무 판별 후 분기",
+        "Apple Distribution 인증서 계정당 3개 제한 및 Revoke 안내 추가",
+        "CSR 다이얼로그의 '디스크에 저장됨' 라디오 선택 강조 (기본값이 'CA로 이메일 보냄'이라 오설정 빈발)",
+        "키체인 인증서 목록이 비어있는 경우를 정상 상태로 명시 - 최초 진입자 혼란 해소",
+        ".cer 다운로드 후 더블클릭 설치 및 '인증서 추가' 창의 키체인 선택(로그인) 안내 추가",
+        "설치 확인 명령(security find-identity) 안내 추가",
+        "키체인 목록의 Apple 중간 CA 인증서와 본인 인증서 구분법 추가",
+        "p12 내보내기 전 개인키 존재 확인 단계 추가",
+        "산출물 파일명을 CertificateSigningRequest / apple_distribution.cer / apple_distribution.p12로 통일",
+        "p12 저장 다이얼로그 입력값 및 비밀번호 2회 입력 안내 상세화",
+        "p12 개인키 포함 여부 검증 명령(openssl pkcs12) 추가",
+        "p12 유출 위험 및 백업 경고 추가",
+        "Step 2 완료 체크리스트 추가 - find-identity 기대 출력 예시 포함",
+        "Step 3에 Capabilities 선택 가이드 추가 - 체크할 것/Info.plist로 처리되는 것 구분",
+        "Step 3에 Xcode Bundle ID 대조 경고 추가 - Flutter 기본값 잔존으로 인한 서명 실패 예방",
+        "Step 4에 프로파일 검증 절차 추가 - security cms로 앱ID/만료/entitlements 확인",
+        "Team ID 입력란에 실시간 자리수 검증 추가 - 9자리 오입력이 Secret에 저장되는 문제 예방",
+        "Step 7에 .p8 파일명으로 Key ID 확인하는 방법 및 기존 키 재사용 안내 추가",
+        "폴더 선택 시 입력칸이 안내문으로 덮어써져 경로가 사라지던 문제 수정 - 힌트 영역 분리",
+        "프로젝트 경로 미입력 시 Step 8 명령어가 /path/to/project로 생성되던 문제에 경고 배너 추가",
+        "프로젝트 경로 상대경로 입력 차단 및 pwd 안내 추가",
+        "모노레포 지원 - 레포 루트와 Flutter 루트가 다를 때 cd 대상과 인자를 분리해 생성",
+        "Git 레포 루트 입력란 추가 (선택) 및 경로가 두 개인 이유 안내",
+        "Flutter 루트가 pubspec.yaml 위치임을 디렉토리 트리로 명시",
+        "Windows/macOS 경로 확인법 분리 안내 (pwd vs cd, 구분자 차이)",
+        "Windows 환경에서 python 실행 파일명과 역슬래시 경로로 명령어 생성",
+        "p12 비밀번호 입력란에 대응 Secret 키(APPLE_CERTIFICATE_PASSWORD) 표시",
+        "Step 8 생성 파일 목록을 실제 산출물과 일치시킴 - Appfile 오기재 제거, 수정 파일 목록 추가",
+        "Step 9 Secret 설명에 누락됐던 IOS_PROVISIONING_PROFILE_NAME/IOS_BUNDLE_ID/APPLE_TEAM_ID 추가"
+      ]
+    },
     {
       "version": "1.3.0",
       "date": "2026-07-20",
@@ -60,7 +96,6 @@
   },
   "repository": "https://github.com/Cassiiopeia/projectops"
 }
-
     </script>
     <!-- JSZip for ZIP export -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -594,8 +629,25 @@
             <!-- 프로젝트 경로 -->
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-slate-300">
-                    Flutter 프로젝트 절대 경로
+                    Flutter 프로젝트 루트 절대 경로 <span class="text-red-400">*</span>
                 </label>
+                <div class="mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                    <p class="text-xs text-blue-200 font-bold mb-1">📍 "Flutter 루트"란 — pubspec.yaml이 있는 폴더</p>
+                    <p class="text-[11px] text-slate-400">
+                        Git 레포 루트와 다를 수 있습니다. <code class="text-slate-300">pubspec.yaml</code>과
+                        <code class="text-slate-300">ios/</code> 폴더가 함께 있는 위치를 입력하세요.
+                    </p>
+                    <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] space-y-0.5">
+                        <div class="text-slate-500">my-repo/            <span class="text-red-400">← ❌ 레포 루트 (pubspec.yaml 없음)</span></div>
+                        <div class="text-slate-500">├─ .github/</div>
+                        <div class="text-slate-500">└─ client/          <span class="text-green-400">← ✅ 여기! Flutter 루트</span></div>
+                        <div class="text-slate-500">&nbsp;&nbsp;&nbsp;├─ pubspec.yaml</div>
+                        <div class="text-slate-500">&nbsp;&nbsp;&nbsp;└─ ios/</div>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-2">
+                        레포 루트에 pubspec.yaml이 바로 있는 일반 구조라면 레포 루트가 곧 Flutter 루트입니다.
+                    </p>
+                </div>
                 <div class="flex gap-3">
                     <input type="text" id="projectPath"
                         class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
@@ -607,6 +659,54 @@
                         폴더
                     </button>
                 </div>
+                <!-- 폴더 선택 결과 표시 — 입력칸을 덮어쓰지 않고 여기에만 안내한다 -->
+                <p id="projectPath-hint" class="text-xs mt-2 text-slate-400 hidden"></p>
+
+                <!-- OS별 경로 확인법: 구분자와 명령이 달라 나눠서 안내한다 -->
+                <div class="mt-3 bg-slate-700/50 border border-slate-600 rounded-lg p-3">
+                    <p class="text-xs font-medium text-blue-400 mb-2">🔍 절대경로 확인하는 법</p>
+                    <p class="text-[11px] text-slate-500 mb-2">
+                        브라우저는 보안상 폴더의 절대경로를 알 수 없어 직접 입력해야 합니다.
+                    </p>
+                    <div class="grid md:grid-cols-2 gap-2">
+                        <div class="bg-slate-900 rounded p-2">
+                            <div class="text-[11px] text-slate-300 font-bold mb-1">🍎 macOS / Linux</div>
+                            <div class="font-mono text-[10px] text-green-400 break-all">cd 프로젝트폴더 && pwd</div>
+                            <div class="text-[10px] text-slate-500 mt-1.5">결과 예시:</div>
+                            <div class="font-mono text-[10px] text-slate-400 break-all">/Users/hong/projects/myapp</div>
+                            <div class="text-[10px] text-slate-600 mt-1">구분자 <span class="text-slate-400">/</span> · <span class="text-slate-400">/</span>로 시작</div>
+                        </div>
+                        <div class="bg-slate-900 rounded p-2">
+                            <div class="text-[11px] text-slate-300 font-bold mb-1">🪟 Windows</div>
+                            <div class="font-mono text-[10px] text-green-400 break-all">cd 프로젝트폴더 && cd</div>
+                            <div class="text-[10px] text-slate-500 mt-1.5">결과 예시:</div>
+                            <div class="font-mono text-[10px] text-slate-400 break-all">C:\Users\hong\projects\myapp</div>
+                            <div class="text-[10px] text-slate-600 mt-1">구분자 <span class="text-slate-400">\</span> · <span class="text-slate-400">드라이브문자:</span>로 시작</div>
+                        </div>
+                    </div>
+                    <div class="mt-2 p-2 bg-orange-900/30 border border-orange-700/50 rounded">
+                        <p class="text-[10px] text-orange-300">
+                            ⚠️ <span class="font-bold">iOS 빌드·서명은 macOS에서만 가능합니다.</span>
+                            Windows에서는 이 마법사로 설정 파일 생성과 GitHub Secrets 등록까지만 하고,
+                            실제 빌드는 GitHub Actions(macOS 러너)가 수행합니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 모노레포 대응: 레포 루트가 Flutter 루트와 다를 때만 필요 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-slate-300">
+                    Git 레포 루트 절대 경로
+                    <span class="text-xs text-slate-500 font-normal">(선택 — 위와 같으면 비워두세요)</span>
+                </label>
+                <input type="text" id="repoRoot"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:border-blue-500 outline-none transition"
+                    placeholder="/Users/username/my-repo (.github 폴더가 있는 위치)">
+                <p class="text-xs text-slate-500 mt-1">
+                    <code class="text-slate-400">.github/</code> 폴더가 있는 위치입니다.
+                    모노레포(Flutter가 <code class="text-slate-400">client/</code> 등 하위에 있는 구조)에서만 입력하세요.
+                </p>
             </div>
 
             <div class="flex justify-end mt-8">
@@ -646,11 +746,115 @@
                 </a>
             </div>
 
-            <!-- 인증서 생성 가이드 -->
-            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
-                <p class="text-sm text-yellow-200 mb-3">📋 새 인증서 만드는 방법</p>
+            <!-- 전체 흐름 안내 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-3">🗺️ 전체 흐름 (순서대로 진행하세요)</p>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">2-0. 이미 있는지 확인</span>
+                    <span class="text-slate-500">→</span>
+                    <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">2-1. CSR 생성</span>
+                    <span class="text-slate-500">→</span>
+                    <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">2-2. 인증서 발급</span>
+                    <span class="text-slate-500">→</span>
+                    <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">2-3. .p12 내보내기</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">이미 유효한 인증서가 있다면 2-0에서 바로 2-3으로 건너뜁니다.</p>
+            </div>
+
+            <!-- 2-0. 이미 있는지 확인 -->
+            <div class="bg-emerald-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-emerald-300 mb-2">✅ 2-0. 먼저 확인: 이미 인증서가 있나요?</p>
+                <p class="text-xs text-slate-400 mb-2">터미널에서 아래 명령을 실행하세요.</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs mb-3">
+                    <div class="text-green-400">security find-identity -v -p codesigning</div>
+                </div>
+                <div class="text-xs text-slate-300 space-y-2">
+                    <div class="p-2 bg-slate-800/50 rounded border-l-4 border-green-500">
+                        <span class="text-green-400 font-bold">"Apple Distribution: ..." 이 보이면</span>
+                        <div class="text-slate-400 mt-1">이미 있습니다! <span class="text-yellow-400">2-1 · 2-2를 건너뛰고 아래 2-3(.p12 내보내기)</span>으로 바로 가세요.</div>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                        <span class="text-orange-400 font-bold">"Apple Development"만 보이거나 아무것도 없으면</span>
+                        <div class="text-slate-400 mt-1">배포용 인증서가 없습니다. <span class="text-yellow-400">2-1부터 진행</span>하세요. (Development 인증서로는 배포 불가)</div>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-red-900/30 border border-red-700 rounded">
+                    <p class="text-xs text-red-300 font-bold mb-1">⚠️ 개수 제한: Apple Distribution 인증서는 계정당 최대 3개</p>
+                    <p class="text-[11px] text-slate-400">
+                        이미 3개라면 새로 만들 수 없습니다.
+                        <a href="https://developer.apple.com/account/resources/certificates/list" target="_blank" rel="noopener" class="text-blue-400 underline">Certificates 페이지</a>에서
+                        만료됐거나 안 쓰는 인증서를 클릭 → <span class="text-yellow-400">Revoke</span> 한 뒤 다시 시도하세요.
+                    </p>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Revoke 전 주의: 그 인증서로 서명된 Provisioning Profile은 무효가 되어 재생성이 필요합니다.
+                        단, <span class="text-slate-400">이미 App Store에 출시된 앱은 영향받지 않습니다.</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- 2-1. CSR 파일 만들기 -->
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
+                <p class="text-sm font-medium text-blue-400 mb-1">📝 2-1. CSR(인증서 서명 요청) 파일 만들기</p>
+                <p class="text-[11px] text-slate-500 mb-3">
+                    CSR을 만든 Mac에 개인키가 생성됩니다. <span class="text-yellow-400">반드시 .p12를 내보낼 Mac에서</span> 만드세요.
+                </p>
                 <ol class="text-xs text-slate-300 list-decimal list-inside space-y-2">
-                    <li>위 버튼 클릭 → Certificates 페이지 열기</li>
+                    <li><span class="text-yellow-400">"키체인 접근"</span> 앱 열기 (⌘+Space → "키체인")</li>
+                    <li>상단 메뉴바: <span class="text-yellow-400">키체인 접근 → 인증서 지원 → 인증 기관에서 인증서 요청...</span></li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500 space-y-2">
+                            <span class="text-orange-400 font-bold">다이얼로그 입력값</span>
+                            <div class="space-y-1.5 font-mono text-[11px]">
+                                <div><span class="text-slate-400">사용자 이메일 주소:</span> <span class="text-white">Apple Developer 계정 이메일</span></div>
+                                <div><span class="text-slate-400">일반 이름:</span> <span class="text-white">[본인이름] Distribution</span> <span class="text-slate-600">(예: HONG GILDONG Distribution)</span></div>
+                                <div><span class="text-slate-400">CA 이메일 주소:</span> <span class="text-red-400 font-bold">반드시 비워둘 것</span></div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-red-400 font-bold text-[11px] mb-1">⚠️ 요청 항목 — 기본값이 틀립니다!</div>
+                                <div class="flex items-center gap-2 text-[11px] text-slate-500">
+                                    <span class="text-red-400">❌</span>
+                                    <span>CA로 이메일 보냄 <span class="text-slate-600">(기본 선택 — 이거 아님!)</span></span>
+                                </div>
+                                <div class="flex items-center gap-2 text-[11px]">
+                                    <span class="text-green-400">✅</span>
+                                    <span class="text-green-400 font-bold">디스크에 저장됨</span>
+                                    <span class="text-slate-400">← 이걸로 바꾸세요</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                                    <span class="text-slate-600">☐</span>
+                                    <span>본인이 키 페어 정보 지정 <span class="text-slate-600">(체크 안 함)</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li><span class="text-yellow-400">계속</span> → 저장 위치는 <span class="text-yellow-400">다운로드 폴더</span> 권장 → 저장
+                        <div class="text-slate-500 text-[10px] mt-1">
+                            파일명은 기본값(<code class="text-slate-400">CertificateSigningRequest</code>) 그대로 두세요. 아래 명령들이 이 이름을 씁니다.
+                        </div>
+                    </li>
+                </ol>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs mt-3">
+                    <div class="text-green-400">→ ~/Downloads/CertificateSigningRequest.certSigningRequest 생성됨</div>
+                </div>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[11px] mt-2">
+                    <div class="text-slate-500 mb-1"># 제대로 만들어졌는지 검증 (선택)</div>
+                    <div class="text-green-400 break-all">openssl req -in ~/Downloads/CertificateSigningRequest.certSigningRequest -noout -subject -verify</div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    <span class="text-green-400">verify OK</span>와 함께
+                    <code class="text-slate-400">CN=..., C=KR</code> 형태의 Subject가 보이면 정상입니다.
+                </p>
+                <div class="mt-3 p-2 bg-slate-800/50 rounded text-[11px] text-slate-400">
+                    💡 다음 단계 업로드 창에서 파일이 안 보이면 → Finder에서 <span class="text-yellow-400">⌘+Shift+G</span> 누르고
+                    <code class="text-slate-300">~/Downloads/CertificateSigningRequest.certSigningRequest</code> 붙여넣으면 바로 선택됩니다.
+                </div>
+            </div>
+
+            <!-- 2-2. 인증서 발급받기 -->
+            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-yellow-200 mb-3">📋 2-2. Apple에서 인증서 발급받기</p>
+                <ol class="text-xs text-slate-300 list-decimal list-inside space-y-2">
+                    <li>위의 <span class="text-blue-400">Certificates 페이지 열기</span> 버튼 클릭</li>
                     <li><span class="text-blue-400 font-bold text-sm">+</span> 버튼 클릭</li>
                     <li class="pl-4">
                         <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
@@ -672,67 +876,230 @@
                             </div>
                         </div>
                     </li>
-                    <li>CSR 파일 업로드가 필요합니다 (아래 참고)</li>
-                    <li>인증서 생성 후 Download</li>
-                    <li>다운로드한 .cer 파일 더블클릭 → 키체인에 자동 설치</li>
+                    <li><span class="text-yellow-400">Choose File</span> → 2-1에서 만든 <span class="text-orange-400">.certSigningRequest</span> 업로드 → Continue</li>
+                    <li><span class="text-yellow-400">Download</span> 클릭 → <code class="text-orange-400">apple_distribution.cer</code> 저장 (기본 파일명 그대로)</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">⚠️ 다운로드만으로는 끝이 아닙니다 — 반드시 설치하세요!</span>
+                            <div class="text-slate-400 mt-2 text-[11px]">
+                                다운로드한 .cer 파일을 <span class="text-yellow-400 font-bold">더블클릭</span>하세요.
+                                (또는 터미널에서 <code class="text-slate-300">open ~/Downloads/apple_distribution.cer</code>)
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-orange-400 font-bold text-[11px] mb-1">"인증서 추가" 창이 뜨면 — 키체인 선택</div>
+                                <div class="flex items-center gap-2 text-[11px]">
+                                    <span class="text-green-400">✅</span>
+                                    <span class="text-green-400 font-bold">로그인</span>
+                                    <span class="text-slate-400">← 기본값 그대로 두고 "추가" 클릭</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                                    <span class="text-red-400">❌</span>
+                                    <span>iCloud / 시스템 / 시스템 루트 <span class="text-slate-600">(선택 금지)</span></span>
+                                </div>
+                                <div class="text-slate-500 text-[10px] mt-2">
+                                    개인키가 <span class="text-slate-400">로그인 키체인</span>에 저장돼 있어서, 인증서도 같은 키체인에 넣어야
+                                    짝이 맞아 .p12로 내보낼 수 있습니다.
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>설치 확인: 터미널에서 <code class="text-slate-300">security find-identity -v -p codesigning</code> → <span class="text-green-400">Apple Distribution</span>이 보이면 성공</li>
                 </ol>
-            </div>
-
-            <!-- CSR 파일 만드는 방법 -->
-            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
-                <p class="text-sm font-medium text-blue-400 mb-3">📝 CSR(인증서 서명 요청) 파일 만드는 방법</p>
-                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs space-y-2">
-                    <div class="text-slate-400">1. 키체인 접근 앱 열기</div>
-                    <div class="text-slate-400">2. 메뉴: 키체인 접근 → 인증서 지원 → 인증 기관에서 인증서 요청</div>
-                    <div class="text-slate-400">3. 사용자 이메일: <span class="text-yellow-400">Apple Developer 계정 이메일</span></div>
-                    <div class="text-slate-400">4. 일반 이름: 아무거나 (예: MyApp Distribution)</div>
-                    <div class="text-slate-400">5. "디스크에 저장" 선택 → 저장</div>
-                    <div class="text-green-400 mt-2">→ CertificateSigningRequest.certSigningRequest 파일 생성됨</div>
+                <div class="mt-3 p-2 bg-slate-800/50 rounded text-[11px] text-slate-400">
+                    "maximum number of certificates" 에러가 뜨면 → 2-0의 개수 제한 안내대로 기존 인증서를 Revoke하세요.
                 </div>
             </div>
 
-            <!-- 키체인에서 .p12 내보내기 -->
+            <!-- 2-3. 키체인에서 .p12 내보내기 -->
             <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
-                <p class="text-sm text-yellow-200 mb-2">📤 키체인에서 .p12 파일 내보내기</p>
+                <p class="text-sm text-yellow-200 mb-2">📤 2-3. 키체인에서 .p12 파일 내보내기</p>
                 <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
                     <li>Mac에서 <span class="text-yellow-400">"키체인 접근"</span> 앱 열기 (⌘+Space → "키체인")</li>
-                    <li>왼쪽: <span class="text-yellow-400">"로그인"</span> 키체인 → 상단: <span class="text-yellow-400">"인증서"</span> 카테고리</li>
-                    <li><span class="text-green-400 font-bold">"Apple Distribution: [팀이름]"</span> 인증서 찾기</li>
-                    <li>우클릭 → <span class="text-yellow-400">"[인증서명] 내보내기"</span></li>
-                    <li>파일 포맷: <span class="text-orange-400 font-bold">.p12</span> 선택</li>
-                    <li>비밀번호 설정 (아래에 입력)</li>
+                    <li>왼쪽: <span class="text-yellow-400">"로그인"</span> 키체인 → 상단: <span class="text-yellow-400">"내 인증서"</span> 카테고리
+                        <span class="text-slate-500 text-[10px]">("인증서" 탭은 Apple CA까지 섞여 나와 헷갈립니다)</span>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">⚠️ 목록에 인증서가 10개쯤 보여도 당황하지 마세요</span>
+                            <div class="text-slate-400 mt-2 text-[11px]">
+                                대부분은 Apple이 자동 설치한 <span class="text-slate-300">중간 CA 인증서</span>입니다.
+                                <span class="text-red-400">건드리지 마세요.</span>
+                            </div>
+                            <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] space-y-0.5">
+                                <div class="text-slate-600">Developer ID Certification Authority</div>
+                                <div class="text-slate-600">Apple Worldwide Developer Relations CA</div>
+                                <div class="text-slate-600">Apple Root CA <span class="text-slate-700">… ❌ 전부 무시</span></div>
+                                <div class="text-green-400 mt-1">▶ Apple Distribution: 이름 (TEAMID) <span class="text-yellow-400">← ✅ 이것!</span></div>
+                                <div class="text-slate-500">▶ Apple Development: 이름 (TEAMID) <span class="text-slate-600">← ❌ 개발용, 배포 불가</span></div>
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-2">
+                                구분법: 이름이 <span class="text-slate-400">"Apple Distribution:"</span>으로 시작하고,
+                                왼쪽에 <span class="text-yellow-400">▶ 삼각형</span>이 붙어 있습니다(= 개인키 보유).
+                                CA 인증서에는 삼각형이 없습니다.
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">⚠️ 개인키가 있는지 먼저 확인!</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                인증서 왼쪽 <span class="text-yellow-400">▶ 삼각형</span>을 펼쳐서 그 아래 <span class="text-yellow-400">🔑 개인키</span>가 보여야 합니다.
+                            </div>
+                            <div class="text-slate-500 mt-1 text-[11px]">
+                                개인키가 없으면 .p12 포맷 자체가 안 뜹니다 → 다른 Mac에서 만든 인증서입니다.
+                                해당 Mac에서 .p12를 받아오거나, 2-1부터 새로 진행하세요.
+                            </div>
+                        </div>
+                    </li>
+                    <li>인증서 우클릭 → <span class="text-yellow-400">"Apple Distribution: ... 내보내기..."</span></li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500 space-y-2">
+                            <span class="text-orange-400 font-bold">저장 다이얼로그</span>
+                            <div class="space-y-1.5 font-mono text-[11px]">
+                                <div><span class="text-slate-400">이름:</span> <code class="text-orange-400">apple_distribution.p12</code></div>
+                                <div><span class="text-slate-400">위치:</span> <span class="text-white">다운로드</span></div>
+                                <div><span class="text-slate-400">파일 포맷:</span> <span class="text-green-400 font-bold">개인 정보 교환 (.p12)</span></div>
+                            </div>
+                            <div class="text-slate-500 text-[10px]">
+                                포맷 드롭다운에 <span class="text-slate-400">.p12</span>가 없으면 개인키가 없는 인증서를 고른 것입니다 → 위 단계로 돌아가세요.
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">🔑 비밀번호 2번 입력 (암호 · 확인)</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                여기서 정한 비밀번호가 곧 GitHub Secret
+                                <code class="text-yellow-400">APPLE_CERTIFICATE_PASSWORD</code> 값이 됩니다.
+                                <span class="text-red-400">반드시 기록해두세요.</span>
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-1">
+                                잊으면 .p12를 다시 내보내야 합니다(인증서 재발급은 불필요).
+                            </div>
+                        </div>
+                    </li>
+                    <li><span class="text-yellow-400">macOS 로그인 암호</span> 입력 → 허용
+                        <span class="text-slate-500 text-[10px]">(키체인이 개인키 반출을 확인하는 절차)</span>
+                    </li>
                 </ol>
+
+                <!-- 검증 -->
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[11px] mt-3">
+                    <div class="text-slate-500 mb-1"># 개인키가 실제로 담겼는지 검증 (권장)</div>
+                    <div class="text-green-400 break-all">openssl pkcs12 -in ~/Downloads/apple_distribution.p12 -nodes -passin pass:설정한비밀번호 | grep -c "PRIVATE KEY"</div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    결과가 <span class="text-green-400">1</span>이면 정상입니다.
+                    <span class="text-slate-400">0</span>이거나 <span class="text-slate-400">Mac verify error</span>가 나오면 비밀번호가 틀렸거나 개인키가 없는 것입니다.
+                </p>
+
+                <!-- 백업 경고 -->
+                <div class="mt-3 p-3 bg-red-900/30 border border-red-700 rounded">
+                    <p class="text-xs text-red-300 font-bold mb-1">🔒 .p12는 개인키를 담고 있습니다 — 취급 주의</p>
+                    <ul class="text-[11px] text-slate-400 list-disc list-inside space-y-0.5">
+                        <li><span class="text-red-400">Git에 절대 커밋하지 마세요.</span> 유출되면 누구나 본인 이름으로 앱에 서명할 수 있습니다</li>
+                        <li>비밀번호와 함께 안전한 곳(비밀번호 관리자 등)에 <span class="text-slate-300">백업</span>하세요</li>
+                        <li>이 파일만 있으면 Mac이 바뀌어도 복구됩니다 — 잃으면 인증서를 재발급해야 하고 3개 한도를 또 씁니다</li>
+                    </ul>
+                </div>
             </div>
 
             <!-- 키체인 시각화 -->
             <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-6">
                 <p class="text-sm font-medium text-blue-400 mb-3">📍 키체인 접근 앱에서 찾는 위치</p>
-                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs overflow-x-auto">
+
+                <!-- 공통: 사이드바 + 카테고리 위치 -->
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs overflow-x-auto mb-3">
                     <div class="flex gap-4">
                         <div class="border-r border-slate-700 pr-4">
-                            <div class="text-slate-500 text-[10px] mb-1">키체인</div>
+                            <div class="text-slate-500 text-[10px] mb-1">기본 키체인</div>
                             <div class="text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">로그인</div>
+                            <div class="text-slate-500 px-2 py-0.5">iCloud</div>
+                            <div class="text-slate-500 text-[10px] mt-2 mb-1">시스템 키체인</div>
                             <div class="text-slate-500 px-2 py-0.5">시스템</div>
+                            <div class="text-slate-500 px-2 py-0.5">시스템 루트</div>
                         </div>
                         <div class="flex-1">
-                            <div class="text-slate-500 text-[10px] mb-1">카테고리</div>
-                            <div class="flex gap-2 mb-3">
+                            <div class="text-slate-500 text-[10px] mb-1">상단 카테고리 탭</div>
+                            <div class="flex gap-2 flex-wrap">
                                 <span class="text-slate-500 px-2 py-0.5">모든 항목</span>
-                                <span class="text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">인증서</span>
                                 <span class="text-slate-500 px-2 py-0.5">암호</span>
-                            </div>
-                            <div class="border border-slate-700 rounded">
-                                <div class="border-l-4 border-green-500 p-2 bg-green-900/20 flex items-center gap-2">
-                                    <span class="text-lg">📜</span>
-                                    <div>
-                                        <div class="text-green-400 font-bold">Apple Distribution: Your Team Name</div>
-                                        <div class="text-slate-500 text-[10px]">만료: 2025년 12월 31일</div>
-                                    </div>
-                                </div>
-                                <div class="text-green-400 text-[10px] pl-6 py-1">↑ 이 인증서 우클릭 → "내보내기"</div>
+                                <span class="text-slate-500 px-2 py-0.5">보안 메모</span>
+                                <span class="text-slate-500 px-2 py-0.5">내 인증서</span>
+                                <span class="text-slate-500 px-2 py-0.5">키</span>
+                                <span class="text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">인증서</span>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- 두 가지 상태 비교 -->
+                <p class="text-xs text-slate-400 mb-2">여기서 화면이 둘 중 하나로 보입니다:</p>
+                <div class="grid md:grid-cols-2 gap-3">
+                    <!-- 비어있는 경우 -->
+                    <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs border-l-4 border-orange-500">
+                        <div class="text-orange-400 font-bold mb-2 text-[11px]">A. 목록이 비어있음 😰</div>
+                        <div class="border border-slate-700 rounded p-3 text-center text-slate-600 mb-2">
+                            <div class="text-[10px]">(항목 없음)</div>
+                        </div>
+                        <div class="text-slate-300 text-[11px] leading-relaxed">
+                            <span class="text-green-400 font-bold">정상입니다!</span> 고장난 게 아닙니다.
+                            아직 인증서를 발급받은 적이 없다는 뜻이에요.
+                            <div class="mt-2 text-yellow-400">→ 위의 2-1(CSR 생성)부터 진행하세요.</div>
+                            <div class="mt-1 text-slate-500 text-[10px]">
+                                CSR을 만들어도 이 목록은 그대로입니다.
+                                <span class="text-slate-400">2-2에서 .cer을 더블클릭한 뒤에야</span> 항목이 생깁니다.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 있는 경우 -->
+                    <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs border-l-4 border-green-500">
+                        <div class="text-green-400 font-bold mb-2 text-[11px]">B. 인증서가 보임 🎉</div>
+                        <div class="border border-slate-700 rounded mb-2">
+                            <div class="p-2 bg-green-900/20 flex items-start gap-1">
+                                <span class="text-slate-500">▼</span>
+                                <span>📜</span>
+                                <div class="min-w-0">
+                                    <div class="text-green-400 font-bold text-[11px] truncate">Apple Distribution: Team</div>
+                                    <div class="text-slate-500 text-[10px]">만료: 2027년 6월 8일</div>
+                                </div>
+                            </div>
+                            <div class="pl-7 py-1 flex items-center gap-1 border-t border-slate-800">
+                                <span>🔑</span>
+                                <span class="text-slate-400 text-[10px]">개인키</span>
+                                <span class="text-green-400 text-[10px]">← 필수!</span>
+                            </div>
+                        </div>
+                        <div class="text-slate-300 text-[11px] leading-relaxed">
+                            <span class="text-yellow-400">▼ 삼각형을 펼쳐</span> 개인키가 있는지 확인하세요.
+                            <div class="mt-2 text-yellow-400">→ 2-3(.p12 내보내기)으로 가세요.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 p-2 bg-slate-800/50 rounded text-[11px] text-slate-400">
+                    💡 <span class="text-slate-300">"내 인증서" 탭</span>은 개인키가 있는 인증서만 보여줍니다.
+                    <span class="text-slate-300">"인증서" 탭</span>에는 보이는데 <span class="text-slate-300">"내 인증서"</span>에 없다면 개인키가 없는 것 → .p12로 내보낼 수 없습니다.
+                </div>
+            </div>
+
+            <!-- 완료 체크리스트 -->
+            <div class="bg-emerald-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-emerald-300 mb-3">🎯 여기까지 왔다면 — 최종 확인</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[11px] mb-3">
+                    <div class="text-green-400">security find-identity -v -p codesigning</div>
+                </div>
+                <p class="text-[11px] text-slate-400 mb-2">아래처럼 <span class="text-green-400">Apple Distribution</span>이 보이면 Step 2 완료입니다:</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[10px] text-slate-400 mb-3 overflow-x-auto">
+                    <div>1) 88BE0B2E... "Apple Development: 이름 (TEAMID)"</div>
+                    <div class="text-green-400">2) A278F54B... "Apple Distribution: 이름 (TEAMID)"</div>
+                    <div class="text-slate-500">&nbsp;&nbsp;&nbsp;2 valid identities found</div>
+                </div>
+                <div class="text-[11px] text-slate-300 space-y-1">
+                    <div>✅ <span class="text-slate-400">키체인에 Apple Distribution 인증서 설치됨</span></div>
+                    <div>✅ <span class="text-slate-400">~/Downloads/apple_distribution.p12 생성됨</span></div>
+                    <div>✅ <span class="text-slate-400">.p12 비밀번호 기록해둠</span></div>
                 </div>
             </div>
 
@@ -746,8 +1113,11 @@
 
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-slate-300">.p12 비밀번호</label>
-                <input type="password" id="p12-password" placeholder="내보낼 때 설정한 비밀번호"
+                <input type="password" id="p12-password" placeholder="2-3에서 내보낼 때 설정한 비밀번호"
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none">
+                <p class="text-xs text-slate-500 mt-1">
+                    GitHub Secret <code class="text-yellow-400">APPLE_CERTIFICATE_PASSWORD</code>로 등록됩니다
+                </p>
             </div>
 
             <div class="flex justify-between items-center mt-8">
@@ -831,7 +1201,43 @@
                             </div>
                         </div>
                     </li>
-                    <li>Capabilities: 필요한 기능만 체크 (Push Notifications 등)</li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">4단계: Capabilities — 목록이 150개쯤 나옵니다</span>
+                            <div class="text-slate-400 mt-2 text-[11px]">
+                                <span class="text-green-400 font-bold">대부분 체크할 필요 없습니다.</span>
+                                Capabilities는 <span class="text-slate-300">Apple 서버 인프라를 쓰거나 샌드박스를 넘는 기능</span>만 해당됩니다.
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-[11px] text-slate-300 mb-1">✅ 해당되면 체크:</div>
+                                <ul class="text-[10px] text-slate-400 list-disc list-inside space-y-0.5">
+                                    <li><span class="text-slate-300">Push Notifications</span> — 푸시 알림 (별도 .p8 키 필요)</li>
+                                    <li><span class="text-slate-300">Sign In with Apple</span> — 애플 로그인</li>
+                                    <li><span class="text-slate-300">In-App Purchase</span> — 인앱 결제</li>
+                                    <li><span class="text-slate-300">Associated Domains</span> — 딥링크/유니버설 링크</li>
+                                    <li><span class="text-slate-300">HealthKit · iCloud · Maps</span> — 해당 프레임워크 사용 시</li>
+                                </ul>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700">
+                                <div class="text-[11px] text-red-400 font-bold mb-1">❌ 체크하지 마세요 — Info.plist로 처리되는 것들</div>
+                                <div class="text-[10px] text-slate-400">
+                                    카메라 · 마이크 녹음 · 음성인식(STT) · TTS · 위치 · 사진앨범 · 블루투스
+                                </div>
+                                <div class="text-[10px] text-slate-500 mt-1">
+                                    이들은 런타임에 사용자 허락을 받는 방식이라 프로비저닝과 무관합니다.
+                                    <code class="text-slate-400">Info.plist</code>의 <code class="text-slate-400">NS...UsageDescription</code> 문자열만 넣으면 됩니다.
+                                </div>
+                                <div class="text-[10px] text-orange-400 mt-2">
+                                    ⚠️ <span class="font-bold">Siri</span>는 "내 앱을 Siri로 호출"(SiriKit)용입니다.
+                                    앱 안에서 음성인식하는 것과 <span class="text-slate-400">무관하니 체크하지 마세요.</span>
+                                </div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-700 text-[10px] text-slate-500">
+                                💡 나중에 추가할 수 있지만, 추가하면 <span class="text-slate-400">Provisioning Profile을 재생성</span>해야 합니다(Step 4 반복).
+                                계획이 확실한 기능은 지금 함께 체크하세요.
+                            </div>
+                        </div>
+                    </li>
                     <li><span class="text-green-400 font-bold">Register</span> 클릭!</li>
                 </ol>
             </div>
@@ -910,6 +1316,20 @@
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
                     placeholder="kr.suhsaechan.suhDevopsTemplate">
                 <p class="text-xs text-slate-500 mt-1">Flutter 프로젝트의 ios/Runner.xcodeproj Bundle Identifier와 동일해야 합니다</p>
+                <div class="mt-3 p-3 bg-red-900/30 border border-red-700 rounded">
+                    <p class="text-xs text-red-300 font-bold mb-2">⚠️ 등록 전 Xcode 프로젝트 값과 대조하세요</p>
+                    <div class="bg-slate-900 rounded p-2 font-mono text-[10px] overflow-x-auto">
+                        <div class="text-green-400 break-all">grep PRODUCT_BUNDLE_IDENTIFIER ios/Runner.xcodeproj/project.pbxproj</div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2">
+                        Flutter가 만든 기본값(<code class="text-slate-300">com.example.앱이름</code> 등)이 그대로 남아 있는 경우가 많습니다.
+                        Apple에 등록할 값과 다르면 <span class="text-red-400">서명 단계에서 실패</span>합니다.
+                    </p>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        다르면 지금 맞추세요. <code class="text-slate-400">RunnerTests</code> 항목까지 함께 바꿔야 합니다.
+                        <span class="text-yellow-400">App Store 출시 후에는 Bundle ID를 변경할 수 없습니다.</span>
+                    </p>
+                </div>
             </div>
 
             <div class="flex justify-between items-center mt-8">
@@ -1003,7 +1423,29 @@
                             </div>
                         </div>
                     </li>
-                    <li><span class="text-green-400 font-bold">Generate</span> → <span class="text-blue-400 font-bold">Download</span></li>
+                    <li><span class="text-green-400 font-bold">Generate</span> → <span class="text-blue-400 font-bold">Download</span> → <code class="text-orange-400">.mobileprovision</code> 저장
+                        <span class="text-slate-500 text-[10px]">(Step 2의 .p12와 달리 키체인 설치 불필요 — 파일만 있으면 됩니다)</span>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-emerald-500">
+                            <span class="text-emerald-400 font-bold">✅ 제대로 만들어졌는지 검증 (권장)</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                프로파일은 텍스트가 아니라 서명된 바이너리라 그냥 열면 깨져 보입니다. 아래 명령으로 내용을 확인하세요.
+                            </div>
+                            <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] overflow-x-auto">
+                                <div class="text-green-400 break-all">security cms -D -i ~/Downloads/파일명.mobileprovision | plutil -p - | grep -E "Name|application-identifier|ExpirationDate|aps-environment"</div>
+                            </div>
+                            <div class="text-slate-400 mt-2 text-[11px]">확인할 것:</div>
+                            <ul class="text-[10px] text-slate-400 list-disc list-inside mt-1 space-y-0.5">
+                                <li><span class="text-slate-300">application-identifier</span>가 <span class="text-yellow-400">팀ID.본인BundleID</span> 형태인지</li>
+                                <li><span class="text-slate-300">aps-environment</span>가 <span class="text-green-400">production</span>인지 (푸시 켠 경우)</li>
+                                <li><span class="text-slate-300">ExpirationDate</span>가 1년 뒤인지</li>
+                            </ul>
+                            <div class="text-slate-500 text-[10px] mt-2">
+                                ⚠️ <span class="text-slate-400">get-task-allow</span>가 <span class="text-red-400">true</span>면 개발용 프로파일을 잘못 만든 것입니다 → Distribution으로 다시 생성하세요.
+                            </div>
+                        </div>
+                    </li>
                 </ol>
             </div>
 
@@ -1289,7 +1731,10 @@
                     </label>
                     <input type="text" id="teamId" maxlength="10"
                         class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm uppercase focus:border-blue-500 outline-none"
-                        placeholder="ABC1234DEF">
+                        placeholder="ABC1234DEF"
+                        oninput="validateTeamId(this)">
+                    <!-- 자리수 미달 경고: 복붙 중 마지막 글자 누락이 잦아 실시간으로 잡는다 -->
+                    <p id="teamId-warning" class="text-xs mt-1 hidden"></p>
                 </div>
 
                 <!-- Profile Name (자동 채워짐) -->
@@ -1323,6 +1768,12 @@
                     </a>
                 </div>
                 <p class="text-xs text-slate-400">페이지에서 "Team ID" 항목을 찾으세요 (10자리 영문+숫자)</p>
+                <div class="mt-3 pt-3 border-t border-slate-600">
+                    <p class="text-xs text-slate-400 mb-2">또는 Step 4에서 받은 프로파일에서 바로 확인:</p>
+                    <div class="bg-slate-900 rounded p-2 font-mono text-[10px] overflow-x-auto">
+                        <div class="text-green-400 break-all">security cms -D -i ~/Downloads/파일명.mobileprovision | plutil -p - | grep -A2 TeamIdentifier</div>
+                    </div>
+                </div>
             </div>
 
             <!-- 암호화 설정 -->
@@ -1391,7 +1842,31 @@
                     <li>Team Keys 탭에서 <span class="text-blue-400 font-bold">+</span> 버튼 클릭</li>
                     <li>Name: 알아보기 쉬운 이름 (예: MY-PROJECT-KEY)</li>
                     <li>Access: <span class="text-orange-400 font-bold">Admin</span> 선택 (권장)</li>
-                    <li>Generate → <span class="text-red-400 font-bold">.p8 파일 즉시 다운로드!</span></li>
+                    <li>Generate → <span class="text-red-400 font-bold">.p8 파일 즉시 다운로드!</span>
+                        <div class="mt-2 p-2 bg-slate-800/50 rounded border-l-4 border-emerald-500 text-[11px]">
+                            <span class="text-emerald-400 font-bold">💡 Key ID는 파일명에 들어 있습니다</span>
+                            <div class="text-slate-400 mt-1 font-mono">
+                                AuthKey_<span class="text-yellow-400">9S3Y25UVZN</span>.p8 → Key ID = <span class="text-yellow-400">9S3Y25UVZN</span>
+                            </div>
+                            <div class="text-slate-500 mt-1">따로 적어두지 않았어도 파일명만 보면 됩니다.</div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
+                            <span class="text-orange-400 font-bold">이미 발급받은 .p8이 있다면</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                새로 만들지 말고 기존 것을 재사용하세요. 단, App Store Connect의
+                                <span class="text-slate-300">Active Keys</span> 목록에 그 Key ID가 남아 있는지 확인해야 합니다.
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-1">
+                                Revoked 된 키는 목록에서 사라지며, 파일이 있어도 업로드가 실패합니다.
+                            </div>
+                            <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] overflow-x-auto">
+                                <div class="text-slate-500"># 파일이 정상 규격인지 확인 (EC P-256이면 정상)</div>
+                                <div class="text-green-400 break-all">openssl pkcs8 -in ~/Downloads/AuthKey_XXXXXXXXXX.p8 -nocrypt | openssl ec -noout -text | grep NIST</div>
+                            </div>
+                        </div>
+                    </li>
                 </ol>
             </div>
 
@@ -1531,17 +2006,43 @@
             </div>
 
             <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
-                <p class="text-sm text-yellow-200 mb-1">생성되는 파일:</p>
+                <p class="text-sm text-yellow-200 mb-1">새로 생성되는 파일:</p>
                 <ul class="text-xs text-slate-300 list-disc list-inside">
-                    <li>ios/Gemfile</li>
-                    <li>ios/fastlane/Appfile</li>
-                    <li>ios/fastlane/Fastfile</li>
-                    <li>ios/ExportOptions.plist</li>
+                    <li><code class="text-slate-400">ios/Gemfile</code> — Fastlane 의존성</li>
+                    <li><code class="text-slate-400">ios/fastlane/Fastfile</code> — TestFlight 업로드 lane</li>
+                    <li><code class="text-slate-400">ios/ExportOptions.plist</code> — IPA 익스포트 설정</li>
                 </ul>
+                <p class="text-sm text-yellow-200 mt-3 mb-1">수정되는 기존 파일:</p>
+                <ul class="text-xs text-slate-300 list-disc list-inside">
+                    <li><code class="text-slate-400">ios/Runner.xcodeproj/project.pbxproj</code> — Bundle ID, Manual Signing, Team ID</li>
+                    <li><code class="text-slate-400">ios/Runner/Info.plist</code> — 암호화 설정(ITSAppUsesNonExemptEncryption)</li>
+                    <li><code class="text-slate-400">ios/.gitignore</code> — Gemfile.lock 추가</li>
+                </ul>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    ⚠️ Bundle ID가 Step 3에서 입력한 값과 다르면 <span class="text-slate-400">자동으로 변경</span>됩니다.
+                    Appfile은 만들지 않습니다 — 앱 식별자를 GitHub Actions 환경변수로 주입하는 방식이라 불필요합니다.
+                </p>
             </div>
 
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-slate-300">터미널에서 실행:</label>
+                <!-- 경로 미입력 시 cd 실패로 이어지므로 복사 전에 경고 -->
+                <div id="initCmd-warning" class="hidden mb-2 p-3 bg-red-900/30 border border-red-700 rounded-lg">
+                    <p class="text-xs text-red-300 font-bold">⚠️ 프로젝트 경로가 비어 있습니다</p>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Step 1로 돌아가 Flutter 프로젝트의 절대경로를 입력하세요. 이대로 실행하면
+                        <code class="text-slate-300">cd: no such file or directory</code> 오류가 납니다.
+                    </p>
+                </div>
+                <!-- 모노레포일 때 cd 대상과 인자가 다른 이유를 설명 -->
+                <div id="initCmd-mono" class="hidden mb-2 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                    <p class="text-xs text-blue-200 font-bold">📌 경로가 두 개인 이유</p>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        <code class="text-slate-300">cd</code>는 스크립트가 있는 <span class="text-yellow-400">레포 루트</span>로,
+                        인자는 pubspec.yaml이 있는 <span class="text-yellow-400">Flutter 루트</span>로 지정됩니다.
+                        모노레포라 두 위치가 달라 이렇게 나눠야 동작합니다.
+                    </p>
+                </div>
                 <div class="code-block">
                     <button class="copy-btn absolute top-2 right-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 transition" onclick="copyCode(this)">복사</button>
                     <pre id="initCmd">cd "/path/to/project" && python3 ".github/util/flutter/testflight-wizard/testflight-wizard.py" setup ...</pre>
@@ -1652,6 +2153,18 @@
                     <div class="p-2 bg-slate-800/50 rounded">
                         <code class="text-green-400 font-bold">APP_STORE_CONNECT_ISSUER_ID</code>
                         <p class="text-slate-400 mt-1">App Store Connect Issuer ID (UUID 형식)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">IOS_PROVISIONING_PROFILE_NAME</code>
+                        <p class="text-slate-400 mt-1">Step 4에서 입력한 프로파일 이름 (예: Elum AppStore Distribution)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">IOS_BUNDLE_ID</code>
+                        <p class="text-slate-400 mt-1">Step 3에서 등록한 Bundle ID (예: kr.example.myapp)</p>
+                    </div>
+                    <div class="p-2 bg-slate-800/50 rounded">
+                        <code class="text-green-400 font-bold">APPLE_TEAM_ID</code>
+                        <p class="text-slate-400 mt-1">Apple Team ID (10자리 영문+숫자)</p>
                     </div>
                 </div>
             </div>

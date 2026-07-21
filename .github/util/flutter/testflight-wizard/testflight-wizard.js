@@ -11,6 +11,7 @@ const state = {
     currentStep: 1,
     totalSteps: 9,
     projectPath: '',
+    repoRoot: '',
     bundleId: '',
     teamId: '',
     profileName: '',
@@ -85,6 +86,7 @@ function restoreUIFromState() {
     // 입력 필드 복원
     const inputs = {
         'projectPath': state.projectPath,
+        'repoRoot': state.repoRoot,
         'bundleId': state.bundleId,
         'bundleId-confirm': state.bundleId,
         'teamId': state.teamId,
@@ -188,6 +190,41 @@ function $$(selector) {
 function getInputValue(id) {
     const element = document.getElementById(id);
     return element?.value?.trim() || '';
+}
+
+/** POSIX(/...)와 Windows(C:\...) 절대경로를 모두 허용한다 */
+function isAbsolutePath(p) {
+    return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p);
+}
+
+/**
+ * Team ID 실시간 검증.
+ * 복붙 중 마지막 글자가 누락된 9자리 입력이 잦은데, 그대로 Secret에 들어가면
+ * 빌드 서명 단계에서야 팀 불일치로 실패해 원인 추적이 어렵다. 입력 시점에 잡는다.
+ */
+function validateTeamId(input) {
+    const warning = document.getElementById('teamId-warning');
+    if (!warning) return;
+
+    const value = (input.value || '').trim().toUpperCase();
+    input.value = value;
+
+    // 미입력 상태에서는 경고를 띄우지 않는다 (입력 전부터 빨간 글씨는 노이즈)
+    if (value.length === 0) {
+        warning.className = 'text-xs mt-1 hidden';
+        return;
+    }
+
+    if (value.length < 10) {
+        warning.textContent = `⚠️ ${value.length}자리 - Team ID는 10자리입니다. 마지막 글자가 빠지지 않았는지 확인하세요.`;
+        warning.className = 'text-xs mt-1 text-red-400';
+    } else if (!/^[A-Z0-9]{10}$/.test(value)) {
+        warning.textContent = '⚠️ Team ID는 영문 대문자와 숫자 10자리입니다.';
+        warning.className = 'text-xs mt-1 text-red-400';
+    } else {
+        warning.textContent = '✅ 형식이 올바릅니다';
+        warning.className = 'text-xs mt-1 text-green-400';
+    }
 }
 
 function setElementText(id, text) {
@@ -335,15 +372,21 @@ async function selectProjectFolder() {
     if ('showDirectoryPicker' in window) {
         try {
             const dirHandle = await window.showDirectoryPicker();
-            const projectPath = dirHandle.name;
+            const folderName = dirHandle.name;
 
-            const input = document.getElementById('projectPath');
-            if (input) {
-                input.value = `선택된 폴더: ${projectPath} (터미널에서 실제 경로를 사용하세요)`;
-                input.placeholder = '선택된 폴더를 확인하고 실제 경로를 입력하세요';
+            // 브라우저는 보안상 절대경로를 주지 않는다 (폴더명만 얻을 수 있음).
+            // 입력칸에 안내문을 써넣으면 실제 경로를 덮어써 폴백(/path/to/project)이 나가므로,
+            // 입력칸은 건드리지 않고 힌트 영역에만 폴더명을 표시한다.
+            const hint = document.getElementById('projectPath-hint');
+            if (hint) {
+                hint.innerHTML = `선택한 폴더: <span class="text-yellow-400 font-mono">${folderName}</span> — 아래 칸에 이 폴더의 <span class="text-yellow-400">절대경로</span>를 입력하세요 (터미널에서 <code class="text-slate-300">pwd</code>)`;
+                hint.classList.remove('hidden');
             }
 
-            showToast(`폴더 "${projectPath}" 선택됨`);
+            const input = document.getElementById('projectPath');
+            if (input) input.focus();
+
+            showToast(`폴더 "${folderName}" 선택됨 - 절대경로를 입력해주세요`);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.error('폴더 선택 오류:', err);
@@ -618,6 +661,7 @@ function resetWizard() {
     if (confirm('모든 데이터를 초기화하시겠습니까?')) {
         state.currentStep = 1;
         state.projectPath = '';
+        state.repoRoot = '';
         state.bundleId = '';
         state.teamId = '';
         state.profileName = '';
@@ -633,7 +677,7 @@ function resetWizard() {
         clearState();
 
         // UI 초기화
-        const inputs = ['projectPath', 'bundleId', 'bundleId-confirm', 'teamId', 'profileName', 'profileName-confirm', 'appName', 'p12-password', 'api-key-id', 'issuer-id'];
+        const inputs = ['projectPath', 'repoRoot', 'bundleId', 'bundleId-confirm', 'teamId', 'profileName', 'profileName-confirm', 'appName', 'p12-password', 'api-key-id', 'issuer-id'];
         inputs.forEach(id => {
             const input = document.getElementById(id);
             if (input) input.value = '';
@@ -669,8 +713,20 @@ function saveCurrentStepData() {
         case 1:
             // Step 1: 시작하기 - 프로젝트 경로
             state.projectPath = getInputValue('projectPath');
+            // 구버전이 입력칸에 써넣던 안내문이 남아 있으면 경로로 쓰지 않는다
             if (state.projectPath.startsWith('선택된 폴더:')) {
                 state.projectPath = '';
+            }
+            // 상대경로는 Step 8 명령어에서 cd 실패로 이어지므로 미리 걸러낸다
+            if (state.projectPath && !isAbsolutePath(state.projectPath)) {
+                showToast('절대경로를 입력해주세요 (예: /Users/이름/projects/myapp)');
+                state.projectPath = '';
+            }
+            // 모노레포에서만 채우는 선택 입력 — 비어 있으면 Flutter 루트를 그대로 쓴다
+            state.repoRoot = getInputValue('repoRoot');
+            if (state.repoRoot && !isAbsolutePath(state.repoRoot)) {
+                showToast('레포 루트도 절대경로로 입력해주세요');
+                state.repoRoot = '';
             }
             break;
         case 2:
@@ -716,13 +772,37 @@ function saveCurrentStepData() {
 // ============================================
 
 function generateInitCommand() {
-    const projectPath = state.projectPath || '/path/to/project';
+    // 경로 미입력 시 placeholder가 그대로 나가면 cd 실패로 이어진다.
+    // 명령어를 감추는 대신 배너로 무엇을 채워야 하는지 알린다.
+    const pathMissing = !state.projectPath;
+    const projectPath = state.projectPath || '<<Step 1에서 프로젝트 절대경로를 입력하세요>>';
     const bundleId = state.bundleId || 'com.example.app';
     const teamId = state.teamId || 'TEAM_ID';
     const profileName = state.profileName || 'Profile Name';
     const usesNonExemptEncryption = state.encryptionType === 'standard' ? 'true' : 'false';
 
-    const cmd = `cd "${projectPath}" && python3 ".github/util/flutter/testflight-wizard/testflight-wizard.py" setup "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
+    const warning = document.getElementById('initCmd-warning');
+    if (warning) {
+        warning.classList.toggle('hidden', !pathMissing);
+    }
+
+    // 스크립트(.github/...)는 레포 루트 기준인데 pubspec.yaml은 Flutter 루트 기준이다.
+    // 모노레포(예: repo/client/)에서는 두 위치가 달라, cd 지점을 레포 루트로 잡고
+    // Flutter 루트는 인자로 따로 넘겨야 양쪽 다 해결된다.
+    const repoRoot = state.repoRoot || projectPath;
+    const isMonorepo = !!state.repoRoot && state.repoRoot !== state.projectPath;
+
+    const monoNote = document.getElementById('initCmd-mono');
+    if (monoNote) {
+        monoNote.classList.toggle('hidden', !isMonorepo);
+    }
+    const isWindows = /^[A-Za-z]:[\\/]/.test(repoRoot);
+    const python = isWindows ? 'python' : 'python3';
+    const scriptPath = isWindows
+        ? '.github\\util\\flutter\\testflight-wizard\\testflight-wizard.py'
+        : '.github/util/flutter/testflight-wizard/testflight-wizard.py';
+
+    const cmd = `cd "${repoRoot}" && ${python} "${scriptPath}" setup "${projectPath}" "${bundleId}" "${teamId}" "${profileName}" "${usesNonExemptEncryption}"`;
     setElementText('initCmd', cmd);
 }
 

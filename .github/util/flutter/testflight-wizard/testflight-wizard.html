@@ -23,7 +23,14 @@
         "키체인 인증서 목록이 비어있는 경우를 정상 상태로 명시 - 최초 진입자 혼란 해소",
         ".cer 다운로드 후 더블클릭 설치 및 '인증서 추가' 창의 키체인 선택(로그인) 안내 추가",
         "설치 확인 명령(security find-identity) 안내 추가",
-        "p12 내보내기 전 개인키 존재 확인 단계 추가"
+        "키체인 목록의 Apple 중간 CA 인증서와 본인 인증서 구분법 추가",
+        "p12 내보내기 전 개인키 존재 확인 단계 추가",
+        "산출물 파일명을 CertificateSigningRequest / apple_distribution.cer / apple_distribution.p12로 통일",
+        "p12 저장 다이얼로그 입력값 및 비밀번호 2회 입력 안내 상세화",
+        "p12 개인키 포함 여부 검증 명령(openssl pkcs12) 추가",
+        "p12 유출 위험 및 백업 경고 추가",
+        "Step 2 완료 체크리스트 추가 - find-identity 기대 출력 예시 포함",
+        "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시"
       ]
     },
     {
@@ -720,7 +727,7 @@
                             <span class="text-orange-400 font-bold">다이얼로그 입력값</span>
                             <div class="space-y-1.5 font-mono text-[11px]">
                                 <div><span class="text-slate-400">사용자 이메일 주소:</span> <span class="text-white">Apple Developer 계정 이메일</span></div>
-                                <div><span class="text-slate-400">일반 이름:</span> <span class="text-white">아무거나 (예: MyApp Distribution)</span></div>
+                                <div><span class="text-slate-400">일반 이름:</span> <span class="text-white">[본인이름] Distribution</span> <span class="text-slate-600">(예: HONG GILDONG Distribution)</span></div>
                                 <div><span class="text-slate-400">CA 이메일 주소:</span> <span class="text-red-400 font-bold">반드시 비워둘 것</span></div>
                             </div>
                             <div class="mt-2 pt-2 border-t border-slate-700">
@@ -741,15 +748,27 @@
                             </div>
                         </div>
                     </li>
-                    <li><span class="text-yellow-400">계속</span> → 저장 위치 지정 (예: 다운로드 폴더) → 저장</li>
+                    <li><span class="text-yellow-400">계속</span> → 저장 위치는 <span class="text-yellow-400">다운로드 폴더</span> 권장 → 저장
+                        <div class="text-slate-500 text-[10px] mt-1">
+                            파일명은 기본값(<code class="text-slate-400">CertificateSigningRequest</code>) 그대로 두세요. 아래 명령들이 이 이름을 씁니다.
+                        </div>
+                    </li>
                 </ol>
                 <div class="bg-slate-900 rounded-lg p-3 font-mono text-xs mt-3">
-                    <div class="text-green-400">→ CertificateSigningRequest.certSigningRequest 생성됨</div>
+                    <div class="text-green-400">→ ~/Downloads/CertificateSigningRequest.certSigningRequest 생성됨</div>
+                </div>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[11px] mt-2">
+                    <div class="text-slate-500 mb-1"># 제대로 만들어졌는지 검증 (선택)</div>
+                    <div class="text-green-400 break-all">openssl req -in ~/Downloads/CertificateSigningRequest.certSigningRequest -noout -subject -verify</div>
                 </div>
                 <p class="text-[11px] text-slate-500 mt-2">
-                    검증(선택): <code class="text-slate-400">openssl req -in ~/Downloads/CertificateSigningRequest.certSigningRequest -noout -subject -verify</code>
-                    → <span class="text-green-400">verify OK</span>가 나오면 정상입니다.
+                    <span class="text-green-400">verify OK</span>와 함께
+                    <code class="text-slate-400">CN=..., C=KR</code> 형태의 Subject가 보이면 정상입니다.
                 </p>
+                <div class="mt-3 p-2 bg-slate-800/50 rounded text-[11px] text-slate-400">
+                    💡 다음 단계 업로드 창에서 파일이 안 보이면 → Finder에서 <span class="text-yellow-400">⌘+Shift+G</span> 누르고
+                    <code class="text-slate-300">~/Downloads/CertificateSigningRequest.certSigningRequest</code> 붙여넣으면 바로 선택됩니다.
+                </div>
             </div>
 
             <!-- 2-2. 인증서 발급받기 -->
@@ -779,7 +798,7 @@
                         </div>
                     </li>
                     <li><span class="text-yellow-400">Choose File</span> → 2-1에서 만든 <span class="text-orange-400">.certSigningRequest</span> 업로드 → Continue</li>
-                    <li><span class="text-yellow-400">Download</span> 클릭 → .cer 파일 저장</li>
+                    <li><span class="text-yellow-400">Download</span> 클릭 → <code class="text-orange-400">apple_distribution.cer</code> 저장 (기본 파일명 그대로)</li>
                     <li class="pl-4">
                         <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
                             <span class="text-red-400 font-bold">⚠️ 다운로드만으로는 끝이 아닙니다 — 반드시 설치하세요!</span>
@@ -817,8 +836,30 @@
                 <p class="text-sm text-yellow-200 mb-2">📤 2-3. 키체인에서 .p12 파일 내보내기</p>
                 <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1">
                     <li>Mac에서 <span class="text-yellow-400">"키체인 접근"</span> 앱 열기 (⌘+Space → "키체인")</li>
-                    <li>왼쪽: <span class="text-yellow-400">"로그인"</span> 키체인 → 상단: <span class="text-yellow-400">"인증서"</span> 카테고리</li>
-                    <li><span class="text-green-400 font-bold">"Apple Distribution: [팀이름]"</span> 인증서 찾기</li>
+                    <li>왼쪽: <span class="text-yellow-400">"로그인"</span> 키체인 → 상단: <span class="text-yellow-400">"내 인증서"</span> 카테고리
+                        <span class="text-slate-500 text-[10px]">("인증서" 탭은 Apple CA까지 섞여 나와 헷갈립니다)</span>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">⚠️ 목록에 인증서가 10개쯤 보여도 당황하지 마세요</span>
+                            <div class="text-slate-400 mt-2 text-[11px]">
+                                대부분은 Apple이 자동 설치한 <span class="text-slate-300">중간 CA 인증서</span>입니다.
+                                <span class="text-red-400">건드리지 마세요.</span>
+                            </div>
+                            <div class="bg-slate-900 rounded p-2 mt-2 font-mono text-[10px] space-y-0.5">
+                                <div class="text-slate-600">Developer ID Certification Authority</div>
+                                <div class="text-slate-600">Apple Worldwide Developer Relations CA</div>
+                                <div class="text-slate-600">Apple Root CA <span class="text-slate-700">… ❌ 전부 무시</span></div>
+                                <div class="text-green-400 mt-1">▶ Apple Distribution: 이름 (TEAMID) <span class="text-yellow-400">← ✅ 이것!</span></div>
+                                <div class="text-slate-500">▶ Apple Development: 이름 (TEAMID) <span class="text-slate-600">← ❌ 개발용, 배포 불가</span></div>
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-2">
+                                구분법: 이름이 <span class="text-slate-400">"Apple Distribution:"</span>으로 시작하고,
+                                왼쪽에 <span class="text-yellow-400">▶ 삼각형</span>이 붙어 있습니다(= 개인키 보유).
+                                CA 인증서에는 삼각형이 없습니다.
+                            </div>
+                        </div>
+                    </li>
                     <li class="pl-4">
                         <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500">
                             <span class="text-orange-400 font-bold">⚠️ 개인키가 있는지 먼저 확인!</span>
@@ -831,11 +872,57 @@
                             </div>
                         </div>
                     </li>
-                    <li>인증서 우클릭 → <span class="text-yellow-400">"[인증서명] 내보내기"</span></li>
-                    <li>파일 포맷: <span class="text-orange-400 font-bold">개인 정보 교환 (.p12)</span> 선택</li>
-                    <li>비밀번호 설정 → <span class="text-slate-400">잊지 마세요, 아래에 입력해야 합니다</span></li>
-                    <li>macOS 로그인 암호 입력 (키체인 접근 허용)</li>
+                    <li>인증서 우클릭 → <span class="text-yellow-400">"Apple Distribution: ... 내보내기..."</span></li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-orange-500 space-y-2">
+                            <span class="text-orange-400 font-bold">저장 다이얼로그</span>
+                            <div class="space-y-1.5 font-mono text-[11px]">
+                                <div><span class="text-slate-400">이름:</span> <code class="text-orange-400">apple_distribution.p12</code></div>
+                                <div><span class="text-slate-400">위치:</span> <span class="text-white">다운로드</span></div>
+                                <div><span class="text-slate-400">파일 포맷:</span> <span class="text-green-400 font-bold">개인 정보 교환 (.p12)</span></div>
+                            </div>
+                            <div class="text-slate-500 text-[10px]">
+                                포맷 드롭다운에 <span class="text-slate-400">.p12</span>가 없으면 개인키가 없는 인증서를 고른 것입니다 → 위 단계로 돌아가세요.
+                            </div>
+                        </div>
+                    </li>
+                    <li class="pl-4">
+                        <div class="mt-2 p-3 bg-slate-800/50 rounded border-l-4 border-red-500">
+                            <span class="text-red-400 font-bold">🔑 비밀번호 2번 입력 (암호 · 확인)</span>
+                            <div class="text-slate-400 mt-1 text-[11px]">
+                                여기서 정한 비밀번호가 곧 GitHub Secret
+                                <code class="text-yellow-400">IOS_DIST_CERT_PASSWORD</code> 값이 됩니다.
+                                <span class="text-red-400">반드시 기록해두세요.</span>
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-1">
+                                잊으면 .p12를 다시 내보내야 합니다(인증서 재발급은 불필요).
+                            </div>
+                        </div>
+                    </li>
+                    <li><span class="text-yellow-400">macOS 로그인 암호</span> 입력 → 허용
+                        <span class="text-slate-500 text-[10px]">(키체인이 개인키 반출을 확인하는 절차)</span>
+                    </li>
                 </ol>
+
+                <!-- 검증 -->
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[11px] mt-3">
+                    <div class="text-slate-500 mb-1"># 개인키가 실제로 담겼는지 검증 (권장)</div>
+                    <div class="text-green-400 break-all">openssl pkcs12 -in ~/Downloads/apple_distribution.p12 -nodes -passin pass:설정한비밀번호 | grep -c "PRIVATE KEY"</div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    결과가 <span class="text-green-400">1</span>이면 정상입니다.
+                    <span class="text-slate-400">0</span>이거나 <span class="text-slate-400">Mac verify error</span>가 나오면 비밀번호가 틀렸거나 개인키가 없는 것입니다.
+                </p>
+
+                <!-- 백업 경고 -->
+                <div class="mt-3 p-3 bg-red-900/30 border border-red-700 rounded">
+                    <p class="text-xs text-red-300 font-bold mb-1">🔒 .p12는 개인키를 담고 있습니다 — 취급 주의</p>
+                    <ul class="text-[11px] text-slate-400 list-disc list-inside space-y-0.5">
+                        <li><span class="text-red-400">Git에 절대 커밋하지 마세요.</span> 유출되면 누구나 본인 이름으로 앱에 서명할 수 있습니다</li>
+                        <li>비밀번호와 함께 안전한 곳(비밀번호 관리자 등)에 <span class="text-slate-300">백업</span>하세요</li>
+                        <li>이 파일만 있으면 Mac이 바뀌어도 복구됩니다 — 잃으면 인증서를 재발급해야 하고 3개 한도를 또 씁니다</li>
+                    </ul>
+                </div>
             </div>
 
             <!-- 키체인 시각화 -->
@@ -918,6 +1005,25 @@
                 </div>
             </div>
 
+            <!-- 완료 체크리스트 -->
+            <div class="bg-emerald-900/30 border border-emerald-700 rounded-lg p-4 mb-6">
+                <p class="text-sm text-emerald-300 mb-3">🎯 여기까지 왔다면 — 최종 확인</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[11px] mb-3">
+                    <div class="text-green-400">security find-identity -v -p codesigning</div>
+                </div>
+                <p class="text-[11px] text-slate-400 mb-2">아래처럼 <span class="text-green-400">Apple Distribution</span>이 보이면 Step 2 완료입니다:</p>
+                <div class="bg-slate-900 rounded-lg p-3 font-mono text-[10px] text-slate-400 mb-3 overflow-x-auto">
+                    <div>1) 88BE0B2E... "Apple Development: 이름 (TEAMID)"</div>
+                    <div class="text-green-400">2) A278F54B... "Apple Distribution: 이름 (TEAMID)"</div>
+                    <div class="text-slate-500">&nbsp;&nbsp;&nbsp;2 valid identities found</div>
+                </div>
+                <div class="text-[11px] text-slate-300 space-y-1">
+                    <div>✅ <span class="text-slate-400">키체인에 Apple Distribution 인증서 설치됨</span></div>
+                    <div>✅ <span class="text-slate-400">~/Downloads/apple_distribution.p12 생성됨</span></div>
+                    <div>✅ <span class="text-slate-400">.p12 비밀번호 기록해둠</span></div>
+                </div>
+            </div>
+
             <!-- 파일 업로드 -->
             <div class="file-upload" id="p12-upload" onclick="document.getElementById('p12-input').click()">
                 <div class="icon">📄</div>
@@ -928,8 +1034,11 @@
 
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-slate-300">.p12 비밀번호</label>
-                <input type="password" id="p12-password" placeholder="내보낼 때 설정한 비밀번호"
+                <input type="password" id="p12-password" placeholder="2-3에서 내보낼 때 설정한 비밀번호"
                     class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 outline-none">
+                <p class="text-xs text-slate-500 mt-1">
+                    GitHub Secret <code class="text-yellow-400">IOS_DIST_CERT_PASSWORD</code>로 등록됩니다
+                </p>
             </div>
 
             <div class="flex justify-between items-center mt-8">

@@ -15,7 +15,14 @@
         "키체인 인증서 목록이 비어있는 경우를 정상 상태로 명시 - 최초 진입자 혼란 해소",
         ".cer 다운로드 후 더블클릭 설치 및 '인증서 추가' 창의 키체인 선택(로그인) 안내 추가",
         "설치 확인 명령(security find-identity) 안내 추가",
-        "p12 내보내기 전 개인키 존재 확인 단계 추가"
+        "키체인 목록의 Apple 중간 CA 인증서와 본인 인증서 구분법 추가",
+        "p12 내보내기 전 개인키 존재 확인 단계 추가",
+        "산출물 파일명을 CertificateSigningRequest / apple_distribution.cer / apple_distribution.p12로 통일",
+        "p12 저장 다이얼로그 입력값 및 비밀번호 2회 입력 안내 상세화",
+        "p12 개인키 포함 여부 검증 명령(openssl pkcs12) 추가",
+        "p12 유출 위험 및 백업 경고 추가",
+        "Step 2 완료 체크리스트 추가 - find-identity 기대 출력 예시 포함",
+        "p12 비밀번호 입력란에 대응 Secret 키(IOS_DIST_CERT_PASSWORD) 표시"
       ]
     },
     {

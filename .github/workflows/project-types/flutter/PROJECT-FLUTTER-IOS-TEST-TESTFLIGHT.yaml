@@ -69,6 +69,10 @@ env:
   XCODE_VERSION: "26.0"
   PROJECT_TYPE: "flutter"
   ENV_FILE_PATH: ".env"
+  # Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
+  # 통합 시점에 integrator의 flutter-root resolver가 project_paths.flutter 값으로 1회 치환.
+  # FLUTTER_ROOT는 Flutter SDK 경로용 공식 변수라 충돌 — APP_ROOT로 분리
+  APP_ROOT: "."  # @wizard auto:flutter-root
 
 jobs:
   # ===================================================================
@@ -191,6 +195,9 @@ jobs:
   prepare-test-build:
     name: 테스트 빌드 준비
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     needs: notify-start
     if: |
       always() &&
@@ -241,10 +248,12 @@ jobs:
 
       # 테스트 빌드 버전 설정 (version.yml에서 동적 읽기)
       - name: 버전 관리 스크립트 권한 설정
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 APP_ROOT가 아닌 레포 루트 기준
         run: chmod +x ./.github/scripts/version_manager.sh
 
       - name: 테스트 빌드 버전 설정
         id: test_version
+        working-directory: ${{ github.workspace }}   # version_manager.sh가 레포 루트 version.yml을 읽어야 함
         run: |
           # version_manager.sh로 버전 가져오기 (프로덕션 워크플로우와 동일한 방식)
           VERSION=$(./.github/scripts/version_manager.sh get | tail -n 1)
@@ -358,21 +367,22 @@ EOF
         uses: actions/upload-artifact@v4
         with:
           name: release-notes
-          path: final_release_notes.txt
+          # 릴리즈 노트는 APP_ROOT에서 생성되지만 아티팩트 액션은 레포 루트 기준이라 prefix 필요
+          path: ${{ env.APP_ROOT }}/final_release_notes.txt
           retention-days: 1
 
       - name: Upload project files
         uses: actions/upload-artifact@v4
         with:
           name: project-files
-          # 모노레포 대응: 산출물은 APP_ROOT 기준이라 경로 prefix가 필요하다.
-          # (없으면 레포 루트에서 찾아 0건 → if-no-files-found 기본값 warn으로 조용히 통과)
+          # 아티팩트 액션은 defaults(working-directory)를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요하다
           path: |
             ${{ env.APP_ROOT }}/${{ env.ENV_FILE_PATH }}
             ${{ env.APP_ROOT }}/ios/Flutter/Secrets.xcconfig
             ${{ env.APP_ROOT }}/pubspec.yaml
             ${{ env.APP_ROOT }}/lib/
             ${{ env.APP_ROOT }}/assets/
+          include-hidden-files: true   # .env가 숨김 파일이라 기본값 false면 누락된다
           retention-days: 1
           include-hidden-files: true   # .env가 숨김 파일이라 기본값 false면 누락된다
           # assets/ 등 일부 경로는 프로젝트마다 없을 수 있어 warn 유지.
@@ -433,6 +443,9 @@ EOF
   build-ios-test:
     name: iOS 테스트 빌드
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     needs: [notify-start, prepare-test-build]
     if: |
       !cancelled() &&
@@ -531,7 +544,6 @@ EOF
         uses: actions/download-artifact@v4
         with:
           name: project-files
-          # 업로드 시 APP_ROOT prefix가 붙으므로 레포 루트에 풀면 원래 위치로 복원된다
           path: .
 
       - name: Ensure .env file exists
@@ -652,9 +664,10 @@ EOF
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
+          # 아티팩트 액션은 defaults(working-directory)를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요하다
           path: |
-            ios/build/ipa/*.ipa
-            build-metadata.json
+            ${{ env.APP_ROOT }}/ios/build/ipa/*.ipa
+            ${{ env.APP_ROOT }}/build-metadata.json
           retention-days: 1
 
       # 진행 상황 업데이트 - IPA 빌드 완료
@@ -777,6 +790,9 @@ EOF
   deploy-testflight-test:
     name: TestFlight 테스트 배포
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ${{ env.APP_ROOT }}
     needs: [notify-start, prepare-test-build, build-ios-test]
     if: |
       !cancelled() &&
@@ -801,12 +817,14 @@ EOF
         uses: actions/download-artifact@v4
         with:
           name: ios-ipa
-          path: ios/build/ipa/
+          # 업로드 경로에 APP_ROOT prefix가 포함되므로 레포 루트에 풀면 원래 위치로 복원된다
+          path: .
 
       - name: Download release notes
         uses: actions/download-artifact@v4
         with:
           name: release-notes
+          # 업로드 경로에 APP_ROOT prefix가 포함되므로 레포 루트에 풀면 원래 위치로 복원된다
           path: .
 
       - name: Verify Fastfile exists

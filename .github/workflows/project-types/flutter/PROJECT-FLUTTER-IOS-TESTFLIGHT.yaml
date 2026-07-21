@@ -386,6 +386,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
+          # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
           path: ${{ env.APP_ROOT }}/ios/build/ipa/*.ipa
           retention-days: 1
 
@@ -416,7 +417,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ios-ipa
-          path: ${{ env.APP_ROOT }}/ios/build/ipa/
+          # 업로드 경로에 APP_ROOT prefix가 포함되므로 레포 루트에 풀어야 원위치로 복원된다
+          # (APP_ROOT를 다시 붙이면 client/client/ios/... 로 이중 중첩)
+          path: .
 
       - name: Download release notes
         uses: actions/download-artifact@v4

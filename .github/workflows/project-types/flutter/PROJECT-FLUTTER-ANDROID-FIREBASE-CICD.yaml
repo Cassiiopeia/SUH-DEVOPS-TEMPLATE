@@ -2,10 +2,10 @@
 # Flutter Android Firebase App Distribution 배포
 # ===================================================================
 #
-# main 브랜치 푸시 시 Android AAB를 빌드하고
+# main 브랜치 푸시 시 Android APK를 빌드하고
 # Firebase App Distribution에 자동 배포합니다.
 #
-# PlayStore CICD와 동일한 빌드 과정(AAB + 버전 검증)을 거친 후
+# PlayStore CICD와 동일한 버전 검증 과정을 거친 후
 # Play Store 대신 Firebase App Distribution에 업로드합니다.
 #
 # ===================================================================
@@ -210,7 +210,7 @@ jobs:
           retention-days: 1
 
   build-android:
-    name: Android AAB 빌드
+    name: Android APK 빌드
     runs-on: ubuntu-latest
     needs: prepare-build
 
@@ -315,14 +315,15 @@ jobs:
       # pubspec.yaml은 x.y.z 형식 그대로 유지
       # Flutter build 명령어의 --build-name, --build-number 플래그가 pubspec.yaml을 오버라이드함
 
-      # Flutter build appbundle (AAB 생성)
-      - name: Build Android App Bundle (AAB)
+      # Flutter build apk (APK 생성)
+      # Firebase App Distribution은 AAB 업로드 시 Google Play 연동을 요구하므로 APK를 쓴다
+      - name: Build Android APK
         run: |
           VERSION_NAME="${{ needs.prepare-build.outputs.version }}"
           VERSION_CODE="${{ needs.prepare-build.outputs.version_code }}"
 
           echo "=========================================="
-          echo "🚀 AAB 빌드 시작"
+          echo "🚀 APK 빌드 시작"
           echo "=========================================="
           echo "🎯 빌드 버전: $VERSION_NAME"
           echo "🎯 빌드 코드: $VERSION_CODE"
@@ -340,8 +341,8 @@ jobs:
 
           # 빌드 디렉토리 정리
           echo "🧹 이전 빌드 결과물 정리..."
-          rm -rf build/app/outputs/bundle/release/
-          mkdir -p build/app/outputs/bundle/release/
+          rm -rf build/app/outputs/flutter-apk/
+          mkdir -p build/app/outputs/flutter-apk/
 
           # Flutter clean 및 pub get
           echo "🔄 Flutter clean 및 의존성 재설치..."
@@ -375,10 +376,10 @@ jobs:
           # --build-name과 --build-number 플래그가 pubspec.yaml의 version을 오버라이드함
           # pubspec.yaml은 x.y.z 형식 유지, VERSION_CODE는 version.yml에서 자동 관리
           echo "🔨 Flutter build 실행..."
-          echo "📋 명령어: flutter build appbundle --release --build-name=$VERSION_NAME --build-number=$VERSION_CODE --verbose"
+          echo "📋 명령어: flutter build apk --release --build-name=$VERSION_NAME --build-number=$VERSION_CODE --verbose"
           echo "⏱️ 빌드 시작 시간: $(date '+%Y-%m-%d %H:%M:%S')"
 
-          flutter build appbundle \
+          flutter build apk \
             --release \
             --build-name="$VERSION_NAME" \
             --build-number="$VERSION_CODE" \
@@ -397,12 +398,12 @@ jobs:
 
           # 빌드 결과 확인
           echo "🔍 빌드 결과 확인:"
-          ls -lah build/app/outputs/bundle/release/
+          ls -lah build/app/outputs/flutter-apk/
 
-          # AAB 파일 존재 확인
-          AAB_FILE="build/app/outputs/bundle/release/app-release.aab"
-          if [ ! -f "$AAB_FILE" ]; then
-            echo "❌ AAB 파일이 생성되지 않았습니다!"
+          # APK 파일 존재 확인
+          APK_FILE="build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            echo "❌ APK 파일이 생성되지 않았습니다!"
             echo "🔍 전체 빌드 디렉토리 내용:"
             find build/ -type f -name "*.aab" -o -name "*.apk" 2>/dev/null || echo "AAB/APK 파일을 찾을 수 없습니다"
             echo "🔍 outputs 디렉토리 구조:"
@@ -410,58 +411,40 @@ jobs:
             exit 1
           fi
 
-          echo "✅ AAB 파일 생성 확인"
-          echo "📱 AAB 파일 크기: $(du -h "$AAB_FILE" | cut -f1)"
-          echo "📋 AAB 파일 정보: $(ls -lah "$AAB_FILE")"
+          echo "✅ APK 파일 생성 확인"
+          echo "📱 APK 파일 크기: $(du -h "$APK_FILE" | cut -f1)"
+          echo "📋 APK 파일 정보: $(ls -lah "$APK_FILE")"
 
-          # bundletool 다운로드 및 설치
-          echo "📦 bundletool 다운로드 중..."
-          BUNDLETOOL_VERSION="1.15.6"
-          BUNDLETOOL_URL="https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"
-
-          echo "📋 다운로드 URL: $BUNDLETOOL_URL"
-          wget -q "$BUNDLETOOL_URL" -O bundletool.jar
-
-          if [ ! -f "bundletool.jar" ]; then
-            echo "❌ bundletool 다운로드 실패"
-            echo "🔄 대체 URL로 재시도..."
-            wget -q "https://github.com/google/bundletool/releases/latest/download/bundletool-all-1.15.6.jar" -O bundletool.jar
-
-            if [ ! -f "bundletool.jar" ]; then
-              echo "❌ bundletool 다운로드 완전 실패"
-              exit 1
-            fi
+          # APK 매니페스트 검증에는 Android SDK의 aapt2를 사용한다
+          # (AAB용 bundletool과 달리 별도 다운로드 불필요 — 러너에 이미 설치됨)
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f 2>/dev/null | sort -V | tail -1)
+          if [ -z "$AAPT2" ]; then
+            echo "❌ aapt2를 찾을 수 없습니다"; exit 1
           fi
+          echo "✅ aapt2 확인: $AAPT2"
 
-          echo "✅ bundletool 다운로드 완료"
-          echo "📋 bundletool 파일 크기: $(du -h bundletool.jar | cut -f1)"
-
-          # Java 환경 확인
-          echo "🔍 Java 환경 확인:"
-          java -version
-
-          # AAB 파일 내부의 실제 버전 정보 확인
+          # APK 파일 내부의 실제 버전 정보 확인
           # Flutter CLI 플래그로 전달한 VERSION_CODE가 제대로 적용되었는지 검증
           echo "=========================================="
-          echo "🔍 AAB 파일 내부 버전 정보 검증"
+          echo "🔍 APK 파일 내부 버전 정보 검증"
           echo "=========================================="
 
           # AndroidManifest.xml에서 버전 정보 추출
-          echo "📋 AAB에서 실제 버전 정보 추출 중..."
-          echo "📋 실행할 명령어: java -jar bundletool.jar dump manifest --bundle='$AAB_FILE'"
+          echo "📋 APK에서 실제 버전 정보 추출 중..."
+          echo "📋 실행할 명령어: $AAPT2 dump badging '$APK_FILE'"
 
-          MANIFEST_OUTPUT=$(java -jar bundletool.jar dump manifest --bundle="$AAB_FILE" 2>&1)
+          MANIFEST_OUTPUT=$("$AAPT2" dump badging "$APK_FILE" 2>&1)
           MANIFEST_EXIT_CODE=$?
 
-          echo "📋 bundletool 실행 결과 (Exit code: $MANIFEST_EXIT_CODE):"
+          echo "📋 aapt2 실행 결과 (Exit code: $MANIFEST_EXIT_CODE):"
           echo "$MANIFEST_OUTPUT"
 
           if [ $MANIFEST_EXIT_CODE -eq 0 ]; then
             echo "✅ Manifest 추출 성공"
 
             # 실제 버전 코드와 버전 이름 추출
-            ACTUAL_VERSION_CODE=$(echo "$MANIFEST_OUTPUT" | grep -o 'android:versionCode="[0-9]*"' | grep -o '[0-9]*' | head -1)
-            ACTUAL_VERSION_NAME=$(echo "$MANIFEST_OUTPUT" | grep -o 'android:versionName="[^"]*"' | sed 's/android:versionName="//;s/"//' | head -1)
+            ACTUAL_VERSION_CODE=$(echo "$MANIFEST_OUTPUT" | grep -o "versionCode='[0-9]*'" | grep -o '[0-9]*' | head -1)
+            ACTUAL_VERSION_NAME=$(echo "$MANIFEST_OUTPUT" | grep -o "versionName='[^']*'" | sed "s/versionName='//;s/'//" | head -1)
 
             echo "🎯 버전 정보 비교:"
             echo "  예상 VERSION_CODE: '$VERSION_CODE'"
@@ -471,17 +454,17 @@ jobs:
 
             # VERSION_CODE 검증 - version.yml에서 관리되는 단순 증가 번호
             if [ -z "$ACTUAL_VERSION_CODE" ]; then
-              echo "❌ 치명적 오류: AAB에서 VERSION_CODE를 추출할 수 없습니다!"
+              echo "❌ 치명적 오류: APK에서 VERSION_CODE를 추출할 수 없습니다!"
               echo "🔍 전체 Manifest 내용:"
               echo "$MANIFEST_OUTPUT"
               exit 1
             elif [ "$ACTUAL_VERSION_CODE" != "$VERSION_CODE" ]; then
-              echo "❌ 치명적 오류: AAB의 VERSION_CODE가 예상과 다릅니다!"
+              echo "❌ 치명적 오류: APK의 VERSION_CODE가 예상과 다릅니다!"
               echo "   이는 Google Play에서 '이미 사용된 버전 코드' 오류를 발생시킵니다."
               echo ""
               echo "🔍 디버깅 정보:"
               echo "   version.yml의 VERSION_CODE: $VERSION_CODE"
-              echo "   AAB 파일 내부의 VERSION_CODE: $ACTUAL_VERSION_CODE"
+              echo "   APK 파일 내부의 VERSION_CODE: $ACTUAL_VERSION_CODE"
               echo ""
               echo "   Flutter build 명령어에 전달된 플래그:"
               echo "   --build-name='$VERSION_NAME'"
@@ -496,7 +479,7 @@ jobs:
 
             # 버전 이름도 확인 (경고만)
             if [ -z "$ACTUAL_VERSION_NAME" ]; then
-              echo "⚠️ 경고: AAB에서 VERSION_NAME을 추출할 수 없습니다"
+              echo "⚠️ 경고: APK에서 VERSION_NAME을 추출할 수 없습니다"
             elif [ "$ACTUAL_VERSION_NAME" != "$VERSION_NAME" ]; then
               echo "⚠️ 경고: VERSION_NAME이 예상과 다릅니다 (치명적이지 않음)"
               echo "   예상: '$VERSION_NAME', 실제: '$ACTUAL_VERSION_NAME'"
@@ -505,35 +488,35 @@ jobs:
             fi
 
           else
-            echo "❌ bundletool로 Manifest 추출 실패"
+            echo "❌ aapt2로 Manifest 추출 실패"
             echo "🔄 대체 방법으로 검증 시도..."
 
             # unzip으로 직접 확인 시도
             echo "📋 unzip을 사용한 직접 추출 시도..."
-            UNZIP_OUTPUT=$(unzip -p "$AAB_FILE" base/manifest/AndroidManifest.xml 2>/dev/null | strings | grep -E "versionCode|versionName")
+            UNZIP_OUTPUT=$(unzip -p "$APK_FILE" base/manifest/AndroidManifest.xml 2>/dev/null | strings | grep -E "versionCode|versionName")
 
             if [ -n "$UNZIP_OUTPUT" ]; then
               echo "✅ unzip으로 버전 정보 추출 성공:"
               echo "$UNZIP_OUTPUT"
             else
               echo "❌ unzip을 사용한 직접 추출도 실패"
-              echo "⚠️ AAB 검증을 건너뛰고 계속 진행합니다."
+              echo "⚠️ APK 검증을 건너뛰고 계속 진행합니다."
             fi
           fi
 
           echo "=========================================="
-          echo "✅ AAB 빌드 및 검증 완료"
-          echo "🎯 최종 AAB: $AAB_FILE"
-          echo "📱 파일 크기: $(du -h "$AAB_FILE" | cut -f1)"
+          echo "✅ APK 빌드 및 검증 완료"
+          echo "🎯 최종 APK: $APK_FILE"
+          echo "📱 파일 크기: $(du -h "$APK_FILE" | cut -f1)"
           echo "=========================================="
 
-      # AAB 파일을 아티팩트로 업로드
-      - name: Upload AAB artifact
+      # APK 파일을 아티팩트로 업로드
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-aab
+          name: android-apk
           # 아티팩트 액션은 defaults를 따르지 않고 항상 레포 루트 기준이라 APP_ROOT prefix가 필요
-          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/app-release.aab
+          path: ${{ env.APP_ROOT }}/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
 
   deploy-firebase:
@@ -551,14 +534,14 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # AAB 파일 다운로드
-      - name: Download AAB artifact
+      # APK 파일 다운로드
+      - name: Download APK artifact
         uses: actions/download-artifact@v4
         with:
-          name: android-aab
+          name: android-apk
           # ⚠️ 업로드 path가 '단일 파일'이면 upload-artifact가 경로를 평탄화한다.
           #    레포 루트에 풀면 원위치가 복원되지 않으므로 원래 디렉터리를 명시한다.
-          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/
+          path: ${{ env.APP_ROOT }}/build/app/outputs/flutter-apk/
 
       # 릴리즈 노트 다운로드
       - name: Download release notes
@@ -582,15 +565,18 @@ jobs:
             bash ./.github/scripts/truncate_release_notes.sh final_release_notes.txt 4000 char
           fi
 
-      # Firebase App Distribution에 AAB 업로드
+      # Firebase App Distribution에 APK 업로드
       - name: Upload to Firebase App Distribution
         id: firebase_upload
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ env.FIREBASE_APP_ID }}
-          serviceCredentialsFile: firebase-service-account.json
+          # ⚠️ uses: 액션은 job의 defaults.working-directory를 따르지 않고
+          #    항상 레포 루트 기준으로 경로를 해석한다.
+          #    자격증명·APK는 APP_ROOT에서 생성되므로 prefix가 필요하다.
+          serviceCredentialsFile: ${{ env.APP_ROOT }}/firebase-service-account.json
           groups: ${{ env.FIREBASE_TESTER_GROUP }}
-          file: build/app/outputs/bundle/release/app-release.aab
+          file: ${{ env.APP_ROOT }}/build/app/outputs/flutter-apk/app-release.apk
           releaseNotesFile: final_release_notes.txt
 
       # Firebase 인증 파일 삭제 (보안)

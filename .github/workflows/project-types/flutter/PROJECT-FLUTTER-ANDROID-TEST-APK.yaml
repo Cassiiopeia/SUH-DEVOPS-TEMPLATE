@@ -749,9 +749,12 @@ EOF
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ env.FIREBASE_APP_ID }}
-          serviceCredentialsFile: firebase-service-account.json
+          # ⚠️ uses: 액션은 job의 defaults.working-directory를 따르지 않고
+          #    항상 레포 루트 기준으로 경로를 해석한다.
+          #    자격증명·APK는 APP_ROOT에서 생성되므로 prefix가 필요하다.
+          serviceCredentialsFile: ${{ env.APP_ROOT }}/firebase-service-account.json
           groups: ${{ env.FIREBASE_TESTER_GROUP }}
-          file: ./android/app/build/outputs/apk/release/${{ steps.apk_filename.outputs.apk_name }}
+          file: ${{ env.APP_ROOT }}/android/app/build/outputs/apk/release/${{ steps.apk_filename.outputs.apk_name }}
           releaseNotes: |
             테스트 빌드 #${{ needs.prepare-test-build.outputs.build_number }}
             브랜치: ${{ needs.prepare-test-build.outputs.branch_name }}

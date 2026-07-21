@@ -1,14 +1,41 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-21T04:33:19Z",
-    "currentVersion": "4.2.28",
+    "lastUpdated": "2026-07-21T05:56:29Z",
+    "currentVersion": "4.2.29",
     "projectType": "basic",
-    "totalReleases": 213,
+    "totalReleases": 214,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.29",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-21",
+      "pr_number": 514,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * Firebase 테스트 배포가 실패하던 문제 해결\n  * 앱이 하위 폴더에 있을 때 배포 인증에 실패하던 문제 해결\n\n* **개선**\n  * Firebase 설정 화면에서 단계를 자유롭게 오갈 수 있도록 개선\n  * 설정 중 자주 막히는 지점에 대한 안내 보강",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "Firebase 테스트 배포가 실패하던 문제 해결",
+            "앱이 하위 폴더에 있을 때 배포 인증에 실패하던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "Firebase 설정 화면에서 단계를 자유롭게 오갈 수 있도록 개선",
+            "설정 중 자주 막히는 지점에 대한 안내 보강"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.28",
       "project_type": "basic",

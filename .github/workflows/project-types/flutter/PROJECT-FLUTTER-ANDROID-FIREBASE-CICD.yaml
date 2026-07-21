@@ -556,8 +556,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android-aab
-          # 업로드 경로에 APP_ROOT prefix가 포함되므로 레포 루트에 풀어야 원위치로 복원된다
-          path: .
+          # ⚠️ 업로드 path가 '단일 파일'이면 upload-artifact가 경로를 평탄화한다.
+          #    레포 루트에 풀면 원위치가 복원되지 않으므로 원래 디렉터리를 명시한다.
+          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/
 
       # 릴리즈 노트 다운로드
       - name: Download release notes

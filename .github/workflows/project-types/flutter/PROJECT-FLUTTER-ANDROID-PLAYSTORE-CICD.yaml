@@ -46,7 +46,8 @@ env:
   PROJECT_TYPE: "flutter"
   # Flutter 루트 경로(레포 루트 기준). 단일레포면 ".", 모노레포면 "app" 등.
   # 통합 시점에 integrator의 flutter-root resolver가 project_paths.flutter 값으로 1회 치환.
-  FLUTTER_ROOT: "."  # @wizard auto:flutter-root
+  # FLUTTER_ROOT는 Flutter SDK 경로용 공식 변수라 충돌 — APP_ROOT로 분리
+  APP_ROOT: "."  # @wizard auto:flutter-root
   # 배포 모드 (store_only | store_prepare | store_submit)
   DEPLOY_MODE: ${{ github.event.inputs.deploy_mode || vars.ANDROID_DEPLOY_MODE || 'store_only' }}
 
@@ -56,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ env.FLUTTER_ROOT }}
+        working-directory: ${{ env.APP_ROOT }}
     # CHANGELOG 워크플로우가 성공한 경우에만 실행
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
 
@@ -100,7 +101,7 @@ jobs:
 
       # 버전 관리 스크립트 권한 설정
       - name: 버전 관리 스크립트 권한 설정
-        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 FLUTTER_ROOT가 아닌 레포 루트 기준
+        working-directory: ${{ github.workspace }}   # 레포 루트 자산(.github/scripts)은 APP_ROOT가 아닌 레포 루트 기준
         run: |
           chmod +x ./.github/scripts/version_manager.sh
           chmod +x ./.github/scripts/changelog_manager.py
@@ -192,7 +193,7 @@ jobs:
     needs: prepare-build
     defaults:
       run:
-        working-directory: ${{ env.FLUTTER_ROOT }}
+        working-directory: ${{ env.APP_ROOT }}
 
     steps:
       - name: Checkout repository
@@ -509,7 +510,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-aab
-          path: ${{ env.FLUTTER_ROOT }}/build/app/outputs/bundle/release/app-release.aab
+          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/app-release.aab
           retention-days: 1
 
   deploy-playstore:
@@ -518,7 +519,7 @@ jobs:
     needs: [prepare-build, build-android]
     defaults:
       run:
-        working-directory: ${{ env.FLUTTER_ROOT }}
+        working-directory: ${{ env.APP_ROOT }}
 
     steps:
       - name: Checkout repository
@@ -539,7 +540,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android-aab
-          path: ${{ env.FLUTTER_ROOT }}/build/app/outputs/bundle/release/
+          path: ${{ env.APP_ROOT }}/build/app/outputs/bundle/release/
 
       # 릴리즈 노트 다운로드
       - name: Download release notes
@@ -555,7 +556,7 @@ jobs:
           ruby-version: "3.4.1"
 
       - name: Install Fastlane
-        working-directory: ${{ env.FLUTTER_ROOT }}/android
+        working-directory: ${{ env.APP_ROOT }}/android
         run: |
           # multi_json: google-apis transitive 의존성이 선언 누락한 upstream 버그 회피 (gemspec 미선언 → Gem::LoadError)
           printf 'source "https://rubygems.org"\ngem "fastlane"\ngem "multi_json"\n' > Gemfile
@@ -656,7 +657,7 @@ jobs:
 
           if [ -f "$GITHUB_WORKSPACE/final_release_notes.txt" ]; then
             # Google Play release notes 한도(500 글자)에 맞춰 절단 (마진 두어 480자)
-            # final_release_notes.txt·truncate 스크립트는 레포 루트 기준 — working-directory가 FLUTTER_ROOT이므로 절대경로 사용
+            # final_release_notes.txt·truncate 스크립트는 레포 루트 기준 — working-directory가 APP_ROOT이므로 절대경로 사용
             bash "$GITHUB_WORKSPACE/.github/scripts/truncate_release_notes.sh" "$GITHUB_WORKSPACE/final_release_notes.txt" 480 char
             cp "$GITHUB_WORKSPACE/final_release_notes.txt" "$CHANGELOG_DIR/${VERSION_CODE}.txt"
             echo "✅ Changelog 준비 완료 (버전 코드: $VERSION_CODE)"

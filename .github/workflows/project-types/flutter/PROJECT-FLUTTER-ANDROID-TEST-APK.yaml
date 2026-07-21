@@ -153,6 +153,9 @@ jobs:
 
       - name: Check Firebase credentials
         id: firebase_check
+        # checkout 전에 실행되므로 APP_ROOT 디렉터리가 아직 없다.
+        # Secret 유무만 확인하는 스텝이라 레포 루트에서 실행한다.
+        working-directory: ${{ github.workspace }}
         env:
           FIREBASE_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
         run: |

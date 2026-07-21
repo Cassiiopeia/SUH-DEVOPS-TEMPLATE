@@ -569,6 +569,11 @@ jobs:
       # iOS 빌드 (서명 없이)
       - name: Build iOS
         id: build
+        env:
+          # xcode-select만으로는 Flutter가 만드는 서브프로세스에 전파되지 않아
+          # 다른 Xcode를 보게 된다. 그 결과 SDK가 설치돼 있어도
+          # 'iOS 26.0 Platform Not Installed'가 발생하므로 명시적으로 지정한다.
+          DEVELOPER_DIR: /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
         run: |
           echo "📦 Flutter iOS 빌드 시작..."
           flutter build ios --release --no-codesign

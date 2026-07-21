@@ -12,7 +12,7 @@
 #   python3 firebase-wizard.py setup \
 #     --project-path /path/to/project \
 #     --app-id "1:905325245238:android:86db..." \
-#     --tester-group "romrom" \
+#     --tester-group "testers" \
 #     [--dry-run] [--non-interactive] [--no-backup]
 #
 # sh/ps1 상이점 기록 (sh 기준 채택):

@@ -1,14 +1,40 @@
 {
   "metadata": {
-    "lastUpdated": "2026-07-21T03:29:42Z",
-    "currentVersion": "4.2.26",
+    "lastUpdated": "2026-07-21T03:44:44Z",
+    "currentVersion": "4.2.27",
     "projectType": "basic",
-    "totalReleases": 211,
+    "totalReleases": 212,
     "projectTypes": [
       "basic"
     ]
   },
   "releases": [
+    {
+      "version": "4.2.27",
+      "project_type": "basic",
+      "project_types": [
+        "basic"
+      ],
+      "date": "2026-07-21",
+      "pr_number": 511,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **버그 수정**\n  * 앱이 하위 폴더에 있을 때 Android 설정이 실행되지 않던 문제 해결\n\n* **개선**\n  * 설정 화면의 입력 예시를 알아보기 쉬운 값으로 통일\n  * iOS와 Android 설정에서 같은 형식의 예시를 보여주도록 개선",
+      "parsed_changes": {
+        "버그_수정": {
+          "title": "버그 수정",
+          "items": [
+            "앱이 하위 폴더에 있을 때 Android 설정이 실행되지 않던 문제 해결"
+          ]
+        },
+        "개선": {
+          "title": "개선",
+          "items": [
+            "설정 화면의 입력 예시를 알아보기 쉬운 값으로 통일",
+            "iOS와 Android 설정에서 같은 형식의 예시를 보여주도록 개선"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    },
     {
       "version": "4.2.26",
       "project_type": "basic",
